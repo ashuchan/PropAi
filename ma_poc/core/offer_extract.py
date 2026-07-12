@@ -104,6 +104,27 @@ _OFFER_TYPE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+# 2026-07-12 (no-offer_type decomposition) — FALLBACK-ONLY patterns,
+# consulted exclusively when the primary taxonomy above returned None.
+# Kept out of _OFFER_TYPE_PATTERNS on purpose: adding them there would
+# re-label multi-offer texts that already classify (e.g. "One Month Free
+# and Half off Admin Fees" is free_rent first) — measured 2,106-unit
+# label churn on the 2026-07-11 canary when tried inline. As a fallback
+# they are strictly additive.
+_OFFER_TYPE_FALLBACK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    # "$99 MOVE IN SPECIAL" / "Move In for Only $500" — a flat move-in
+    # price, not $-off-rent (518 canary units).
+    ("move_in_special", re.compile(
+        r"\$\s*\d[\d,]*[\s!*.]*move[- ]?in\s+special\b"
+        r"|\bmove[- ]?in\s+(?:for\s+)?(?:only\s+)?\$\s*\d[\d,]*"
+        r"|\$\s*\d[\d,]*\s+moves?\s+you\s+in\b",
+        re.IGNORECASE,
+    )),
+    # Worded fraction "half off" (greenarchtulsa class) → 50% discount.
+    ("percent_off", re.compile(r"\bhalf\s+off\b", re.IGNORECASE)),
+)
+
+
 def classify_offer_type(text: str | None) -> str | None:
     """Return the offer-type label, or None when no pattern matches.
 
@@ -115,6 +136,14 @@ def classify_offer_type(text: str | None) -> str | None:
     if not text or not isinstance(text, str):
         return None
     for label, pat in _OFFER_TYPE_PATTERNS:
+        if pat.search(text):
+            return label
+    return None
+
+
+def _classify_offer_type_fallback(text: str) -> str | None:
+    """Second-pass taxonomy for texts the primary patterns don't reach."""
+    for label, pat in _OFFER_TYPE_FALLBACK_PATTERNS:
         if pat.search(text):
             return label
     return None
@@ -227,6 +256,17 @@ def extract_offer_value(text: str | None, offer_type: str | None = None) -> str 
         m = _VAL_PERCENT_RE.search(text)
         if m:
             return f"{m.group(1)}%"
+        # "half off" carries no digits — worded fraction maps to 50%.
+        if re.search(r"\bhalf\s+off\b", text, re.IGNORECASE):
+            return "50%"
+        return None
+
+    if offer_type == "move_in_special":
+        # The flat move-in price ("$99 MOVE IN SPECIAL" → "$99").
+        m = _VAL_DOLLAR_RE.search(text)
+        if m:
+            raw = m.group(1).replace(",", "")
+            return f"${int(raw):,}" if len(raw) >= 4 else f"${raw}"
         return None
 
     if offer_type == "free_rent":
@@ -487,6 +527,32 @@ def extract_offer_banner(text: str | None) -> str | None:
 # ──────────────────────────────────────────────────────────────────────
 
 
+def _normalize_offer_text(text: str) -> str:
+    """Normalise surface variants that defeat the classifier regexes.
+
+    2026-07-12 (no-offer_type decomposition — 10,838 texted units carried
+    no structured type; the three biggest MECHANICAL classes):
+      * HTML entities: ``Look &amp; Lease`` never matched the
+        ``look[- ]?(?:and|&|n)[- ]?lease`` pattern (290 units).
+      * Hyphenated durations: ``Up to 1-Month Free`` failed the
+        ``\\d+\\s+months?`` patterns (771 units).
+      * Possessive durations: ``3 Month's Base Rent FREE`` broke the
+        ``months?\\s+…rent\\s+free`` adjacency (153 units).
+    Classification/value/target/conditions run on the normalised text;
+    ``offer_banner`` keeps the raw input (display verbatim).
+    """
+    import html as _html
+
+    norm = _html.unescape(text)
+    # "1-Month Free" / "2-weeks free" → "1 Month Free" / "2 weeks free"
+    norm = re.sub(r"(\d)\s*-\s*(months?|weeks?|days?)\b", r"\1 \2", norm,
+                  flags=re.IGNORECASE)
+    # "Month's" / "Weeks’" possessives → bare unit word
+    norm = re.sub(r"\b(months?|weeks?)['’]s?\b", r"\1", norm,
+                  flags=re.IGNORECASE)
+    return norm
+
+
 def extract_offer(text: str | None) -> dict[str, Any]:
     """Return all 5 offer fields as a flat dict, suitable for direct
     inclusion in a unit dict or v2 output row.
@@ -504,9 +570,22 @@ def extract_offer(text: str | None) -> dict[str, Any]:
     if not text or not isinstance(text, str) or not text.strip():
         return out
 
+    # Strictly-additive fallback ladder (2026-07-12): raw text first —
+    # already-classifying texts keep their exact pre-fix labels/values —
+    # then the normalised text, then the fallback taxonomy. ``basis`` is
+    # whichever text produced the type, so value/target/conditions parse
+    # the same surface the classifier matched.
+    basis = text
     out["offer_type"] = classify_offer_type(text)
-    out["offer_target"] = classify_offer_target(text, out["offer_type"])
-    out["offer_value"] = extract_offer_value(text, out["offer_type"])
-    out["offer_conditions"] = extract_offer_conditions(text)
+    if out["offer_type"] is None:
+        norm = _normalize_offer_text(text)
+        basis = norm
+        out["offer_type"] = (
+            classify_offer_type(norm)
+            or _classify_offer_type_fallback(norm)
+        )
+    out["offer_target"] = classify_offer_target(basis, out["offer_type"])
+    out["offer_value"] = extract_offer_value(basis, out["offer_type"])
+    out["offer_conditions"] = extract_offer_conditions(basis)
     out["offer_banner"] = extract_offer_banner(text)
     return out
