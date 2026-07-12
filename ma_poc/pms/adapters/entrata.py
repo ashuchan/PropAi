@@ -1887,9 +1887,9 @@ class EntrataAdapter:
             # stripped that config block — so if the token isn't in the
             # captured body, re-fetch the origin ROOT statically (the
             # curl shell reliably carries "property_id":"<pid>").
+            _pid_re = re.compile(r'"property_id"\s*:\s*"?(\d{3,12})"?')
             if "prospectportal.com" in urlparse(base).netloc:
                 _pid = ""
-                _pid_re = re.compile(r'"property_id"\s*:\s*"?(\d{3,12})"?')
                 if isinstance(fr_body_check, str) and fr_body_check:
                     _m = _pid_re.search(fr_body_check)
                     if _m:
@@ -1909,6 +1909,44 @@ class EntrataAdapter:
                         + "/Apartments/module/property_info/property_id/"
                         + _pid
                     )
+            elif isinstance(fr_body_check, str) and fr_body_check:
+                # 2026-07-11 (DOM-tier debug): CROSS-DOMAIN Prospect Portal.
+                # Plan-card marketing sites (WordPress etc.) link to
+                # ``{slug}.prospectportal.com`` for availability — the
+                # portal carries the full fp-card unit index but neither
+                # discovery path above can reach it: the deep-candidate
+                # regex is same-host-only (``netloc.endswith(_base_host)``)
+                # and the pid-mining block requires the ENTRY base to be
+                # prospectportal.com. Net effect: the adapter dies
+                # SHAPE_REJECTED, Path-B retries promote generic_plan_text,
+                # and the property ships plan-level rows despite unit-level
+                # data one hop away (liveatthemirage.com → themirage.
+                # prospectportal.com pid 100052396, 16 fp-cards — verified
+                # live; ~15% of the 344-prop plan-shaped GENERIC_PLAN_TEXT
+                # cohort carries a prospectportal href). Mine the portal
+                # origin from the marketing body, statically fetch its
+                # shell for the internal property_id, and feed the module
+                # endpoint to Step 3 — same machinery as the same-host
+                # path above.
+                _pp_m = _PP_HOST_RE.search(fr_body_check)
+                if _pp_m:
+                    _pp_origin = (
+                        f"https://{_pp_m.group(1)}.prospectportal.com"
+                    )
+                    try:
+                        _pp_shell = await _entrata_static_fetch(
+                            _pp_origin + "/"
+                        )
+                    except Exception:
+                        _pp_shell = ""
+                    if _pp_shell:
+                        _m = _pid_re.search(_pp_shell)
+                        if _m:
+                            deep_candidates.append(
+                                _pp_origin
+                                + "/Apartments/module/property_info/property_id/"
+                                + _m.group(1)
+                            )
 
             # Step 3: fetch and try the PP SSR parser. Stop on first
             # body that admits at least one validity-gated row.
