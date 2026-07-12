@@ -811,8 +811,17 @@ _WORD_NUM = {
     "studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
 }
 
+# 2026-07-12: the name group was ``[^<\-]{1,80}?`` — it forbade '-', so any
+# SecureCafe plan header whose name contains a hyphen never matched and
+# parse_securecafe_availableunits returned [] despite SSR AvailUnitRow rows
+# with rent being present (verified: roundtree-mckinley availableunits.aspx
+# ships 'Floor Plan: 1bd x 1ba - 850sqft - The Birch - 1 Bedroom, 1 Bathroom'
+# — 2 priced rows, 0 parsed). Broadened the name to ``[^<]{1,120}?``; the
+# LAZY quantifier plus the explicit ``- (Studio|N Bedroom), N Bathroom``
+# anchor keeps the boundary unambiguous (name stops at the FINAL
+# bed/bath clause, which appears once per header).
 _SECURECAFE_FP_HDR_RE = re.compile(
-    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"Floor\s+Plan:\s*(?P<name>[^<]{1,120}?)\s*-\s*"
     r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
     r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
     re.IGNORECASE,
