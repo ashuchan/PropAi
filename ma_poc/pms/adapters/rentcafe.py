@@ -811,8 +811,17 @@ _WORD_NUM = {
     "studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
 }
 
+# 2026-07-12: the name group was ``[^<\-]{1,80}?`` — it forbade '-', so
+# SecureCafe headers whose plan name itself contains a hyphen
+# ("Floor Plan: 1bd x 1ba - 850sqft - The Birch - 1 Bedroom, 1 Bathroom")
+# never matched and parse_securecafe_availableunits returned [] despite
+# real ``<tr class='AvailUnitRow'>`` rows being present (prod 2026-07-12
+# rentcafe plan-level cohort, verified 0→2 units on roundtree). The lazy
+# ``[^<]{1,120}?`` still terminates unambiguously because the following
+# ``\s*-\s*(Studio|N Bedroom), N Bathroom`` structural anchor is the only
+# thing that ends the name — it just no longer trips on interior hyphens.
 _SECURECAFE_FP_HDR_RE = re.compile(
-    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"Floor\s+Plan:\s*(?P<name>[^<]{1,120}?)\s*-\s*"
     r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
     r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
     re.IGNORECASE,
@@ -1140,7 +1149,92 @@ async def _try_rentcafe_anchor_walk(
                 result.winning_url = cand
                 return units
 
+        # 2026-07-12: RentCafe-vanity /floorplans pages SSR a
+        # ``ysi.unitsList = [...]`` JSON array carrying full unit-level data
+        # (UnitCode/Beds/Baths/SqFt/MinRent/AvailableDate/FloorplanId). The
+        # anchor-walk previously only ran the AvailUnitRow and fp-unit
+        # parsers on these pages, silently dropping the embedded JSON — so
+        # the LLM-DOM tier later won on the SAME page (prod 2026-07-12
+        # rentcafe plan-level cohort: parksouth/fairwood/regencyparknorth
+        # had 9/11/12 units in ysi.unitsList yet shipped plan-level).
+        if "ysi.unitsList" in body_text:
+            units = parse_rentcafe_ysi_unitslist(body_text, cand)
+            if units:
+                result.winning_url = cand
+                return units
+
     return []
+
+
+_YSI_UNITSLIST_RE = re.compile(
+    r"ysi\.unitsList\s*=\s*(\[.*?\])\s*;", re.DOTALL
+)
+
+
+def parse_rentcafe_ysi_unitslist(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Parse a RentCafe-vanity page's ``ysi.unitsList`` JSON into unit dicts.
+
+    RentCafe marketing themes SSR the full unit inventory as a JavaScript
+    array assigned to ``ysi.unitsList``. Each element is a per-unit object
+    with (case varies across themes) UnitCode/ApartmentName, Beds/Baths,
+    SqFt, MinRent/MaxRent (or Rent), AvailableDate, FloorplanName and
+    FloorplanId. Returns ``[]`` if the marker is absent or the JSON is
+    unparseable (caller falls through to the next tier — never raises).
+    """
+    if "ysi.unitsList" not in html:
+        return []
+    m = _YSI_UNITSLIST_RE.search(html)
+    if not m:
+        return []
+    try:
+        rows = json.loads(m.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+
+    def _pick(d: dict[str, Any], *keys: str) -> Any:
+        """First present, non-empty value among *keys* (case-insensitive)."""
+        lower = {k.lower(): v for k, v in d.items()}
+        for k in keys:
+            v = lower.get(k.lower())
+            if v not in (None, ""):
+                return v
+        return None
+
+    units: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        unit_no = _pick(row, "UnitCode", "ApartmentName", "UnitName", "Name")
+        if not unit_no:
+            continue
+        rent_min = _pick(row, "MinRent", "Rent", "MarketRent", "StartingRent")
+        rent_max = _pick(row, "MaxRent") or rent_min
+        rent_low = money_to_int(str(rent_min)) if rent_min is not None else None
+        rent_high = money_to_int(str(rent_max)) if rent_max is not None else rent_low
+        fpid = _pick(row, "FloorplanId", "FloorPlanId", "FloorplanID")
+        source_ids: dict[str, Any] = {}
+        if fpid:
+            source_ids["securecafe_floorplan_id"] = str(fpid)
+        sqft_val = _pick(row, "SqFt", "SquareFeet", "Sqft")
+        units.append(
+            make_unit_dict(
+                floor_plan_name=str(_pick(row, "FloorplanName", "FloorPlanName") or ""),
+                bedrooms=str(_pick(row, "Beds", "Bedrooms") or ""),
+                bathrooms=str(_pick(row, "Baths", "Bathrooms") or ""),
+                sqft=str(sqft_val).replace(",", "") if sqft_val is not None else "",
+                unit_number=str(unit_no),
+                rent_low=rent_low,
+                rent_high=rent_high,
+                availability_status="AVAILABLE",
+                availability_date=str(_pick(row, "AvailableDate", "DateAvailable") or ""),
+                source_api_url=source_url,
+                extraction_tier="TIER_1_API_RENTCAFE_YSI_UNITSLIST",
+                source_ids=source_ids,
+            )
+        )
+    return units
 
 
 async def _try_rentcafe_securecafe_probe(
