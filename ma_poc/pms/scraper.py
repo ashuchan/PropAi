@@ -3080,6 +3080,16 @@ async def _try_link_hop(
             explored[sub_url] = False
             continue
 
+        # 2026-07-12: a hopped page carried the operator-published
+        # zero-availability statement. Checkpoint the flag into the
+        # cancellation-surviving partial state so a later mid-hop timeout
+        # salvages SUCCESS_NO_AVAILABILITY instead of FAILED_NO_DATA.
+        # (Mirrors the entry-page checkpoint in scrape_jugnu.)
+        if sub_result.get("_operator_no_availability") and shared_budget is not None:
+            _ext_ref = shared_budget.get("_external_partial_ref")
+            if isinstance(_ext_ref, dict):
+                _ext_ref["operator_no_availability"] = True
+
         had_data = bool(sub_result.get("units"))
         explored[sub_url] = had_data
         if had_data:
@@ -3717,6 +3727,19 @@ async def scrape_jugnu(
     if _soft_404_recovery:
         result["_soft_404_recovery"] = True
         result["_soft_404_status"] = _soft_404_status_code
+
+    # 2026-07-12: checkpoint the operator-no-availability flag into the
+    # cancellation-surviving partial state BEFORE any link-hop begins.
+    # Prod 2026-07-12 cohort: the entry page carries an explicit "no units
+    # available" statement (flag set, placeholder returned), the hop
+    # continues anyway (correct — deeper pages might still list units),
+    # then the property times out mid-hop and the timeout salvage stamps
+    # FAILED_NO_DATA — losing the operator's authoritative zero-inventory
+    # answer. Writing the flag into the _external_partial_ref dict (which
+    # lives in _process_one's scope and survives coroutine cancellation)
+    # lets the jugnu salvage path compute SUCCESS_NO_AVAILABILITY.
+    if result.get("_operator_no_availability") and partial_state is not None:
+        partial_state["operator_no_availability"] = True
 
     # Telemetry B: attach fetch diagnostic (error_signature, final_url, body
     # size, captcha, proxy, identity) so the per-property report can render

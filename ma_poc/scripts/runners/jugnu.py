@@ -567,10 +567,21 @@ async def run_jugnu(
                 _salvage_extract: Any = (
                     {"units": _partial_units} if _partial_units else None
                 )
+                # 2026-07-12: honor the operator-published zero-availability
+                # statement seen BEFORE the timeout. scrape_jugnu/_try_link_hop
+                # checkpoint the flag into _partial_state (survives coroutine
+                # cancellation). Without it, a property whose entry page says
+                # "no units available" but times out on a later hop was
+                # stamped FAILED_NO_DATA — discarding the operator's
+                # authoritative answer. With the flag and zero partial units,
+                # compute() returns SUCCESS_NO_AVAILABILITY.
                 _salvage_verdict = _compute_verdict(
                     fetch_outcome=None,
                     extract_result=_salvage_extract,
                     units=_partial_units or None,
+                    operator_no_availability=bool(
+                        _partial_state.get("operator_no_availability")
+                    ),
                 )
                 _salvage_meta = failed.setdefault("_meta", {})
                 _salvage_meta["verdict"] = _salvage_verdict.verdict.value
