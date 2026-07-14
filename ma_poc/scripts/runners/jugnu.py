@@ -1006,6 +1006,54 @@ async def _process_property(
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
 
+    # 2026-07-12 (campaign Lever 6): for a zero-unit property, grade whether
+    # its "no data published" claim is airtight enough to count as gold
+    # under the revised gold definition (Tier-1 units OR verified-no-data at
+    # 100% confidence). This is ADDITIVE — it stamps _meta.publish_ceiling +
+    # an evidence bundle and NEVER changes the verdict above. The gold%
+    # tally reads the grade post-hoc. The verifier's guards (rent-present /
+    # embed / unit-vocab / crashed-cascade → not gold) block the false-gold
+    # the rentcafe audit caught (marker string + real units). Never-fail.
+    if not result.get("units"):
+        try:
+            from ma_poc.reporting.publish_ceiling import assess_publish_ceiling
+
+            _pc_extract = extract_result
+            _pc_plans = getattr(_pc_extract, "plan_summaries", None)
+            if _pc_plans is None and isinstance(_pc_extract, dict):
+                _pc_plans = _pc_extract.get("plan_summaries")
+            _pc_body = getattr(fetch_result, "body", None)
+            _pc_html = (
+                _pc_body.decode("utf-8", "replace")
+                if isinstance(_pc_body, bytes)
+                else (_pc_body or "")
+            )
+            _pc = assess_publish_ceiling(
+                units=result.get("units"),
+                plan_summaries=_pc_plans,
+                html_signals=result.get("_html_characterization"),
+                tier_trace=result.get("_tier_attempts"),
+                page_html=_pc_html,
+            )
+            meta["publish_ceiling"] = {
+                "verdict": _pc.verdict.value,
+                "gold_eligible": _pc.gold_eligible,
+                "confidence": _pc.confidence,
+                "reason": _pc.reason,
+                "evidence": _pc.evidence,
+            }
+            emit(
+                EventKind.PROPERTY_EMITTED,  # publish_ceiling ride-along
+                task.property_id,
+                publish_ceiling=_pc.verdict.value,
+                pc_gold_eligible=_pc.gold_eligible,
+            )
+        except Exception as _pc_exc:  # never-fail contract
+            log.debug(
+                "publish_ceiling assessment failed for %s: %s",
+                task.property_id, _pc_exc,
+            )
+
     emit(
         EventKind.PROPERTY_EMITTED,
         task.property_id,
