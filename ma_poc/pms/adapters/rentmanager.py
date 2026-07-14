@@ -181,6 +181,89 @@ def parse_rentmanager_search(text: str, url: str) -> list[dict[str, Any]]:
     return out
 
 
+def parse_rentmanager_wp_cards(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Parse the WordPress RentManager plugin's availability cards.
+
+    2026-07-12: the KRC/WP RentManager theme renders each available unit as
+    ``<a class="individual-item" data-bed data-rent data-date>`` cards inside
+    ``.rm-ua-container`` — NOT the ``tr.unit_avail_container`` table that
+    ``parse_iloveleasing_table`` targets. So finelivingapts-class properties
+    (20 real SSR unit cards, verified) parsed to 0 units and fell through to
+    the LLM tier. Fields: data-rent (per-unit rent), data-bed (beds), the
+    ``.availableDate`` div (real move-in date), the ``h2`` (floor-plan name +
+    ``#unit`` in its span), and ``uid=`` in the detail href (stable id).
+
+    Returns ``[]`` on absent markup / unparseable HTML — never raises.
+    """
+    if not html or "individual-item" not in html:
+        return []
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "lxml")
+    items = soup.select("a.individual-item")
+    units: list[dict[str, Any]] = []
+    for it in items:
+        href = str(it.get("href") or "")
+        rent = _rm_money(it.get("data-rent"))
+        beds = it.get("data-bed")
+
+        fp_name = ""
+        unit_no = ""
+        h2 = it.find("h2")
+        if h2 is not None:
+            span = h2.find("span")
+            if span is not None:
+                m = re.search(r"#\s*([A-Za-z0-9-]+)", span.get_text(" ", strip=True))
+                if m:
+                    unit_no = m.group(1)
+                fp_name = h2.get_text(" ", strip=True).replace(
+                    span.get_text(" ", strip=True), ""
+                ).strip()
+            else:
+                fp_name = h2.get_text(" ", strip=True)
+
+        avail = ""
+        ad = it.find(class_="availableDate")
+        if ad is not None:
+            dm = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", ad.get_text(" ", strip=True))
+            if dm:
+                avail = _rm_iso(dm.group(1))
+        if not avail and it.get("data-date"):
+            dm = re.match(r"(\d{4})/(\d{1,2})", str(it.get("data-date")))
+            if dm:
+                avail = f"{dm.group(1)}-{int(dm.group(2)):02d}-01"
+
+        bath_m = re.search(r"Bath\s+([\d.]+)", it.get_text(" ", strip=True), re.I)
+        baths = bath_m.group(1) if bath_m else ""
+
+        source_ids: dict[str, Any] = {}
+        uid_m = re.search(r"uid=(\d+)", href)
+        if uid_m:
+            source_ids["rentmanager_uid"] = uid_m.group(1)
+            if not unit_no:
+                unit_no = uid_m.group(1)
+        if not unit_no:
+            continue
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft="",
+                unit_number=str(unit_no),
+                rent_low=rent,
+                rent_high=rent,
+                availability_status="AVAILABLE",
+                availability_date=avail,
+                source_api_url=source_url,
+                extraction_tier="TIER_1_DOM_RENTMANAGER_WP_CARDS",
+                source_ids=source_ids,
+            )
+        )
+    return units
+
+
 class RentManagerAdapter:
     """RentManager ``ua.rentmanager.com/Search_Result`` extractor.
 
@@ -305,6 +388,27 @@ class RentManagerAdapter:
             result.errors.append(
                 f"RENTMANAGER_ILOVELEASING_VALIDITY_REJECTED: "
                 f"{len(il_units)} rows failed unit_validity"
+            )
+
+        # ── Path C: WordPress RentManager plugin availability cards ───────────
+        # (finelivingapts-class — <a class="individual-item" data-rent …>
+        # cards inside .rm-ua-container that the iLoveLeasing table parser
+        # can't see. 19 SSR unit cards verified live w/ rent+beds+date+uid.)
+        wp_units = parse_rentmanager_wp_cards(html, page_url)
+        if wp_units:
+            _pp = post_process(
+                wp_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if _pp.n_admitted > 0:
+                result.units = _pp.admitted
+                result.plan_summaries = _pp.plan_summaries
+                result.winning_url = page_url or None
+                result.tier_used = "TIER_1_DOM_RENTMANAGER_WP_CARDS"
+                result.confidence = min(0.90, 0.7 + 0.04 * _pp.n_admitted)
+                return result
+            result.errors.append(
+                f"RENTMANAGER_WP_CARDS_VALIDITY_REJECTED: "
+                f"{len(wp_units)} cards failed unit_validity"
             )
 
         if not result.errors:
