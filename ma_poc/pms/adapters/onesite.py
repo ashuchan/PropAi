@@ -35,6 +35,7 @@ import string
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
     realpage_units_to_adapter_shape as _dr_realpage_units,
@@ -388,23 +389,48 @@ def parse_onesite_workflowstartup(
                 elif isinstance(baths, str):
                     baths_str = baths
 
-                units.append(
-                    make_unit_dict(
-                        floor_plan_name=name,
-                        bed_label=bed_label_from(beds_i, name),
-                        bedrooms=str(beds_i) if beds_i is not None else "",
-                        bathrooms=baths_str,
-                        sqft=str(sqft_i) if sqft_i else "",
-                        unit_number="",
-                        rent_range=format_rent_range(rent_lo_i, rent_hi_i),
-                        rent_low=rent_lo_i,
-                        rent_high=rent_hi_i,
-                        availability_status="AVAILABLE",
-                        available_units=str(avail_i) if avail_i else "",
-                        source_api_url=url,
-                        extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
+                # 2026-07-12: expand fp["UnitIds"] into real per-unit rows.
+                # The workflowstartup JSON carries the actual available unit
+                # numbers per floorplan; the old code discarded them and
+                # emitted ONE blank-unit_number row per plan hardcoded
+                # AVAILABLE — even for floorplans with AvailableUnits=0 but a
+                # published price (142 such plans in the 25-prop local sample
+                # were falsely marked AVAILABLE). Validated on real
+                # workflowstartup bodies from a residential IP: 252 unit-level
+                # rows across 20 of 25 sample properties.
+                # Decide the (unit_number, status, available_units) rows to
+                # emit for this floorplan:
+                #  • available + unit ids → one real unit-level row per uid
+                #  • available, no unit ids → keep a plan-level AVAILABLE row
+                #  • not available (but priced) → ONE plan-level UNAVAILABLE
+                #    row (fixes the old hardcoded-AVAILABLE mislabel; post_
+                #    process routes no-unit-id rows to plan_summaries).
+                _uids = [str(u) for u in (fp.get("UnitIds") or []) if str(u).strip()]
+                if avail_i > 0 and _uids:
+                    _rows = [(uid, "AVAILABLE", "1") for uid in _uids]
+                elif avail_i > 0:
+                    _rows = [("", "AVAILABLE", str(avail_i))]
+                else:
+                    _rows = [("", "UNAVAILABLE", "0")]
+
+                for _unit_no, _status, _avail in _rows:
+                    units.append(
+                        make_unit_dict(
+                            floor_plan_name=name,
+                            bed_label=bed_label_from(beds_i, name),
+                            bedrooms=str(beds_i) if beds_i is not None else "",
+                            bathrooms=baths_str,
+                            sqft=str(sqft_i) if sqft_i else "",
+                            unit_number=_unit_no,
+                            rent_range=format_rent_range(rent_lo_i, rent_hi_i),
+                            rent_low=rent_lo_i,
+                            rent_high=rent_hi_i,
+                            availability_status=_status,
+                            available_units=_avail,
+                            source_api_url=url,
+                            extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
+                        )
                     )
-                )
     return units
 
 
@@ -445,7 +471,17 @@ async def _probe_onesite_workflowstartup(
     # (the marketing site might just have a link to {prefix}.onlineleasing
     # — that subdomain's HTML has the widgetLoader.js?siteId reference)
     if not site_ids:
-        sub_match = _ONESITE_SUBDOMAIN_RE.search(raw_body)
+        # 2026-07-12: some marketing sites embed the leasing subdomain link
+        # backslash-/entity-escaped inside a JSON string
+        # (e.g. `href=\\"https:\\/\\/8452182.onlineleasing.realpage.com\\/`),
+        # which the literal-slash regex misses. Unescape a copy before the
+        # search so those properties (pid 19785 class) resolve their SiteId.
+        import html as _html
+
+        _sub_hay = _html.unescape(raw_body).replace("\\/", "/").replace("\\", "")
+        sub_match = _ONESITE_SUBDOMAIN_RE.search(
+            raw_body
+        ) or _ONESITE_SUBDOMAIN_RE.search(_sub_hay)
         if sub_match:
             sub_host = sub_match.group(0).rstrip("/") + "/"
             try:
