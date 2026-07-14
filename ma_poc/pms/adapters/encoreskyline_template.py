@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any
 from ma_poc.pms.adapters._encoreskyline_units import (
     is_encoreskyline_template_page,
     parse_encoreskyline_units,
+    parse_rentpress_data_floorplans,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
@@ -178,6 +179,28 @@ class EncoreSkylineTemplateAdapter:
                 confidence=0.0,
                 errors=["Jonah Digital widget marker not present"],
             )
+
+        # 1b. Static RentPress fast-path. RentPress (RentCafe-synced) sites
+        #     embed the full unit inventory as an escaped-JSON
+        #     ``data-floorplans`` attribute in the initial HTML — no per-plan
+        #     click flow needed. This short-circuits the (slow, render-
+        #     dependent) Jonah drill for the ~8-prop RentPress cohort that
+        #     otherwise fell through to LLM/failed. See
+        #     parse_rentpress_data_floorplans.
+        rp_units = parse_rentpress_data_floorplans(
+            html, getattr(ctx, "base_url", "") or ""
+        )
+        if rp_units:
+            from ma_poc.extraction.post_process import post_process as _pp_rp
+
+            _rp = _pp_rp(rp_units, property_id=getattr(ctx, "property_id", None))
+            if _rp.n_admitted > 0:
+                return AdapterResult(
+                    units=_rp.admitted,
+                    plan_summaries=_rp.plan_summaries,
+                    tier_used="TIER_1_DOM_RENTPRESS",
+                    confidence=min(0.92, 0.7 + 0.04 * _rp.n_admitted),
+                )
 
         # 2. Discover per-plan URLs. If none are on the current page,
         #    hop the user to ``/floorplans`` first and retry — the per-plan

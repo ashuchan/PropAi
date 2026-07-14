@@ -123,6 +123,108 @@ def _int_or_none(s: str | None) -> int | None:
         return None
 
 
+_RENTPRESS_ATTR_RE = re.compile(
+    r"""data-floorplans\s*=\s*(["'])(?P<json>.*?)\1""", re.DOTALL
+)
+
+
+def _rp_iso(s: str) -> str:
+    """``09/10/2026`` (MM/DD/YYYY) | ``2026-09-10`` → ``2026-09-10``; else ''."""
+    s = str(s or "").strip()
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})$", s)
+    if m:
+        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+    m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})$", s)
+    if m:
+        return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    return ""
+
+
+def parse_rentpress_data_floorplans(
+    html: str, source_url: str
+) -> list[dict[str, Any]]:
+    """Parse the RentPress WordPress plugin's ``data-floorplans`` attribute.
+
+    2026-07-12: RentPress (RentCafe-synced) sites embed the FULL unit
+    inventory as an entity-escaped JSON array in
+    ``<div id="rentpress-app" ... data-floorplans='[{...}]'>`` — statically,
+    in the initial HTML. Each floorplan carries a ``units`` array of real
+    per-unit objects (unit_name, unit_rent_best, unit_bedrooms, unit_sqft,
+    unit_available_on). The encoreskyline adapter previously only drove the
+    Jonah per-plan click flow and never read this attribute, so these
+    RentPress-backed sites fell through to the LLM/failed tier despite
+    carrying clean unit-level data in the static page.
+
+    Emits one unit-level row per unit. Returns ``[]`` on absent/unparseable
+    markup — never raises. Verified live (curl_cffi, $0): themobilelofts.com
+    → 2 units (OSL-D1 $1,589 653sqft 2026-09-10; OSL-... $1,759).
+    """
+    import html as _html
+    import json
+
+    if not html or "data-floorplans" not in html:
+        return []
+    m = _RENTPRESS_ATTR_RE.search(html)
+    if not m:
+        return []
+    try:
+        plans = json.loads(_html.unescape(m.group("json")))
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(plans, list):
+        return []
+
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for fp in plans:
+        if not isinstance(fp, dict):
+            continue
+        fp_name = str(fp.get("floorplan_name") or fp.get("floorplan_post_title") or "")
+        for u in fp.get("units") or []:
+            if not isinstance(u, dict):
+                continue
+            unit_no = str(
+                u.get("unit_name") or u.get("unit_code") or u.get("unit_space_id") or ""
+            ).strip()
+            if not unit_no or unit_no in seen:
+                continue
+            seen.add(unit_no)
+            rent = _int_or_none(
+                str(
+                    u.get("unit_rent_best") or u.get("unit_rent_min")
+                    or u.get("unit_rent_base") or ""
+                )
+            )
+            _sqft = _int_or_none(
+                str(u.get("unit_sqft") or fp.get("floorplan_sqft_min") or "")
+            )
+            source_ids: dict[str, Any] = {}
+            if u.get("unit_code"):
+                source_ids["rentpress_unit_code"] = str(u["unit_code"])
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=fp_name,
+                    bedrooms=str(u.get("unit_bedrooms") or fp.get("floorplan_bedrooms") or ""),
+                    bathrooms=str(u.get("unit_bathrooms") or fp.get("floorplan_bathrooms") or ""),
+                    sqft=str(_sqft or ""),
+                    unit_number=unit_no,
+                    rent_low=rent,
+                    rent_high=rent,
+                    availability_status=(
+                        "AVAILABLE" if str(u.get("unit_available")) in ("1", "True", "true")
+                        else "UNAVAILABLE"
+                    ),
+                    availability_date=_rp_iso(
+                        str(u.get("unit_available_on") or u.get("unit_ready_date") or "")
+                    ),
+                    source_api_url=source_url,
+                    extraction_tier="TIER_1_DOM_RENTPRESS",
+                    source_ids=source_ids,
+                )
+            )
+    return units
+
+
 def parse_encoreskyline_units(
     rendered_text: str, source_url: str
 ) -> list[dict[str, Any]]:
