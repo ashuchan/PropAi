@@ -46,6 +46,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ma_poc.pms.adapters._parsing import (
+    address_unit_id,
     bed_label_from,
     format_rent_range,
     make_unit_dict,
@@ -266,6 +267,11 @@ def parse_appfolio_websites_listing(
             "appfolio_id": appfolio_id or None,
             "appfolio_database_name": (data.get("database_name") or "").strip()
             or None,
+            # 2026-07-14: keep the full street address as provenance so the
+            # combine-point scattered-site id resolver (which sees all pages)
+            # can identify which units carry an address-derived unit_id.
+            "appfolio_full_address": (data.get("full_address") or "").strip()
+            or None,
         }.items()
         if v
     }
@@ -292,6 +298,13 @@ def parse_appfolio_websites_listing(
     # across both branch shapes — the downstream consumers read
     # ``unit["source_ids"]`` directly.
     unit["source_ids"] = source_ids
+    # 2026-07-14 identity-layer fix: scattered-site AppFolio Websites feeds
+    # carry the full street address in ``full_address``. Anchor unit_id to it
+    # (marketing-visible + run-stable) instead of the volatile listable_uid /
+    # AppFolio id. No-op when full_address isn't address-shaped.
+    addr_uid = address_unit_id((data.get("full_address") or "").strip())
+    if addr_uid:
+        unit["unit_id"] = addr_uid
     return unit
 
 
