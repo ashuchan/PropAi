@@ -383,14 +383,60 @@ def test_parse_workflowstartup_clamps_huge_rent_range_from_bridgewater_live() ->
     assert int(beeson["market_rent_high"]) == 3625
 
 
-def test_parse_workflowstartup_emits_six_plans_from_bridgewater_live() -> None:
-    """No plan should be dropped by the placeholder guard on Bridgewater:
-    all 6 plans have either rent>0 or sqft>0 (or both)."""
+def test_workflowstartup_unit_id_expansion_three_branches() -> None:
+    """The three emission branches: available+ids → per-unit rows;
+    available+no-ids → one AVAILABLE plan row; priced+0-avail → one
+    UNAVAILABLE plan row (never falsely AVAILABLE)."""
+    body = {"Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
+        {"Id": "a", "Name": "A2", "Bedrooms": 1, "Bathrooms": 1,
+         "Squarefeet": 700, "MinPriceRange": 2295, "MaxPriceRange": 2295,
+         "AvailableUnits": 1, "UnitIds": ["8"]},
+        {"Id": "c", "Name": "C2", "Bedrooms": 2, "Bathrooms": 2,
+         "Squarefeet": 1100, "MinPriceRange": 3902, "MaxPriceRange": 3952,
+         "AvailableUnits": 4, "UnitIds": ["119", "130", "131", "125"]},
+        {"Id": "noavail", "Name": "B1", "Bedrooms": 1, "Bathrooms": 1,
+         "Squarefeet": 800, "MinPriceRange": 1800, "MaxPriceRange": 1800,
+         "AvailableUnits": 0, "UnitIds": []},
+        {"Id": "noids", "Name": "D1", "Bedrooms": 0, "Bathrooms": 1,
+         "Squarefeet": 500, "MinPriceRange": 1200, "MaxPriceRange": 1200,
+         "AvailableUnits": 2, "UnitIds": []},
+    ]}]}]}}
+    units = parse_onesite_workflowstartup(body, "u")
+    by_num = {u["unit_number"]: u for u in units if u.get("unit_number")}
+    # A2 → 1 unit, C2 → 4 units
+    assert by_num["8"]["availability_status"] == "AVAILABLE"
+    assert by_num["8"]["market_rent_low"] == 2295
+    assert {"119", "130", "131", "125"} <= set(by_num)
+    # priced+0-avail → UNAVAILABLE plan row, NOT falsely AVAILABLE
+    b1 = [u for u in units if u["floor_plan_name"] == "B1"]
+    assert len(b1) == 1 and b1[0]["availability_status"] == "UNAVAILABLE"
+    assert b1[0]["unit_number"] == ""
+    # available but no unit ids → single AVAILABLE plan row
+    d1 = [u for u in units if u["floor_plan_name"] == "D1"]
+    assert len(d1) == 1 and d1[0]["availability_status"] == "AVAILABLE"
+
+
+def test_parse_workflowstartup_expands_unit_ids_bridgewater() -> None:
+    """2026-07-12: the parser now expands fp[UnitIds] into per-unit rows.
+    Bridgewater's 5 available plans (UnitIds 5+1+9+5+3 = 23 units) become 23
+    unit-level rows; the 1 zero-availability plan (The Marshall, avail=0,
+    priced) becomes a single UNAVAILABLE plan row — so no plan is dropped by
+    the placeholder guard, and none is falsely marked AVAILABLE."""
     body = json.loads(
         (FIXTURES / "onesite_workflowstartup_bridgewater.json").read_text()
     )
     units = parse_onesite_workflowstartup(body, "u")
-    assert len(units) == 6
+    unit_level = [u for u in units if u.get("unit_number")]
+    unavail = [u for u in units if u.get("availability_status") == "UNAVAILABLE"]
+    assert len(unit_level) == 23
+    assert len(unavail) == 1  # The Marshall — priced but 0 available
+    assert len(units) == 24
+    # every available plan's real unit numbers survive to unit-level rows
+    beeson = {
+        u["unit_number"] for u in unit_level
+        if u["floor_plan_name"] == "The Beeson"
+    }
+    assert beeson == {"156", "169", "142", "155", "126"}
 
 
 def test_parse_workflowstartup_widens_sqft_cascade_to_max_keys() -> None:
