@@ -1034,6 +1034,18 @@ def _entry_html_from_ctx(ctx: AdapterContext) -> str | None:
     return None
 
 
+def _normalize_sightmap_slashes(html: str) -> str:
+    """Un-escape JSON slash escapes so ``sightmap.com\\/embed\\/{code}`` and
+    the ``\\u002f`` variant match the literal-slash SightMap regexes."""
+    if not html:
+        return html
+    return (
+        html.replace("\\u002f", "/")
+        .replace("\\u002F", "/")
+        .replace("\\/", "/")
+    )
+
+
 def find_sightmap_embed_codes(html: str) -> list[str]:
     """Return any SightMap embed codes found anywhere in *html* (deduped).
 
@@ -1056,6 +1068,13 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
     """
     if not html or "sightmap.com" not in html.lower():
         return []
+    # 2026-07-12: normalize escaped slashes so JSON-embedded embed URLs
+    # (IMT WordPress: ``"sightmap_embed_url":"https:\/\/sightmap.com\/embed\/
+    # {code}"`` and the ``/`` variant) are matched by the literal-slash
+    # regex. Done on a copy used for the whole scan so the JSON-position
+    # look-back below stays index-consistent.
+    html = _normalize_sightmap_slashes(html)
+
     seen: set[str] = set()
     codes: list[str] = []
     for m in _SIGHTMAP_EMBED_URL_RE.finditer(html):
@@ -1075,7 +1094,16 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
         while i >= 0 and html[i] in " \t":
             i -= 1
         if i >= 0 and html[i] == ":":
-            continue
+            # 2026-07-12: a ``":"``-preceded URL is normally a config blob
+            # (handled by the generic portal-hint path). But when the JSON
+            # KEY is a real sightmap/engrain embed key, it IS the live embed
+            # URL — keep it (IMT sightmap_embed_url form). Otherwise skip.
+            _key_ctx = html[max(0, start - 60):start].lower()
+            if not any(
+                k in _key_ctx
+                for k in ("sightmap_embed_url", "sightmap_link", "engrainedurl")
+            ):
+                continue
 
         code = m.group(1)
         # Reserved infra segments — never customer codes.
@@ -1102,7 +1130,7 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
 import re as _sm_re  # noqa: E402 — local to keep this section self-contained
 
 _SM_EMBED_RE = _sm_re.compile(
-    r"(?:https?:)?//sightmap\.com/(?:embed|app/embed)/([a-z0-9]+)",
+    r"(?:https?:)?//sightmap\.com/(?:embed|app/embed)/([a-zA-Z0-9_-]{4,32})",
     _sm_re.IGNORECASE,
 )
 # Reserved infra path segments — ``embed/api.js`` is the loader,
