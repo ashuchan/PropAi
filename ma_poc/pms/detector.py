@@ -500,6 +500,30 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
     return "rentcafe", 0.40, [f".aspx path on vanity host ({host}) — weak RentCafe/Yardi heuristic (needs HTML corroboration)"]
 
 
+# 2026-07-12: a real SightMap embed URL in ANY escaping (literal, ``\/``,
+# ``/``) — e.g. the IMT WordPress theme ships
+# ``"sightmap_embed_url":"https:\/\/sightmap.com\/embed\/{code}"`` which the
+# literal ``"sightmap.com/embed/" in h`` check missed. The captured {code}
+# is the GUARD: the Entrata cookie-consent text (``"token":"engrain_sightmap"``
+# … "enables Engrain's SightMap") and empty Engrain configs
+# (``engrainedUrl: ''``) mention SightMap but carry NO code, so they
+# correctly do NOT route to the (would-be-dead) SightMap adapter.
+_SIGHTMAP_EMBED_CODE_RE = re.compile(
+    r"sightmap\.com/embed/([a-zA-Z0-9_-]{4,32})", re.IGNORECASE
+)
+
+
+def _detect_sightmap_embed(h: str) -> bool:
+    """True iff *h* carries a real ``sightmap.com/embed/{code}`` URL in any
+    slash escaping. Requiring a captured code is the false-positive guard."""
+    if "sightmap" not in h.lower():
+        return False
+    h_norm = (
+        h.replace("\\u002f", "/").replace("\\u002F", "/").replace("\\/", "/")
+    )
+    return bool(_SIGHTMAP_EMBED_CODE_RE.search(h_norm))
+
+
 def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[str]]]:
     h = page_html.lower()
     # 2026-05-20 fix (feature_fail_1429 cluster #3): G5 marketing-cloud
@@ -669,7 +693,11 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # TIER_3_DOM on every one, prod caught SightMap).
     # Note: bare ``sightmap.com`` substring is NOT enough — could be a CDN
     # asset or analytics link. ``sightmap.com/embed/`` is iframe-specific.
-    _has_sightmap_embed = "sightmap.com/embed/" in h
+    # 2026-07-12: also match escaped forms (\/, /) so the IMT
+    # WordPress ``sightmap_embed_url`` JSON blob routes here; the code
+    # requirement guards against the Entrata cookie-text / empty-config
+    # false positives. See _detect_sightmap_embed.
+    _has_sightmap_embed = _detect_sightmap_embed(h)
     if _has_sightmap_embed and _has_entrata_widget:
         yield (
             "sightmap",
