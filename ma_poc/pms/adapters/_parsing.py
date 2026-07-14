@@ -743,6 +743,125 @@ def clean_unit_number(val: str) -> str:
     return cleaned
 
 
+# ── Scattered-site marketing identity (AppFolio et al.) ──────────────────────
+# 2026-07-14 (identity-layer fix): "scattered site" / small-PMC properties
+# list each home by its FULL STREET ADDRESS — the value a prospect actually
+# sees on the marketing card. The raw feed only gives us the PMS-internal
+# listing_id or a bare apartment suffix ("C", "#3", "APT 219"). Using either
+# as the canonical unit identity is wrong:
+#   * listing_id / detail-uuid ROTATE across runs and across re-listings of
+#     the same physical unit (observed on prod: "102 Jackson Walk Plaza,
+#     Suite 101" emitted 3× under 3 different floor_plan_id-derived ids), and
+#   * a bare suffix COLLIDES across addresses ("712 S 11th St #3" and
+#     "2224 A St #3" both collapse to "3").
+# The downstream _apply_p2b_floor_plan_id_disambiguation workaround
+# (scripts/runners/jugnu.py) papers over the collision with a
+# floor_plan_id[:8] prefix ("cca8adc1-318") — but that is neither stable
+# (fp_id rotates) nor the marketing-page identity the BRD requires.
+#
+# The street address is the stable, unique, marketing-visible key. When a
+# unit's plan/address field is address-shaped we derive the unit_id from it:
+# two listings of the same physical home collapse (correct), two different
+# homes stay distinct (correct), and the id survives across runs.
+_US_ZIP_RE = re.compile(r"\b\d{5}(?:-\d{4})?\b")
+_STREET_TYPE_RE = re.compile(
+    r"\b(?:st|street|ave|avenue|rd|road|blvd|boulevard|ln|lane|dr|drive|"
+    r"ct|court|cir|circle|pl|place|way|ter|terr|terrace|pkwy|parkway|plaza|"
+    r"hwy|highway|trail|trl|loop|pike|row|walk|run|path|square|sq)\b",
+    re.IGNORECASE,
+)
+# Leading house number, allowing a single letter suffix ("703A", "90C") —
+# verified live on terracemgmt/fairlawn AppFolio listings. The trailing
+# ``\b`` + the AND-gate on a street token / ZIP / suffix keeps plan
+# descriptors ("2 Bed", "550 Sqft Studio") out.
+_HOUSE_NUMBER_RE = re.compile(r"^\s*\d{1,6}[A-Za-z]?\b")
+_SUFFIX_MARKER_RE = re.compile(
+    r"(?:#|\bapt\b|\bunit\b|\bsuite\b|\bste\b)", re.IGNORECASE
+)
+_ADDR_SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
+
+
+def is_street_address(s: str) -> bool:
+    """True when ``s`` looks like a full street address (scattered-site).
+
+    Requires a leading house number AND at least one of: a US ZIP, a
+    street-type token, or a unit-suffix marker. This distinguishes real
+    addresses ("2323 East Main Street - APT 219, Richmond, VA 23223")
+    from plan descriptors that also start with a digit ("1 Bedroom, 1
+    Bath", "2 Bed / 2 Bath", "550 Sqft Studio") — those carry no street
+    token, ZIP, or suffix marker and are correctly rejected.
+    """
+    if not s or not isinstance(s, str) or not _HOUSE_NUMBER_RE.match(s):
+        return False
+    return bool(
+        _US_ZIP_RE.search(s)
+        or _STREET_TYPE_RE.search(s)
+        or _SUFFIX_MARKER_RE.search(s)
+    )
+
+
+def address_unit_id(address: str) -> str:
+    """Derive a stable, marketing-visible unit id from a full address.
+
+    Returns a lowercased hyphen slug of the ENTIRE address string (so a
+    mid-string apartment suffix like ``203 Hull Street, 4B, Richmond`` is
+    never lost), or ``""`` when ``address`` is not address-shaped — in
+    which case the caller keeps its existing unit_number / listing_id
+    behaviour untouched (real multifamily AppFolio with plan names).
+    """
+    if not is_street_address(address):
+        return ""
+    return _ADDR_SLUG_STRIP_RE.sub("-", address.strip().lower()).strip("-")
+
+
+def resolve_scattered_site_ids(addr_units: list[dict[str, Any]]) -> int:
+    """Second pass over units whose unit_id is an address slug.
+
+    Marketing pages verified live (AppFolio /listings, 2026-07-14) show the
+    full street address — WITH its apartment suffix when the building has
+    one ("400 Blake St #4110", "6014 W. 25th St., #1032") — as the only
+    prospect-visible identifier. So a slugged address is already unique for
+    the vast majority of units.
+
+    The exception is a no-suffix address that AppFolio lists more than once
+    — a conventional community whose per-unit street address is just the
+    community address ("7524 Southside Blvd" ×5), or two homes at one
+    building shown without an apt ("234 Sherman Ave" as both a 1bd and a
+    2bd). The marketing page itself gives no per-unit id there, so we append
+    the STABLE AppFolio listing id (never a run-volatile derived hash) to
+    keep the real units distinct. Unique slugs are left clean (= exactly the
+    marketing address).
+
+    ``addr_units`` must contain only units the caller assigned an address
+    slug to (so real-multifamily unit numbers are never touched). Mutates
+    the colliding units in place. Returns the count of rows disambiguated.
+    """
+    from collections import defaultdict
+
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for u in addr_units:
+        uid = u.get("unit_id")
+        if isinstance(uid, str) and uid:
+            groups[uid].append(u)
+
+    rewritten = 0
+    for slug, group in groups.items():
+        if len(group) < 2:
+            continue
+        for u in group:
+            sids = u.get("source_ids") or {}
+            disc = (
+                sids.get("appfolio_listing_id")
+                or sids.get("appfolio_id")
+                or sids.get("appfolio_listable_uid")
+                or ""
+            )
+            if disc:
+                u["unit_id"] = f"{slug}-{disc}"
+                rewritten += 1
+    return rewritten
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",

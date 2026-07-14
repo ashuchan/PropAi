@@ -42,11 +42,13 @@ from ma_poc.pms.adapters._appfolio_websites_duda import (
 )
 from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _MERGE_UNIT_SIGNAL_KEYS
 from ma_poc.pms.adapters._parsing import (
+    address_unit_id,
     bed_label_from,
     format_rent_range,
     get_field,
     make_unit_dict,
     money_to_int,
+    resolve_scattered_site_ids,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
@@ -501,6 +503,13 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     if not sqft_str:
         unit["data_gaps"] = ["sqft"]
         unit["data_quality_flag"] = "SQFT_NOT_PUBLISHED"
+    # 2026-07-14 identity-layer fix: the detail page has no unit_number, so
+    # without this it falls through to an ``inferred_<hash>`` id. When the h1
+    # is a street address (scattered-site homes), anchor unit_id to it — a
+    # stable, marketing-visible key instead of a physical-attribute hash.
+    addr_uid = address_unit_id(floor_plan_name)
+    if addr_uid:
+        unit["unit_id"] = addr_uid
     return [unit]
 
 
@@ -663,6 +672,7 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
     the path dependency-free and fast.
     """
     units: list[dict[str, str]] = []
+    addr_units: list[dict[str, Any]] = []
     for m in _LISTING_BLOCK_RE.finditer(html):
         body = m.group("body")
         listing_id = m.group("id")
@@ -702,24 +712,35 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
         # present so the no_area retry doesn't fire and the verdict lands
         # SUCCESS instead of SUCCESS_PLAN_LEVEL.
         sqft_gap = not sqft or sqft == "0"
-        units.append(
-            make_unit_dict(
-                floor_plan_name=address or f"AppFolio listing {listing_id}",
-                bed_label=bed_label_from(beds, address),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
-                sqft=sqft,
-                unit_number=unit_number_display,
-                rent_range=format_rent_range(rent_val, rent_val),
-                availability_status="AVAILABLE",
-                availability_date=avail_raw or "",
-                source_ids={"appfolio_listing_id": listing_id} if listing_id else {},
-                source_api_url=url,
-                extraction_tier="TIER_1_DOM_APPFOLIO_SSR",
-                data_gaps=["sqft"] if sqft_gap else None,
-                data_quality_flag="SQFT_NOT_PUBLISHED" if sqft_gap else "",
-            )
+        unit = make_unit_dict(
+            floor_plan_name=address or f"AppFolio listing {listing_id}",
+            bed_label=bed_label_from(beds, address),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=sqft,
+            unit_number=unit_number_display,
+            rent_range=format_rent_range(rent_val, rent_val),
+            availability_status="AVAILABLE",
+            availability_date=avail_raw or "",
+            source_ids={"appfolio_listing_id": listing_id} if listing_id else {},
+            source_api_url=url,
+            extraction_tier="TIER_1_DOM_APPFOLIO_SSR",
+            data_gaps=["sqft"] if sqft_gap else None,
+            data_quality_flag="SQFT_NOT_PUBLISHED" if sqft_gap else "",
         )
+        # 2026-07-14 identity-layer fix: scattered-site AppFolio lists each
+        # home by its full street address. Anchor unit_id to that address
+        # (the marketing-visible, run-stable, collision-free key) instead of
+        # the rotating listing_id / bare suffix. Display suffix stays in
+        # unit_number. No-op for real multifamily (plan-name floor_plan_name).
+        addr_uid = address_unit_id(address)
+        if addr_uid:
+            unit["unit_id"] = addr_uid
+            addr_units.append(unit)
+        units.append(unit)
+    # Disambiguate no-suffix addresses that AppFolio lists more than once
+    # (e.g. "234 Sherman Ave" ×2) with the stable listing id.
+    resolve_scattered_site_ids(addr_units)
     return units
 
 
@@ -730,6 +751,7 @@ def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[
     /floorplans/all endpoint (bed, bath, rent, sq_ft).
     """
     units: list[dict[str, str]] = []
+    addr_units: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -760,33 +782,40 @@ def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[
         # as the SSR path so downstream gates can distinguish operator-
         # gap from parser-miss.
         sqft_gap = not sqft or str(sqft).strip() in ("", "0")
-        units.append(
-            make_unit_dict(
-                floor_plan_name=name,
-                bed_label=bed_label_from(beds, name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
-                sqft=sqft,
-                unit_number=unit_num,
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                availability_status="AVAILABLE"
-                if not status or "avail" in status.lower()
-                else status.upper(),
-                availability_date=avail_date,
-                source_ids={
-                    k: v
-                    for k, v in {
-                        "appfolio_id": item.get("id"),
-                        "appfolio_unit_id": item.get("unit_id"),
-                    }.items()
-                    if v
-                },
-                source_api_url=url,
-                extraction_tier="TIER_1_API_APPFOLIO",
-                data_gaps=["sqft"] if sqft_gap else None,
-                data_quality_flag="SQFT_NOT_PUBLISHED" if sqft_gap else "",
-            )
+        unit = make_unit_dict(
+            floor_plan_name=name,
+            bed_label=bed_label_from(beds, name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=sqft,
+            unit_number=unit_num,
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            availability_status="AVAILABLE"
+            if not status or "avail" in status.lower()
+            else status.upper(),
+            availability_date=avail_date,
+            source_ids={
+                k: v
+                for k, v in {
+                    "appfolio_id": item.get("id"),
+                    "appfolio_unit_id": item.get("unit_id"),
+                }.items()
+                if v
+            },
+            source_api_url=url,
+            extraction_tier="TIER_1_API_APPFOLIO",
+            data_gaps=["sqft"] if sqft_gap else None,
+            data_quality_flag="SQFT_NOT_PUBLISHED" if sqft_gap else "",
         )
+        # 2026-07-14 identity-layer fix: anchor unit_id to the street address
+        # for scattered-site listings (the address field, not the plan name,
+        # carries the marketing identity here). No-op when not address-shaped.
+        addr_uid = address_unit_id(address_field)
+        if addr_uid:
+            unit["unit_id"] = addr_uid
+            addr_units.append(unit)
+        units.append(unit)
+    resolve_scattered_site_ids(addr_units)
     return units
 
 
@@ -1121,6 +1150,23 @@ class AppFolioAdapter:
                                 f"ctx_zip={ctx_zip!r}"
                             )
                     if duda_units:
+                        # Resolve scattered-site id collisions across ALL
+                        # paginated pages (a no-suffix address split across
+                        # pages must still disambiguate). Only units the Duda
+                        # helper anchored to their full_address are touched.
+                        duda_addr_units = [
+                            u
+                            for u in duda_units
+                            if (u.get("source_ids") or {}).get(
+                                "appfolio_full_address"
+                            )
+                            and isinstance(u.get("unit_id"), str)
+                            and u["unit_id"]
+                            == address_unit_id(
+                                u["source_ids"]["appfolio_full_address"]
+                            )
+                        ]
+                        resolve_scattered_site_ids(duda_addr_units)
                         result.units = duda_units
                         result.tier_used = "TIER_1_API_APPFOLIO_DUDA"
                         result.winning_url = duda_winning_url
