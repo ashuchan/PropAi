@@ -3248,6 +3248,13 @@ async def _try_link_hop(
                     _ext_ref = shared_budget.get("_external_partial_ref")
                     if isinstance(_ext_ref, dict):
                         _ext_ref["units"] = list(_accumulated_units)
+                        # 2026-07-12: also checkpoint the winning-hop tier so a
+                        # mid-hop timeout salvage can stamp it (else the salvage
+                        # ships tier_used=None and a real Tier-1 recovery is not
+                        # counted as gold — the 231-prop link-hop NONE cohort).
+                        _ext_ref["tier_used"] = (
+                            _first_successful_result or sub_result
+                        ).get("extraction_tier_used")
                 # Cache the LLM DOM selectors from this index page so
                 # sub-pages can replay them without another LLM call.
                 if _fp_llm_selectors is None:
@@ -3289,6 +3296,9 @@ async def _try_link_hop(
                     _ext_ref = shared_budget.get("_external_partial_ref")
                     if isinstance(_ext_ref, dict):
                         _ext_ref["units"] = list(_accumulated_units)
+                        _ext_ref["tier_used"] = (
+                            _first_successful_result or sub_result
+                        ).get("extraction_tier_used")
                 # Cache selectors from first sub-page that has them.
                 if _fp_llm_selectors is None:
                     _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")

@@ -586,6 +586,21 @@ async def run_jugnu(
                 _salvage_meta = failed.setdefault("_meta", {})
                 _salvage_meta["verdict"] = _salvage_verdict.verdict.value
                 _salvage_meta["verdict_reason"] = _salvage_verdict.reason
+                # 2026-07-12: stamp the winning-hop tier onto _extract_result
+                # so this salvage is counted at its true tier. _try_link_hop
+                # checkpoints the real tier into _partial_state (survives the
+                # coroutine cancellation); _format_output above rebuilt
+                # _extract_result as None (the salvage input dict had none),
+                # so without this the record ships tier_used=None and a real
+                # Tier-1 link-hop recovery (the 231-prop timeout-salvage
+                # cohort) is NOT counted as gold. Reporting reads the tier
+                # from _extract_result.tier_used (see scripts/CLAUDE.md).
+                _salvage_tier = _partial_state.get("tier_used")
+                if _salvage_tier and _partial_units:
+                    failed["_extract_result"] = {
+                        "tier_used": _salvage_tier,
+                        "llm_cost_usd": 0.0,
+                    }
             except Exception as _vexc:
                 log.warning(
                     "partial-recovery verdict compute failed for %s: %s",
