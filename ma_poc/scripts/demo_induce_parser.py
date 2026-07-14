@@ -101,12 +101,40 @@ def demo_gate() -> bool:
     return parser is None and not rep.passed
 
 
+def demo_nested() -> bool:
+    # Units nested under a group array (units-per-floorplan) — the apts247
+    # objects[].units[] / AMLI queries[*].data[].units[] shape. The inducer
+    # must flatten via a [*] group wildcard.
+    body = {
+        "objects": [
+            {"id": "FP1", "name": "The Oak", "units": [
+                {"number": "101", "price": 1500}, {"number": "205", "price": 1550}]},
+            {"id": "FP2", "name": "The Elm", "units": [
+                {"number": "310", "price": 2100}]},
+        ]
+    }
+    gold = [
+        {"unit_number": "101", "market_rent_low": 1500},
+        {"unit_number": "205", "market_rent_low": 1550},
+        {"unit_number": "310", "market_rent_low": 2100},
+    ]
+    parser, rep = induce_fallback_parser(gold, body, api_url="apts247/x")
+    print("── CASE 4  nested group array (units-per-floorplan) → [*] flatten ──")
+    if parser:
+        print(f"   envelope:   {parser.envelope}")
+        print(f"   json_paths: {parser.to_llm_field_mapping()['json_paths']}")
+        print(f"   replay:     {sorted(r['unit_number'] for r in replay(parser, body))}")
+    print(f"   VALIDATE:   passed={rep.passed} coverage={rep.coverage:.0%} "
+          f"id_fidelity={rep.id_fidelity:.0%} matched={rep.matched}/{rep.gold_total}\n")
+    return rep.passed
+
+
 def main() -> int:
-    ok = [demo_json(), demo_dom(), demo_gate()]
+    ok = [demo_json(), demo_dom(), demo_nested(), demo_gate()]
     passed = all(ok)
     print("=" * 68)
     print(f"POC RESULT: {'PASS' if passed else 'FAIL'}  "
-          f"(json={ok[0]}, dom={ok[1]}, gate-rejects={ok[2]})")
+          f"(json={ok[0]}, dom={ok[1]}, nested={ok[2]}, gate-rejects={ok[3]})")
     return 0 if passed else 1
 
 

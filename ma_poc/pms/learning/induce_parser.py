@@ -205,20 +205,62 @@ class InductionReport:
 def _iter_dict_arrays(
     obj: Any, path: str = "", depth: int = 0
 ) -> list[tuple[str, list[dict[str, Any]]]]:
-    """Enumerate (dotted_path, list-of-dicts) nodes, breadth-bounded."""
+    """Enumerate (dotted_path, list-of-dicts) nodes, breadth-bounded.
+
+    Recurses into the first several elements of every list (not just index
+    0) so a unit array nested under a specific index — e.g.
+    ``queries[2].state.data`` (AMLI tRPC) — is still discovered.
+    """
     out: list[tuple[str, list[dict[str, Any]]]] = []
-    if depth > 6:
+    if depth > 8:
         return out
     if isinstance(obj, list):
-        if obj and all(isinstance(e, dict) for e in obj):
-            out.append((path, obj))
-        # also recurse into first element for nested arrays
-        for i, e in enumerate(obj[:1]):
+        dicts = [e for e in obj if isinstance(e, dict)]
+        if dicts and len(dicts) >= max(1, len(obj) // 2):
+            out.append((path, dicts))
+        for i, e in enumerate(obj[:12]):
             out += _iter_dict_arrays(e, f"{path}[{i}]", depth + 1)
     elif isinstance(obj, dict):
         for k, v in obj.items():
             out += _iter_dict_arrays(v, f"{path}.{k}" if path else k, depth + 1)
     return out
+
+
+def _unit_array_candidates(
+    api_body: Any,
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Every direct list-of-dicts, PLUS grouped (join) candidates.
+
+    Many APIs nest the per-unit rows one level down: a group array whose
+    elements each carry a sub-list of unit dicts (units-per-floorplan).
+    ``objects[].units[]`` (apts247), ``queries[2].state.data[].units[]``
+    (AMLI). For each such group array we emit a flattened candidate whose
+    envelope uses a single ``[*]`` wildcard: ``objects[*].units``. Replay
+    (:func:`_resolve_envelope`) re-expands it the same way, so the induced
+    mapping stays a plain LlmFieldMapping the existing replay can consume.
+    """
+    from collections import Counter
+
+    cands: list[tuple[str, list[dict[str, Any]]]] = []
+    seen: set[str] = set()
+    for path, arr in _iter_dict_arrays(api_body):
+        if path not in seen:
+            cands.append((path, arr))
+            seen.add(path)
+        subkeys: Counter[str] = Counter()
+        for e in arr:
+            for k, v in e.items():
+                if isinstance(v, list) and any(isinstance(x, dict) for x in v):
+                    subkeys[k] += 1
+        for sk, cnt in subkeys.items():
+            if cnt < max(1, len(arr) // 2):
+                continue
+            flat = [x for e in arr for x in (e.get(sk) or []) if isinstance(x, dict)]
+            genv = f"{path}[*].{sk}"
+            if flat and genv not in seen:
+                cands.append((genv, flat))
+                seen.add(genv)
+    return cands
 
 
 def _element_matches_gold(elem: dict[str, Any], g_unit: str, g_rent: int | None) -> bool:
@@ -253,7 +295,7 @@ def induce_json_field_mapping(
         )
 
     best: tuple[InducedParser, InductionReport] | None = None
-    for path, arr in _iter_dict_arrays(api_body):
+    for path, arr in _unit_array_candidates(api_body):
         if len(arr) < 1:
             continue
         # match gold anchors to elements
@@ -460,6 +502,29 @@ def _nav(body: Any, dotted: str) -> Any:
     return cur
 
 
+def _resolve_envelope(body: Any, envelope: str) -> list[dict[str, Any]]:
+    """Resolve an envelope to a flat list of unit dicts.
+
+    Handles a single ``[*]`` group wildcard (``objects[*].units``): walk to
+    the group array, then concatenate each group element's sub-list. Falls
+    back to a plain dotted nav for direct arrays.
+    """
+    if "[*]" in envelope:
+        head, _, tail = envelope.partition("[*]")
+        group = _nav(body, head)
+        if not isinstance(group, list):
+            return []
+        tail = tail.lstrip(".")
+        out: list[dict[str, Any]] = []
+        for g in group:
+            sub = _nav(g, tail) if tail else g
+            if isinstance(sub, list):
+                out.extend(x for x in sub if isinstance(x, dict))
+        return out
+    arr = _nav(body, envelope)
+    return [x for x in arr if isinstance(x, dict)] if isinstance(arr, list) else []
+
+
 def replay(parser: InducedParser, body: Any) -> list[dict[str, Any]]:
     """Run an induced parser to recover unit rows (deterministic, no LLM)."""
     if parser.kind == "json":
@@ -473,9 +538,7 @@ def _replay_json(parser: InducedParser, api_body: Any) -> list[dict[str, Any]]:
             api_body = json.loads(api_body)
         except (json.JSONDecodeError, TypeError, ValueError):
             return []
-    arr = _nav(api_body, parser.envelope)
-    if not isinstance(arr, list):
-        return []
+    arr = _resolve_envelope(api_body, parser.envelope)
     out: list[dict[str, Any]] = []
     for elem in arr:
         if not isinstance(elem, dict):
