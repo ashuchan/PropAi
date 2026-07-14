@@ -428,11 +428,21 @@ _LEASELEADS_HTML_SIGNAL_RE = re.compile(
 
 
 def _pp_iso(s: str) -> str:
-    """``2026/05/17`` | ``2026-05-17`` → ``2026-05-17``; else ''."""
-    m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", str(s or ""))
-    if not m:
-        return ""
-    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    """``2026/05/17`` | ``2026-05-17`` | ``05/17/2026`` → ``2026-05-17``; else ''.
+
+    2026-07-12: added the US month-first form. The view_unit_spaces
+    fragment publishes ``data-unitavailabilitydate="09/17/2026"`` (MM/DD/
+    YYYY), which the year-first-only regex dropped — so availability_date
+    came back empty on every replayed unit row.
+    """
+    txt = str(s or "")
+    m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", txt)
+    if m:
+        return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", txt)  # MM/DD/YYYY
+    if m:
+        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+    return ""
 
 
 def parse_prospectportal_unit_spaces(
@@ -1570,11 +1580,122 @@ def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
     return out
 
 
-async def _entrata_static_fetch(url: str, *, unlocker: bool = True) -> str:
+async def _entrata_static_fetch(
+    url: str, *, unlocker: bool = True, headers: dict[str, str] | None = None
+) -> str:
     from ma_poc.pms.adapters._probe import probe_get
 
-    r = probe_get(url, timeout=20, unlocker=unlocker)
+    kw: dict[str, Any] = {"timeout": 20, "unlocker": unlocker}
+    if headers:
+        kw["headers"] = headers
+    r = probe_get(url, **kw)
     return (r.text or "") if r.status_code == 200 else ""
+
+
+# Verbatim ``view_unit_spaces`` XHR URL embedded in a PP grid's primary-action
+# buttons (data-url / href). Anchored on the endpoint token; the surrounding
+# non-delimiter run captures the full (possibly &amp;- or \/-escaped) URL.
+_VUS_URL_RE = re.compile(
+    r"""((?:https?:)?[^\s"'<>\\]*view_unit_spaces[^\s"'<>\\]*)""",
+    re.IGNORECASE,
+)
+
+
+def _extract_vus_urls(index_bodies: list[tuple[str, str]], base: str) -> list[tuple[str, str]]:
+    """Return ``(grid_url, view_unit_spaces_url)`` pairs harvested from the
+    grid bodies. ``is_availability_alert`` (waitlist) plans are skipped —
+    they are legitimately 0-unit and keep their plan-level row."""
+    from urllib.parse import urljoin
+
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for idx_url, html in index_bodies:
+        if not html:
+            continue
+        for m in _VUS_URL_RE.finditer(html):
+            raw = m.group(1).replace("&amp;", "&").replace("\\/", "/")
+            if "is_availability_alert" in raw:
+                continue
+            if raw.startswith("//"):
+                raw = "https:" + raw
+            elif raw.startswith("/"):
+                raw = urljoin(idx_url or base, raw)
+            if raw in seen:
+                continue
+            seen.add(raw)
+            out.append((idx_url or base, raw))
+    return out
+
+
+def _replay_vus_sync(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
+    """Blocking replay of view_unit_spaces URLs on a cookie-bearing session.
+
+    The endpoint 400s unless the request carries (a) the grid page's session
+    cookies AND (b) an ``X-Requested-With: XMLHttpRequest`` header AND (c) a
+    ``Referer`` of the grid URL — it is an in-page XHR. So we open ONE
+    curl_cffi session per grid, GET the grid to seat cookies, then replay
+    each unit URL on that session. Runs in a worker thread (see caller).
+    Validated locally (residential IP): villagewestside → unit rows w/ rent.
+    """
+    try:
+        from curl_cffi import requests as _cc
+    except Exception:
+        return []
+    rows: list[dict[str, str]] = []
+    sessions: dict[str, Any] = {}
+    for grid_url, vus_url in pairs[:8]:
+        try:
+            sess = sessions.get(grid_url)
+            if sess is None:
+                sess = _cc.Session(impersonate="chrome120")
+                sess.get(grid_url, timeout=25)  # seat cookies
+                sessions[grid_url] = sess
+            r = sess.get(
+                vus_url,
+                timeout=25,
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "text/html, */*; q=0.01",
+                    "Referer": grid_url,
+                },
+            )
+            if getattr(r, "status_code", 0) == 200 and r.text:
+                rows.extend(parse_prospectportal_unit_spaces(r.text, vus_url))
+        except Exception:
+            continue
+    for sess in sessions.values():
+        try:
+            sess.close()
+        except Exception:
+            pass
+    return rows
+
+
+async def _harvest_view_unit_spaces(
+    index_bodies: list[tuple[str, str]], base: str
+) -> list[dict[str, str]]:
+    """Harvest the verbatim ``view_unit_spaces`` XHR URLs from PP grid bodies
+    and replay them (cookie-bearing session + XHR + Referer) into unit rows.
+
+    2026-07-12: the complete per-plan availability URLs are embedded verbatim
+    in the /conventional grid's primary-action buttons; the old
+    ``_probe_prospectportal`` RECONSTRUCTS a stripped URL that 400s. Replaying
+    the verbatim URL as an in-page XHR yields unit-level rows the existing
+    ``parse_prospectportal_unit_spaces`` handles. Validated locally from a
+    residential IP. Self-gating + never-raises: vanity grids carry no such
+    buttons (0 URLs → 0 rows → plan-level stands), and from a walled network
+    the replay 403s and returns []. Runs the blocking session work in a
+    worker thread so the event loop is never blocked.
+    """
+    import asyncio
+
+    pairs = _extract_vus_urls(index_bodies, base)
+    if not pairs:
+        return []
+    try:
+        return await asyncio.to_thread(_replay_vus_sync, pairs)
+    except Exception:
+        return []
 
 
 # 2026-05-20: structured empty-exit labels for Path B retry. Same pattern
@@ -2021,6 +2142,19 @@ class EntrataAdapter:
                 pp_unit_card_rows.extend(
                     parse_entrata_pp_unit_cards(fr_body_check, _cap_url)
                 )
+
+            # 2026-07-12: when the per-plan unit-card drill found nothing,
+            # harvest the verbatim view_unit_spaces XHR URLs from the grid
+            # bodies and replay them with the XHR header. This upgrades the
+            # prospectportal-hosted plan grids to unit-level (the vanity-domain
+            # grids carry no such buttons and harvest nothing — they keep
+            # their plan-level row). See _harvest_view_unit_spaces.
+            if not pp_unit_card_rows and pp_ssr_index_bodies:
+                _vus_rows = await _harvest_view_unit_spaces(
+                    pp_ssr_index_bodies, base
+                )
+                if _vus_rows:
+                    pp_unit_card_rows.extend(_vus_rows)
 
             if pp_unit_card_rows:
                 pp_ssr_units = pp_unit_card_rows
