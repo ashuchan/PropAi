@@ -144,3 +144,41 @@ def test_evidence_bundle_is_populated() -> None:
         "n_units", "rent_signal_count", "spa_confidence", "tiers_ran_and_empty",
     }
     assert r.evidence["tiers_ran_and_empty"] is True
+
+
+# ── Runner-integration contract: the EXACT signal shapes jugnu.py passes ─────
+
+def test_accepts_characterize_html_and_log_attempt_shapes() -> None:
+    """Guards against silent shape drift between the runner and the verifier.
+
+    html_signals comes verbatim from _characterize_html (scraper.py) and
+    tier_trace from the generic adapter's _log_attempt entries. If either
+    field name changes upstream, this test breaks before a prod run does."""
+    characterize_html_output = {
+        "body_bytes": 40000,
+        "text_bytes": 12000,
+        "script_count": 8,
+        "iframe_count": 0,
+        "jsonld_block_count": 0,
+        "jsonld_types": [],
+        "framework_hints": [],
+        "spa_confidence": 0.1,
+        "rent_signal_count": 0,
+    }
+    log_attempt_trace = [
+        {"tier_key": "generic:api_narrow", "outcome": "ran_empty",
+         "units_found": 0, "reason": "no captured API responses", "duration_ms": 3},
+        {"tier_key": "generic:dom_scan", "outcome": "ran_empty",
+         "units_found": 0, "reason": "no DOM container matched", "duration_ms": 12},
+    ]
+    r = assess_publish_ceiling(
+        units=[],
+        plan_summaries=None,
+        html_signals=characterize_html_output,
+        tier_trace=log_attempt_trace,
+        page_html="<html><body>Sorry, there are no available units at this time.</body></html>",
+    )
+    # cascade observed to run empty + explicit marker + no rent/embed/vocab
+    assert r.verdict is PublishCeiling.CONFIRMED_NO_DATA
+    assert r.gold_eligible is True
+    assert r.evidence["tiers_ran_and_empty"] is True
