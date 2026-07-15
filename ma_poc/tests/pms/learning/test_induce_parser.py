@@ -86,6 +86,70 @@ def test_json_replay_from_raw_string_body() -> None:
     assert len(rows) == 3
 
 
+# ── nested / grouped (join) JSON induction ───────────────────────────────────
+# Units nested one level down under a group array (units-per-floorplan), the
+# apts247 objects[].units[] shape. The inducer must flatten via a [*] wildcard.
+_NESTED_BODY = {
+    "meta": {"total": 3},
+    "objects": [
+        {"id": "FP1", "name": "The Oak", "bed": 1,
+         "units": [
+             {"number": "101", "price": 1500, "sqft": 700},
+             {"number": "205", "price": 1550, "sqft": 700},
+         ]},
+        {"id": "FP2", "name": "The Elm", "bed": 2,
+         "units": [
+             {"number": "310", "price": 2100, "sqft": 1000},
+         ]},
+    ],
+}
+_NESTED_GOLD = [
+    {"unit_number": "101", "market_rent_low": 1500, "sqft": 700},
+    {"unit_number": "205", "market_rent_low": 1550, "sqft": 700},
+    {"unit_number": "310", "market_rent_low": 2100, "sqft": 1000},
+]
+
+
+def test_nested_group_array_induction() -> None:
+    parser, rep = induce_json_field_mapping(_NESTED_GOLD, _NESTED_BODY, "apts247/x")
+    assert parser is not None
+    # grouped envelope with the [*] wildcard
+    assert parser.envelope == "objects[*].units"
+    jp = parser.to_llm_field_mapping()["json_paths"]
+    assert jp["unit_number"] == "number"
+    assert jp["rent_low"] == "price"
+    assert rep.passed and rep.coverage == 1.0 and rep.id_fidelity == 1.0
+
+
+def test_nested_group_replay_flattens_all_units() -> None:
+    parser, _ = induce_json_field_mapping(_NESTED_GOLD, _NESTED_BODY, "x")
+    assert parser is not None
+    rows = replay(parser, _NESTED_BODY)
+    assert {r["unit_number"] for r in rows} == {"101", "205", "310"}
+
+
+def test_nested_array_under_fixed_index() -> None:
+    # AMLI shape: the unit groups live under a specific list index
+    # (queries[2].state.data[*].units), not index 0.
+    body = {"queries": [
+        {"state": {"data": "noise"}},
+        {"state": {"data": [{"x": 1}]}},
+        {"state": {"data": [
+            {"planId": "A", "units": [{"unitNumber": "12A", "rent": 1800}]},
+            {"planId": "B", "units": [{"unitNumber": "34B", "rent": 2400}]},
+        ]}},
+    ]}
+    gold = [
+        {"unit_number": "12A", "market_rent_low": 1800},
+        {"unit_number": "34B", "market_rent_low": 2400},
+    ]
+    parser, rep = induce_json_field_mapping(gold, body, "amli/x")
+    assert parser is not None
+    assert "[*]" in parser.envelope and "queries[2]" in parser.envelope
+    assert rep.passed
+    assert {r["unit_number"] for r in replay(parser, body)} == {"12A", "34B"}
+
+
 # ── DOM induction ────────────────────────────────────────────────────────────
 
 _WP = """
