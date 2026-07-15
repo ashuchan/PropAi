@@ -1893,11 +1893,34 @@ async def scrape(
             and adapter_result.units
             and page_html
         ):
+            import json as _json
+
             from ma_poc.pms.learning import induce_dom_selectors, parser_to_dict
 
             _idp, _idp_rep = induce_dom_selectors(adapter_result.units, page_html)
             if _idp is not None and _idp_rep.passed:
                 result["_induced_dom_parser"] = parser_to_dict(_idp)
+            # Instrumentation (measurement step 1): record the induction OUTCOME
+            # for EVERY attempt — pass or fail — so a flag-on run self-reports
+            # the DOM eligible-set rate and the container-signature cohorts.
+            # Offline archives can't measure this (raw_html is a pre-render
+            # shell), so the number only exists in a live flag-on run. Emitted
+            # as one JSON log line (grep "induced_dom_learning") and stashed on
+            # the result for any downstream aggregator.
+            _idp_report = {
+                "property_id": property_id or base_url,
+                "tier": adapter_result.tier_used or None,
+                "n_gold": len(adapter_result.units),
+                "passed": bool(_idp_rep.passed),
+                "coverage": round(_idp_rep.coverage, 3),
+                "id_fidelity": round(_idp_rep.id_fidelity, 3),
+                "matched": _idp_rep.matched,
+                "gold_total": _idp_rep.gold_total,
+                "container": (_idp.container if _idp is not None else None),
+                "reason": (_idp_rep.reasons[0] if _idp_rep.reasons else ""),
+            }
+            result["_induced_dom_report"] = _idp_report
+            log.info("induced_dom_learning %s", _json.dumps(_idp_report))
     except Exception:
         pass
 
