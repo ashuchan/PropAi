@@ -572,6 +572,65 @@ def record_explored_link(
             profile.navigation.explored_links = profile.navigation.explored_links[-_MAX_EXPLORED_LINKS:]
 
 
+def learn_induced_field_mappings(
+    profile: ScrapeProfile,
+    units: list[dict],
+    url_to_body: dict[str, Any],
+    *,
+    multi_source: bool = False,
+    max_bodies: int = 6,
+) -> int:
+    """Deterministically LEARN a replayable JSON field-mapping from this run's
+    own gold units + raw API bodies — no LLM, no cost.
+
+    Where ``save_llm_field_mapping`` persists a mapping the *LLM* produced,
+    this fires on EVERY successful API scrape (the platform adapters that
+    never invoke the LLM), inducing the mapping directly from the gold roster.
+    The inducer's own fidelity gate — the replayed mapping must reproduce the
+    gold roster keyed on the real marketing ``unit_number`` — means only
+    correct mappings are saved. Best-effort: never raises; a failed induction
+    just persists nothing. Only JSON parsers are persisted here (they map
+    1:1 to ``LlmFieldMapping`` + ``apply_saved_mapping`` replay); induced DOM
+    parsers are out of scope for this path.
+
+    Returns the number of mappings saved/upserted.
+    """
+    import os
+
+    if os.environ.get("ENABLE_INDUCED_MAPPING_LEARNING", "true").lower() == "false":
+        return 0
+    if not units or not url_to_body:
+        return 0
+    try:
+        from ma_poc.pms.learning import induce_fallback_parser
+    except Exception:
+        return 0
+
+    saved = 0
+    n = len(units)
+    for url, body in list(url_to_body.items())[:max_bodies]:
+        if body is None:
+            continue
+        try:
+            parser, report = induce_fallback_parser(units, body, api_url=url or "")
+        except Exception:
+            continue
+        if parser is None or parser.kind != "json" or not report.passed:
+            continue
+        try:
+            if save_llm_field_mapping(
+                profile,
+                parser.to_llm_field_mapping(),
+                expected_unit_count=n,
+                body_for_validation=body,
+                multi_source=multi_source,
+            ):
+                saved += 1
+        except Exception:
+            continue
+    return saved
+
+
 def update_profile_after_extraction(
     profile: ScrapeProfile,
     scrape_result: dict,
@@ -860,6 +919,18 @@ def update_profile_after_extraction(
 
     llm_analysis = scrape_result.get("_llm_analysis_results", {})
     is_multi_source = len(llm_analysis) > 1
+
+    # Deterministic ($0, no-LLM) self-learning: induce a replayable JSON field
+    # mapping straight from this run's gold units + raw API bodies and persist
+    # it — fires on every successful API scrape, not just LLM runs. The
+    # inducer's fidelity gate guarantees only mappings that reproduce the
+    # marketing unit# roster are saved. Best-effort; never raises.
+    learn_induced_field_mappings(
+        profile,
+        scrape_result.get("units", []) or [],
+        url_to_body,
+        multi_source=is_multi_source,
+    )
     # Per-URL verdict cache the LLM produced this run. Maintains the
     # ``llm_artifacts.last_api_analysis_results`` field so the cascade
     # can future-skip re-analysing the same URL when the verdict is
@@ -1101,6 +1172,7 @@ def update_fetch_profile_after_fetch(
         return profile
     try:
         from datetime import UTC
+
         from ma_poc.models.fetch_tier import FetchTier
         from ma_poc.observability.events import EventKind, emit
 
