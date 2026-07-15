@@ -9,6 +9,14 @@ AUDIT_DOC = REPO_ROOT / "docs" / "STEALTH_SHIM_AUDIT.md"
 
 _FORBIDDEN_SHIMS = ("playwright_stealth",)
 _PLAYWRIGHT_SHIMS = ("patchright", "rebrowser_playwright", "playwright")
+# Anti-detection ("stealth") Playwright forks. At most ONE of these may be
+# used in fetch/ — mixing stealth forks is the accident the S1 rule guards
+# against. Vanilla ``playwright`` is NOT a stealth fork: it is deliberately
+# used by the clean "2a" residential-render tier
+# (fetch/providers/residential_render.py), which must ship a real, un-patched
+# browser. That documented exception is why it is excluded here. See
+# docs/STEALTH_SHIM_AUDIT.md.
+_STEALTH_SHIMS = ("patchright", "rebrowser_playwright")
 
 
 def _read_all_py(root: Path) -> dict[Path, str]:
@@ -26,16 +34,21 @@ def test_s1_no_playwright_stealth_imports() -> None:
 
 
 def test_s1_single_playwright_shim() -> None:
-    """At most one of {patchright, rebrowser_playwright, playwright} is imported in fetch/."""
-    found: dict[str, list[str]] = {s: [] for s in _PLAYWRIGHT_SHIMS}
+    """At most ONE stealth Playwright fork in fetch/.
+
+    Vanilla ``playwright`` is permitted (the documented 2a exception — the
+    clean residential-render tier deliberately uses a non-stealth browser);
+    the rule only forbids mixing multiple STEALTH forks.
+    """
+    found: dict[str, list[str]] = {s: [] for s in _STEALTH_SHIMS}
     for path, text in _read_all_py(FETCH_DIR).items():
-        for shim in _PLAYWRIGHT_SHIMS:
+        for shim in _STEALTH_SHIMS:
             if f"from {shim}." in text or f"import {shim}" in text:
                 found[shim].append(str(path.relative_to(REPO_ROOT)))
     used = [s for s, files in found.items() if files]
-    assert len(used) == 1, (
-        f"expected exactly one shim in ma_poc/fetch/; found {len(used)}: {used}. "
-        f"Details: {found}"
+    assert len(used) <= 1, (
+        f"expected at most one STEALTH shim in ma_poc/fetch/; found {len(used)}: "
+        f"{used}. Details: {found}"
     )
 
 

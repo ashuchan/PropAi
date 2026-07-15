@@ -27,8 +27,49 @@ WIDGET-dual-use (only trusted when ``body_size`` is below the
 from __future__ import annotations
 
 import logging
+from enum import StrEnum
 
 log = logging.getLogger(__name__)
+
+
+class ChallengeKind(StrEnum):
+    """How an anti-bot interstitial should be handled by a real-browser render.
+
+    This is the legal boundary for the clean "2a" residential-render tier
+    (:mod:`ma_poc.fetch.providers.residential_render`): a real browser is
+    allowed to *pass* a challenge only by rendering the page and *waiting*
+    for the site's own JavaScript to clear it — the same thing every human
+    visitor's browser does. It is NEVER allowed to *solve* a challenge
+    (click a widget, answer an image grid, run a CAPTCHA solver).
+    """
+
+    #: No challenge — the body is the real content.
+    NONE = "NONE"
+    #: A JavaScript interstitial (Cloudflare "Just a moment…", managed
+    #: challenge) that a real browser clears on its own by executing the
+    #: page's JS and waiting. Passing it = "being a browser", not defeating
+    #: a control. The render tier waits and re-checks.
+    PASSABLE_JS = "PASSABLE_JS"
+    #: An INTERACTIVE captcha (hCaptcha, reCAPTCHA image grid, PerimeterX
+    #: press-and-hold, Sucuri "Robot Challenge Screen") that requires a
+    #: human action to clear. The render tier must ABORT here — never click,
+    #: never solve. Reaching one means the site is gating with a real
+    #: access control and we go out of scope.
+    INTERACTIVE = "INTERACTIVE"
+
+
+# Providers whose interstitial a real browser clears by executing JS +
+# waiting (no human action). Cloudflare's managed / JS challenge is the
+# canonical case. If it does NOT clear within the wait budget, the render
+# tier treats it as still-blocked and aborts — it never interacts.
+_PASSABLE_JS_PROVIDERS: frozenset[str] = frozenset({"cloudflare"})
+
+# Providers whose interstitial requires a human action. The render tier
+# aborts on sight — solving/clicking these is exactly the line we won't
+# cross.
+_INTERACTIVE_PROVIDERS: frozenset[str] = frozenset(
+    {"recaptcha", "hcaptcha", "perimeterx", "sucuri"}
+)
 
 # Real captcha CHALLENGE pages are small — typically 3-15 KB of minimal
 # layout + the challenge widget. Real content pages with embedded
@@ -139,3 +180,33 @@ def looks_like_captcha(
                     return True, provider
 
     return False, None
+
+
+def classify_challenge(
+    body: bytes,
+    body_size: int | None = None,
+) -> tuple[ChallengeKind, str | None]:
+    """Classify an anti-bot interstitial for the clean render tier.
+
+    Wraps :func:`looks_like_captcha` and maps the detected provider to a
+    :class:`ChallengeKind`, which decides the render tier's behaviour:
+
+      * ``NONE``        → the body is real content; return it.
+      * ``PASSABLE_JS`` → a Cloudflare JS/managed challenge; a real browser
+        clears it by executing the page JS and waiting. The tier waits and
+        re-checks; it never interacts.
+      * ``INTERACTIVE`` → an hCaptcha / reCAPTCHA / PerimeterX / Sucuri
+        challenge that needs a human action; the tier ABORTS (never solves).
+
+    Returns ``(kind, provider_or_none)``. This is a pure function — the
+    same body-size guard as :func:`looks_like_captcha` applies so real
+    pages that merely embed a captcha widget are ``NONE``.
+    """
+    is_captcha, provider = looks_like_captcha(body, body_size)
+    if not is_captcha:
+        return ChallengeKind.NONE, None
+    if provider in _PASSABLE_JS_PROVIDERS:
+        return ChallengeKind.PASSABLE_JS, provider
+    # Any recognised non-JS provider (or an unexpected/unknown one) is
+    # treated as interactive — we fail safe toward NOT interacting.
+    return ChallengeKind.INTERACTIVE, provider

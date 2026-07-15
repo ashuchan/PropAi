@@ -47,6 +47,19 @@ ENABLE_FLARESOLVERR_TIER: Final[bool] = (
     os.environ.get("ENABLE_FLARESOLVERR_TIER", "false").lower() == "true"
 )
 
+# Clean "2a" residential-render tier — a REAL (non-stealth) browser rendering
+# through a residential proxy that passes JS challenges by WAITING and ABORTS
+# on interactive captchas (never a solver). Positioned after RESIDENTIAL in
+# the ladder. For the defensible "be a normal browser, don't defeat controls"
+# posture, run it with the two solver tiers OFF:
+#   ENABLE_RESIDENTIAL_RENDER_TIER=true
+#   ENABLE_UNLOCKER_TIER=false  ENABLE_FLARESOLVERR_TIER=false
+# See fetch/providers/residential_render.py. Default off.
+ENABLE_RESIDENTIAL_RENDER_TIER: Final[bool] = (
+    ENABLE_TIER_ESCALATION
+    and os.environ.get("ENABLE_RESIDENTIAL_RENDER_TIER", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.
