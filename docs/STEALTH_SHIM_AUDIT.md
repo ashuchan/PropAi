@@ -80,3 +80,29 @@ from patchright.async_api import Browser, BrowserContext, Page  # (TYPE_CHECKING
 ```
 
 No other code changes are required — patchright's API surface is a drop-in superset of playwright's.
+
+---
+
+## 2026-07-14 — documented exception: vanilla `playwright` for the clean "2a" render tier
+
+The single-shim rule (`test_s1_single_playwright_shim`) protects against
+accidentally mixing multiple **stealth** Playwright forks. It was tightened
+to `_STEALTH_SHIMS = (patchright, rebrowser_playwright)` so that vanilla
+`playwright` is now explicitly **permitted** alongside patchright.
+
+**Why:** the clean **"2a" residential-render tier**
+(`ma_poc/fetch/providers/residential_render.py`) must ship a *real,
+un-patched* browser — its entire (legal) value is being an ordinary browser
+that passes JS challenges by waiting, never an anti-detection build. patchright
+is a stealth fork (removes automation signals) and is **Chromium-only**, so it
+cannot deliver either (a) the non-stealth posture or (b) a Firefox engine.
+
+**Scope of the exception:**
+- `browser_pool.BrowserContextPool(driver=...)` selects the shim:
+  `"patchright"` (default — the existing bot-blocked render path, unchanged)
+  or `"playwright"` (vanilla — used ONLY by the 2a tier).
+- Vanilla `playwright` must not be used to build a *stealth* browser; the 2a
+  tier applies no fingerprint patching.
+
+**Invariant preserved:** at most one *stealth* fork (patchright). Adding a
+second stealth fork (e.g. `rebrowser_playwright`) still fails the test.

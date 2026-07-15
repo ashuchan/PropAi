@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 from ma_poc.config.feature_flags import (
     ENABLE_DC_PROXY_TIER,
     ENABLE_FLARESOLVERR_TIER,
+    ENABLE_RESIDENTIAL_RENDER_TIER,
     ENABLE_RESIDENTIAL_TIER,
     ENABLE_TIER_ESCALATION,
     ENABLE_UNLOCKER_TIER,
@@ -51,6 +52,11 @@ PROBE_MIN_INTERVAL_HOURS: int = 24
 TIER_SKIP_RULES: dict[FetchTier, set[FetchTier]] = {
     FetchTier.DC_PROXY: {FetchTier.DIRECT},
     FetchTier.RESIDENTIAL: {FetchTier.DIRECT, FetchTier.DC_PROXY},
+    FetchTier.RESIDENTIAL_RENDER: {
+        FetchTier.DIRECT,
+        FetchTier.DC_PROXY,
+        FetchTier.RESIDENTIAL,
+    },
     FetchTier.UNLOCKER: {FetchTier.DIRECT, FetchTier.DC_PROXY, FetchTier.RESIDENTIAL},
 }
 
@@ -75,11 +81,20 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
         (FetchTier.DIRECT, True),
         (FetchTier.DC_PROXY, ENABLE_DC_PROXY_TIER),
         (FetchTier.RESIDENTIAL, _residential_on),
+        # Clean "2a" render tier: a real browser on residential that passes
+        # JS challenges by waiting and aborts on interactive captchas. Placed
+        # BEFORE the solver tiers so a defensible render is tried first; run
+        # it with the solvers off for the clean posture.
+        (FetchTier.RESIDENTIAL_RENDER, ENABLE_RESIDENTIAL_RENDER_TIER),
         # FlareSolverr sits between RESIDENTIAL and UNLOCKER. It handles CF
         # JS challenges locally (no proxy cost) but can't bypass WAF blocks.
         (FetchTier.FLARESOLVERR, ENABLE_FLARESOLVERR_TIER),
         (FetchTier.UNLOCKER, ENABLE_UNLOCKER_TIER),
     ]
+    # Explicit list order sets the attempt order; the ``t >= floor`` guard
+    # only filters by the property's tier floor. RESIDENTIAL_RENDER's high
+    # int value means it always passes that guard (always available when its
+    # flag is on) — see FetchTier.RESIDENTIAL_RENDER.
     return [t for t, enabled in all_tiers if enabled and t >= floor]
 
 
@@ -132,6 +147,11 @@ def _make_provider(tier: FetchTier) -> "FetchProvider":
     if tier == FetchTier.RESIDENTIAL:
         from ma_poc.fetch.providers.residential import ResidentialProvider
         return ResidentialProvider()
+    if tier == FetchTier.RESIDENTIAL_RENDER:
+        from ma_poc.fetch.providers.residential_render import (
+            ResidentialRenderProvider,
+        )
+        return ResidentialRenderProvider()
     if tier == FetchTier.UNLOCKER:
         from ma_poc.fetch.providers.unlocker import UnlockerProvider
         return UnlockerProvider()

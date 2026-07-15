@@ -60,3 +60,18 @@ def test_carry_forward_fires_on_fetch_hard_fail() -> None:
     should, reason = should_carry_forward(None, fetch_outcome="HARD_FAIL")
     assert should is True
     assert "HARD_FAIL" in reason
+
+
+# ── human-review tagging for the clean render tier's interactive-challenge tail ──
+
+def test_carry_forward_reason_tags_captcha_for_review() -> None:
+    from ma_poc.discovery.carry_forward import (
+        INTERACTIVE_CAPTCHA_REVIEW,
+        carry_forward_reason_for,
+    )
+
+    # interactive challenge (render tier aborted, captcha_detected=True) → review queue
+    assert carry_forward_reason_for("bot_blocked", True) == INTERACTIVE_CAPTCHA_REVIEW
+    # routine carry-forward (no captcha) → reason unchanged
+    assert carry_forward_reason_for("not_modified", False) == "not_modified"
+    assert carry_forward_reason_for("transient", False) == "transient"

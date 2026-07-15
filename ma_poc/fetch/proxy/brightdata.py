@@ -79,6 +79,7 @@ class BrightDataProvider:
         tier: ProxyTier,
         canonical_id: str,
         country: str = "us",
+        state: str | None = None,
         session_salt: int = 0,
     ) -> ProxyConfig:
         """Build a per-request ProxyConfig.
@@ -89,6 +90,12 @@ class BrightDataProvider:
                 the session-id so retries on the same property hit the
                 same exit IP within the BrightData session TTL.
             country: ISO 3166-1 alpha-2 country hint for IP geo.
+            state: Optional BrightData US-state slug (e.g. ``"california"``)
+                to target the exit IP's region so it matches the browser's
+                timezone offset (an honest consistency fix for the render
+                tier). ``None`` = country-level targeting only. Requires a
+                plan that supports state targeting; callers should treat a
+                proxy error as a signal to fall back to ``None``.
             session_salt: Bump to force BrightData to issue a fresh
                 exit IP for ``canonical_id``. Salt 0 (default) is the
                 original sticky behavior; a positive salt produces a
@@ -106,7 +113,7 @@ class BrightDataProvider:
 
         zone = self.zones[tier]
         session_id = self._session_id(canonical_id, session_salt=session_salt)
-        username = self._build_username(zone.zone_name, country, session_id)
+        username = self._build_username(zone.zone_name, country, session_id, state=state)
         return ProxyConfig(
             tier=tier,
             server=f"http://{BRIGHTDATA_HOST}:{BRIGHTDATA_PORT}",
@@ -138,11 +145,15 @@ class BrightDataProvider:
         digest = hashlib.sha256(hash_input.encode()).hexdigest()
         return f"s{digest[:10]}"
 
-    def _build_username(self, zone: str, country: str, session_id: str) -> str:
-        # brd-customer-{id}-zone-{zone}-country-{cc}-session-{sid}
+    def _build_username(
+        self, zone: str, country: str, session_id: str, *, state: str | None = None
+    ) -> str:
+        # brd-customer-{id}-zone-{zone}-country-{cc}[-state-{st}]-session-{sid}
+        state_seg = f"-state-{state.lower()}" if state else ""
         return (
             f"brd-customer-{self.customer_id}"
             f"-zone-{zone}"
             f"-country-{country.lower()}"
+            f"{state_seg}"
             f"-session-{session_id}"
         )

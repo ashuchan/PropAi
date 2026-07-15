@@ -23,6 +23,22 @@ log = logging.getLogger(__name__)
 
 _DATE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+#: carry-forward reason used when a property carried forward because the clean
+#: render tier hit an interactive challenge it will NOT solve (interactive
+#: CAPTCHA, or a Cloudflare JS challenge that never auto-cleared). These are
+#: the human-review / authorized-feed candidates — an operator can filter the
+#: run's carry-forwards on this reason to get the review queue, distinct from
+#: routine (transient / not-modified) carry-forwards that self-resolve.
+INTERACTIVE_CAPTCHA_REVIEW = "interactive_captcha_review"
+
+
+def carry_forward_reason_for(base_reason: str, captcha_detected: bool) -> str:
+    """Tag a carry-forward for human review when it was a challenge we won't
+    solve. Returns :data:`INTERACTIVE_CAPTCHA_REVIEW` when ``captcha_detected``
+    (the clean render tier aborted on an interactive/never-clearing challenge),
+    else the original ``base_reason`` unchanged."""
+    return INTERACTIVE_CAPTCHA_REVIEW if captcha_detected else base_reason
+
 
 def carry_forward_property(
     property_id: str,

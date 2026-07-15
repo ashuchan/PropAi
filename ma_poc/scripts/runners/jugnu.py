@@ -845,7 +845,18 @@ async def _process_property(
         should_cf, reason = should_carry_forward(None, fetch_outcome=outcome_val)
         if should_cf:
             # Try carry-forward from prior state
-            from ma_poc.discovery.carry_forward import carry_forward_property
+            from ma_poc.discovery.carry_forward import (
+                carry_forward_property,
+                carry_forward_reason_for,
+            )
+
+            # Tag interactive-challenge carry-forwards for the human-review
+            # queue: the clean render tier aborts (never solves) on interactive
+            # CAPTCHA / never-clearing CF JS, stamping captcha_detected. This
+            # makes them filterable, distinct from routine carry-forwards.
+            reason = carry_forward_reason_for(
+                reason, getattr(fetch_result, "captcha_detected", False)
+            )
 
             try:
                 # Use the run-level shared StateStore when available so
@@ -1713,8 +1724,8 @@ def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
     are never modified.
 
     Returns count of rewritten rows."""
-    from collections import defaultdict
     import hashlib as _hl
+    from collections import defaultdict
 
     groups: dict[str, list[int]] = defaultdict(list)
     for i, u in enumerate(units):

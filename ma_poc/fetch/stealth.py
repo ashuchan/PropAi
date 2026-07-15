@@ -200,6 +200,33 @@ _IDENTITIES: list[Identity] = [
 ]
 
 
+# ── Geo consistency for the clean 2a render tier ────────────────────────────
+# A realistic desktop screen. Headless browsers report a tiny/absent
+# ``window.screen`` (a classic automation tell); a real monitor is ~1080p.
+# Fixed (not randomised) — a real screen, not an evasion of fingerprint
+# tracking. Must be >= the identity viewport.
+REALISTIC_SCREEN: tuple[int, int] = (1920, 1080)
+
+# Map each US identity timezone to a BrightData residential *state* slug so the
+# render tier can make the EXIT IP's region match the browser's timezone
+# (IP UTC-offset == browser UTC-offset). This is an HONEST consistency fix —
+# a real visitor from that IP has that timezone — NOT fingerprint spoofing.
+_TZ_TO_BRIGHTDATA_STATE: dict[str, str] = {
+    "America/New_York": "new_york",
+    "America/Chicago": "illinois",
+    "America/Denver": "colorado",
+    "America/Los_Angeles": "california",
+}
+
+
+def brightdata_state_for_timezone(timezone_id: str) -> str | None:
+    """Return the BrightData US-state slug whose UTC offset matches
+    ``timezone_id``, or ``None`` when there is no confident mapping (caller
+    falls back to country-level US targeting — still consistent at the
+    country granularity CF/DataDome check most often)."""
+    return _TZ_TO_BRIGHTDATA_STATE.get(timezone_id)
+
+
 class IdentityPool:
     """Rotates through curated browser identities.
 
@@ -243,6 +270,22 @@ class IdentityPool:
         rotation = self._rotations.get(sticky_key, 0)
         idx = (self._hash_key(sticky_key) + rotation) % len(chrome_ids)
         return chrome_ids[idx]
+
+    def pick_family(self, families: tuple[str, ...], sticky_key: str) -> Identity:
+        """Like :meth:`pick`, restricted to the given browser families.
+
+        Lets a render tier match the UA to the actual engine it launches
+        (e.g. a Firefox identity for a Firefox engine) — a Chrome UA on a
+        Firefox engine (or vice-versa) is a self-inflicted inconsistency.
+        Falls back to the full pool when no identity matches, so callers
+        never crash.
+        """
+        matches = [i for i in self._identities if i.browser_family in families]
+        if not matches:
+            return self.pick(sticky_key)
+        rotation = self._rotations.get(sticky_key, 0)
+        idx = (self._hash_key(sticky_key) + rotation) % len(matches)
+        return matches[idx]
 
     def rotate(self, sticky_key: str) -> None:
         """Rotate to a different identity for the given key.

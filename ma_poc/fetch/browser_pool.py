@@ -191,25 +191,70 @@ class BrowserContextPool:
 
     Args:
         max_contexts: Maximum concurrent contexts.
+        driver: ``"patchright"`` (default — the stealth-Chromium fork used by
+            the existing bot-blocked render path) or ``"playwright"`` (vanilla,
+            un-patched — required by the clean "2a" residential-render tier so
+            it does NOT ship an anti-detection browser).
+        engine: ``"chromium"`` (default) or ``"firefox"``.
+        headless: ``True`` (default; modern Playwright launches new-headless)
+            or ``False`` for a headful window (needs a display / xvfb on
+            headless hosts — passes CF challenges far better).
+        channel: e.g. ``"chrome"`` to drive the stock installed Chrome instead
+            of the bundled Chromium (more genuinely a real browser). Chromium
+            only; ignored for Firefox. ``None`` = bundled build.
+
+    Defaults reproduce the previous behaviour exactly (patchright / chromium /
+    headless / bundled), so existing callers are unaffected.
     """
 
-    def __init__(self, max_contexts: int = 1) -> None:
+    def __init__(
+        self,
+        max_contexts: int = 1,
+        *,
+        driver: str = "patchright",
+        engine: str = "chromium",
+        headless: bool = True,
+        channel: str | None = None,
+    ) -> None:
         self._max_contexts = max_contexts
         self._semaphore = asyncio.Semaphore(max_contexts)
         self._browser: Browser | None = None
         self._lock = asyncio.Lock()
         self._active_contexts: list[BrowserContext] = []
+        self._driver = driver
+        self._engine = engine
+        self._headless = headless
+        self._channel = channel
 
     async def _ensure_browser(self) -> Browser:
         """Launch browser if not already running."""
         if self._browser is None or not self._browser.is_connected():
             async with self._lock:
                 if self._browser is None or not self._browser.is_connected():
-                    from patchright.async_api import async_playwright
+                    # Vanilla ``playwright`` is used ONLY by the clean 2a
+                    # residential-render tier (driver="playwright"), which
+                    # deliberately ships a real, un-patched browser; every other
+                    # caller uses the patchright stealth fork. Single dynamic
+                    # import so the two shims' differing types don't collide.
+                    # See docs/STEALTH_SHIM_AUDIT.md for the documented exception.
+                    import importlib
 
-                    pw = await async_playwright().start()
-                    self._browser = await pw.chromium.launch(headless=True)
-                    log.info("Launched Playwright browser")
+                    _mod = importlib.import_module(
+                        "playwright.async_api"
+                        if self._driver == "playwright"
+                        else "patchright.async_api"
+                    )
+                    pw = await _mod.async_playwright().start()
+                    launcher = pw.firefox if self._engine == "firefox" else pw.chromium
+                    launch_kwargs: dict[str, object] = {"headless": self._headless}
+                    # ``channel`` (stock Chrome) applies to Chromium only.
+                    if self._channel and self._engine == "chromium":
+                        launch_kwargs["channel"] = self._channel
+                    self._browser = await launcher.launch(**launch_kwargs)
+                    log.info(
+                        "Launched %s/%s browser (headless=%s channel=%s)",
+                        self._driver, self._engine, self._headless, self._channel,
+                    )
         return self._browser
 
     async def acquire(
@@ -234,9 +279,15 @@ class BrowserContextPool:
         await self._semaphore.acquire()
         browser = await self._ensure_browser()
 
+        from ma_poc.fetch.stealth import REALISTIC_SCREEN
+
         context_opts: dict[str, object] = {
             "user_agent": identity.user_agent,
             "viewport": {"width": identity.viewport[0], "height": identity.viewport[1]},
+            # A real desktop monitor. Headless browsers report a tiny/absent
+            # ``window.screen`` (a classic automation tell); pin a realistic,
+            # fixed 1080p screen (>= viewport). Honest realism, not evasion.
+            "screen": {"width": REALISTIC_SCREEN[0], "height": REALISTIC_SCREEN[1]},
             "locale": identity.accept_language.split(",")[0],
             # Inject timezone matching the identity's plausible US region.
             # Without this, Playwright contexts on a UTC host (Cloud Run, CI)
