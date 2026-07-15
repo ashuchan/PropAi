@@ -249,6 +249,11 @@ class DomHints(BaseModel):
     field_selectors: FieldSelectorMap = Field(default_factory=FieldSelectorMap)
     jsonld_present: bool = False
     availability_page_sections: list[str] = Field(default_factory=list)  # CSS selectors for unit sections
+    # API-supervised DOM parser (serialized InducedParser, kind="dom"), learned
+    # from a prior run's API gold and gated to reproduce the marketing unit#
+    # roster. Replayed ($0) on the rendered HTML as a marketing-page fallback
+    # when the API path yields nothing. None until a DOM induction passes.
+    induced_dom_parser: dict[str, Any] | None = None
     # Phase 8: drift eviction — clear field_selectors after 3 consecutive misses
     consecutive_misses: int = 0
     # Save-time replay quality for ``field_selectors``. Recorded by

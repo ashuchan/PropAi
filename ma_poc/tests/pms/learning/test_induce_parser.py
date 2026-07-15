@@ -235,3 +235,36 @@ def test_fallback_prefers_json_for_json_body() -> None:
 def test_fallback_uses_dom_for_html_body() -> None:
     parser, rep = induce_fallback_parser(_GOLD_DOM, _WP)
     assert parser is not None and parser.kind == "dom" and rep.passed
+
+
+# ── persistence + DOM replay-into-pipeline ───────────────────────────────────
+
+def test_parser_serialize_roundtrip() -> None:
+    from ma_poc.pms.learning.induce_parser import parser_from_dict, parser_to_dict
+
+    parser, _ = induce_dom_selectors(_GOLD_DOM, _WP)
+    assert parser is not None
+    d = parser_to_dict(parser)
+    assert d["kind"] == "dom" and d["container"] == "a.individual-item"
+    back = parser_from_dict(d)
+    # round-trip replay reproduces the same unit numbers
+    assert {r["unit_number"] for r in replay(back, _WP)} == {"308", "209"}
+
+
+def test_replay_induced_dom_to_units_maps_pipeline_keys() -> None:
+    from ma_poc.pms.learning import parser_to_dict, replay_induced_dom_to_units
+
+    parser, _ = induce_dom_selectors(_GOLD_DOM, _WP)
+    assert parser is not None
+    units = replay_induced_dom_to_units(parser_to_dict(parser), _WP)
+    assert {u["unit_number"] for u in units} == {"308", "209"}
+    u0 = next(u for u in units if u["unit_number"] == "308")
+    assert u0["market_rent_low"] == 1030          # rent_low → market_rent_low, int
+    assert u0["extraction_tier"] == "TIER_1_INDUCED_DOM_REPLAY"
+
+
+def test_replay_induced_dom_to_units_safe_on_junk() -> None:
+    from ma_poc.pms.learning import replay_induced_dom_to_units
+
+    assert replay_induced_dom_to_units({"kind": "json"}, "<html></html>") == []  # non-dom
+    assert replay_induced_dom_to_units({}, "") == []                              # empty

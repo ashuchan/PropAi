@@ -931,6 +931,12 @@ def update_profile_after_extraction(
         url_to_body,
         multi_source=is_multi_source,
     )
+    # Persist a marketing-page DOM parser learned this run (scraper.py induced
+    # it from gold + rendered HTML and stashed the serialized, fidelity-gated
+    # form). Replayed as a $0 marketing-DOM fallback when the API path fails.
+    _induced_dom = scrape_result.get("_induced_dom_parser")
+    if isinstance(_induced_dom, dict) and _induced_dom.get("kind") == "dom":
+        profile.dom_hints.induced_dom_parser = _induced_dom
     # Per-URL verdict cache the LLM produced this run. Maintains the
     # ``llm_artifacts.last_api_analysis_results`` field so the cascade
     # can future-skip re-analysing the same URL when the verdict is

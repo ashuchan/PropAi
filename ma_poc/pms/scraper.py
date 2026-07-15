@@ -1879,6 +1879,28 @@ async def scrape(
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
 
+    # Learn a marketing-page DOM parser from this run's gold units + rendered
+    # HTML ($0, no LLM) → serialized parser stashed for profile_updater to
+    # persist, then replayed on a future run when the API path yields nothing.
+    # Only kept if it reproduces the marketing unit# roster (induction fidelity
+    # gate). DOM induction re-parses the full HTML, so unlike the cheap JSON
+    # path it is OPT-IN (default off) — enable to build the DOM-fallback corpus.
+    try:
+        import os as _os
+
+        if (
+            _os.environ.get("ENABLE_INDUCED_DOM_LEARNING", "false").lower() == "true"
+            and adapter_result.units
+            and page_html
+        ):
+            from ma_poc.pms.learning import induce_dom_selectors, parser_to_dict
+
+            _idp, _idp_rep = induce_dom_selectors(adapter_result.units, page_html)
+            if _idp is not None and _idp_rep.passed:
+                result["_induced_dom_parser"] = parser_to_dict(_idp)
+    except Exception:
+        pass
+
     # --- Step 9b: API-concession rescan on adapter-initiated responses ---
     # Step 3b (above) scanned ctx._api_responses — the responses the
     # Playwright route interceptor caught during the initial page render.
