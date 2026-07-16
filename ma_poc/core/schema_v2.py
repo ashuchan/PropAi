@@ -181,6 +181,23 @@ def build_v2_property(
     return prop
 
 
+def _is_floor_plan_level(unit: dict) -> bool:
+    """True if the unit is a plan-LEVEL placeholder, not a real individual unit.
+
+    Stamped explicitly on the output so downstream (and our own audits) can
+    tell a floor-plan placeholder apart from a real-unit-missing-an-id without
+    fragile inference over the synthetic-id + UNAVAILABLE + no-available_units
+    combo. Signals: the adapter's own ``data_quality_flag`` (SightMap sets
+    ``SIGHTMAP_PLAN_PRESENCE`` for plans with no units) or a ``*_PLAN_LEVEL``
+    extraction tier.
+    """
+    dqf = str(unit.get("data_quality_flag") or "").upper()
+    if "PLAN_PRESENCE" in dqf or "PLAN_LEVEL" in dqf:
+        return True
+    tier = str(unit.get("extraction_tier") or unit.get("_extraction_tier") or "").upper()
+    return tier.endswith("_PLAN_LEVEL")
+
+
 def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> dict:
     """Transform a single internal unit dict to V2 unit format.
 
@@ -289,6 +306,10 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
+        # SightMap plans with no available units) so consumers don't mistake
+        # them for real units missing an id.
+        "is_floor_plan_level": _is_floor_plan_level(unit),
         "rent_low": _format_rent(rent_lo),
         "rent_high": _format_rent(rent_hi),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
