@@ -11,9 +11,24 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from .contracts import CrawlTask, TaskReason
+from .rediscovery import (
+    RediscoveryEngine,
+    RediscoveryEntry,
+    RediscoveryResult,
+    RediscoveryStatus,
+)
 from .scheduler import Scheduler
 
-__all__ = ["CrawlTask", "TaskReason", "build_tasks_for_run", "record_task_outcome"]
+__all__ = [
+    "CrawlTask",
+    "RediscoveryEngine",
+    "RediscoveryEntry",
+    "RediscoveryResult",
+    "RediscoveryStatus",
+    "TaskReason",
+    "build_tasks_for_run",
+    "record_task_outcome",
+]
 
 
 async def build_tasks_for_run(
