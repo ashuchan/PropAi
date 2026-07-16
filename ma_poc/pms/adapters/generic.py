@@ -2886,6 +2886,44 @@ class GenericAdapter:
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
             _log_attempt("generic:dom_scan", "skipped", reason="no HTML body available")
 
+        # Sub-tier 5.9: induced DOM-parser replay ($0, no LLM) ------------
+        # Last deterministic attempt before paying for the LLM: replay a
+        # marketing-page DOM parser a PRIOR run learned from this property's
+        # own API gold (persisted only if it reproduced the marketing unit#
+        # roster — the induction fidelity gate). This is the API-supervised
+        # DOM fallback: when the API path yields nothing this run, read the
+        # units straight from the rendered page with the learned selectors.
+        if not result.units and ctx.profile is not None:
+            _idp = getattr(ctx.profile.dom_hints, "induced_dom_parser", None)
+            if _idp:
+                _t0 = _time.monotonic()
+                try:
+                    from ma_poc.pms.learning import replay_induced_dom_to_units
+
+                    _html = await _get_page_html(page, ctx)
+                    _dom_units = replay_induced_dom_to_units(_idp, _html or "")
+                    if _dom_units:
+                        result.units = _dom_units
+                        result.tier_used = "TIER_1_INDUCED_DOM_REPLAY"
+                        result.winning_url = ctx.base_url
+                        result.confidence = min(0.88, 0.7 + 0.03 * len(_dom_units))
+                        _log_attempt(
+                            "generic:induced_dom_replay", "ran_units",
+                            units=len(_dom_units),
+                            duration_ms=int((_time.monotonic() - _t0) * 1000),
+                        )
+                        return result
+                    _log_attempt(
+                        "generic:induced_dom_replay", "ran_empty",
+                        duration_ms=int((_time.monotonic() - _t0) * 1000),
+                    )
+                except Exception as _exc:
+                    _log_attempt(
+                        "generic:induced_dom_replay", "error",
+                        reason=str(_exc)[:80],
+                        duration_ms=int((_time.monotonic() - _t0) * 1000),
+                    )
+
         # Sub-tier 6: LLM extraction --------------------------------------
         # Originally gated ON only for ``pms=unknown``. Option C relaxes
         # that gate: if the detected adapter returned empty BUT the page

@@ -664,3 +664,85 @@ def induce_fallback_parser(
         return parser, report
 
     return None, InductionReport(False, 0.0, 0.0, 0, len(gold_units), 0, reasons=["body is neither JSON nor HTML"])
+
+
+# ── persistence + DOM replay-into-pipeline ───────────────────────────────────
+
+
+def parser_to_dict(parser: InducedParser) -> dict[str, Any]:
+    """Serialize an InducedParser for storage on a profile (JSON-safe)."""
+    return {
+        "kind": parser.kind,
+        "envelope": parser.envelope,
+        "container": parser.container,
+        "source_ref": parser.source_ref,
+        "field_rules": {
+            f: {"kind": r.kind, "ref": r.ref} for f, r in parser.field_rules.items()
+        },
+    }
+
+
+def parser_from_dict(d: dict[str, Any]) -> InducedParser:
+    """Rebuild an InducedParser from :func:`parser_to_dict` output."""
+    rules = {
+        f: FieldRule(kind=str(v.get("kind", "")), ref=v.get("ref"))
+        for f, v in (d.get("field_rules") or {}).items()
+        if isinstance(v, dict)
+    }
+    return InducedParser(
+        kind=str(d.get("kind", "")),
+        envelope=str(d.get("envelope", "")),
+        container=str(d.get("container", "")),
+        field_rules=rules,
+        source_ref=str(d.get("source_ref", "")),
+    )
+
+
+# inducer canonical field -> pipeline unit-dict key
+_INDUCED_TO_UNIT_KEY: dict[str, str] = {
+    "unit_number": "unit_number",
+    "rent_low": "market_rent_low",
+    "rent_high": "market_rent_high",
+    "bedrooms": "bedrooms",
+    "bathrooms": "bathrooms",
+    "sqft": "sqft",
+    "floor_plan_name": "floor_plan_name",
+    "availability_date": "availability_date",
+}
+_INDUCED_INT_FIELDS = ("rent_low", "rent_high")
+
+
+def replay_induced_dom_to_units(parser_dict: dict[str, Any], html: str) -> list[dict[str, Any]]:
+    """Deserialize a persisted induced DOM parser, replay it on ``html``, and
+    map the recovered rows to the pipeline's unit-dict keys
+    (``unit_number`` / ``market_rent_low`` / …). Returns ``[]`` on any failure
+    or for a non-DOM parser. The single entry point generic.py calls — all the
+    replay logic lives here (testable), keeping the adapter footprint one line.
+    """
+    try:
+        parser = parser_from_dict(parser_dict)
+        if parser.kind != "dom" or not html:
+            return []
+        rows = replay(parser, html)
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        un = str(r.get("unit_number") or "").strip()
+        if not un:
+            continue
+        u: dict[str, Any] = {"unit_number": un, "extraction_tier": "TIER_1_INDUCED_DOM_REPLAY"}
+        for src, dst in _INDUCED_TO_UNIT_KEY.items():
+            if src == "unit_number":
+                continue
+            v = r.get(src)
+            if v in (None, ""):
+                continue
+            if src in _INDUCED_INT_FIELDS:
+                iv = _num(v)
+                if iv is not None:
+                    u[dst] = iv
+            else:
+                u[dst] = v
+        out.append(u)
+    return out

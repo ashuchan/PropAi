@@ -24,13 +24,19 @@ from ma_poc.pms.learning.induce_parser import (
     induce_dom_selectors,
     induce_fallback_parser,
     induce_json_field_mapping,
+    parser_from_dict,
+    parser_to_dict,
     replay,
+    replay_induced_dom_to_units,
     validate_induction,
 )
 
 __all__ = [
     "InducedParser",
     "InductionReport",
+    "parser_from_dict",
+    "parser_to_dict",
+    "replay_induced_dom_to_units",
     "induce_fallback_parser",
     "induce_dom_selectors",
     "induce_json_field_mapping",
