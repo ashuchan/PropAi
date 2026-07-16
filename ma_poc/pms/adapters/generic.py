@@ -1037,6 +1037,28 @@ async def _probe_realpage_cws(html: str) -> list[dict[str, Any]]:
     return units
 
 
+def _should_probe_realpage_cws(html: str) -> bool:
+    """True when the RealPage CWS credential probe should run.
+
+    Fires on the ``rpfp_config`` wrapper literal OR — more robustly — whenever
+    the probe's actual preconditions are present: both a numeric ``propertyId``
+    AND a UUID ``apiKey`` embedded in the HTML. Newer / legacy CWS themes
+    (floorplan-V3 / Lyon) carry the same public widget credentials without the
+    ``rpfp_config`` literal, so gating on that literal alone misses them.
+
+    Keying on the credentials themselves is precise, not just permissive: the
+    probe (`_probe_realpage_cws`) already self-guards and returns [] when
+    either credential is absent, and ``propertyId`` + a UUID ``apiKey`` in the
+    same page is a strong RealPage-CWS signature — so the probe only fires when
+    it can actually succeed, adding at most one (self-limiting) API call.
+    """
+    if not html:
+        return False
+    if "rpfp_config" in html.lower():
+        return True
+    return bool(_RPFP_PROPERTY_ID.search(html) and _RPFP_API_KEY.search(html))
+
+
 class GenericAdapter:
     """Generic fallback adapter.
 
@@ -2700,7 +2722,7 @@ class GenericAdapter:
             # list (rent, sqft, availability) is returned directly.
             # Extracting credentials from HTML and re-firing the call gives
             # deterministic results without waiting for the JS bundle to load.
-            if not result.units and html and "rpfp_config" in html.lower():
+            if not result.units and _should_probe_realpage_cws(html):
                 try:
                     _cws_units = await _probe_realpage_cws(html)
                     if _cws_units:
