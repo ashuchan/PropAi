@@ -712,3 +712,29 @@ def test_make_unit_dict_then_format_v2_unit_integration() -> None:
     )
     out = _format_v2_unit(unit, _TS)
     assert out["available_date"] == "2026-06-20"
+
+
+# ── #36: explicit floor-plan-level placeholder flag ─────────────────────────
+def test_is_floor_plan_level_sightmap_plan_presence() -> None:
+    out = _format_v2_unit(
+        {"floor_plan_name": "The Blue Elderberry", "data_quality_flag": "SIGHTMAP_PLAN_PRESENCE"},
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is True
+
+
+def test_is_floor_plan_level_plan_level_tier() -> None:
+    out = _format_v2_unit(
+        {"floor_plan_name": "1 Bedroom", "extraction_tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL"},
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is True
+
+
+def test_is_floor_plan_level_false_for_real_unit() -> None:
+    out = _format_v2_unit(
+        {"floor_plan_name": "A1", "unit_id": "101", "rent_low": 1500,
+         "availability_status": "AVAILABLE", "extraction_tier": "TIER_1_API_ENTRATA"},
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is False
