@@ -54,7 +54,14 @@ from bs4 import BeautifulSoup
 
 # ── Detector ────────────────────────────────────────────────────────────────
 
-_HGM_MARKER = "harborgroupmanagement.com/apartments/"
+# Detection URL patterns. ``hgliving.com`` is a Harbor Group mirror domain that
+# 301-redirects to ``harborgroupmanagement.com``; both must detect because the
+# request URL keeps its original host, so hgliving properties otherwise miss the
+# adapter and fall to the LLM/generic fallback (11 props in the 07-12 run).
+_HGM_MARKERS: tuple[str, ...] = (
+    "harborgroupmanagement.com/apartments/",
+    "hgliving.com/apartments/",
+)
 
 
 def detect_harbor_group(url: str) -> bool:
@@ -62,8 +69,11 @@ def detect_harbor_group(url: str) -> bool:
 
     Detection is URL-based (not HTML-based) because the landing HTML
     is generic Drupal — there is no unique clientlib or meta marker.
+    Adapter fetches follow the ``hgliving.com`` → ``harborgroupmanagement.com``
+    301 redirect, so a mirror-domain URL resolves the same as a native one.
     """
-    return _HGM_MARKER in (url or "").lower()
+    u = (url or "").lower()
+    return any(m in u for m in _HGM_MARKERS)
 
 
 # ── Plan-slug discovery (operates on {prop-url}/floor-plans) ────────────────
