@@ -362,3 +362,34 @@ def test_seen_at_iso_strips_surrounding_whitespace() -> None:
     """Common upstream issue — whitespace around the run_date string."""
     res = seen_at_iso("  2026-05-06  ")
     assert res.startswith("2026-05-06T")
+
+
+# ── #34: prefer a captured per-unit source_id over the phenotype hash ────────
+def test_fallback_prefers_per_unit_source_id() -> None:
+    """A captured appfolio_listing_id becomes the (real, non-synthetic) id
+    instead of an inferred_ phenotype hash."""
+    u = {
+        "floor_plan_name": "A1", "beds": 1, "baths": 1, "sqft": 700, "rent_low": 1500,
+        "source_ids": {"appfolio_listing_id": "12345"},
+    }
+    res = assign_fallback_unit_id(u, "P1")
+    assert res == "appfolio-12345"
+    assert not res.startswith(("inferred_", "unkeyable_"))
+
+
+def test_fallback_ignores_plan_level_source_id() -> None:
+    """A PLAN-level source id (sightmap_floor_plan_id) is shared across a plan's
+    units and must NOT be used as a per-unit id — falls through to the hash."""
+    u = {
+        "floor_plan_name": "A1", "beds": 1, "baths": 1, "sqft": 700,
+        "source_ids": {"sightmap_floor_plan_id": "999"},
+    }
+    res = assign_fallback_unit_id(u, "P1")
+    assert res.startswith("inferred_")
+
+
+def test_fallback_source_id_rent_stable() -> None:
+    """Source-id anchor is rent-independent (daily-join stability)."""
+    a = assign_fallback_unit_id({"source_ids": {"apts247_unit_id": "77"}, "rent_low": 1500}, "P1")
+    b = assign_fallback_unit_id({"source_ids": {"apts247_unit_id": "77"}, "rent_low": 1600}, "P1")
+    assert a == b == "apts247-77"
