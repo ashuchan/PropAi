@@ -35,8 +35,16 @@ def test_detect_harbor_group_deep_subpage():
     assert detect_harbor_group(url) is True
 
 
+def test_detect_harbor_group_hgliving_mirror():
+    # hgliving.com is a Harbor Group mirror that 301s to harborgroupmanagement.com
+    assert detect_harbor_group("https://www.hgliving.com/apartments/pa/phoenixville/riverworks") is True
+    assert detect_harbor_group("https://www.hgliving.com/apartments/tx/san-antonio/linden-at-the-rim/") is True
+
+
 def test_detect_harbor_group_negative_other_domain():
     assert detect_harbor_group("https://www.udr.com/apartments/some-property") is False
+    # hgliving without the /apartments/ path must NOT match (avoid false positives)
+    assert detect_harbor_group("https://www.hgliving.com/contact") is False
 
 
 def test_detect_harbor_group_empty_string():
