@@ -202,6 +202,9 @@ _DMAPI_RE = re.compile(r"Functions\[[\"'][a-f0-9]+~\d+[\"']\]\s*=\s*function", r
 
 # Used to detect "starts with orphan punctuation" (truncated mid-statement).
 _LEADING_ORPHAN_RE = re.compile(r"^\s*[)}\];,=+<>/]")
+# Strips the full leading run of orphan punctuation (handles ``}); ``,
+# ``) `` and similar HTML/JS-flatten artifacts, with intervening whitespace).
+_LEADING_ORPHAN_RUN_RE = re.compile(r"^(?:\s*[)}\];,=+<>/]+\s*)+")
 
 # 2026-05-20 (header-only): phrases that signal a concession exists but
 # carry no actionable terms on their own — banners typically render
@@ -481,6 +484,20 @@ def clean_concession_text(text: str | None) -> str:
                         r"(?:\s+(?:[x✕×]|how))+\s*$", "", _head_clean,
                         flags=re.IGNORECASE,
                     ).rstrip(" ,;:-—–")
+    if quality == "unclean_orphan_prefix":
+        # 2026-07-16: strip the leading orphan-punctuation run (a ``) `` /
+        # ``}); `` artifact from HTML/JS flattening) and re-clean the
+        # remainder — mirrors the cookie_chrome path. The offer copy AFTER
+        # the orphan is intact, so re-cleaning the stripped text returns the
+        # whole offer (when it re-classifies as clean) instead of the lossy
+        # offer-window crop in Pass 1 below, which dropped a leading header
+        # offer (e.g. "Free AC Unit") whenever ``_OFFER_RE`` first matched a
+        # LATER phrase ("look and lease special"). Recursion terminates: the
+        # stripped text no longer opens with orphan punctuation, so its
+        # quality is never ``unclean_orphan_prefix`` again.
+        stripped = _LEADING_ORPHAN_RUN_RE.sub("", text).strip()
+        if stripped and stripped != text.strip():
+            return clean_concession_text(stripped)
     if quality in ("unclean_header_only", "no_offer_signal"):
         # Nothing to extract — either the text IS the banner header
         # (no body), or it carries no offer vocabulary at all
