@@ -26,6 +26,7 @@ import os
 import re as _re
 import sys
 import uuid
+from dataclasses import replace as _dc_replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -182,6 +183,110 @@ def _resolve_data_dirs(
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     return run_dir, state_dir, cache_dir, schema_root
+
+
+# ── End-of-run transient retry pass (opt-in) ─────────────────────────────────
+# Re-runs ONLY the transient-class fetch failures once, in-process, after the
+# main pass — natural output consolidation (the retry results overlay the same
+# in-memory `results` list, so the single properties.json write already
+# reflects them), and by the time a large run finishes the transient condition
+# that failed an early property (5xx / timeout / rate-limit / proxy hiccup /
+# empty body) has usually cleared. Deliberately EXCLUDES:
+#   - BOT_BLOCKED  — won't clear on the same burned proxy pool this soon; that's
+#                    the render / proxy-rotation lever, not a time-based retry.
+#   - DEAD_URL     — terminal (404 / soft-404 / NXDOMAIN).
+#   - HARD_FAIL    — SSL / non-retriable 4xx.
+#   - FAILED_NO_DATA — the page was REACHED; empty extraction is extraction-side,
+#                    a re-fetch won't help.
+# Gated off by default → zero behaviour change until ENABLE_END_OF_RUN_RETRY.
+# A single pass only (no loop) → bounded cost on the (small) transient cohort.
+_TRANSIENT_RETRY_OUTCOMES: tuple[str, ...] = (
+    "TRANSIENT",
+    "RATE_LIMITED",
+    "PROXY_ERROR",
+    "EMPTY_BODY",
+)
+
+
+def _end_of_run_retry_enabled() -> bool:
+    """True when the opt-in end-of-run transient retry pass is enabled."""
+    return os.getenv("ENABLE_END_OF_RUN_RETRY", "false").strip().lower() == "true"
+
+
+def _end_of_run_retry_delay_s() -> int:
+    """Seconds to wait before the retry pass (0 = immediate). A large run's own
+    duration already gives early-failed properties a long natural delay; this
+    knob lets rate-limit-heavy fleets add an explicit cool-off."""
+    raw = os.getenv("END_OF_RUN_RETRY_DELAY_S", "0").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 0
+
+
+def _is_transient_fetch_failure(record: dict[str, Any]) -> bool:
+    """True when a result record failed with a transient (retriable) fetch
+    outcome — the only class worth an immediate second attempt."""
+    meta = record.get("_meta") or {}
+    if str(meta.get("verdict") or "") != "FAILED_UNREACHABLE":
+        return False
+    reason = str(meta.get("verdict_reason") or "")
+    return any(f"fetch outcome: {o}" in reason for o in _TRANSIENT_RETRY_OUTCOMES)
+
+
+def _retry_improved(old: dict[str, Any], new: dict[str, Any]) -> bool:
+    """True when the retry result is strictly better than the first-pass record.
+
+    A retry replaces the first-pass record only if it becomes a success-class
+    verdict WITHOUT losing units, or it simply gains units. The unit-count
+    guard is defensive: it prevents a lower-yield retry from ever overwriting a
+    richer first-pass record (in practice ``old`` is always a transient failure,
+    so this only bites if the helper is reused elsewhere)."""
+    from ma_poc.reporting.verdict import verdict_is_success
+
+    old_units = len(old.get("units") or [])
+    new_units = len(new.get("units") or [])
+    if verdict_is_success((new.get("_meta") or {}).get("verdict")):
+        return new_units >= old_units
+    return new_units > old_units
+
+
+def _select_transient_retry_tasks(
+    tasks: list[Any], results: list[Any]
+) -> list[Any]:
+    """Build RETRY CrawlTasks for the transient-failed subset. ``results`` is
+    order-aligned with ``tasks`` (pool.map preserves order)."""
+    from ma_poc.discovery.contracts import TaskReason
+
+    out: list[Any] = []
+    for t, r in zip(tasks, results, strict=False):
+        if not isinstance(r, dict):
+            continue
+        if _is_transient_fetch_failure(r):
+            out.append(_dc_replace(t, reason=TaskReason.RETRY))
+    return out
+
+
+def _apply_retry_results(
+    tasks: list[Any],
+    results: list[Any],
+    retry_tasks: list[Any],
+    retry_results: list[Any],
+) -> list[Any]:
+    """Overlay retry results onto the first pass, replacing a record only when
+    the retry improved it. Order-preserving; keyed by property_id."""
+    retry_by_pid: dict[str, Any] = {}
+    for t, rr in zip(retry_tasks, retry_results, strict=False):
+        if isinstance(rr, dict):
+            retry_by_pid[t.property_id] = rr
+    merged: list[Any] = []
+    for t, r in zip(tasks, results, strict=False):
+        rr = retry_by_pid.get(getattr(t, "property_id", "") or "")
+        if rr is not None and isinstance(r, dict) and _retry_improved(r, rr):
+            merged.append(rr)
+        else:
+            merged.append(r)
+    return merged
 
 
 async def run_jugnu(
@@ -617,6 +722,49 @@ async def run_jugnu(
             )
 
     results = await pool.map(_process_one, [(t,) for t in tasks])
+
+    # End-of-run transient retry pass (opt-in via ENABLE_END_OF_RUN_RETRY).
+    # Re-drives ONLY the transient-class fetch failures through the SAME
+    # _process_one path once; the merged results feed the single properties.json
+    # write below, so recovery is consolidated with no separate run or output
+    # merge. Best-effort — a failure here must never sink the whole run.
+    if _end_of_run_retry_enabled():
+        try:
+            retry_tasks = _select_transient_retry_tasks(tasks, results)
+            if retry_tasks:
+                _delay = _end_of_run_retry_delay_s()
+                if _delay > 0:
+                    log.info(
+                        "end-of-run retry: waiting %ds then re-running %d "
+                        "transient-failed properties",
+                        _delay, len(retry_tasks),
+                    )
+                    await asyncio.sleep(_delay)
+                else:
+                    log.info(
+                        "end-of-run retry: re-running %d transient-failed properties",
+                        len(retry_tasks),
+                    )
+                retry_results = await pool.map(
+                    _process_one, [(t,) for t in retry_tasks]
+                )
+                _before = sum(
+                    1 for r in results
+                    if isinstance(r, dict) and _is_transient_fetch_failure(r)
+                )
+                results = _apply_retry_results(
+                    tasks, results, retry_tasks, retry_results
+                )
+                _after = sum(
+                    1 for r in results
+                    if isinstance(r, dict) and _is_transient_fetch_failure(r)
+                )
+                log.info(
+                    "end-of-run retry: recovered %d of %d transient-failed properties",
+                    _before - _after, len(retry_tasks),
+                )
+        except Exception as _eor_exc:  # never break the run on the retry pass
+            log.warning("end-of-run retry pass failed (non-fatal): %s", _eor_exc)
 
     # Persist the run-level state-store exactly once after all properties
     # complete.  A single save amortises the per-property I/O cost (was
