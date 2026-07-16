@@ -30,7 +30,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from ma_poc.pms.adapters._parsing import make_unit_dict
+from ma_poc.pms.adapters._parsing import format_rent_range, make_unit_dict
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
@@ -54,6 +54,29 @@ def _rent_to_int(val: Any) -> int | None:
         return int(m.group(0).replace(",", ""))
     except (TypeError, ValueError):
         return None
+
+
+def _rent_range(val: Any) -> tuple[int | None, int | None]:
+    """Parse an Apts247 rent value into ``(low, high)``.
+
+    Apts247 gives per-unit rent as a lease-term RANGE (``"$1,960-$3,112"`` —
+    rent varies by term), not a single number. The adapter previously took
+    only the first number and mirrored it into both rent_low/rent_high,
+    losing the high end on ~88% of units. Now: low = min, high = max of every
+    number in the string. Single value (``"$899"``) → ``(899, 899)``;
+    ``"Call for details"`` / "" → ``(None, None)``.
+    """
+    if val is None:
+        return (None, None)
+    nums = [
+        int(m.replace(",", ""))
+        for m in re.findall(r"[\d,]+", str(val))
+        if m.replace(",", "").isdigit()
+    ]
+    nums = [n for n in nums if n >= 100]  # drop stray small numbers (fees, etc.)
+    if not nums:
+        return (None, None)
+    return (min(nums), max(nums))
 
 
 def _beds_from_label(label: Any) -> str:
@@ -96,15 +119,15 @@ def parse_apts247_floorplans(
         baths = plan.get("bath")
         baths_s = str(baths) if baths is not None else ""
         plan_sqft = str(plan.get("sq_ft") or "").strip()
-        plan_rent = _rent_to_int(plan.get("rent"))
+        plan_lo, plan_hi = _rent_range(plan.get("rent"))
         glist = plan.get("units") or []
         if isinstance(glist, list) and glist:
             for u in glist:
                 if not isinstance(u, dict):
                     continue
-                rent_i = _rent_to_int(u.get("rent"))
-                if rent_i is None:
-                    rent_i = plan_rent
+                rent_lo, rent_hi = _rent_range(u.get("rent"))
+                if rent_lo is None:
+                    rent_lo, rent_hi = plan_lo, plan_hi
                 # Apts247 frequently leaves ``number`` blank but every unit
                 # carries a real, stable PMS ``id`` (e.g. 1785008). Without a
                 # natural identifier the row gets an ``inferred_`` fallback
@@ -127,15 +150,16 @@ def parse_apts247_floorplans(
                         unit_number=unum,
                         floor=str(u.get("floor") or ""),
                         building=str(u.get("building") or ""),
-                        rent_low=rent_i,
-                        rent_high=rent_i,
+                        rent_low=rent_lo,
+                        rent_high=rent_hi,
+                        rent_range=format_rent_range(rent_lo, rent_hi),
                         availability_status="AVAILABLE",
                         availability_date=str(u.get("available_date") or ""),
                         source_api_url=source_url,
                         extraction_tier=_TIER,
                     )
                 )
-        elif plan_rent is not None:
+        elif plan_lo is not None:
             units.append(
                 make_unit_dict(
                     floor_plan_name=plan_name,
@@ -144,8 +168,9 @@ def parse_apts247_floorplans(
                     bathrooms=baths_s,
                     sqft=plan_sqft,
                     unit_number="",
-                    rent_low=plan_rent,
-                    rent_high=plan_rent,
+                    rent_low=plan_lo,
+                    rent_high=plan_hi,
+                    rent_range=format_rent_range(plan_lo, plan_hi),
                     availability_status="UNKNOWN",
                     source_api_url=source_url,
                     extraction_tier=_TIER,
