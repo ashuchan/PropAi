@@ -310,6 +310,13 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.
         "is_floor_plan_level": _is_floor_plan_level(unit),
+        # Per-unit provenance — which extraction tier produced THIS unit, so a
+        # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
+        # plan-level placeholder). Captured on the internal unit dict but was
+        # dropped by this transform until now.
+        "extraction_tier": (
+            unit.get("extraction_tier") or unit.get("_extraction_tier") or None
+        ),
         "rent_low": _format_rent(rent_lo),
         "rent_high": _format_rent(rent_hi),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),

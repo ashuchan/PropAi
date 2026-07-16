@@ -98,6 +98,33 @@ def _scan_event_ledger(
     return bot, captcha, verdict_by_pid
 
 
+# Fields whose fill-rate the dashboard reports. Kept small + high-signal.
+_FILL_FIELDS: tuple[str, ...] = (
+    "unit_id", "beds", "baths", "area", "rent_low", "available_date",
+    "availability_status", "floor_plan_name", "floor", "building",
+    "concession_text", "source_ids",
+)
+
+
+def _report_tier_family(tier: str) -> str:
+    """Collapse an extraction_tier code to a coarse family for the dashboard.
+
+    Local copy (reporting must not import from scripts.runners — that would
+    invert the layer dependency); mirrors jugnu._tier_family."""
+    t = (tier or "").upper()
+    if not t:
+        return "NONE"
+    if "LLM" in t:
+        return "LLM"
+    if "API" in t:
+        return "API"
+    if "JSONLD" in t or "JSON_LD" in t:
+        return "JSONLD"
+    if "EMBEDDED" in t:
+        return "EMBEDDED"
+    if "DOM" in t or "TEXT" in t:
+        return "DOM"
+    return "OTHER"
 
 
 def build(
@@ -266,6 +293,44 @@ def build(
     bot_blocked_list = sorted(bot_blocked_by_pid.values(), key=lambda r: r["property_id"])
     captcha_list = sorted(captcha_by_pid.values(), key=lambda r: r["property_id"])
 
+    # Output-surfacing dashboard (2026-07-16): verdict spread, per-field fill
+    # rates, and a data-quality mix computed from the DELIVERED units — so a
+    # reviewer sees coverage + trust at a glance without re-parsing
+    # properties.json. Reads per-unit ``extraction_tier`` (surfaced by
+    # schema_v2._format_v2_unit) to split real Tier-1 rows from LLM / plan-level.
+    verdict_distribution: Counter[str] = Counter()
+    fill_counts: dict[str, int] = dict.fromkeys(_FILL_FIELDS, 0)
+    tier_family_units: Counter[str] = Counter()
+    n_units = n_real_id = n_synth_id = n_plan_level = 0
+    for p in properties:
+        v = str((p.get("_meta", {}) or {}).get("verdict") or "UNKNOWN")
+        verdict_distribution[v] += 1
+        for u in (p.get("units") or []):
+            n_units += 1
+            for k in _FILL_FIELDS:
+                if u.get(k) not in (None, "", "null", [], {}):
+                    fill_counts[k] += 1
+            u_tier = str(u.get("extraction_tier") or "")
+            tier_family_units[_report_tier_family(u_tier)] += 1
+            if u.get("is_floor_plan_level") or u_tier.upper().endswith("_PLAN_LEVEL"):
+                n_plan_level += 1
+            uid = str(u.get("unit_id") or "")
+            if uid.startswith(("inferred_", "unkeyable_")):
+                n_synth_id += 1
+            elif uid:
+                n_real_id += 1
+    field_fill_rates = {
+        k: (round(100 * fill_counts[k] / n_units, 1) if n_units else 0.0)
+        for k in _FILL_FIELDS
+    }
+    data_quality = {
+        "total_units": n_units,
+        "by_tier_family": dict(tier_family_units.most_common()),
+        "real_id_units": n_real_id,
+        "synthetic_id_units": n_synth_id,
+        "plan_level_units": n_plan_level,
+    }
+
     report = {
         "run_date": run_date,
         "generated_at": datetime.now(UTC).isoformat(),
@@ -288,6 +353,10 @@ def build(
         },
         # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
         "tier_distribution": dict(real_tier_counts.most_common()),
+        # Output-surfacing dashboard (2026-07-16).
+        "verdict_distribution": dict(verdict_distribution.most_common()),
+        "field_fill_rates": field_fill_rates,
+        "data_quality": data_quality,
         "pre_extraction_terminations": pre_extraction_terminations,
         # 2026-05-04: bot/captcha summaries at run-level. Full per-property
         # detail is also written to bot_blocked_properties.json so the
@@ -354,6 +423,26 @@ def build(
     ]
     for tier, count in tier_counts.most_common():
         md_lines.append(f"| {tier} | {count} |")
+
+    # Output-surfacing dashboard: data-quality mix + per-field fill rates.
+    md_lines.extend(
+        [
+            "",
+            "## Data Quality",
+            "",
+            f"- Units: {n_units}",
+            f"- Real-id units: {n_real_id}  ·  synthetic-id: {n_synth_id}  ·  "
+            f"plan-level: {n_plan_level}",
+            f"- By tier family: {dict(tier_family_units.most_common())}",
+            "",
+            "### Field fill rates",
+            "",
+            "| Field | Fill % |",
+            "|---|---|",
+        ]
+    )
+    for _fld, _rate in field_fill_rates.items():
+        md_lines.append(f"| {_fld} | {_rate}% |")
 
     # 2026-05-27 follow-up: surface operator-transparency cohort with
     # the matched phrase histogram + per-PID list. Skip the section
