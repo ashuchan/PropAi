@@ -129,6 +129,41 @@ _TIER_OPERATOR_RENT_NOT_PUBLISHED = f"{_TIER_BASE}_OPERATOR_RENT_NOT_PUBLISHED"
 _PARTIAL_JOIN_FRACTION = 0.2
 
 
+def _sightmap_deposit(u: dict[str, Any]) -> str:
+    """Refundable security deposit from a SightMap unit's expense breakdown.
+
+    Deposit is not a top-level field — it lives in
+    ``static_expenses[].expenses[]`` (the expense DEFINITIONS, keyed by ``id``)
+    with the per-unit dollar figure in ``expense_amounts[<id>].amount``. Only
+    the "Security Deposit (Refundable)" line carries a real number; the
+    "Security Deposit Alternative" line is always ``"Varies"`` (skip it).
+
+    Returns ``"$500"`` when a numeric amount is present, else ``""``. Population
+    is SPARSE — verified live 2026-07-16, only a minority of SightMap
+    properties publish it (anthemeverett $500; most others none) — so this
+    only fills the subset that does, and never invents a value.
+    """
+    amounts = u.get("expense_amounts")
+    if not isinstance(amounts, dict):
+        return ""
+    for grp in u.get("static_expenses") or []:
+        if not isinstance(grp, dict):
+            continue
+        for e in grp.get("expenses") or []:
+            if not isinstance(e, dict):
+                continue
+            lbl = str(e.get("label") or "").lower()
+            if "deposit" in lbl and "refundable" in lbl:
+                amt = (amounts.get(str(e.get("id"))) or {}).get("amount")
+                if amt in (None, "", 0):
+                    continue
+                try:
+                    return f"${int(float(str(amt).replace(',', ''))):,}"
+                except (TypeError, ValueError):
+                    return ""
+    return ""
+
+
 def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
@@ -217,6 +252,7 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 floor=str(u.get("floor_id") or ""),
                 building=str(u.get("building") or ""),
                 rent_range=f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
+                deposit=_sightmap_deposit(u),
                 concession=str(u.get("specials_description") or ""),
                 availability_status="AVAILABLE",
                 available_units="1",
