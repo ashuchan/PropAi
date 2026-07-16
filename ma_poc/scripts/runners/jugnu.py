@@ -1032,6 +1032,17 @@ async def _process_property(
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
 
+    # Property-level provenance — surface the diagnostics we already captured
+    # (confidence, adapter/PMS, tiers attempted, fetch method/latency, and a
+    # per-property data-quality mix) onto _meta.provenance. Additive +
+    # never-fail, same contract as the _meta.publish_ceiling stamp below.
+    try:
+        meta["provenance"] = _provenance_block(
+            result, csv_row or {}, fetch_result, outcome_val
+        )
+    except Exception:  # provenance must never sink a property record
+        pass
+
     # 2026-07-12 (campaign Lever 6): for a zero-unit property, grade whether
     # its "no data published" claim is airtight enough to count as gold
     # under the revised gold definition (Tier-1 units OR verified-no-data at
@@ -1267,6 +1278,87 @@ async def _process_property(
 # ---------------------------------------------------------------------------
 # Output formatting — v1 / v2
 # ---------------------------------------------------------------------------
+
+
+# ── Property-level provenance (surface captured-but-dropped diagnostics) ─────
+# The output record historically exposed only verdict + tier_used + llm_cost.
+# During a scrape we capture far more — confidence, which adapter/PMS won, the
+# tiers attempted, how many APIs were intercepted, the fetch method/latency, and
+# (from the units) a data-quality mix. This stamps that onto _meta.provenance so
+# a consumer can judge trust/coverage without re-deriving it. Additive +
+# never-fail, mirroring the adjacent _meta.publish_ceiling stamp.
+def _tier_family(tier: str) -> str:
+    """Collapse a specific extraction_tier code to a coarse family."""
+    t = (tier or "").upper()
+    if not t:
+        return "NONE"
+    if "LLM" in t:
+        return "LLM"
+    if "API" in t:
+        return "API"
+    if "JSONLD" in t or "JSON_LD" in t:
+        return "JSONLD"
+    if "EMBEDDED" in t:
+        return "EMBEDDED"
+    if "DOM" in t or "TEXT" in t:
+        return "DOM"
+    return "OTHER"
+
+
+def _is_lease_up(csv_row: dict[str, Any]) -> bool:
+    """True when the CSV marks this property LEASE_UP (vs STABILISED)."""
+    for k in ("type", "Type"):
+        v = csv_row.get(k)
+        if isinstance(v, str) and "lease" in v.lower() and "up" in v.lower():
+            return True
+    return False
+
+
+def _provenance_block(
+    result: dict[str, Any],
+    csv_row: dict[str, Any],
+    fetch_result: Any,
+    outcome_val: str | None,
+) -> dict[str, Any]:
+    """Compute _meta.provenance from an already-scraped result. Pure; never raises."""
+    units = result.get("units") or []
+    by_family: dict[str, int] = {}
+    n_plan = n_synth = n_realid = 0
+    for u in units:
+        tier = str(u.get("extraction_tier") or u.get("_extraction_tier") or "")
+        fam = _tier_family(tier)
+        by_family[fam] = by_family.get(fam, 0) + 1
+        if u.get("is_floor_plan_level") or tier.upper().endswith("_PLAN_LEVEL"):
+            n_plan += 1
+        uid = str(u.get("unit_id") or u.get("unit_number") or "")
+        if uid.startswith(("inferred_", "unkeyable_")):
+            n_synth += 1
+        elif uid:
+            n_realid += 1
+    det = result.get("_detected_pms") or {}
+    rm = getattr(fetch_result, "render_mode", None)
+    return {
+        "unit_count": len(units),
+        "confidence": result.get("confidence"),
+        "adapter": result.get("_adapter_used") or None,
+        "detected_pms": det.get("pms") if isinstance(det, dict) else None,
+        "winning_tier": result.get("extraction_tier_used"),
+        "tiers_attempted": list(result.get("_fallback_chain") or []),
+        "api_calls_intercepted": len(result.get("api_calls_intercepted") or []),
+        "is_lease_up": _is_lease_up(csv_row),
+        "fetch": {
+            "outcome": outcome_val,
+            "render_mode": getattr(rm, "value", rm),
+            "proxied": bool(getattr(fetch_result, "proxy_label", None)),
+            "page_load_ms": getattr(fetch_result, "elapsed_ms", None),
+        },
+        "data_quality": {
+            "by_tier_family": by_family,
+            "real_id_units": n_realid,
+            "synthetic_id_units": n_synth,
+            "plan_level_units": n_plan,
+        },
+    }
 
 
 def _format_output(
