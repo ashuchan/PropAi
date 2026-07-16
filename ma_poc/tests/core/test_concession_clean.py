@@ -130,6 +130,31 @@ def test_clean_extracts_offer_from_woodland_creek_leak() -> None:
     assert "Limited Time Offer" in cleaned, (
         f"expected 'Limited Time Offer' in cleaned output; got {cleaned!r}"
     )
+
+
+def test_clean_orphan_prefix_strips_leading_run() -> None:
+    """A leading ``) `` HTML/JS-flatten artifact is stripped and the offer
+    copy after it is preserved."""
+    text = ") Now offering up to 1 month free on select units. $99 deposit."
+    cleaned = clean_concession_text(text)
+    assert not cleaned.startswith(")")
+    assert "1 month free" in cleaned
+    assert "$99 deposit" in cleaned
+
+
+def test_clean_orphan_prefix_preserves_leading_header_offer() -> None:
+    """2026-07-16 over-strip fix: when the offer opens with a header phrase
+    that isn't a recognized offer token (``Free AC Unit``) followed by a
+    LATER recognized phrase (``look and lease special``), the old Pass-1
+    offer-window crop dropped the header. Strip-then-reclean keeps it."""
+    text = (
+        ") Free AC Unit Free AC Unit We are doing a look and lease special "
+        "on select apartment homes now. Come tour with us."
+    )
+    cleaned = clean_concession_text(text)
+    assert "Free AC Unit" in cleaned  # was dropped before the fix
+    assert "look and lease special" in cleaned
+    assert not cleaned.startswith(")")
     # Should NOT contain the JS leak any more
     assert "PropLeadSource" not in cleaned
     assert "href.indexOf" not in cleaned
