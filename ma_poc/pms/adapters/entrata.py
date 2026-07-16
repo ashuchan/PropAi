@@ -1492,6 +1492,93 @@ def parse_entrata_pp_unit_cards(
     return units
 
 
+# ── Prospect Portal "jd-fp-unit-card" widget (2026-07-16) ────────────────────
+# Newer Entrata vanity-domain template. The /floorplans page ships skeleton
+# ``jd-fp-unit-card--preload`` cards, then JS populates the real per-apartment
+# roster as ``<a data-jd-fp-selector="unit-card" title="#3100"
+# data-unit="<hash>" class="jd-fp-unit-card jd-fp-unit-card--row">`` — the
+# marketing unit number in ``title``, a stable per-unit id in ``data-unit``,
+# and beds/baths/sqft/rent/availability in the card text. The static
+# (unrendered) grid carries only ``--preload`` skeletons with placeholder
+# numbers (#00000), so this parser is meaningful ONLY on a RENDERED body and
+# filters the preload skeletons out. Live-verified 2026-07-16 on a rendered
+# anthemeverett.com/floorplans capture: 25/25 real distinct unit numbers.
+_JDFP_TITLE_RE = re.compile(r"#\s*([0-9A-Za-z][0-9A-Za-z-]*)")
+_JDFP_FP_RE = re.compile(
+    r"Floorplan layout:\s*([^\n$]+?)(?:\s+\$|\s+\d+\s*months?|$)", re.IGNORECASE
+)
+# jd-fp cards write sqft as "464 sq. ft." (with periods) — the older
+# _PP_UNIT_CARD_SQFT_RE doesn't tolerate the dotted form.
+_JDFP_SQFT_RE = re.compile(r"([\d,]+)\s*sq\.?\s*ft", re.IGNORECASE)
+
+
+def parse_entrata_pp_jd_fp_cards(html: str, url: str) -> list[dict[str, str]]:
+    """Parse Entrata ``jd-fp-unit-card`` widget rows from a RENDERED /floorplans
+    page. Skips ``--preload`` skeletons; the real ``unit_number`` is the
+    ``title`` attribute (``#3100`` → ``3100``)."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    units: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for card in soup.select('a[data-jd-fp-selector="unit-card"]'):
+        classes = " ".join(card.get("class") or [])
+        if "preload" in classes:
+            continue  # skeleton placeholder, not real data
+        m = _JDFP_TITLE_RE.match(str(card.get("title") or "").strip())
+        unum = m.group(1) if m else ""
+        if not unum or unum in seen:
+            continue
+        seen.add(unum)
+        text = re.sub(r"\s+", " ", card.get_text(" ", strip=True))
+        plan = ""
+        fpm = _JDFP_FP_RE.search(text)
+        if fpm:
+            plan = fpm.group(1).strip()
+        beds_val: int | None = None
+        if re.search(r"\bstudio\b", text, re.IGNORECASE):
+            beds_val = 0
+        else:
+            bm = _PP_UNIT_CARD_BED_RE.search(text)
+            if bm and bm.group(1):
+                beds_val = int(bm.group(1))
+        bam = _PP_UNIT_CARD_BATH_RE.search(text)
+        baths_val = bam.group(1) if bam else ""
+        sm = _JDFP_SQFT_RE.search(text)
+        sqft_val = sm.group(1).replace(",", "") if sm else ""
+        rents = _PP_UNIT_CARD_RENT_RE.findall(text)
+        rent_lo = int(rents[0].replace(",", "")) if rents else None
+        rent_hi = int(rents[-1].replace(",", "")) if rents else None
+        status = "AVAILABLE" if re.search(r"available", text, re.IGNORECASE) else "UNKNOWN"
+        adm = _PP_UNIT_CARD_AVAIL_MDY_RE.search(text)
+        avail_date = (
+            f"{adm.group(3)}-{adm.group(1).zfill(2)}-{adm.group(2).zfill(2)}"
+            if adm
+            else ""
+        )
+        src = str(card.get("data-unit") or "").strip()
+        source_ids: dict[str, Any] = {"entrata_uid": src} if src else {}
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bed_label=bed_label_from(beds_val, plan),
+                bedrooms=str(beds_val) if beds_val is not None else "",
+                bathrooms=baths_val,
+                sqft=sqft_val,
+                unit_number=unum,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status=status,
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_JD_FP",
+                source_ids=source_ids or None,
+            )
+        )
+    return units
+
+
 # Anchor selectors PP uses to link from the plan grid to a per-plan
 # detail page. The href matches ``/floorplans/<state>/<property>/<slug>
 # -<fpid>-<phase>/`` — _PP_PLAN_URL_RE pins the format. The ".fp-name-
@@ -2155,6 +2242,24 @@ class EntrataAdapter:
                 )
                 if _vus_rows:
                     pp_unit_card_rows.extend(_vus_rows)
+
+            # 2026-07-16: newer Entrata vanity-domain "jd-fp-unit-card" widget.
+            # A RENDERED /floorplans body carries real per-unit rows the older
+            # .unit-card / view_unit_spaces paths don't recognise. Additive and
+            # safe: the static (unrendered) grid has only --preload skeletons,
+            # which parse_entrata_pp_jd_fp_cards filters out → no-op unless the
+            # captured body was rendered (render tier / unlocker) and populated.
+            if not pp_unit_card_rows:
+                _jdfp_bodies = [b for _, b in pp_ssr_index_bodies]
+                if isinstance(fr_body_check, str) and fr_body_check:
+                    _jdfp_bodies.append(fr_body_check)
+                _jdfp_url = str(getattr(fr, "final_url", "") or base)
+                for _jb in _jdfp_bodies:
+                    if "jd-fp-unit-card" not in _jb:
+                        continue
+                    pp_unit_card_rows.extend(
+                        parse_entrata_pp_jd_fp_cards(_jb, _jdfp_url)
+                    )
 
             if pp_unit_card_rows:
                 pp_ssr_units = pp_unit_card_rows
