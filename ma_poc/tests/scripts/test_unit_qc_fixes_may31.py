@@ -83,6 +83,39 @@ def test_p3_is_deterministic_across_runs() -> None:
     assert [u["unit_id"] for u in a] == [u["unit_id"] for u in b]
 
 
+def test_p3_suffix_stable_across_rent_change() -> None:
+    """Daily-join fix (#33): a unit's suffixed id must NOT change when its rent
+    moves — rent is excluded from the suffix. Same units + different rents =>
+    identical ids, so the daily diff sees 'updated', not 'disappeared+new'."""
+    from ma_poc.scripts.runners.jugnu import _apply_p3_inferred_id_collision_suffix
+
+    def rows(r1: int, r2: int) -> list[dict[str, object]]:
+        return [
+            {"unit_id": "inferred_x", "beds": 1, "baths": 1.0, "area": 700, "building": "A", "rent_low": r1, "rent_high": r1, "floor_plan_name": "A1"},
+            {"unit_id": "inferred_x", "beds": 1, "baths": 1.0, "area": 710, "building": "A", "rent_low": r2, "rent_high": r2, "floor_plan_name": "A1"},
+        ]
+
+    day1 = rows(1500, 1600)
+    _apply_p3_inferred_id_collision_suffix(day1)
+    day2 = rows(1900, 2000)  # both rents changed day-over-day
+    _apply_p3_inferred_id_collision_suffix(day2)
+    assert [u["unit_id"] for u in day1] == [u["unit_id"] for u in day2], "id must be rent-independent"
+    assert day1[0]["unit_id"] != day1[1]["unit_id"], "distinct units keep distinct ids"
+
+
+def test_p3_suffix_identical_rows_positional_tiebreak() -> None:
+    """Two rows identical on every STABLE field (only rent differs) still get
+    distinct ids via the positional tiebreak (no merge / silent undercount)."""
+    from ma_poc.scripts.runners.jugnu import _apply_p3_inferred_id_collision_suffix
+
+    units = [
+        {"unit_id": "inferred_y", "beds": 1, "baths": 1.0, "area": 700, "building": "A", "rent_low": 1500, "rent_high": 1500, "floor_plan_name": "A1"},
+        {"unit_id": "inferred_y", "beds": 1, "baths": 1.0, "area": 700, "building": "A", "rent_low": 1600, "rent_high": 1600, "floor_plan_name": "A1"},
+    ]
+    _apply_p3_inferred_id_collision_suffix(units)
+    assert len({u["unit_id"] for u in units}) == 2, "identical-stable rows still kept distinct"
+
+
 # ─── Fix 2: P0 fp_name canonicalization ───────────────────
 
 

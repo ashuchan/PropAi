@@ -216,15 +216,53 @@ def _last_resort_key(unit: dict[str, Any], property_id: str) -> str | None:
     return f"inferred_{digest}"
 
 
+# Per-unit ids some adapters capture into ``source_ids`` but never promote to
+# ``unit_id``. These are STABLE, UNIQUE-PER-UNIT keys — prefer them over the
+# phenotype hash (which is rent-unstable when two same-plan units collide, and
+# reads as synthetic ``inferred_``). Whitelist only the per-UNIT keys; the
+# per-PLAN keys (``sightmap_floor_plan_id``, ``*_floor_plan_id``,
+# ``*_floorplan_id``) are shared across a plan's units and must NOT be used.
+_PER_UNIT_SOURCE_ID_KEYS: tuple[str, ...] = (
+    "appfolio_listing_id",
+    "appfolio_listable_uid",
+    "appfolio_id",
+    "apts247_unit_id",
+    "entrata_unit_id",
+    "knock_unit_id",
+)
+
+
+def _source_id_anchor(unit: dict[str, Any]) -> str | None:
+    """A stable, unique per-unit id captured in ``source_ids``, or None.
+
+    Returns a provenance-prefixed id (e.g. ``appfolio-12345``) so it is
+    unambiguous and never collides with a real ``unit_number`` namespace. Only
+    the per-unit keys in :data:`_PER_UNIT_SOURCE_ID_KEYS` qualify.
+    """
+    sids = unit.get("source_ids")
+    if not isinstance(sids, dict):
+        return None
+    for k in _PER_UNIT_SOURCE_ID_KEYS:
+        v = sids.get(k)
+        if v in (None, "", -1, "-1"):
+            continue
+        s = str(v).strip()
+        if s and s.lower() not in {"null", "none"}:
+            return f"{k.split('_')[0]}-{s}"
+    return None
+
+
 def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | None:
     """Mutate ``unit['unit_id']`` in place with a stable fallback id.
 
     Resolution order:
 
       1. Existing non-empty ``unit_id`` / ``unit_number`` — keep it.
-      2. ``compute_fallback_unit_id`` — SHA256 of physical attrs (preferred).
-      3. ``_last_resort_key`` — SHA256 of just floor_plan.
-      4. None — unit has no identifying anchor at all.
+      2. A stable per-unit id from ``source_ids`` (captured-but-ignored) —
+         e.g. ``appfolio_listing_id``. Real, unique, rent-stable.
+      3. ``compute_fallback_unit_id`` — SHA256 of physical attrs.
+      4. ``_last_resort_key`` — SHA256 of just floor_plan.
+      5. None — unit has no identifying anchor at all.
 
     Returns the assigned id, or ``None`` when nothing identifiable could be
     derived. Callers that must persist every record (no-drop contract)
@@ -236,6 +274,14 @@ def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | Non
     if existing and existing.lower() not in {"null", "none"}:
         unit["unit_id"] = existing
         return existing
+
+    # Prefer a captured per-unit source id before phenotype-hashing — it is a
+    # real, unique, rent-stable anchor (fixes the synthetic-id + daily-join gap
+    # for AppFolio/apts247 units that carry one).
+    anchor = _source_id_anchor(unit)
+    if anchor:
+        unit["unit_id"] = anchor
+        return anchor
 
     derived = compute_fallback_unit_id(unit, property_id) or _last_resort_key(unit, property_id)
     if derived:

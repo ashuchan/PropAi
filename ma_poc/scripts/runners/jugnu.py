@@ -1715,10 +1715,14 @@ def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
       portfolio sites had identical 122-row patterns, etc. — 3,924 extra
       collision rows across 456 props in the may13 may28 canary.
 
-    Fix: after P1 dedup, append a stable per-row suffix to break the
-    collisions while preserving the plan-anchor in the prefix. Suffix
-    is short, deterministic (sha of the row's full fingerprint), and
-    safe across runs of the same input (no random component).
+    Fix: after P1 dedup, append a STABLE per-row suffix to break the
+    collisions while preserving the plan-anchor in the prefix. The suffix
+    hashes only STABLE physical fields (raw area, building, floor,
+    unit_number) — NOT rent/availability. (An earlier version hashed the
+    full ``_dedup_fingerprint`` which INCLUDES rent_low/rent_high, so a
+    unit's id changed whenever its rent moved → it churned "disappeared+new"
+    in the daily diff, breaking rent-change / days-on-market tracking for
+    ~2.7% of units.)
 
     Only fires on ``inferred_*`` IDs — real adapter-provided unit_ids
     are never modified.
@@ -1735,15 +1739,24 @@ def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
         groups[uid].append(i)
 
     rewritten = 0
+    # Fields that distinguish real distinct units sharing a plan-anchor WITHOUT
+    # depending on mutable rent/availability. Raw ``area`` matters: the inferred
+    # id buckets sqft to the nearest 10, so two units at 683 vs 691 sqft collide
+    # on the prefix but differ here → a stable, rent-independent suffix.
+    _STABLE_SUFFIX_FIELDS = ("area", "building", "floor", "unit_number")
     for uid, idxs in groups.items():
         if len(idxs) < 2:
             continue
-        # Suffix each row with first 6 chars of sha of its full fingerprint.
-        # Stable across runs — same inputs → same suffix.
+        seen_base: dict[str, int] = {}
         for i in idxs:
             u = units[i]
-            fp = _dedup_fingerprint(u)
-            sfx = _hl.sha256(repr(fp).encode()).hexdigest()[:6]
+            stable = tuple(u.get(k) for k in _STABLE_SUFFIX_FIELDS)
+            base = _hl.sha256(repr(stable).encode()).hexdigest()[:6]
+            # Positional tiebreak ONLY for rows identical on every stable field
+            # (inherently indistinguishable without a per-unit id).
+            n = seen_base.get(base, 0)
+            seen_base[base] = n + 1
+            sfx = base if n == 0 else f"{base}-{n}"
             u["unit_id"] = f"{uid}-{sfx}"
             rewritten += 1
     return rewritten
