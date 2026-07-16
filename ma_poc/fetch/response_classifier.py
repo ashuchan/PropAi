@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import ssl
 from collections.abc import Mapping
 from socket import gaierror
@@ -61,6 +62,86 @@ def _is_parked_domain(body_head: bytes) -> bool:
     except Exception:
         return False
     return any(phrase in text for phrase in _PARKED_DOMAIN_PHRASES)
+
+
+# ── Soft-404 content fingerprints ─────────────────────────────────────────────
+# A "soft 404" serves HTTP 200 but the page IS a not-found / error placeholder:
+# the property's specific path is dead (or its whole domain now redirects to a
+# management-company "notfound" host), yet the origin returns 200 so the HTTP
+# layer sees a success. The page then flows into extraction as junk, yields no
+# units, and is logged as a generic FAILED_NO_DATA — indistinguishable from a
+# real property with zero inventory, and re-fetched/escalated every run for a
+# resource that no longer exists.
+#
+# Precision is critical: a false positive marks a LIVE property DEAD_URL,
+# dropping it from the success-rate denominator and the retry queue. We anchor
+# the match to the page's own <title>/<h1> (its authoritative headline) rather
+# than a body substring — "404" appears incidentally in asset hashes, analytics
+# and script paths on real pages, so a raw body scan over-fires. Deliberately
+# EXCLUDES "coming soon" / "under construction": those are legitimate lease-up
+# (LEASE_UP) properties whose site is a preview, not dead URLs.
+#
+# Validated 2026-07-16: 11/11 soft-404s in the FAILED cohort caught; 0 false
+# positives across 60 GOLD (SUCCESS) property pages + 40 reached-but-no-data
+# pages. See project_full_nongold_audit_2026-07-15 (#28).
+_SOFT_404_TITLE_PHRASES: tuple[str, ...] = (
+    "page not found",
+    "page cannot be found",
+    "page could not be found",
+    "page doesn't exist",
+    "page does not exist",
+    "page can't be found",
+    "page not available",
+    "this page isn't available",
+    "this page is not available",
+    "404 not found",
+    "404 error",
+    "error 404",
+    "http 404",
+    "404 page",
+    "site not found",
+    "account suspended",
+    "nothing found",
+)
+
+# Exact-title matches for terse error pages whose <title> is just the code /
+# phrase (kept separate so the substring list above can't over-match a longer
+# legitimate title that happens to contain one of these short strings).
+_SOFT_404_TITLE_EXACT: frozenset[str] = frozenset(
+    {"404", "not found", "404 not found", "page not found"}
+)
+
+_TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+
+
+def _tag_text(pattern: re.Pattern[str], text: str) -> str:
+    """Extract and normalise the inner text of the first tag match (lowercased)."""
+    m = pattern.search(text)
+    if not m:
+        return ""
+    inner = re.sub(r"<[^>]+>", " ", m.group(1))
+    return re.sub(r"\s+", " ", inner).strip().lower()
+
+
+def _is_soft_404(body_head: bytes) -> bool:
+    """Return True if body_head is an HTTP-200 not-found / error placeholder.
+
+    High precision by design (see ``_SOFT_404_TITLE_PHRASES``): only fires when
+    the page's own ``<title>`` or ``<h1>`` headline names it a not-found/error
+    page. Never raises — decodes as latin-1 like ``_is_parked_domain``.
+    """
+    if not body_head:
+        return False
+    try:
+        text = body_head[:4096].decode("latin-1")
+    except Exception:
+        return False
+    title = _tag_text(_TITLE_RE, text)
+    h1 = _tag_text(_H1_RE, text)
+    if title in _SOFT_404_TITLE_EXACT or h1 in _SOFT_404_TITLE_EXACT:
+        return True
+    return any(p in title or p in h1 for p in _SOFT_404_TITLE_PHRASES)
 
 # F3 — Cloudflare-edge response markers. ``server: cloudflare`` is the
 # canonical marker; ``cf-ray`` / ``cf-mitigated`` / ``cf-cache-status``
@@ -240,6 +321,13 @@ def classify(
         _b200 = looks_like_200_block(body_head, headers)
         if _b200:
             return FetchOutcome.BOT_BLOCKED, f"{_b200.upper()}_200"
+        # Content-based soft-404 detection. Runs AFTER the captcha / 200-block
+        # checks so a bot-block interstitial still escalates tiers rather than
+        # being mislabelled terminal-dead. A 200 whose <title>/<h1> declares
+        # itself a not-found page is a dead URL: terminal, excluded from the
+        # success-rate denominator, routed to re-discovery (same as HTTP 404).
+        if body_head and _is_soft_404(body_head):
+            return FetchOutcome.DEAD_URL, "SOFT_404"
         return FetchOutcome.OK, None
 
     # Stage 3 (2026-05-12): explicit "this resource is gone" statuses are
