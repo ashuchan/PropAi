@@ -133,6 +133,64 @@ def test_classify_nxdomain_chrome_signature_is_dead_url() -> None:
     assert sig == "ERR_DNS_NXDOMAIN"
 
 
+# ── Soft-404 detection (#28, 2026-07-16) ──────────────────────────────────────
+# HTTP 200 whose <title>/<h1> declares the page a not-found placeholder is a
+# dead URL (terminal, excluded from success-rate denominator, re-discovery
+# queue) — not a real property with zero inventory.
+
+
+def test_classify_soft_404_title_is_dead_url() -> None:
+    """200 with a 'Page Not Found' <title> — the notfound.apts247.info pattern."""
+    body = b"<html><head><title>Page Not Found</title></head><body>Sorry.</body></html>"
+    outcome, sig = classify(200, {}, body)
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "SOFT_404"
+
+
+def test_classify_soft_404_h1_is_dead_url() -> None:
+    """200 whose <h1> headline names it a 404, even with a benign <title>."""
+    body = (
+        b"<html><head><title>Acme Apartments</title></head>"
+        b"<body><h1>404 - Page Not Found</h1></body></html>"
+    )
+    outcome, sig = classify(200, {}, body)
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "SOFT_404"
+
+
+def test_classify_soft_404_exact_title() -> None:
+    """A terse ``<title>404</title>`` error page."""
+    outcome, sig = classify(200, {}, b"<html><head><title>404</title></head></html>")
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "SOFT_404"
+
+
+def test_classify_real_property_page_not_soft_404() -> None:
+    """A real property page whose title contains no not-found headline stays OK,
+    even when '404' appears incidentally in a body asset path (the false-positive
+    that a raw body-substring scan would trip on — reserveatriverplace/266lofts)."""
+    body = (
+        b"<html><head><title>Apartments in Memphis, TN | 266 LOFTS</title></head>"
+        b"<body><script src='/assets/app.404abc.js'></script>"
+        b"<h1>A Refreshing Community</h1></body></html>"
+    )
+    outcome, sig = classify(200, {}, body)
+    assert outcome == FetchOutcome.OK
+    assert sig is None
+
+
+def test_classify_lease_up_coming_soon_not_soft_404() -> None:
+    """'Coming soon' / 'under construction' are legitimate LEASE_UP previews,
+    NOT dead URLs — must stay OK so lease-up properties aren't dropped."""
+    body = (
+        b"<html><head><title>Now Leasing - Coming Soon | The Grove</title></head>"
+        b"<body><h1>Under Construction</h1></body></html>"
+    )
+    outcome, sig = classify(200, {}, body)
+    assert outcome == FetchOutcome.OK
+    assert sig is None
+
+
 def test_patchright_timeout_import_resolves() -> None:
     """Catches patchright internal reorganisation that would silently degrade
     classify() to generic 'TimeoutError' signatures, breaking retry back-off."""
