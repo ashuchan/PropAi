@@ -39,6 +39,7 @@ Key findings:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import TYPE_CHECKING, Any
@@ -1548,30 +1549,36 @@ async def _try_sightmap_iframe_fallback(
     # hasn't yet rendered. Try each candidate; first valid response wins.
     direct_urls = find_sightmap_direct_api_urls(html)
     if direct_urls:
+        # 2026-07-16 (Lever 1): route via probe_get (residential/PROBE_PROXY_URL
+        # + cost-gated Web Unlocker) instead of a bare httpx client from the GCP
+        # runner IP. sightmap.com's CDN CF-blocks the runner IP, so the unrouted
+        # fetch returned nothing in the page=None prod path — verified: the same
+        # reconstructed API URLs return full inventory through residential.
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-                for api_url in direct_urls[:3]:
-                    try:
-                        ar = await c.get(api_url, headers=headers)
-                    except Exception:
-                        continue
-                    if ar.status_code != 200:
-                        continue
-                    try:
-                        body = ar.json()
-                    except (json.JSONDecodeError, ValueError):
-                        continue
-                    if not isinstance(body, dict) or not _is_sightmap_response(body):
-                        continue
-                    units, _dropped = parse_sightmap_payload(body, api_url)
-                    if units:
-                        result.api_responses.append(
-                            {"url": api_url, "status": 200, "body": body,
-                             "via": "direct_api_fallback"}
-                        )
-                        result.winning_url = api_url
-                        return units
+            from ma_poc.pms.adapters._probe import probe_get
+            for api_url in direct_urls[:3]:
+                try:
+                    ar = await asyncio.to_thread(
+                        probe_get, api_url, headers=headers, timeout=15
+                    )
+                except Exception:
+                    continue
+                if getattr(ar, "status_code", 0) != 200:
+                    continue
+                try:
+                    body = json.loads(getattr(ar, "text", "") or "")
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(body, dict) or not _is_sightmap_response(body):
+                    continue
+                units, _dropped = parse_sightmap_payload(body, api_url)
+                if units:
+                    result.api_responses.append(
+                        {"url": api_url, "status": 200, "body": body,
+                         "via": "direct_api_fallback"}
+                    )
+                    result.winning_url = api_url
+                    return units
         except Exception as exc:
             result.errors.append(
                 f"sightmap-direct-api-fallback-error: "
@@ -1586,28 +1593,33 @@ async def _try_sightmap_iframe_fallback(
         return []
     embed_code = codes[0]
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            embed_url = f"https://sightmap.com/embed/{embed_code}"
-            er = await c.get(embed_url, headers=embed_headers)
-            if er.status_code != 200 or not er.text:
-                return []
-            api_url = extract_sightmap_api_url(er.text)
-            if not api_url:
-                return []
-            # API call: Referer is the embed URL itself (mirrors the
-            # browser's iframe → XHR chain).
-            api_headers = dict(base_headers)
-            api_headers["Referer"] = embed_url
-            if operator_referer:
-                api_headers["Origin"] = operator_referer.rstrip("/")
-            ar = await c.get(api_url, headers=api_headers)
-            if ar.status_code != 200:
-                return []
-            try:
-                body = ar.json()
-            except (json.JSONDecodeError, ValueError):
-                return []
+        # 2026-07-16 (Lever 1): probe_get (residential + WU) instead of bare
+        # httpx — same CF-block rationale as Pass 1.
+        from ma_poc.pms.adapters._probe import probe_get
+        embed_url = f"https://sightmap.com/embed/{embed_code}"
+        er = await asyncio.to_thread(
+            probe_get, embed_url, headers=embed_headers, timeout=15
+        )
+        if getattr(er, "status_code", 0) != 200 or not getattr(er, "text", ""):
+            return []
+        api_url = extract_sightmap_api_url(er.text)
+        if not api_url:
+            return []
+        # API call: Referer is the embed URL itself (mirrors the
+        # browser's iframe → XHR chain).
+        api_headers = dict(base_headers)
+        api_headers["Referer"] = embed_url
+        if operator_referer:
+            api_headers["Origin"] = operator_referer.rstrip("/")
+        ar = await asyncio.to_thread(
+            probe_get, api_url, headers=api_headers, timeout=15
+        )
+        if getattr(ar, "status_code", 0) != 200:
+            return []
+        try:
+            body = json.loads(getattr(ar, "text", "") or "")
+        except (json.JSONDecodeError, ValueError):
+            return []
         if not isinstance(body, dict) or not _is_sightmap_response(body):
             return []
         units, _dropped = parse_sightmap_payload(body, api_url)

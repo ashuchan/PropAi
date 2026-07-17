@@ -37,7 +37,6 @@ from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
-
 # 2026-05-24: per-call capture buffer for the raw doorway-api responses.
 # ``_fetch_knock_units`` resets and writes to this; the adapter reads from
 # it after the fetch to surface the responses via
@@ -337,6 +336,24 @@ class KnockAdapter:
 
         if not (public_key and comm_id) and not result.units:
             result.errors.append("knock-adapter: no knockDoorway.init() call in HTML")
+
+        # ── Path 3: SSR SecureCafe/RentCafe AvailUnitRow table in body ─────
+        # 2026-07-16 (Lever 2): some Knock-detected operators never sync
+        # inventory to Knock's Doorway DB (Path 1 → 0 units) yet server-render
+        # the full unit-level RentCafe/SecureCafe ``<tr class='AvailUnitRow'>``
+        # table straight into the same marketing body we already fetched.
+        # Parse that body directly instead of only emitting subpage hints —
+        # mirrors the marketapts page=None fix (the data is in hand).
+        if (public_key and comm_id) and not result.units and "AvailUnitRow" in html:
+            from ma_poc.pms.adapters.rentcafe import parse_securecafe_availableunits
+
+            ssr_units = parse_securecafe_availableunits(html, base_url)
+            if ssr_units:
+                result.units = ssr_units
+                result.winning_url = base_url or None
+                result.tier_used = "TIER_1_KNOCK_SSR_AVAILUNITROW"
+                result.confidence = min(0.9, 0.6 + 0.02 * len(ssr_units))
+                return result
 
         # ── Empty-Knock-API fallthrough (2026-05-21) ───────────────────────
         # When Knock is correctly DETECTED (knockDoorway.init in HTML) but

@@ -20,6 +20,8 @@ from ma_poc.pms.adapters import get_adapter
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.marketapts import (
     MarketAptsAdapter,
+    marketapts_payload_to_units,
+    marketapts_static_payload,
     parse_marketapts_template_a,
     parse_marketapts_template_b,
     parse_marketapts_template_c,
@@ -27,7 +29,6 @@ from ma_poc.pms.adapters.marketapts import (
     parse_marketapts_template_f,
 )
 from ma_poc.pms.detector import detect_pms
-
 
 # ── Template A fixtures ─────────────────────────────────────────────
 # Sandpiper Apts: ``/floorplans`` SSR — .floorplan-block with two
@@ -686,11 +687,13 @@ async def test_adapter_no_plans_returns_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_adapter_non_dict_payload_returns_failure() -> None:
-    """DOM JS returns None or a list under hostile pages — adapter must
-    not crash and must surface confidence 0."""
+    """DOM JS returns None or a list under hostile pages — with no live page
+    payload AND no parseable body in the ctx, the adapter must not crash and
+    must surface confidence 0 (the static-body fallback finds nothing)."""
     result = await MarketAptsAdapter().extract(_FakePage(None), _ctx())  # type: ignore[arg-type]
     assert result.confidence == 0.0
-    assert "non-dict" in " ".join(result.errors)
+    assert result.units == []
+    assert "no parseable body" in " ".join(result.errors)
 
 
 # ── Detector + registry ─────────────────────────────────────────────
@@ -809,7 +812,6 @@ def test_template_a_guard_requires_unit_single_selector() -> None:
     Without this guard, 9+ RentCafe-ASPX sites would false-route to the
     MA adapter and emit malformed rows.
     """
-    import inspect
     from ma_poc.pms.adapters.marketapts import _MARKETAPTS_DOM_JS
     src = _MARKETAPTS_DOM_JS
     # The Template A branch MUST AND-guard on .floorplan-unit-single.
@@ -1315,3 +1317,139 @@ def test_brookstone_listing_fixture_matches_template_d_layout() -> None:
         f"drill anchor text {text!r} must match the 'N Apartments "
         f"Available' wording"
     )
+
+
+# ── Fetch-only (page=None) static-body recovery path ────────────────
+
+_STATIC_B_LISTING = """
+<html><body>
+  <div class="floorplan-item">
+    <div class="floorplan-title">A1</div>
+    <div class="floorplan-features">BEDROOMS: 1 BATHROOMS: 1.0 SQ. FEET: 580</div>
+    <div class="floorplan-num">$975</div>
+    <a href="/unit/a1">3 Units Available</a>
+  </div>
+  <div class="floorplan-item">
+    <div class="floorplan-title">B2</div>
+    <div class="floorplan-features">BEDROOMS: 2 BATHROOMS: 2.0 SQ. FEET: 865</div>
+    <div class="floorplan-num">$1,199</div>
+    <a href="/unit/b2">1 Unit Available</a>
+  </div>
+</body></html>
+"""
+
+_STATIC_B_DRILL_A1 = """
+<html><body>
+  <div class="unit-table-row"><div>3109</div><div>$975</div><div>Available 08/07/2026</div></div>
+  <div class="unit-table-row"><div>7224</div><div>$980</div><div>Available Now</div></div>
+</body></html>
+"""
+
+_STATIC_A_LISTING = """
+<html><body>
+  <div class="floorplan-block" data-bedrooms="1" data-bathrooms="1">
+    <div class="floorplan-name">A1</div>
+    <div class="floorplan-num">$975</div>
+    <div class="floorplan-unit-single" data-price="975" data-when="2026-08-07">
+      UNIT 3109 <span class="unit-price-single">$975</span>
+      <span class="unit-available-single">Available 08/07/2026</span>
+    </div>
+  </div>
+</body></html>
+"""
+
+
+def _null_drill(url: str, xhr: bool = False) -> None:
+    return None
+
+
+def test_static_payload_template_b_plan_level() -> None:
+    """Template B body with NO drill fetch → plan-level rows (rent+sqft)."""
+    payload = marketapts_static_payload(
+        _STATIC_B_LISTING, "https://ex.com/", _null_drill
+    )
+    assert payload["template"] == "B"
+    assert len(payload["plans"]) == 2
+    units = marketapts_payload_to_units(payload, "https://ex.com/floorplans")
+    assert len(units) == 2
+    a1 = units[0]
+    assert a1["floor_plan_name"] == "A1"
+    assert str(a1["market_rent_low"]) == "975"
+    assert str(a1["sqft"]) == "580"
+    assert a1["unit_number"] == ""  # plan-level (no drill)
+
+
+def test_static_payload_template_b_unit_level_via_drill() -> None:
+    """Template B with a drill fetch returning /unit/ rows → unit-level."""
+
+    def drill(url: str, xhr: bool = False) -> str | None:
+        return _STATIC_B_DRILL_A1 if url.endswith("/unit/a1") else None
+
+    payload = marketapts_static_payload(_STATIC_B_LISTING, "https://ex.com/", drill)
+    units = marketapts_payload_to_units(payload, "https://ex.com/floorplans")
+    unit_level = [u for u in units if u["unit_number"]]
+    assert {u["unit_number"] for u in unit_level} == {"3109", "7224"}
+    assert str(unit_level[0]["market_rent_low"]) == "975"
+    assert unit_level[0]["availability_date"] == "08/07/2026"
+
+
+def test_static_payload_template_a_inline() -> None:
+    """Template A inline units are read from the body with no drilling."""
+    payload = marketapts_static_payload(_STATIC_A_LISTING, "https://ex.com/", _null_drill)
+    assert payload["template"] == "A"
+    units = marketapts_payload_to_units(payload, "https://ex.com/floorplans")
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "3109"
+    assert str(units[0]["market_rent_low"]) == "975"
+    assert units[0]["availability_date"] == "2026-08-07"
+
+
+def test_static_payload_none_when_no_markers() -> None:
+    """A homepage shell with no plan markers and no self-fetch → NONE."""
+    payload = marketapts_static_payload(
+        "<html><body><a href='/floor-plans'>Floor Plans</a></body></html>",
+        "https://ex.com/",
+        _null_drill,
+    )
+    assert payload["template"] == "NONE"
+
+
+@pytest.mark.asyncio
+async def test_extract_static_fallback_when_page_none() -> None:
+    """extract() with page=None recovers from ctx.fetch_result.body."""
+    import types
+
+    ctx = _ctx(base_url="https://ex.com/")
+    ctx.fetch_result = types.SimpleNamespace(body=_STATIC_B_LISTING.encode("utf-8"))
+    result = await MarketAptsAdapter().extract(None, ctx)  # type: ignore[arg-type]
+    assert result.confidence > 0.0
+    assert len(result.units) == 2  # plan-level (no live drill in this test)
+    assert result.tier_used.startswith("TIER_1_DOM_MARKETAPTS_B")
+
+
+_STATIC_G_LISTING = """
+<html><body>
+  <div class="col-12 col-md-4 mb-3">
+    <strong>Name:</strong> The Carr<br>
+    <strong>Square Feet:</strong> 602<br>
+    <strong>Starting Rent:</strong> $1282<br>
+  </div>
+  <div class="col-12 col-md-4 mb-3">
+    <strong>Name:</strong> The Lazarus<br>
+    <strong>Square Feet:</strong> 761<br>
+    <strong>Starting Rent:</strong> $1636<br>
+  </div>
+</body></html>
+"""
+
+
+def test_static_payload_template_g_plaintext() -> None:
+    """Template G plain-text <strong>Name:</strong> cards → plan-level rows."""
+    payload = marketapts_static_payload(_STATIC_G_LISTING, "https://ex.com/", _null_drill)
+    assert payload["template"] == "G"
+    assert len(payload["plans"]) == 2
+    units = marketapts_payload_to_units(payload, "https://ex.com/floorplans")
+    assert len(units) == 2
+    assert units[0]["floor_plan_name"] == "The Carr"
+    assert str(units[0]["sqft"]) == "602"
+    assert str(units[0]["market_rent_low"]) == "1282"

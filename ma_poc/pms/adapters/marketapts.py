@@ -92,10 +92,14 @@ on any site that uses the CMS.
 
 from __future__ import annotations
 
+import copy
 import logging
 import re
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse, urlunparse
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urljoin, urlparse, urlunparse
+
+from bs4 import BeautifulSoup
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -482,6 +486,30 @@ async () => {
       return {template: 'F', plans: [], rows: rows};
     }
   }
+
+  // ── Template G — plain-text <strong>Name:</strong> plan cards ──
+  // 223etown-style /floor-plans: plans rendered as "<strong>Name:</strong> X
+  // <strong>Square Feet:</strong> Y <strong>Starting Rent:</strong> $Z" with
+  // no class-based plan container. Plan-level only (unit roster on
+  // /availability = Template F). Emitted Template-B-shaped for reuse.
+  const gPlans = [];
+  let gCur = null;
+  for (const s of Array.from(doc.querySelectorAll('strong'))) {
+    const lab = T(s).replace(/:$/, '').toLowerCase();
+    if (!['name', 'square feet', 'starting rent'].includes(lab)) continue;
+    const sib = s.nextSibling;
+    const val = sib ? (sib.textContent || sib.nodeValue || '').replace(/\s+/g, ' ').trim() : '';
+    if (lab === 'name') {
+      if (gCur) gPlans.push(gCur);
+      gCur = {template: 'B', title: val, features: '', startingPrice: '', units: []};
+    } else if (gCur && lab === 'square feet') {
+      gCur.features = 'SQ. FEET: ' + val;
+    } else if (gCur && lab === 'starting rent') {
+      gCur.startingPrice = val;
+    }
+  }
+  if (gCur) gPlans.push(gCur);
+  if (gPlans.length > 0) return {template: 'G', plans: gPlans};
 
   return {template: 'NONE', plans: []};
 }
@@ -1070,6 +1098,438 @@ def parse_marketapts_template_f(
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Fetch-only (page=None) recovery path
+#
+# ``MarketAptsAdapter.extract`` originally required a live Playwright page:
+# the whole DOM cascade + per-plan drill fetch ran inside ``page.evaluate``.
+# But the fetch ladder frequently serves a MarketApts site through the
+# curl_cffi / Unlocker CF-bypass path — a plain HTTP GET that persists the
+# SSR ``body`` yet leaves ``page=None``. In that case the adapter bailed
+# ("no live page to parse") and emitted 0 units even though the full
+# floorplan markup was in hand. The functions below re-derive the exact same
+# ``{template, plans, rows}`` payload from the persisted body in pure Python
+# (a faithful mirror of ``_MARKETAPTS_DOM_JS``), so the existing
+# ``parse_marketapts_template_*`` transforms run unchanged. Per-plan ``/unit``
+# drills route through ``PROBE_PROXY_URL`` (residential) via
+# ``_probe.probe_get`` so the target site never sees the runner's own IP.
+# ─────────────────────────────────────────────────────────────────────────
+
+# Plan-card markers that mean "this document already carries floorplan data"
+# (mirror of the ``hasMarker`` check in the JS blob).
+_MA_PLAN_MARKERS: tuple[str, ...] = (
+    ".floorplan-block",
+    ".floorplan-item",
+    ".floorplan-unit-single",
+    ".floor-plans-block",
+    ".floorplan-name",
+)
+# Extra markers accepted from a self-fetched candidate document.
+_MA_CANDIDATE_MARKERS: tuple[str, ...] = _MA_PLAN_MARKERS + (
+    ".floorplan-container",
+    "table.table-hover",
+)
+# Some MarketApts SPA deployments return the homepage shell for every path
+# unless the request carries these XHR headers (see JS blob 2026-05-26 note).
+_MA_XHR_HEADERS: dict[str, str] = {
+    "Accept": "application/json, text/plain, */*",
+    "X-Requested-With": "XMLHttpRequest",
+}
+_MA_B_DRILL_TEXT = re.compile(
+    r"view\s+available|view\s+details|see\s+available"
+    r"|\b\d+\s+units?\s+available\b|\b\d+\s+apartments?\s+available\b",
+    re.I,
+)
+_MA_D_DRILL_TEXT = re.compile(
+    r"apartments?\s+available|view\s+available|view\s+details", re.I
+)
+
+
+def _ma_txt(el: Any) -> str:
+    """Mirror of JS ``T(el)``: collapsed, trimmed textContent."""
+    if el is None:
+        return ""
+    return re.sub(r"\s+", " ", el.get_text()).strip()
+
+
+def _ma_origin(url: str) -> str:
+    try:
+        p = urlparse(url)
+    except Exception:
+        return ""
+    if not p.scheme or not p.netloc:
+        return ""
+    return f"{p.scheme}://{p.netloc}"
+
+
+def _ma_row_cells(row: Any) -> tuple[list[str], dict[str, str]]:
+    """Direct-child cell texts (mobile-only label spans removed) + camelCased
+    ``data-*`` attrs — mirror of the JS ``rowClone`` cell mapping + ``dataset``.
+    """
+    clone = copy.copy(row)
+    for lab in clone.select(".visible-xs, .visible-sm, .hidden-md, .hidden-lg"):
+        lab.decompose()
+    cells = [_ma_txt(c) for c in clone.find_all(recursive=False)]
+    data_attrs: dict[str, str] = {}
+    for key, val in (row.attrs or {}).items():
+        if not key.startswith("data-"):
+            continue
+        parts = key[len("data-"):].split("-")
+        camel = parts[0] + "".join(p.title() for p in parts[1:])
+        data_attrs[camel] = val if isinstance(val, str) else " ".join(val)
+    return cells, data_attrs
+
+
+def _ma_find_drill(item: Any, *, kind: str) -> str:
+    """Return the drill-anchor href for a plan card (mirror of the JS
+    ``drillAnchor`` finder). ``kind`` is ``"unit"`` (Templates B) or
+    ``"apartments"`` (Template D)."""
+    for a in item.select("a"):
+        href = a.get("href", "") or ""
+        text = _ma_txt(a).lower()
+        if kind == "unit":
+            if "/unit/" in href or _MA_B_DRILL_TEXT.search(text):
+                return href
+        else:
+            if "/apartments/" in href or _MA_D_DRILL_TEXT.search(text):
+                return href
+    return ""
+
+
+def _ma_template_a_unit(u: Any) -> dict[str, str]:
+    text = _ma_txt(u)
+    m = re.search(r"UNIT\s*[#:]?\s*([A-Z0-9\-]+)", text, re.I)
+    return {
+        "unitNumber": m.group(1) if m else "",
+        "dataWhen": u.get("data-when", "") or "",
+        "dataPrice": u.get("data-price", "") or "",
+        "dataBeds": u.get("data-bedrooms", "") or "",
+        "dataBaths": u.get("data-bathrooms", "") or "",
+        "priceText": _ma_txt(u.select_one(".unit-price-single")),
+        "availText": _ma_txt(u.select_one(".unit-available-single")),
+    }
+
+
+def _ma_template_g_plans(doc: Any) -> list[dict[str, Any]]:
+    """Template G — plain-text plan cards labelled ``<strong>Name:</strong>``
+    / ``<strong>Square Feet:</strong>`` / ``<strong>Starting Rent:</strong>``
+    (observed on 223etown.com/floor-plans). Plan-level only — the unit roster
+    for these sites lives on ``/availability`` (Template F). Emitted as
+    Template-B-shaped dicts so ``parse_marketapts_template_b`` handles them
+    with no new transform.
+    """
+    plans: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    for s in doc.find_all("strong"):
+        label = _ma_txt(s).rstrip(":").lower()
+        if label not in ("name", "square feet", "starting rent"):
+            continue
+        sib = s.next_sibling
+        if sib is None:
+            val = ""
+        elif isinstance(sib, str):
+            val = sib.strip()
+        else:
+            val = _ma_txt(sib)
+        if label == "name":
+            if cur is not None:
+                plans.append(cur)
+            cur = {
+                "template": "B",
+                "title": val,
+                "features": "",
+                "startingPrice": "",
+                "units": [],
+            }
+        elif cur is not None and label == "square feet":
+            cur["features"] = f"SQ. FEET: {val}"
+        elif cur is not None and label == "starting rent":
+            cur["startingPrice"] = val
+    if cur is not None:
+        plans.append(cur)
+    return plans
+
+
+def marketapts_static_payload(
+    html: str,
+    base_url: str,
+    drill_fetch: Callable[[str, bool], str | None],
+) -> dict[str, Any]:
+    """Pure-Python mirror of ``_MARKETAPTS_DOM_JS`` for the ``page=None`` path.
+
+    Args:
+        html: The persisted SSR response body.
+        base_url: The property URL (used to resolve relative drill hrefs and
+            to derive the origin for self-fetches).
+        drill_fetch: ``(url, xhr) -> html | None`` — fetches a URL's HTML.
+            ``xhr=True`` sends the XHR headers some SPA deployments require.
+            Returns None on any failure (plan-level fallback then applies).
+
+    Returns:
+        ``{"template": <A|B|C|D|E|F|NONE>, "plans": [...], "rows": [...]}`` in
+        the exact shape the ``parse_marketapts_template_*`` transforms expect.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    doc: Any = soup
+    origin = _ma_origin(base_url)
+
+    # ── locate the floorplans document (mirror of the JS self-fetch) ──
+    if not any(soup.select_one(m) for m in _MA_PLAN_MARKERS):
+        for path in ("/floorplans", "/floor-plans", "/availability"):
+            if not origin:
+                break
+            cand_html = drill_fetch(origin + path, True)
+            if not cand_html:
+                continue
+            cand = BeautifulSoup(cand_html, "lxml")
+            if any(cand.select_one(m) for m in _MA_CANDIDATE_MARKERS):
+                doc = cand
+                break
+
+    def _drill_rows(drill_path: str, selector: str) -> list[dict[str, Any]]:
+        if not drill_path:
+            return []
+        drill_html = drill_fetch(urljoin(base_url, drill_path), False)
+        if not drill_html:
+            return []
+        ddoc = BeautifulSoup(drill_html, "lxml")
+        rows: list[dict[str, Any]] = []
+        for row in ddoc.select(selector):
+            cells, data_attrs = _ma_row_cells(row)
+            rows.append({"cells": cells, "dataAttrs": data_attrs})
+        return rows
+
+    # ── Template A — inline unit rows ──
+    a_blocks = doc.select(".floorplan-block")
+    if a_blocks and doc.select_one(".floorplan-unit-single"):
+        plans = [
+            {
+                "template": "A",
+                "beds": b.get("data-bedrooms", "") or "",
+                "baths": b.get("data-bathrooms", "") or "",
+                "name": _ma_txt(b.select_one(".floorplan-name, .floorplan-title")),
+                "startingPrice": _ma_txt(
+                    b.select_one(".floorplan-num, .floorplan-rent")
+                ),
+                "units": [
+                    _ma_template_a_unit(u)
+                    for u in b.select(".floorplan-unit-single")
+                ],
+            }
+            for b in a_blocks
+        ]
+        return {"template": "A", "plans": plans}
+
+    # ── Template B — .floorplan-item + /unit/ drill ──
+    b_items = doc.select(".floorplan-item")
+    if b_items:
+        plans = []
+        for item in b_items:
+            drill_path = _ma_find_drill(item, kind="unit")
+            plans.append(
+                {
+                    "template": "B",
+                    "title": _ma_txt(item.select_one(".floorplan-title")),
+                    "features": _ma_txt(item.select_one(".floorplan-features")),
+                    "startingPrice": _ma_txt(item.select_one(".floorplan-num")),
+                    "drillPath": drill_path,
+                    "units": _drill_rows(drill_path, ".unit-table-row"),
+                }
+            )
+        return {"template": "B", "plans": plans}
+
+    # ── Template C — .floorplan-container gallery + /unit/ drill ──
+    c_containers = doc.select(".floorplan-container")
+    if c_containers:
+        hrefs: list[str] = []
+        for cont in c_containers:
+            for a in cont.select('a[href*="/unit/"]'):
+                href = a.get("href", "") or ""
+                if href and href not in hrefs:
+                    hrefs.append(href)
+        if not hrefs:
+            return {"template": "NONE", "plans": []}
+        plans = []
+        for href in hrefs:
+            title = ""
+            specs = ""
+            units: list[dict[str, Any]] = []
+            drill_html = drill_fetch(urljoin(base_url, href), False)
+            if drill_html:
+                ddoc = BeautifulSoup(drill_html, "lxml")
+                title = _ma_txt(ddoc.select_one("h1"))
+                specs = _ma_txt(
+                    ddoc.select_one("section.unit, .section.unit")
+                ) or _ma_txt(ddoc.body)[:2000]
+                for row in ddoc.select(".unit-details"):
+                    cells, data_attrs = _ma_row_cells(row)
+                    units.append({"cells": cells, "dataAttrs": data_attrs})
+            plans.append(
+                {
+                    "title": title,
+                    "specsBlob": specs,
+                    "drillPath": href,
+                    "units": units,
+                    "template": "C",
+                }
+            )
+        return {"template": "C", "plans": plans}
+
+    # ── Template D — .floor-plans-block + /apartments/ drill ──
+    d_blocks = doc.select(".floor-plans-block")
+    if d_blocks:
+        plans = []
+        for block in d_blocks:
+            drill_path = _ma_find_drill(block, kind="apartments")
+            from_m = re.search(
+                r"FROM\s*:?\s*\$\s*([\d,]+)", _ma_txt(block), re.I
+            )
+            plans.append(
+                {
+                    "template": "D",
+                    "title": _ma_txt(block.select_one("h1, h2, h3, h4, h5, h6")),
+                    "features": _ma_txt(
+                        block.select_one(".floor-plans-block-details, .list-group")
+                    ),
+                    "startingPrice": ("$" + from_m.group(1)) if from_m else "",
+                    "drillPath": drill_path,
+                    "units": _drill_rows(drill_path, ".unit-table-row"),
+                }
+            )
+        return {"template": "D", "plans": plans}
+
+    # ── Template E — tabbed accordion, plan-only ──
+    e_cards = doc.select(".floorplan-name")
+    if e_cards:
+        seen: set[int] = set()
+        plans = []
+        for name_el in e_cards:
+            card = name_el.find_parent(class_="card") or name_el.parent
+            if card is None or id(card) in seen:
+                continue
+            seen.add(id(card))
+            items = [
+                t
+                for t in (
+                    _ma_txt(li)
+                    for li in card.select(".list-group-item, .floorplan-info li")
+                )
+                if t
+            ]
+            plans.append(
+                {"template": "E", "name": _ma_txt(name_el), "infoItems": items}
+            )
+        if plans:
+            return {"template": "E", "plans": plans}
+
+    # ── Template F — /availability data tables ──
+    avail_doc: Any = None
+    if doc.select_one("table.table-hover"):
+        avail_doc = doc
+    elif origin:
+        cand_html = drill_fetch(origin + "/availability", False)
+        if cand_html:
+            cand = BeautifulSoup(cand_html, "lxml")
+            if cand.select_one("table.table-hover"):
+                avail_doc = cand
+    if avail_doc is not None:
+        rows = []
+        for table in avail_doc.select("table.table-hover"):
+            table_name = " ".join(table.get("class", []) or [])
+            for tr in table.select("tbody tr"):
+                cells, data_attrs = _ma_row_cells(tr)
+                rows.append(
+                    {"cells": cells, "tableName": table_name, "dataAttrs": data_attrs}
+                )
+        if rows:
+            return {"template": "F", "plans": [], "rows": rows}
+
+    # ── Template G — plain-text <strong>Name:</strong> plan cards ──
+    # Fallback for the plain-text plan layout (223etown-style /floor-plans)
+    # that none of the class-based selectors match. Plan-level only.
+    g_plans = _ma_template_g_plans(doc)
+    if g_plans:
+        return {"template": "G", "plans": g_plans}
+
+    return {"template": "NONE", "plans": []}
+
+
+def _ma_payload_has_data(payload: Any) -> bool:
+    """True when a payload carries a usable template + at least one plan/row."""
+    if not isinstance(payload, dict):
+        return False
+    if str(payload.get("template") or "NONE") == "NONE":
+        return False
+    plans = payload.get("plans") or []
+    rows = payload.get("rows") or []
+    return (isinstance(plans, list) and len(plans) > 0) or (
+        isinstance(rows, list) and len(rows) > 0
+    )
+
+
+def marketapts_payload_to_units(payload: dict[str, Any], url: str) -> list[dict[str, str]]:
+    """Dispatch a ``{template, plans, rows}`` payload to the matching
+    ``parse_marketapts_template_*`` transform. Shared by the live-page and
+    the fetch-only paths so both produce identical rows."""
+    template = str(payload.get("template") or "NONE")
+    plans = payload.get("plans") or []
+    if not isinstance(plans, list):
+        plans = []
+    if template == "A":
+        return parse_marketapts_template_a(plans, url)
+    if template == "B":
+        return parse_marketapts_template_b(plans, url)
+    if template == "C":
+        return parse_marketapts_template_c(plans, url)
+    if template == "D":
+        # Template D drills share Template B's row shape.
+        return parse_marketapts_template_b(plans, url)
+    if template == "E":
+        return parse_marketapts_template_e(plans, url)
+    if template == "F":
+        rows = payload.get("rows") or []
+        return parse_marketapts_template_f(rows, url) if isinstance(rows, list) else []
+    if template == "G":
+        # Template G plans are Template-B-shaped (plan-level; the unit roster
+        # for these sites lives on /availability = Template F).
+        return parse_marketapts_template_b(plans, url)
+    return []
+
+
+def _ma_ctx_body(ctx: AdapterContext) -> str:
+    """Decode the persisted response body from the AdapterContext, or ''."""
+    fetch_result = getattr(ctx, "fetch_result", None)
+    body = getattr(fetch_result, "body", None) if fetch_result is not None else None
+    if body is None:
+        return ""
+    if isinstance(body, bytes):
+        return body.decode("utf-8", errors="replace")
+    return str(body)
+
+
+def _ma_residential_drill_fetch(url: str, xhr: bool = False) -> str | None:
+    """Fetch a drill/self-fetch URL through ``PROBE_PROXY_URL`` (residential)
+    via curl_cffi, so the target never sees the runner's own IP. Returns the
+    response HTML, or None on any failure (→ plan-level fallback)."""
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except ImportError:
+        return None
+    kwargs: dict[str, Any] = {"timeout": 30}
+    if xhr:
+        kwargs["headers"] = _MA_XHR_HEADERS
+    try:
+        resp = probe_get(url, unlocker=False, **kwargs)
+    except Exception as exc:
+        log.debug("marketapts drill fetch failed url=%s err=%s", url, exc)
+        return None
+    text = getattr(resp, "text", None)
+    status = int(getattr(resp, "status_code", 0) or 0)
+    if not text or status >= 400:
+        return None
+    return str(text)
+
+
 class MarketAptsAdapter:
     """Market Apartments CMS adapter — handles Templates A/B/C/D/E/F."""
 
@@ -1087,73 +1547,57 @@ class MarketAptsAdapter:
         emit unit-level dicts.
         """
         result = AdapterResult(tier_used="TIER_1_DOM_MARKETAPTS")
+
+        # Path 1 — live Playwright page: run the in-browser DOM cascade.
         evaluate = getattr(page, "evaluate", None)
-        if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("marketapts: no live page to parse")
-            return result
+        payload: Any = None
+        if callable(evaluate):
+            try:
+                payload = await evaluate(_MARKETAPTS_DOM_JS)
+            except Exception as exc:
+                log.debug("marketapts DOM evaluate failed err=%s", exc)
+                payload = None
 
-        try:
-            payload = await evaluate(_MARKETAPTS_DOM_JS)
-        except Exception as exc:
-            log.debug("marketapts DOM evaluate failed err=%s", exc)
-            payload = None
+        # Path 2 — fetch-only fallback. When there is no live page (the
+        # curl_cffi / Unlocker CF-bypass path serves the body but leaves
+        # page=None) — or the live page produced nothing usable — re-derive
+        # the payload from the persisted response body with a pure-Python
+        # mirror of the DOM JS. Per-plan ``/unit`` drills route through
+        # PROBE_PROXY_URL (residential) so the target never sees the runner's
+        # own IP.
+        if not _ma_payload_has_data(payload):
+            body = _ma_ctx_body(ctx)
+            if body:
+                try:
+                    static_payload = marketapts_static_payload(
+                        body,
+                        getattr(ctx, "base_url", "") or "",
+                        _ma_residential_drill_fetch,
+                    )
+                except Exception as exc:
+                    log.debug("marketapts static parse failed err=%s", exc)
+                    static_payload = {"template": "NONE", "plans": []}
+                if _ma_payload_has_data(static_payload):
+                    payload = static_payload
+                    log.debug(
+                        "marketapts: recovered via static body path (page=None)"
+                    )
 
-        if not isinstance(payload, dict):
-            result.confidence = 0.0
-            result.errors.append("marketapts: DOM JS returned non-dict")
-            return result
-
-        template = str(payload.get("template") or "NONE")
-        plans = payload.get("plans") or []
-        # Template F carries its data under ``rows`` (not ``plans``) — the
-        # /availability table format has no plan-level container, just a
-        # flat list of unit rows. Don't bail when plans is empty if F
-        # provides rows.
-        f_rows = payload.get("rows") or []
-        has_data = (
-            (isinstance(plans, list) and len(plans) > 0)
-            or (isinstance(f_rows, list) and len(f_rows) > 0)
-        )
-        if template == "NONE" or not has_data:
+        if not _ma_payload_has_data(payload):
             result.confidence = 0.0
             result.errors.append(
-                "marketapts: no .floorplan-block/.floorplan-item/.floor-plans-block/"
-                ".floorplan-container/.floorplan-name cards and no /availability "
-                "table found"
+                "marketapts: no live page and no parseable body — no "
+                ".floorplan-block/.floorplan-item/.floor-plans-block/"
+                ".floorplan-container/.floorplan-name cards and no "
+                "/availability table found"
             )
             return result
 
+        assert isinstance(payload, dict)
+        template = str(payload.get("template") or "NONE")
+        plans = payload.get("plans") or []
         winning = self._winning_url(page, ctx)
-        if template == "A":
-            units = parse_marketapts_template_a(plans, winning)
-        elif template == "B":
-            units = parse_marketapts_template_b(plans, winning)
-        elif template == "C":
-            units = parse_marketapts_template_c(plans, winning)
-        elif template == "D":
-            # Template D's drill rows share Template B's selector and
-            # cell shape; the row-level ``data-available-date`` is
-            # consumed by ``parse_marketapts_template_b`` (see dataAttrs
-            # branch). Listing-side title/features come from the
-            # ``.floor-plans-block`` heading + details, ``startingPrice``
-            # synthesised from "FROM: $X,XXX".
-            units = parse_marketapts_template_b(plans, winning)
-        elif template == "E":
-            # Subpath tabbed accordion (sylispm-style). Plan-level only;
-            # cards expose ``.floorplan-name`` + ``.list-group`` items.
-            units = parse_marketapts_template_e(plans, winning)
-        elif template == "F":
-            # ``/availability`` data-tables (223etown-style). Plans live
-            # in the per-row "Style" cell; unit roster has no explicit
-            # unit_number.
-            payload_rows = payload.get("rows") or []
-            if isinstance(payload_rows, list):
-                units = parse_marketapts_template_f(payload_rows, winning)
-            else:
-                units = []
-        else:
-            units = []
+        units = marketapts_payload_to_units(payload, winning)
 
         if not units:
             result.confidence = 0.0
