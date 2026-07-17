@@ -1052,6 +1052,44 @@ async def _process_property(
         partial_state=partial_state,
     )
 
+    # ── L3: render-on-empty escalation (2026-07-16, flag-gated, default off) ──
+    # When a routed adapter extracts 0 units from a fetch that SUCCEEDED (a 200
+    # SSR/shell body) and did NOT already render, re-fetch that property ONCE
+    # via RenderMode.RENDER so the browser fires the client-side widget XHRs
+    # (OneSite OLL, Entrata/nestin SPAs) and re-run extraction. Bounded to one
+    # extra render per empty-GET property; the render fetch's captured XHR
+    # waterfall lands in render_fetch so scrape_jugnu extracts from it.
+    from ma_poc.config.feature_flags import ENABLE_RENDER_ON_EMPTY
+    from ma_poc.fetch.contracts import RenderMode
+
+    if (
+        ENABLE_RENDER_ON_EMPTY
+        and not (result.get("units") or [])
+        and fetch_result.ok()
+        and getattr(fetch_result, "render_mode", None) != RenderMode.RENDER
+    ):
+        try:
+            render_task = _dc_replace(task, render_mode=RenderMode.RENDER)
+            render_fetch = await jugnu_fetch(render_task, profile=profile_for_dispatch)
+            if render_fetch.ok():
+                render_result = await scrape_jugnu(
+                    task=render_task,
+                    fetch_result=render_fetch,
+                    page=None,
+                    profile=profile,
+                    csv_row=csv_row,
+                    partial_state=partial_state,
+                )
+                if len(render_result.get("units") or []) > 0:
+                    result = render_result
+                    fetch_result = render_fetch
+        except Exception as _roe_exc:  # never let escalation crash a property
+            log.debug(
+                "render-on-empty escalation failed for %s: %s",
+                task.property_id,
+                _roe_exc,
+            )
+
     # F6 (H6/H11) — surface the propertyId we used (resolved or cached)
     # so the profile_updater can persist it. Read by
     # update_profile_after_extraction; only written there when the tier
