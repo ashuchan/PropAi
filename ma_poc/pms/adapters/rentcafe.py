@@ -534,6 +534,29 @@ class RentCafeAdapter:
                     result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
                     return result
 
+        # 2026-07-16 (Lever 2): inline SecureCafe AvailUnitRow table. Some
+        # RentCafe/Yardi marketing pages SSR the full availableunits.aspx
+        # table INLINE in the rendered body (``<tr class='AvailUnitRow'>``
+        # rows under "Floor Plan: <name> - N Bedroom, N Bathroom" headers)
+        # rather than behind a portal drill. The live SecureCafe probe above
+        # can miss these (base-URL discovery fails or the portal fetch is
+        # CF/proxy-blocked), yet the same rows are already in ``_rc_html``.
+        if _rc_html and "AvailUnitRow" in _rc_html:
+            inline_units = parse_securecafe_availableunits(
+                _rc_html, str(getattr(ctx, "base_url", "") or "")
+            )
+            if inline_units:
+                from ma_poc.extraction.post_process import post_process
+                pp = post_process(
+                    inline_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if pp.n_admitted > 0:
+                    result.units = pp.admitted
+                    result.plan_summaries = pp.plan_summaries
+                    result.tier_used = "TIER_1_DOM_RENTCAFE_INLINE_AVAILUNITROW"
+                    result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                    return result
+
         # 2026-05-20: Nestin per-plan DOM recovery. The 35-prop JSON-LD
         # probe (project_jsonld_recovery_2026-05-20.md) found that ~89% of
         # the 298-prop JSON-LD ALL_fail bucket are RentCafe-Nestin marketing
@@ -1338,6 +1361,28 @@ async def _try_rentcafe_securecafe_probe(
             except Exception as exc:
                 result.errors.append(
                     f"rentcafe-securecafe-proxied-fetch-error[{candidate_base}]: "
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
+        # Attempt 3: WEB UNLOCKER (2026-07-16, Lever 1). Direct + proxied both
+        # miss SecureCafe's HTTP-200 CF/JS challenge shells — Yardi's Cloudflare
+        # tenant returns a 200 challenge body (not a 403), so probe_get's
+        # _looks_blocked gate never escalates and the drill silently sees no
+        # AvailUnitRow. Escalate explicitly whenever rows are still missing and
+        # a Web Unlocker token is set — independent of PROBE_PROXY_URL and of
+        # _looks_blocked. No-op (returns empty) when WEB_UNLOCKER_KEY is unset.
+        if "AvailUnitRow" not in body_text:
+            try:
+                from ma_poc.pms.adapters._probe import (
+                    web_unlocker_get,
+                    web_unlocker_key,
+                )
+                if web_unlocker_key():
+                    wu = web_unlocker_get(candidate_au, timeout=120)
+                    if wu.status_code == 200 and "AvailUnitRow" in (wu.text or ""):
+                        body_text = wu.text or ""
+            except Exception as exc:
+                result.errors.append(
+                    f"rentcafe-securecafe-unlocker-fetch-error[{candidate_base}]: "
                     f"{type(exc).__name__}: {str(exc)[:80]}"
                 )
         if "AvailUnitRow" not in body_text:
