@@ -887,3 +887,28 @@ def test_detector_routes_securecafenet_html_to_rentcafe() -> None:
         f"securecafenet link must route to rentcafe adapter; got "
         f"pms={det.pms!r}, confidence={det.confidence!r}"
     )
+
+
+def test_securecafe_applicant_floorplans_v2() -> None:
+    """RentCafe applicant-portal FloorPlansV2 API → unit + plan-level rows."""
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_applicant_floorplans
+
+    payload = {"status": True, "floorPlanList": [
+        {"floorPlan": {"FloorPlanName": "B2", "Beds": 2, "Baths": 2.0,
+                       "MinimumRent": 1570, "MaximumRent": 1570, "MinimumArea": 975,
+                       "MinimumDeposit": 300, "DoNotPublish": False},
+         "UnitAvailability": []},
+        {"floorPlan": {"FloorPlanName": "A1", "Beds": 1, "Baths": 1.0,
+                       "MinimumRent": 1200, "MaximumRent": 1350, "MinimumArea": 700,
+                       "DoNotPublish": False},
+         "UnitAvailability": [
+             {"unitcode": "A1-101", "DisplayMinRent": 1225, "AvailableDate": "2026-08-01"},
+             {"unitcode": "A1-204", "startingRent": 1250}]},
+        {"floorPlan": {"FloorPlanName": "Hidden", "DoNotPublish": True},
+         "UnitAvailability": []},
+    ]}
+    units = parse_securecafe_applicant_floorplans(payload, "https://x.securecafeapplicant.com/")
+    assert len(units) == 3
+    assert any(u["unit_number"] == "A1-101" and str(u["market_rent_low"]) == "1225" for u in units)
+    assert any(u["floor_plan_name"] == "B2" and not u["unit_number"] for u in units)
+    assert not any(u["floor_plan_name"] == "Hidden" for u in units)

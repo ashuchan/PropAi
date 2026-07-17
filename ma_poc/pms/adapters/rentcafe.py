@@ -968,6 +968,109 @@ def _beds_from_text(bedtxt: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def _sc_applicant_int(v: Any) -> int | None:
+    """Coerce the applicant-portal's numeric fields (int/float/str) to a sane int."""
+    try:
+        n = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    return n if 0 < n < 1_000_000 else None
+
+
+def parse_securecafe_applicant_floorplans(
+    payload: Any, source_url: str
+) -> list[dict[str, Any]]:
+    """Parse the RentCafe "applicant portal" FloorPlansV2 API.
+
+    This is the React-SPA replacement for the legacy ``availableunits.aspx``
+    that Yardi began migrating SecureCafe tenants to ~2026-07-15 (see
+    ``project_securecafe_applicant_spa_migration_2026-07-16``). The legacy
+    ``AvailUnitRow`` HTML no longer exists for migrated tenants; unit data
+    comes from this JSON API instead.
+
+    Endpoint (behind CF Turnstile — reachable with a HEADED browser render,
+    no BrightData needed):
+        ``{sub}.securecafeapplicant.com/onlineleasing/api/floorplan/
+        getfloorplanandavailableunits?propertyId={pid}&RequestBeforeLogin=true
+        &isPropertyList=false``
+
+    Envelope (verified live on belair 2026-07-16 + against
+    ``FloorPlansV2Api-*.js``)::
+
+        {"status": true, "floorPlanList": [
+            {"floorPlan": {"FloorPlanName", "Beds", "Baths", "MinimumRent",
+                           "MaximumRent", "MinimumArea", "MaximumArea",
+                           "MinimumDeposit", "AvailableUnits", "DoNotPublish"},
+             "UnitAvailability": [{"unitcode", "DisplayMinRent"|"startingRent",
+                                   "AvailableDate"}]}]}
+
+    Emits unit-level rows when ``UnitAvailability`` is populated, else a
+    plan-level row per published floor plan (fully-occupied plans still carry
+    rent/sqft). Unit-level field names are confirmed from the JS module; the
+    plan-level fields + envelope are confirmed against a live response.
+    """
+    plans: list[Any] = []
+    if isinstance(payload, dict):
+        plans = payload.get("floorPlanList") or payload.get("FloorPlanList") or []
+    elif isinstance(payload, list):
+        plans = payload
+    units: list[dict[str, Any]] = []
+    for entry in plans:
+        if not isinstance(entry, dict):
+            continue
+        fp = entry.get("floorPlan") or entry.get("FloorPlan") or {}
+        if not isinstance(fp, dict) or fp.get("DoNotPublish"):
+            continue
+        name = str(fp.get("FloorPlanName") or "")
+        beds = fp.get("Beds")
+        baths = fp.get("Baths")
+        sqft_v = _sc_applicant_int(fp.get("MinimumArea") or fp.get("MaximumArea"))
+        dep_v = _sc_applicant_int(fp.get("MinimumDeposit"))
+        deposit = f"${dep_v:,}" if dep_v else ""
+        beds_s = "" if beds is None else str(beds)
+        baths_s = "" if baths is None else str(baths)
+        sqft_s = "" if sqft_v is None else str(sqft_v)
+        avail = entry.get("UnitAvailability") or entry.get("unitAvailability") or []
+        if isinstance(avail, list) and avail:
+            for u in avail:
+                if not isinstance(u, dict):
+                    continue
+                rent = _sc_applicant_int(
+                    u.get("DisplayMinRent")
+                    or u.get("startingRent")
+                    or fp.get("MinimumRent")
+                )
+                units.append(
+                    make_unit_dict(
+                        floor_plan_name=name,
+                        bedrooms=beds_s,
+                        bathrooms=baths_s,
+                        sqft=sqft_s,
+                        unit_number=str(u.get("unitcode") or u.get("UnitCode") or ""),
+                        rent_low=rent,
+                        rent_high=rent,
+                        deposit=deposit,
+                        availability_date=str(
+                            u.get("AvailableDate") or u.get("availableDate") or ""
+                        ),
+                    )
+                )
+        elif name:
+            fp_lo = _sc_applicant_int(fp.get("MinimumRent"))
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=name,
+                    bedrooms=beds_s,
+                    bathrooms=baths_s,
+                    sqft=sqft_s,
+                    rent_low=fp_lo,
+                    rent_high=_sc_applicant_int(fp.get("MaximumRent")) or fp_lo,
+                    deposit=deposit,
+                )
+            )
+    return units
+
+
 def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str, Any]]:
     """Parse a securecafe ``availableunits.aspx`` page into unit-level dicts.
 
