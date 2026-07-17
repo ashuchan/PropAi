@@ -60,6 +60,16 @@ ENABLE_RESIDENTIAL_RENDER_TIER: Final[bool] = (
     and os.environ.get("ENABLE_RESIDENTIAL_RENDER_TIER", "false").lower() == "true"
 )
 
+# Lever 3 (2026-07-16): render-on-empty escalation. When a routed adapter
+# extracts 0 units from a fetch that SUCCEEDED (a 200 SSR/shell body) and did
+# NOT already render, re-fetch that property ONCE via RenderMode.RENDER so the
+# browser fires the client-side widget XHRs (OneSite OLL, Entrata/nestin SPAs,
+# etc.) and re-run extraction. Bounded to one extra render per empty-GET
+# property. Default OFF — a render run enables it and verifies recovery/cost.
+ENABLE_RENDER_ON_EMPTY: Final[bool] = (
+    os.environ.get("ENABLE_RENDER_ON_EMPTY", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.
