@@ -70,6 +70,22 @@ ENABLE_RENDER_ON_EMPTY: Final[bool] = (
     os.environ.get("ENABLE_RENDER_ON_EMPTY", "false").lower() == "true"
 )
 
+# Entrata plan→unit render lever (2026-07-18, task #42). The Entrata
+# prospect-portal per-apartment roster is a jd-fp widget
+# (``a[data-jd-fp-selector="unit-card"]``) populated CLIENT-SIDE; a static
+# probe_get sees only ``--preload`` skeletons, so ~146 props land at
+# TIER_1_DOM_ENTRATA_PP_SSR *plan-level* (floorplan rows, unit_number="").
+# render-on-empty never fires on them because they return >0 rows. This flag
+# extends the same render+re-extract escalation to fire on an Entrata
+# plan-level SUCCESS (units present but none carry a real unit_number): re-fetch
+# once via RenderMode.RENDER and re-run extraction so parse_entrata_pp_jd_fp_cards
+# populates the roster and the tier relabels to PP_UNIT_LEVEL. Entrata-scoped,
+# one extra render/prop, accept only on a strict unit-level upgrade. Default OFF
+# — a flag-on canary over the 172 plan cohort measures the PP_SSR→UNIT_LEVEL flip.
+ENABLE_ENTRATA_PLAN_RENDER: Final[bool] = (
+    os.environ.get("ENABLE_ENTRATA_PLAN_RENDER", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.

@@ -871,6 +871,40 @@ async def _try_rentcafe_direct(
     return await _impl(task, profile, csv_row)
 
 
+def _unit_level_row_count(result: dict[str, Any]) -> int:
+    """Count extracted rows carrying a real (non-empty) ``unit_number`` — i.e.
+    genuine per-apartment unit-level rows, vs plan-level floorplan rows (which
+    the PP_SSR / plan parsers emit with ``unit_number=""``). Used to decide
+    whether a render escalation strictly improved a plan-level result. Never
+    raises on malformed input."""
+    n = 0
+    for u in result.get("units") or []:
+        try:
+            if str(u.get("unit_number") or "").strip():
+                n += 1
+        except Exception:
+            continue
+    return n
+
+
+def _is_entrata_plan_level(result: dict[str, Any]) -> bool:
+    """True iff *result* is an Entrata SUCCESS that stalled at PLAN level — the
+    trigger for the #42 render lever. Such a result has floorplan rows present
+    but NONE carrying a real ``unit_number`` (the per-apartment jd-fp roster is
+    client-rendered and the static fetch saw only ``--preload`` skeletons).
+    Scoped to Entrata via the tier label so other legitimately plan-only
+    adapters (generic_plan_text, etc.) are never re-rendered. Never raises."""
+    extract_result = result.get("_extract_result")
+    tier = (getattr(extract_result, "tier_used", "") or "") if extract_result else ""
+    if not tier:
+        tier = str(result.get("extraction_tier_used") or "")
+    if "ENTRATA" not in tier.upper():
+        return False
+    if not (result.get("units") or []):
+        return False  # zero-units is the render-on-empty path, not this one
+    return _unit_level_row_count(result) == 0
+
+
 async def _process_property(
     task: Any,
     cost_ledger: Any,
@@ -1059,12 +1093,21 @@ async def _process_property(
     # (OneSite OLL, Entrata/nestin SPAs) and re-run extraction. Bounded to one
     # extra render per empty-GET property; the render fetch's captured XHR
     # waterfall lands in render_fetch so scrape_jugnu extracts from it.
-    from ma_poc.config.feature_flags import ENABLE_RENDER_ON_EMPTY
+    from ma_poc.config.feature_flags import (
+        ENABLE_ENTRATA_PLAN_RENDER,
+        ENABLE_RENDER_ON_EMPTY,
+    )
     from ma_poc.fetch.contracts import RenderMode
 
+    # Two triggers share one render + re-extract (bounded to one/property):
+    #   • render-on-empty (L3): a routed adapter extracted ZERO units.
+    #   • Entrata plan→unit (#42): an Entrata SUCCESS stalled at plan-level
+    #     (rows present, none with a real unit_number) — the jd-fp roster is
+    #     client-rendered, so a render reveals it. See feature_flags.
+    _zero_units = not (result.get("units") or [])
+    _entrata_plan = ENABLE_ENTRATA_PLAN_RENDER and _is_entrata_plan_level(result)
     if (
-        ENABLE_RENDER_ON_EMPTY
-        and not (result.get("units") or [])
+        ((ENABLE_RENDER_ON_EMPTY and _zero_units) or _entrata_plan)
         and fetch_result.ok()
         and getattr(fetch_result, "render_mode", None) != RenderMode.RENDER
     ):
@@ -1080,7 +1123,13 @@ async def _process_property(
                     csv_row=csv_row,
                     partial_state=partial_state,
                 )
-                if len(render_result.get("units") or []) > 0:
+                # Accept only a strict improvement: the empty case wants any
+                # units; the plan-level case wants MORE real unit-level rows
+                # than we already had (never regress a plan-level success).
+                if (_zero_units and len(render_result.get("units") or []) > 0) or (
+                    _unit_level_row_count(render_result)
+                    > _unit_level_row_count(result)
+                ):
                     result = render_result
                     fetch_result = render_fetch
         except Exception as _roe_exc:  # never let escalation crash a property
