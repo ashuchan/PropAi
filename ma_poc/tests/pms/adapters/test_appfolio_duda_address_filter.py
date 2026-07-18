@@ -6,9 +6,9 @@ a future refactor doesn't silently re-introduce the 87b837b
 contamination (axiomproperties.com 455 units, gbatx.com 440 units).
 """
 from __future__ import annotations
+
 import re
 from pathlib import Path
-
 
 _APPFOLIO_PATH = (
     Path(__file__).resolve().parents[3] / "pms" / "adapters" / "appfolio.py"
@@ -39,20 +39,20 @@ def test_duda_path_invokes_address_filter() -> None:
     )
 
 
-def test_duda_filter_gated_on_missing_property_group() -> None:
-    """The filter only needs to fire when property_group is unset (i.e.
-    Duda collection came back un-scoped). Mirrors the VANITY gate at
-    line ~997 (``if vanity_units and not property_group``)."""
+def test_duda_filter_fires_unconditionally() -> None:
+    """2026-07-18: the DUDA address filter must fire even when property_group
+    IS set. The URL-level propertyGroup filter proved unreliable — 94 props
+    leaked the whole PMC despite it — so the address filter is the safety net
+    and must NOT be gated on ``not duda_property_group``."""
     src = _APPFOLIO_PATH.read_text(encoding="utf-8")
-    # The DUDA filter block should be guarded on `not duda_property_group`
-    assert re.search(
+    assert not re.search(
         r"if\s+duda_units\s+and\s+not\s+duda_property_group",
         src,
     ), (
-        "DUDA address filter must be gated on `not duda_property_group` "
-        "— firing unconditionally would over-filter the PMC sites that "
-        "DO scope correctly via propertyGroup."
+        "DUDA address filter must NOT be gated on `not duda_property_group` "
+        "— propertyGroup URL-scoping is unreliable; always run the address filter."
     )
+    assert "if duda_units:" in src, "DUDA filter must fire whenever duda_units exist"
 
 
 def test_duda_filter_passes_ctx_address_and_zip() -> None:

@@ -40,7 +40,6 @@ from ma_poc.pms.adapters._appfolio_websites_duda import (
     origin_from_url,
     parse_collection_payload,
 )
-from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _MERGE_UNIT_SIGNAL_KEYS
 from ma_poc.pms.adapters._parsing import (
     address_unit_id,
     bed_label_from,
@@ -418,30 +417,42 @@ def filter_listings_by_property_address(
         telemetry["reason"] = "no_units_to_filter"
         return units, telemetry
 
-    if not ctx_address and not ctx_zip:
-        telemetry["reason"] = "no_ctx_address_or_zip"
-        return units, telemetry
-
     distinct_addresses = {
         (u.get(address_field) or "").strip() for u in units
     }
     distinct_addresses.discard("")
     if len(distinct_addresses) <= 1:
+        # Single-address response = a single property; nothing to scope.
         telemetry["reason"] = "single_address_in_response"
         return units, telemetry
 
-    matched: list[dict[str, Any]] = []
-    for u in units:
-        addr = u.get(address_field) or ""
-        if _address_matches(addr, ctx_address, ctx_zip, fuzzy_threshold):
-            matched.append(u)
-
-    if not matched:
-        telemetry["filter_activated"] = True
-        telemetry["kept"] = len(units)
-        telemetry["dropped"] = 0
-        telemetry["reason"] = "filter_rejected_all_fallback"
+    if not ctx_address and not ctx_zip:
+        # No CSV context to scope by — can't distinguish a legit scattered
+        # single-property from a PMC dump, so leave it (rare: CSV row with no
+        # address column). The 94-prop contamination cohort all HAVE a ctx
+        # ZIP, so they are handled by the rejected-all demote below, not here.
+        telemetry["reason"] = "no_ctx_address_or_zip"
         return units, telemetry
+
+    matched: list[dict[str, Any]] = [
+        u
+        for u in units
+        if _address_matches(u.get(address_field) or "", ctx_address, ctx_zip, fuzzy_threshold)
+    ]
+    if not matched:
+        # 2026-07-18 contamination fix: the response is MULTI-address (a
+        # whole-PMC scattered dump) and NONE matched the target property's
+        # address/ZIP — emit NOTHING so it demotes to FAILED_NO_DATA rather
+        # than shipping OTHER properties' (often other-city) rents. Prior
+        # behaviour returned the ORIGINAL units here, which WAS the leak
+        # (94/259 AppFolio props in the 2026-07-17 canary: identical unit sets
+        # across 7+ communities; single props spanning 100+ ZIPs).
+        telemetry["filter_activated"] = True
+        telemetry["kept"] = 0
+        telemetry["dropped"] = len(units)
+        telemetry["reason"] = "filter_rejected_all_demote"
+        telemetry["unscopeable"] = True
+        return [], telemetry
 
     telemetry["filter_activated"] = True
     telemetry["kept"] = len(matched)
@@ -1023,7 +1034,10 @@ class AppFolioAdapter:
                         # has no ``propertyGroup``), the vanity response
                         # still leaks the entire PMC. Drop listings whose
                         # address + ZIP don't match the target property.
-                        if vanity_units and not property_group:
+                        # 2026-07-18: always scope, even when propertyGroup is
+                        # set — the URL-level propertyGroup filter proved
+                        # unreliable (94 props leaked the whole PMC despite it).
+                        if vanity_units:
                             ctx_address = getattr(ctx, "address", "") or ""
                             ctx_zip = getattr(ctx, "zip_code", "") or ""
                             vanity_units, addr_filter_tel = (
@@ -1132,7 +1146,9 @@ class AppFolioAdapter:
                     # ``full_address`` which is mapped to
                     # ``floor_plan_name`` by ``parse_collection_payload``
                     # — the filter's default ``address_field`` matches.
-                    if duda_units and not duda_property_group:
+                    # 2026-07-18: always scope (see the vanity path) — the
+                    # propertyGroup URL-filter is not reliable enough to skip it.
+                    if duda_units:
                         ctx_address = getattr(ctx, "address", "") or ""
                         ctx_zip = getattr(ctx, "zip_code", "") or ""
                         duda_units, addr_filter_tel = (
@@ -1182,6 +1198,17 @@ class AppFolioAdapter:
 
         result.confidence = 0.0
         result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")
+        # 2026-07-18: mark the no-units exit as an EMPTY-EXIT so the Path-B
+        # retry (scraper.py::_retry_trigger_reason) re-dispatches on the SAME
+        # page and lets generic DOM/plan extraction read the marketing site's
+        # own "Floor Plans" section (plan-level rents). This is the recovery
+        # for props whose AppFolio listings widget returned an un-scopeable
+        # whole-PMC dump that the address filter correctly demoted (as well as
+        # any genuinely-empty AppFolio page). Bare TIER_1_API_APPFOLIO is a
+        # SUCCESS label (not retryable); the ``_EMPTY`` suffix flips
+        # is_empty_exit() to True.
+        if not result.units:
+            result.tier_used = "TIER_1_API_APPFOLIO_EMPTY"
         return result
 
     def static_fingerprints(self) -> list[str]:

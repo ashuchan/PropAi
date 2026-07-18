@@ -233,12 +233,13 @@ def test_filter_empty_ctx_address_is_noop_passthrough() -> None:
     assert filtered == units
 
 
-def test_filter_mismatched_zip_falls_back_to_pmc_wide_with_warning() -> None:
-    """If the ctx ZIP doesn't appear anywhere in the response, the
-    filter would reject everything. Per task design, we fall back to
-    the original PMC-wide list (emitting zero units would be a worse
-    failure mode than the contamination) — but stamp the telemetry so
-    downstream observability can flag the address/ZIP mismatch."""
+def test_filter_mismatched_zip_demotes_unscopeable_dump() -> None:
+    """2026-07-18 contamination fix (reverses the prior keep-all fallback):
+    when the ctx ZIP/address match NO listing in a multi-address PMC dump,
+    the property is un-scopeable — emit NOTHING so it demotes to
+    FAILED_NO_DATA rather than shipping OTHER properties' (other-city) rents.
+    (The 2026-07-17 canary showed 94/259 AppFolio props leaking whole-PMC
+    inventory this way; correctness beats the metric.)"""
     units = [
         _unit("11 West Third St., Apt.111, Corning, NY 14830", "u1"),
         _unit("4801 Meadowview Dr. #317, Erie, PA 16509", "u2"),
@@ -248,10 +249,11 @@ def test_filter_mismatched_zip_falls_back_to_pmc_wide_with_warning() -> None:
         units, ctx_address="1503 E Park Ave", ctx_zip="31602",
     )
     assert tel["filter_activated"] is True
-    assert tel["reason"] == "filter_rejected_all_fallback"
-    assert tel["kept"] == 2
-    assert tel["dropped"] == 0
-    assert filtered == units
+    assert tel["reason"] == "filter_rejected_all_demote"
+    assert tel["unscopeable"] is True
+    assert tel["kept"] == 0
+    assert tel["dropped"] == 2
+    assert filtered == []
 
 
 def test_filter_empty_units_list_is_noop() -> None:
