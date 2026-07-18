@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ma_poc.pms.adapters  # noqa: F401  # populate adapter registry
 from ma_poc.pms.adapters.essex import (
+    _PROP_ID_RE,
     EssexAdapter,
     build_unit_id_to_name_map,
     parse_essex_availability,
@@ -208,3 +209,32 @@ def test_per_unit_fallback_falls_back_to_unit_id_when_map_lacks_id() -> None:
 def test_per_unit_fallback_handles_empty_map() -> None:
     units = parse_essex_availability(_REAL, "x", unit_id_to_name={})
     assert units[0]["unit_number"] == "6302379"
+
+
+class TestPropertyIdExtraction:
+    """2026-07-18: essexapartmenthomes.com migrated to the Next.js App Router.
+    The propertyId now lives in an ``__next_f`` streaming blob with
+    BACKSLASH-ESCAPED JSON quotes (``\\"propertyId\\":\\"514264\\"``). The old
+    literal-quote regex matched 0/23 live props → every Essex property fell to
+    FAILED_NO_DATA. These lock the backslash-tolerant pattern (validated live
+    23/23, 310 units)."""
+
+    def test_extracts_escaped_quote_approuter_form(self) -> None:
+        # verbatim shape from the live __next_f blob
+        html = r'Center\",\"propertyId\":\"514264\",\"propertyCode\":\"p0523894\"'
+        m = _PROP_ID_RE.search(html)
+        assert m is not None and m.group(1) == "514264"
+
+    def test_still_extracts_legacy_literal_quote_form(self) -> None:
+        m = _PROP_ID_RE.search('foo "propertyId":"492967" bar')
+        assert m is not None and m.group(1) == "492967"
+
+    def test_extracts_from_api_path(self) -> None:
+        m = _PROP_ID_RE.search("GET /api/properties/510892/availability?format=spa")
+        assert m is not None and m.group(1) == "510892"
+
+    def test_does_not_capture_property_code_decoy(self) -> None:
+        # propertyCode "p0523894" is a decoy (the bulk API 404s on it); the
+        # pattern anchors on propertyId, so a code-only blob yields no match.
+        m = _PROP_ID_RE.search(r'\"propertyCode\":\"p0523894\"')
+        assert m is None

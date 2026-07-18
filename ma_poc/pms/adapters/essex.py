@@ -70,8 +70,17 @@ _TIER = "TIER_1_API_ESSEX"
 #   {"result":{"floorplans":[{...,"units":[{unit_id,name,floorplan_name,
 #     beds,baths,sqft,minimum_rent,maximum_rent,availability_date,
 #     specials,amenities,floorplate:{floor,building_name}}]}]}}
+# 2026-07-18: essexapartmenthomes.com migrated to the Next.js App Router —
+# the community HTML no longer carries __NEXT_DATA__ or a raw
+# ``"propertyId":"..."``; the id now lives inside an ``__next_f`` streaming
+# blob where the JSON quotes are BACKSLASH-ESCAPED (``\"propertyId\":\"514264\"``).
+# The old literal-quote pattern matched 0/23 live props → all 23 fell to
+# FAILED_NO_DATA. Tolerate the optional backslash before each quote so the
+# static probe_get path resolves the id again (validated 23/23, 310 units).
+# NB: ``propertyCode`` (e.g. ``p0523894``) is a DECOY — the bulk API 404s on
+# it — so the pattern anchors specifically on ``propertyId``.
 _PROP_ID_RE = re.compile(
-    r'(?:data-property-id="|/api/properties/|"propertyId"\s*[:=]\s*"?)(\d{5,7})',
+    r'(?:data-property-id=\\?"|/api/properties/|\\?"propertyId\\?"\s*[:=]\s*\\?"?)(\d{5,7})',
     re.IGNORECASE,
 )
 
