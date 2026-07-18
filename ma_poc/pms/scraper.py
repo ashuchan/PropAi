@@ -441,6 +441,61 @@ def _refresh_monolithic_budget_for_llm_hint(
     return True
 
 
+def _empty_exit_subpage_plan_text(base_url: str) -> list[dict[str, Any]]:
+    """Probe a property's marketing plan/availability subpages and return the
+    first page's ``parse_generic_plan_text`` rows (plan-level), or ``[]``.
+
+    Used by the #41 empty-exit recovery (``scrape``): a confirmed PMS adapter
+    emptied out (e.g. the AppFolio contamination filter demoted a whole-PMC
+    dump to ``[]``), but the property's OWN plan-level rents still live on its
+    marketing ``/floor-plans`` page. Reuses the exact cheap mechanics F1.5 uses
+    — ``probe_get(unlocker=False)`` (public plan pages need no Web-Unlocker) +
+    ``parse_generic_plan_text`` on the page bodytext. Stops at the first subpath
+    that yields rows. Never raises; returns ``[]`` on nothing found.
+
+    Parameters
+    ----------
+    base_url:
+        ``scheme://netloc`` origin of the property's marketing site.
+    """
+    from ma_poc.pms.adapters._probe import probe_get
+    from ma_poc.pms.adapters.generic_plan_text import (
+        _bodytext_from_fetch_result,
+        parse_generic_plan_text,
+    )
+
+    if not base_url:
+        return []
+    for _path in (
+        "/floorplans/", "/floorplans",
+        "/floor-plans/", "/floor-plans",
+        "/availability/", "/availability",
+        "/apartments/", "/apartments",
+        "/pricing/", "/pricing",
+    ):
+        try:
+            _r = probe_get(base_url + _path, timeout=12, unlocker=False)
+        except Exception:
+            continue
+        if getattr(_r, "status_code", 0) != 200 or not _r.text:
+            continue
+
+        class _Stub:
+            pass
+
+        _stub = _Stub()
+        _stub.fetch_result = type(
+            "_FR", (), {"body": _r.text.encode("utf-8", "replace")}
+        )()
+        _body = _bodytext_from_fetch_result(_stub)  # type: ignore[arg-type]
+        if not _body:
+            continue
+        _rows = parse_generic_plan_text(_body, base_url + _path)
+        if _rows:
+            return _rows
+    return []
+
+
 async def scrape(
     base_url: str,
     proxy: str | None = None,
@@ -1248,6 +1303,52 @@ async def scrape(
             result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
             result["_plan_level_reason"] = _initial_trigger_reason
     except Exception:  # pragma: no cover — Path B/C must never block scrape
+        pass
+
+    # --- #41: empty-exit → marketing-subpage plan-text fallback (2026-07-18) --
+    # When a CONFIRMED PMS adapter empty-exits with 0 units (e.g. the AppFolio
+    # contamination filter demoted a whole-PMC dump to [] → tier
+    # TIER_1_API_APPFOLIO_EMPTY), the property's OWN plan-level rents still sit
+    # on its marketing /floor-plans page — which the emptied adapter never read
+    # and the detector-driven Path-B retry can't reach (excl gate + no baseline
+    # units to restore). Fire the SAME cheap probe_get(unlocker=False) +
+    # parse_generic_plan_text subpage pass F1.5 uses, but ADOPT the rows (F1.5
+    # only merges into existing units), and emit SUCCESS_PLAN_LEVEL. Flag-gated,
+    # off by default. Runs BEFORE F1.5 so F1.5 can then top up any still-missing
+    # dimension on the freshly-adopted rows.
+    try:
+        from ma_poc.config.feature_flags import ENABLE_EMPTY_EXIT_PLAN_TEXT
+        from ma_poc.pms.empty_exit import is_empty_exit as _ee_is_empty_exit
+
+        if (
+            ENABLE_EMPTY_EXIT_PLAN_TEXT
+            and not (adapter_result.units or [])
+            and _ee_is_empty_exit(adapter_result.tier_used)
+        ):
+            from urllib.parse import urlparse as _ee_urlparse
+
+            _ee_origin = ""
+            _ee_fr = getattr(ctx, "fetch_result", None)
+            if _ee_fr is not None:
+                _ee_origin = str(getattr(_ee_fr, "final_url", "") or "")
+            _ee_origin = _ee_origin or getattr(ctx, "base_url", "") or ""
+            _eep = _ee_urlparse(_ee_origin)
+            _ee_base = (
+                f"{_eep.scheme}://{_eep.netloc}" if _eep.scheme and _eep.netloc else ""
+            )
+
+            _ee_rows = (
+                _empty_exit_subpage_plan_text(_ee_base) if _ee_base else []
+            )
+            if _ee_rows:
+                # Preserve the empty-exit adapter's provenance, mark plan-level.
+                _ee_prior_tier = adapter_result.tier_used or ""
+                adapter_result.units = _ee_rows
+                if "_PLAN_LEVEL" not in _ee_prior_tier:
+                    adapter_result.tier_used = f"{_ee_prior_tier}_PLAN_LEVEL"
+                result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+                result["_plan_level_reason"] = "empty_exit_subpage_recovery"
+    except Exception:  # pragma: no cover — recovery must never block scrape
         pass
 
     # --- F1.5: Bi-directional subpage cross-page enrichment (2026-05-24) ----

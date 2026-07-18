@@ -86,6 +86,20 @@ ENABLE_ENTRATA_PLAN_RENDER: Final[bool] = (
     os.environ.get("ENABLE_ENTRATA_PLAN_RENDER", "false").lower() == "true"
 )
 
+# Empty-exit → marketing-subpage plan-text fallback (2026-07-18, task #41).
+# When a CONFIRMED PMS adapter empty-exits with 0 units (e.g. the AppFolio
+# contamination filter demoted a whole-PMC dump to [] → TIER_1_API_APPFOLIO_EMPTY),
+# the property's OWN plan-level rents still sit on its marketing /floor-plans page,
+# which the emptied adapter never read and the detector-driven Path-B retry can't
+# reach. This fires the SAME cheap probe_get(unlocker=False) + parse_generic_plan_text
+# subpage pass F1.5 already uses, ADOPTS the rows (F1.5 only merges into existing
+# units), and emits SUCCESS_PLAN_LEVEL. Validated 7/11 demote candidates publish
+# static plan rent (livefountainplace $1,050-1,335, westwatervillage, arendal, ...).
+# Default OFF — a flag-on run measures how many empty-exits recover plan-level.
+ENABLE_EMPTY_EXIT_PLAN_TEXT: Final[bool] = (
+    os.environ.get("ENABLE_EMPTY_EXIT_PLAN_TEXT", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.
