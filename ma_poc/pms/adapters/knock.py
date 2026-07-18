@@ -372,6 +372,20 @@ class KnockAdapter:
         return result
 
 
+async def _knock_get(c: Any, url: str, headers: dict[str, str]) -> Any:
+    """GET through the per-shared-host politeness throttle.
+
+    Every Knock call hits the single global host
+    ``doorway-api.knockrentals.com`` (registrable ``knockrentals.com``), so
+    N concurrent property scrapes would otherwise hammer one backend with no
+    throttle. No-op unless RATELIMIT_* is configured (safe generous defaults).
+    """
+    from ma_poc.fetch.host_throttle import async_throttle
+
+    async with async_throttle(url):
+        return await c.get(url, headers=headers)
+
+
 async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict[str, Any]]:
     """Two-step Doorway API fetch: community → numeric_id → units.
 
@@ -406,7 +420,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         # caller; hit /units directly.
         units_url = f"{base}/{comm_id}/units"
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            r = await c.get(units_url, headers=headers)
+            r = await _knock_get(c, units_url, headers)
             if r.status_code != 200:
                 return []
             try:
@@ -417,7 +431,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
     # Community-keyed: fetch property meta first.
     community_url = f"{base}/community/{comm_id}"
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-        r = await c.get(community_url, headers=headers)
+        r = await _knock_get(c, community_url, headers)
         if r.status_code != 200:
             return []
         try:
@@ -439,7 +453,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         if not numeric_id:
             return []
         units_url = f"{base}/{numeric_id}/units"
-        r2 = await c.get(units_url, headers=headers)
+        r2 = await _knock_get(c, units_url, headers)
         if r2.status_code != 200:
             return []
         try:
@@ -592,7 +606,7 @@ async def _fetch_knock_units_by_domain(
 
     async def _fetch_units(c: httpx.AsyncClient, pid_str: str) -> list[dict[str, Any]]:
         units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
-        ur = await c.get(units_url, headers=headers)
+        ur = await _knock_get(c, units_url, headers)
         if ur.status_code != 200:
             return []
         try:
@@ -609,7 +623,7 @@ async def _fetch_knock_units_by_domain(
                     f"https://doorway-api.knockrentals.com/v1/property/"
                     f"community/{community_hash}"
                 )
-                br = await c.get(boot_url, headers=headers)
+                br = await _knock_get(c, boot_url, headers)
                 if br.status_code == 200:
                     try:
                         boot_body = br.json()
@@ -625,7 +639,7 @@ async def _fetch_knock_units_by_domain(
                 "https://doorway-api.knockrentals.com/v1/profile"
                 f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
             )
-            pr = await c.get(profile_url, headers=headers)
+            pr = await _knock_get(c, profile_url, headers)
             if pr.status_code != 200:
                 return None, []
             try:

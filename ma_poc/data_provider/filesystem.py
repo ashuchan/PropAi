@@ -521,11 +521,16 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
         count = filters.shard_count
         if count <= 0 or idx < 0 or idx >= count:
             return []
-        # Ceiling division so the last shard absorbs the remainder.
-        per_shard = (len(pairs) + count - 1) // count
-        start = idx * per_shard
-        end = min(start + per_shard, len(pairs))
-        return pairs[start:end]
+        # STRIDED (round-robin), NOT contiguous pairs[start:end]. A catalog
+        # sorted/clustered by PMS or host would otherwise pack a whole shared
+        # backend (e.g. all *.sightmap.com, all *.securecafe.com) into a few
+        # contiguous shards — which defeats the divide-by-tasks aggregate rate
+        # cap (host_throttle RATELIMIT_DIVIDE_BY_TASKS): the sum of per-task
+        # budgets only stays <= the global budget when each shared host is
+        # spread evenly across tasks. pairs[idx::count] gives task idx every
+        # count-th row, splitting any contiguous run of one host evenly across
+        # all shards. Deterministic in (idx, count) -> resumable/retry-safe.
+        return pairs[idx::count]
 
     def list_active(
         self,

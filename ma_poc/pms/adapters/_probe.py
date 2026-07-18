@@ -360,13 +360,20 @@ def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
+    from ma_poc.fetch.host_throttle import throttle as _host_throttle
+
     opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw}, url=url)
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)
         opts.setdefault("verify", False)  # BrightData edge TLS termination
+    # Per-shared-host politeness gate: keys on the registrable domain of the
+    # DRILL url (securecafe.com / sightmap.com / myresman.com / realpage.com …)
+    # so N concurrent property scrapes don't hammer one PMS backend. No-op
+    # unless RATELIMIT_* is configured (safe generous defaults).
     try:
-        resp = _creq.get(url, **opts)
+        with _host_throttle(url):
+            resp = _creq.get(url, **opts)
     except Exception:
         if unlocker and web_unlocker_key():
             wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)
@@ -417,9 +424,12 @@ def probe_post(url: str, data: Any = None, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
+    from ma_poc.fetch.host_throttle import throttle as _host_throttle
+
     opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw}, url=url)
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)
         opts.setdefault("verify", False)  # BrightData edge TLS termination
-    return _creq.post(url, data=data, **opts)
+    with _host_throttle(url):
+        return _creq.post(url, data=data, **opts)

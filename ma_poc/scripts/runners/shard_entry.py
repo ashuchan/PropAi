@@ -50,7 +50,6 @@ runner exited non-zero (that is the whole reason we're here).
 from __future__ import annotations
 
 import csv
-import math
 import os
 import subprocess
 import sys
@@ -92,11 +91,15 @@ def _slice_csv(src: Path, task_idx: int, task_count: int, limit: int | None) -> 
             sys.exit("CSV is empty — nothing to process")
         rows = list(reader)
 
-    total = len(rows)
-    shard_size = math.ceil(total / task_count)
-    start = task_idx * shard_size
-    end = min(start + shard_size, total)
-    shard_rows = rows[start:end]
+    # STRIDED (round-robin), not contiguous rows[start:end] — see
+    # data_provider.filesystem._apply_shard. A CSV clustered by PMS/host would
+    # otherwise pack a whole shared backend into a few contiguous shards,
+    # defeating the divide-by-tasks aggregate rate cap; rows[idx::count] spreads
+    # each host evenly across shards. Deterministic in (idx, count).
+    if task_count <= 0 or not (0 <= task_idx < task_count):
+        shard_rows: list[list[str]] = []
+    else:
+        shard_rows = rows[task_idx::task_count]
 
     if limit is not None:
         shard_rows = shard_rows[:limit]

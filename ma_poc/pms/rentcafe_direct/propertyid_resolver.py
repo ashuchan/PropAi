@@ -141,10 +141,14 @@ async def resolve_property_id(
 
     try:
         try:
-            resp = await client.get(
-                _AGGREGATOR_SEARCH_URL,
-                params={"q": f"{property_name} {city} {target_zip}".strip()},
-            )
+            # Per-shared-host politeness gate: the RentCafe search API is one
+            # shared host (www.rentcafe.com) hit for every property resolve.
+            from ma_poc.fetch.host_throttle import async_throttle
+            async with async_throttle(_AGGREGATOR_SEARCH_URL):
+                resp = await client.get(
+                    _AGGREGATOR_SEARCH_URL,
+                    params={"q": f"{property_name} {city} {target_zip}".strip()},
+                )
         except (httpx.NetworkError, httpx.TimeoutException):
             return ResolveResult(None, None, None, "NONE", None, "SEARCH_NETWORK_ERROR")
         except Exception:

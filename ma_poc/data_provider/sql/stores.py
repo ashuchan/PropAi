@@ -461,10 +461,10 @@ class SqlPropertyCatalogSource(IPropertyCatalogSource):
             count = filters.shard_count
             if count <= 0 or idx < 0 or idx >= count:
                 return []
-            per_shard = (len(rows) + count - 1) // count
-            start = idx * per_shard
-            end = min(start + per_shard, len(rows))
-            rows = rows[start:end]
+            # Strided (round-robin) — see filesystem._apply_shard: spreads each
+            # shared backend host evenly across shards so the divide-by-tasks
+            # aggregate rate cap holds. Must match the CSV source exactly.
+            rows = rows[idx::count]
 
         if filters is not None and filters.start_index:
             rows = rows[filters.start_index :]
@@ -484,10 +484,8 @@ class SqlPropertyCatalogSource(IPropertyCatalogSource):
             count = filters.shard_count
             if count <= 0 or idx < 0 or idx >= count:
                 return 0
-            per_shard = (len(rows) + count - 1) // count
-            start = idx * per_shard
-            end = min(start + per_shard, len(rows))
-            return end - start
+            # Strided count — must match list_active's rows[idx::count] slice.
+            return len(rows[idx::count])
         return len(rows)
 
 

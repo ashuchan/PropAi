@@ -222,6 +222,12 @@ class Fetcher:
             return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()
         host = urlparse(task.url).netloc
+        # Rate-limit on the registrable domain (eTLD+1), not the per-property
+        # netloc: the front-end host is unique per property so its bucket never
+        # accumulates, whereas the registrable domain groups shared PMS backends
+        # (e.g. a SightMap/Knock primary URL) into one protected bucket.
+        from .host_throttle import registrable_domain as _rl_domain
+        rl_host = _rl_domain(task.url) or host
         identity = self._identities.pick(sticky_key=task.property_id)
         proxy = self._proxy_pool.pick(sticky_key=task.property_id)
 
@@ -300,7 +306,7 @@ class Fetcher:
             attempt += 1
             # 3. Rate limit
             try:
-                await asyncio.wait_for(self._rate_limiter.acquire(host), timeout=30.0)
+                await asyncio.wait_for(self._rate_limiter.acquire(rl_host), timeout=30.0)
             except TimeoutError:
                 pass
 

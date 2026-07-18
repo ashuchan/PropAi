@@ -104,7 +104,11 @@ async def fetch_direct(
 
     try:
         try:
-            resp = await client.get(url)
+            # Per-shared-host politeness gate: www.rentcafe.com is a single
+            # shared aggregator host across all RentCafe-direct properties.
+            from ma_poc.fetch.host_throttle import async_throttle
+            async with async_throttle(url):
+                resp = await client.get(url)
         except (httpx.NetworkError, httpx.TimeoutException) as e:
             return DirectFetchResult(
                 property_id,
