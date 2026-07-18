@@ -867,6 +867,14 @@ _SC_RENT_RE = re.compile(
 _SC_DATE_RE = re.compile(
     r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S
 )
+# 2026-07-16: many securecafe AvailUnitRow layouts carry a
+# ``<td ... data-label='Deposit'>$200</td>`` cell (verified live on
+# parksrichardson.securecafe.com — column present on some properties, absent
+# on others). Capture it — the deposit field was dropped despite being a
+# RealPage priority field and already plumbed through make_unit_dict + v2.
+_SC_DEPOSIT_RE = re.compile(
+    r"data-label=['\"]?Deposit['\"]?[^>]*>\s*\$?\s*([\d,]+)", re.I
+)
 # 2026-05-22: every AvailUnitRow carries a "Apply Now" button whose onclick
 # is ``SetTermsUrl('rentaloptions.aspx?UnitID=<u>&FloorPlanID=<fp>&...')``.
 # The FloorPlanID is the stable Yardi plan ID — same value as apts247's
@@ -1110,6 +1118,8 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
             if date_m:
                 avail_date = re.sub(r"<[^>]+>", " ", date_m.group(1))
                 avail_date = re.sub(r"\s+", " ", avail_date).strip()
+            dep_m = _SC_DEPOSIT_RE.search(row)
+            deposit = f"${dep_m.group(1)}" if dep_m else ""
             # Capture the FloorPlanID from the rentaloptions onclick — used
             # downstream as the apts247 feed_id join key. ``source_ids`` is
             # the schema-blessed bag for stable PMS-native identifiers (see
@@ -1128,6 +1138,7 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
                     unit_number=apt.group(1),
                     rent_low=rent_low,
                     rent_high=rent_high,
+                    deposit=deposit,
                     availability_status="AVAILABLE",
                     availability_date=avail_date,
                     source_api_url=source_url,
