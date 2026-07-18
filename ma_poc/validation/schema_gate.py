@@ -233,15 +233,41 @@ def _is_plan_presence_marker(unit: dict[str, Any]) -> bool:
     return not any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS)
 
 
+def _is_unavailable_rentless(unit: dict[str, Any]) -> bool:
+    """True for an UNAVAILABLE row carrying no numeric rent — even with a
+    real (non-inferred) backend unit id.
+
+    2026-07-18 verdict-hygiene. SightMap (and similar map-cell) extractions
+    emit one row per unit INCLUDING occupied/unavailable cells that carry a
+    real ``sightmap_unit_id`` but no published rent. Those are NOT plan
+    markers (``_is_plan_presence_marker`` keeps real-uid rows in), yet they
+    dilute the rent-signal denominator exactly like markers do — a property
+    with 33 priced available units + 100 UNAVAILABLE real-uid map cells reads
+    33/133 = 25% and is wrongly demoted to plan-level. Rent-coverage should be
+    measured over the units that COULD carry a rent (available / real-anchor);
+    an UNAVAILABLE row with no numeric rent cannot, so it is excluded. The
+    ``real if real else units`` fallback below still (correctly) reads a
+    property whose EVERY row is unavailable-rentless as no-signal / plan-level.
+    """
+    if str(unit.get("availability_status") or "").upper() != "UNAVAILABLE":
+        return False
+    return not any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS)
+
+
 def _signal_denominator(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Rows that count toward the rent/area-signal ratio.
 
-    Plan-presence marker rows are excluded — they carry no rent/area BY
-    DESIGN, so they may not dilute the signal of the real units they ride
-    along with. When EVERY row is a marker, fall back to the full list so
-    the property still (correctly) reads as no-signal / plan-level.
+    Plan-presence markers and UNAVAILABLE-rentless map cells are excluded —
+    they carry no rent/area BY DESIGN, so they may not dilute the signal of
+    the real available units they ride along with. When EVERY row is excluded,
+    fall back to the full list so the property still (correctly) reads as
+    no-signal / plan-level.
     """
-    real = [u for u in units if not _is_plan_presence_marker(u)]
+    real = [
+        u
+        for u in units
+        if not _is_plan_presence_marker(u) and not _is_unavailable_rentless(u)
+    ]
     return real if real else units
 
 

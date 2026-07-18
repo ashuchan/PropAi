@@ -79,6 +79,26 @@ def _rent_range(val: Any) -> tuple[int | None, int | None]:
     return (min(nums), max(nums))
 
 
+def _sqft_low(val: Any) -> str:
+    """Low-end of an Apts247 sqft value as a clean numeric string.
+
+    2026-07-18 verdict-hygiene. Apts247 publishes ``sq_ft`` as a RANGE
+    (``"700 - 900"``) as often as a single value. The raw range string is
+    non-numeric, so the area-signal gate (which requires a positive numeric)
+    read the unit as ``no_area`` and demoted otherwise-unit-level rows to
+    plan-level. Take the low end — this matches the sqft the v2 transform
+    already publishes for these units, so there is no output drift.
+    ``""`` / ``"Call for details."`` → ``""``.
+    """
+    nums = [
+        int(m.replace(",", ""))
+        for m in re.findall(r"[\d,]+", str(val or ""))
+        if m.replace(",", "").isdigit()
+    ]
+    nums = [n for n in nums if n >= 100]  # drop stray small numbers (fees, etc.)
+    return str(min(nums)) if nums else ""
+
+
 def _beds_from_label(label: Any) -> str:
     """``"Studio"`` → ``"0"``; ``"1 Bed"`` / ``"2 Bedroom"`` → ``"1"`` / ``"2"``."""
     s = str(label or "").strip()
@@ -146,7 +166,7 @@ def parse_apts247_floorplans(
                         )
                         or beds,
                         bathrooms=baths_s,
-                        sqft=str(u.get("sq_ft") or plan_sqft or ""),
+                        sqft=_sqft_low(u.get("sq_ft") or plan_sqft),
                         unit_number=unum,
                         floor=str(u.get("floor") or ""),
                         building=str(u.get("building") or ""),
@@ -166,7 +186,7 @@ def parse_apts247_floorplans(
                     bed_label=str(plan.get("display_bed") or ""),
                     bedrooms=beds,
                     bathrooms=baths_s,
-                    sqft=plan_sqft,
+                    sqft=_sqft_low(plan_sqft),
                     unit_number="",
                     rent_low=plan_lo,
                     rent_high=plan_hi,

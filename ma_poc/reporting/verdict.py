@@ -32,6 +32,47 @@ log = logging.getLogger(__name__)
 _EMIT_KIND = "output.property_emitted"
 
 
+# 2026-07-18 verdict-hygiene: per-unit backend source ids that establish
+# unit-level identity even when a row has no natural unit_number, so the
+# plan-vs-unit downgrade must NOT treat such a row as plan-level. PER-UNIT
+# ids ONLY — never *_floor_plan_id / *_fpid / *_slug (those are plan-scoped).
+PER_UNIT_SOURCE_ID_KEYS = frozenset(
+    {
+        "sightmap_unit_id", "entrata_uid", "apts247_unit_id", "camden_unit_id",
+        "udr_unitid", "edifice_unit_id", "spherexx_unit_id", "appfolio_listing_id",
+        "appfolio_listable_uid", "appfolio_id", "thinkreside_unit", "securecafe_id",
+    }
+)
+
+
+def _has_per_unit_source_id(unit: dict[str, Any]) -> bool:
+    """True when *unit* carries a real per-unit backend id in ``source_ids``."""
+    sids = unit.get("source_ids") or {}
+    if not isinstance(sids, dict):
+        return False
+    return any(sids.get(k) for k in PER_UNIT_SOURCE_ID_KEYS)
+
+
+def _units_are_unit_level(units: list[dict[str, Any]] | None) -> bool:
+    """True when the accepted units carry real unit-level identity AND rent —
+    i.e. they must NOT be demoted to plan-level.
+
+    A row is unit-level when it has a natural (non-``inferred_``) unit_id OR a
+    real per-unit source id; the property must additionally carry a rent
+    signal over its available / real-anchor units.
+    """
+    if not units:
+        return False
+    from ma_poc.validation.schema_gate import property_has_rent_signal
+
+    has_identity = any(
+        (not str(u.get("unit_id", "")).startswith("inferred_"))
+        or _has_per_unit_source_id(u)
+        for u in units
+    )
+    return has_identity and property_has_rent_signal(units)
+
+
 class Verdict(StrEnum):
     """Property-level outcome verdict."""
 
@@ -262,7 +303,13 @@ def compute(
     # fallback already stamped ``_verdict_quality="SUCCESS_PLAN_LEVEL"`` or
     # (b) every accepted unit is plan-level-shaped — either an inferred_*
     # UID prefix on all rows OR no rent on any row.
-    if verdict_quality_override == Verdict.SUCCESS_PLAN_LEVEL.value:
+    # (e) demote-guard (2026-07-18): honor the Path-C plan-level stamp UNLESS
+    # the accepted units actually carry real unit-level identity + rent — a
+    # stale _verdict_quality must not bury rows that pass every gate.
+    if (
+        verdict_quality_override == Verdict.SUCCESS_PLAN_LEVEL.value
+        and not _units_are_unit_level(units)
+    ):
         return VerdictResult(
             Verdict.SUCCESS_PLAN_LEVEL,
             "path_c_plan_level_fallback",
@@ -270,8 +317,14 @@ def compute(
         )
 
     if units:
+        # (c) honor real per-unit source ids (2026-07-18): a row with a real
+        # backend per-unit id (sightmap_unit_id / entrata_uid / …) is
+        # unit-level even without a natural unit_number, so it is not
+        # "inferred" for the plan-vs-unit decision.
         all_inferred = all(
-            str(u.get("unit_id", "")).startswith("inferred_") for u in units
+            str(u.get("unit_id", "")).startswith("inferred_")
+            and not _has_per_unit_source_id(u)
+            for u in units
         )
         if all_inferred:
             return VerdictResult(
