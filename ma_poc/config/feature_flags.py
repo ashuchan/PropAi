@@ -65,9 +65,13 @@ ENABLE_RESIDENTIAL_RENDER_TIER: Final[bool] = (
 # NOT already render, re-fetch that property ONCE via RenderMode.RENDER so the
 # browser fires the client-side widget XHRs (OneSite OLL, Entrata/nestin SPAs,
 # etc.) and re-run extraction. Bounded to one extra render per empty-GET
-# property. Default OFF — a render run enables it and verifies recovery/cost.
+# property. Default ON (2026-07-19, user-approved): this is the generic
+# self-heal for the shape-mismatch / needs-render class (~262 confirmed props
+# where the roster is client-rendered) — a per-vendor fingerprint can't cover
+# it. Cost note: adds at most ONE local render per zero-unit property (no paid
+# tier — jugnu_fetch ladder still governs escalation). Env "false" disables.
 ENABLE_RENDER_ON_EMPTY: Final[bool] = (
-    os.environ.get("ENABLE_RENDER_ON_EMPTY", "false").lower() == "true"
+    os.environ.get("ENABLE_RENDER_ON_EMPTY", "true").lower() == "true"
 )
 
 # Entrata plan→unit render lever (2026-07-18, task #42). The Entrata
