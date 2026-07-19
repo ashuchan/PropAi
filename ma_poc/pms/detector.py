@@ -40,7 +40,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ma_poc.config.feature_flags import enable_onsite_apply_adapter
+from ma_poc.config.feature_flags import (
+    enable_onsite_apply_adapter,
+    enable_venterra_adapter,
+)
 
 PmsName = Literal[
     "rentcafe",
@@ -85,6 +88,7 @@ PmsName = Literal[
     "squarespace_nopms",
     "wix_nopms",
     "onsite_apply",
+    "venterra",
     "custom",
     "unknown",
 ]
@@ -141,6 +145,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "onsite_apply": "portal_hop",
+    "venterra": "dom_first",
     "custom": "cascade",
     "unknown": "cascade",
 }
@@ -652,6 +657,22 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.91,
             ["On-Site.com leasing-portal marker in HTML "
              "(on-site.com/apply/property or /web/online_app3)"],
+        )
+    # Venterra Living in-house (2026-07-19, flag-gated gap #4). The marketing
+    # page SSRs a static ``var vt_units = [...]`` island (proper JSON) + links to
+    # ``online.venterraliving.com/eOnlineLease``. Definitive Venterra + static
+    # unit-level, so fires at 0.92 to beat a co-resident SightMap embed (these
+    # props were mis-routed to SightMap + needs_render). The ``vt_units`` token
+    # is Venterra's own JS var — it cannot false-fire on a non-Venterra site.
+    if enable_venterra_adapter() and (
+        "vt_units" in h
+        or "online.venterraliving.com/eonlinelease" in h
+        or "venterraliving.com/eonlinelease" in h
+    ):
+        yield (
+            "venterra",
+            0.92,
+            ["Venterra in-house marker in HTML (vt_units island / eOnlineLease)"],
         )
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``

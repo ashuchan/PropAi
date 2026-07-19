@@ -51,6 +51,7 @@ from ma_poc.pms.adapters.spherexx import SpherexxAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.thinkreside import ThinkResideAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
+from ma_poc.pms.adapters.venterra import VenterraAdapter
 from ma_poc.pms.adapters.wix_floor_plans import WixFloorPlansAdapter
 from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
 
@@ -110,6 +111,7 @@ def _bootstrap_registry() -> None:
         WixFloorPlansAdapter,
         EquityApartmentsAdapter,
         GenericPlanTextAdapter,
+        VenterraAdapter,
         SquarespaceNoPmsAdapter,
         ThinkResideAdapter,
         WixNoPmsAdapter,

@@ -131,6 +131,27 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
 )
 
 
+def enable_venterra_adapter() -> bool:
+    """Venterra in-house (eOnlineLease) unit-level lever (2026-07-19, gap #4).
+
+    When True, the detector routes a page carrying Venterra's static
+    ``var vt_units = [...]`` island (or an ``online.venterraliving.com/
+    eOnlineLease`` marker) to the ``venterra`` adapter, which parses that island
+    — a proper JSON array of unit records (unit_name / unit_rent_min-max /
+    unit_sqft / unit_bedrooms / unit_available_on / unit_specials_message /
+    stable unit_code) straight from the marketing page body. Static, no render,
+    no cross-host API.
+
+    The roster-confirmation sweep mis-routed these to SightMap + needs_render;
+    the island is right there in the SSR body. Live-verified across forest-view
+    (20 units) / canton-mill (19) / thomasglen (11). ~10 props.
+
+    Default OFF: a new detector route that can win co-residence against a
+    SightMap embed, so a flag-on canary measures it. Read each call.
+    """
+    return os.environ.get("ENABLE_VENTERRA_ADAPTER", "false").lower() == "true"
+
+
 def enable_cws_getunits() -> bool:
     """RealPage CWS GetUnits unit-level lever (2026-07-19, roster-confirmation gap #3).
 
