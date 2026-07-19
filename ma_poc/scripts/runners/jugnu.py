@@ -80,18 +80,31 @@ _API_SAMPLE_TIER_MARKERS = ("ENTRATA", "ONESITE", "RENTCAFE", "KNOCK")
 # (PROFILE_GCS_PREFIX, e.g. gs://jugnu-canary/profiles/) and fully
 # non-fatal: a sync failure must never break or fail the run.
 _PROFILE_GCS_PREFIX = os.getenv("PROFILE_GCS_PREFIX", "").strip()
+# Watermark captured right after the warm-start pull completes. The end-of-run
+# push uploads only profiles whose mtime exceeds this, so a shard re-uploads
+# ONLY the ~1/N slice it actually modified — never the whole downloaded tree.
+# Without this, parallel shards clobber each other's fresh writes with the
+# stale seed copies they each downloaded (last-writer-wins); the 2026-07-19
+# canary banked only 310/4,982 profiles (6.2%) because of exactly this race.
+_PROFILE_PULL_WATERMARK: float | None = None
 
 
 def _pull_profiles_from_gcs(profiles_dir: Path) -> None:
     """Warm-start: pull persisted profile JSONs from GCS before processing."""
+    global _PROFILE_PULL_WATERMARK
     if not _PROFILE_GCS_PREFIX:
         return
     try:
         from ma_poc.storage import gcs
 
         n = gcs.download_prefix(_PROFILE_GCS_PREFIX, profiles_dir)
+        # Stamp the watermark AFTER the download so every just-downloaded file
+        # has mtime <= watermark and is excluded from the push unless the run
+        # re-saves it. Small margin added so coarse-resolution filesystems
+        # don't misclassify a download that finished in the same clock tick.
+        _PROFILE_PULL_WATERMARK = _time.time() + 0.001
         log.info(
-            "profile warm-start: pulled %d profiles from %s",
+            "profile warm-start: pulled %d profiles from %s (push-watermark set)",
             n, _PROFILE_GCS_PREFIX,
         )
     except Exception as exc:  # never block the runner on a sync blip
@@ -99,15 +112,25 @@ def _pull_profiles_from_gcs(profiles_dir: Path) -> None:
 
 
 def _push_profiles_to_gcs(profiles_dir: Path) -> None:
-    """Persist this run's learned/updated profile JSONs back to GCS."""
+    """Persist this run's learned/updated profile JSONs back to GCS.
+
+    Shard-safe: uploads only profiles modified after the warm-start pull
+    watermark (i.e. the ones THIS shard actually re-saved), so concurrent
+    shards never overwrite each other's learning. When no pull happened
+    (cold/local run, watermark None) it uploads everything, unchanged.
+    """
     if not _PROFILE_GCS_PREFIX:
         return
     try:
         from ma_poc.storage import gcs
 
-        n = gcs.upload_prefix(profiles_dir, _PROFILE_GCS_PREFIX)
+        n = gcs.upload_prefix(
+            profiles_dir,
+            _PROFILE_GCS_PREFIX,
+            only_modified_after=_PROFILE_PULL_WATERMARK,
+        )
         log.info(
-            "profile persistence: pushed %d profiles to %s",
+            "profile persistence: pushed %d modified profiles to %s",
             n, _PROFILE_GCS_PREFIX,
         )
     except Exception as exc:

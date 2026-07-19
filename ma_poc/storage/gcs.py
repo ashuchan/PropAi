@@ -114,12 +114,23 @@ def upload_prefix(
     uri_prefix: str,
     *,
     client: storage.Client | None = None,
+    only_modified_after: float | None = None,
 ) -> int:
     """Walk ``src_dir`` and upload each file under ``uri_prefix``.
 
     Preserves relative paths. Best-effort: per-file errors are logged and
     skipped, so a broken file doesn't mask the runner's actual exit code.
     Returns the number of objects successfully uploaded.
+
+    ``only_modified_after`` (a ``time.time()`` epoch) makes the upload
+    SHARD-SAFE: only files whose mtime is strictly greater are uploaded.
+    Without it, every parallel Cloud Run shard — which downloads the WHOLE
+    shared prefix at startup, mutates only its own ~1/N slice, then re-uploads
+    the whole tree — clobbers the other shards' fresh writes with the stale
+    copies it downloaded (last-writer-wins). Passing the post-download
+    watermark uploads only the profiles THIS shard actually modified, so no
+    object is ever written by two shards and no learning is lost. ``None``
+    preserves the upload-everything behaviour for single-process / local runs.
     """
     bucket_name, prefix = parse_gcs_uri(uri_prefix)
     prefix = prefix.rstrip("/") + "/" if prefix else ""
@@ -130,9 +141,17 @@ def upload_prefix(
     bucket = client.bucket(bucket_name)
 
     count = 0
+    skipped = 0
     for root, _, files in os.walk(src_dir):
         for fname in files:
             src = Path(root) / fname
+            if only_modified_after is not None:
+                try:
+                    if src.stat().st_mtime <= only_modified_after:
+                        skipped += 1
+                        continue
+                except OSError:
+                    pass  # can't stat → fall through and attempt the upload
             rel = src.relative_to(src_dir).as_posix()
             blob = bucket.blob(prefix + rel)
             try:
@@ -140,5 +159,8 @@ def upload_prefix(
                 count += 1
             except Exception as exc:  # noqa: BLE001 — don't suppress runner exit code
                 log.warning("upload_prefix: failed %s → %s%s: %s", src, uri_prefix, rel, exc)
-    log.info("uploaded %d objects from %s → %s", count, src_dir, uri_prefix)
+    log.info(
+        "uploaded %d objects from %s → %s (%d unmodified skipped)",
+        count, src_dir, uri_prefix, skipped,
+    )
     return count

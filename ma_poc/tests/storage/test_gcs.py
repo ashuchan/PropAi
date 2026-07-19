@@ -140,3 +140,64 @@ def test_upload_prefix_tolerates_per_file_failure(tmp_path: Path) -> None:
 
 def test_upload_prefix_returns_zero_for_missing_src(tmp_path: Path) -> None:
     assert gcs.upload_prefix(tmp_path / "nope", "gs://b/x/", client=MagicMock()) == 0
+
+
+# ── 2026-07-19: shard-safe upload — only_modified_after (profile-push race fix) ──
+
+
+def test_upload_prefix_only_modified_after_skips_unmodified(tmp_path: Path) -> None:
+    """The core shard-race fix: with a watermark, only files touched AFTER the
+    watermark upload — an untouched (downloaded-then-not-modified) file is
+    skipped, so a shard never re-uploads another shard's slice."""
+    import os as _os
+
+    src = tmp_path / "src"
+    src.mkdir()
+    old = src / "unmodified.json"
+    new = src / "modified.json"
+    old.write_bytes(b"seed")
+    new.write_bytes(b"learned")
+
+    watermark = 1_000_000.0
+    # old = downloaded before the watermark; new = re-saved by this shard after.
+    _os.utime(old, (watermark - 100, watermark - 100))
+    _os.utime(new, (watermark + 100, watermark + 100))
+
+    client = MagicMock()
+    bucket = client.bucket.return_value
+
+    n = gcs.upload_prefix(src, "gs://b/profiles/", client=client, only_modified_after=watermark)
+
+    assert n == 1
+    names = [call.args[0] for call in bucket.blob.call_args_list]
+    assert names == ["profiles/modified.json"]  # ONLY the modified file
+
+
+def test_upload_prefix_none_watermark_uploads_all(tmp_path: Path) -> None:
+    """Backward-compat: no watermark → upload everything (single-process/local)."""
+    import os as _os
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.json").write_bytes(b"a")
+    (src / "b.json").write_bytes(b"b")
+    _os.utime(src / "a.json", (1.0, 1.0))  # ancient mtime must NOT be skipped
+
+    client = MagicMock()
+    n = gcs.upload_prefix(src, "gs://b/p/", client=client, only_modified_after=None)
+    assert n == 2
+
+
+def test_upload_prefix_watermark_skips_all_when_none_modified(tmp_path: Path) -> None:
+    import os as _os
+
+    src = tmp_path / "src"
+    src.mkdir()
+    for name in ("x.json", "y.json", "z.json"):
+        f = src / name
+        f.write_bytes(b"seed")
+        _os.utime(f, (500.0, 500.0))  # all before the watermark
+
+    client = MagicMock()
+    n = gcs.upload_prefix(src, "gs://b/p/", client=client, only_modified_after=1000.0)
+    assert n == 0  # nothing modified this shard → nothing uploaded → no clobber
