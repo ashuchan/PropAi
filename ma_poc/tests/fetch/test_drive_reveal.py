@@ -73,3 +73,20 @@ async def test_non_dict_result_is_false(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr("ma_poc.pms.interactive_reveal.maybe_reveal", _weird)
     assert await _drive_reveal_in_render(_Page()) is False
+
+
+@pytest.mark.asyncio
+async def test_page_html_is_forwarded_to_maybe_reveal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The already-captured body must be forwarded so maybe_reveal skips its own
+    page.content() (the residual render-hang source). Non-reveal pages then do
+    zero page ops."""
+    monkeypatch.setenv("INTERACTION_REVEAL", "true")
+    seen: dict[str, object] = {}
+
+    async def _spy(page: object, *, page_html: object = None, **kw: object) -> dict:
+        seen["page_html"] = page_html
+        return {"triggered": False, "reason": "no_reveal_text"}
+
+    monkeypatch.setattr("ma_poc.pms.interactive_reveal.maybe_reveal", _spy)
+    await _drive_reveal_in_render(_Page(), "<html>rendered body</html>")
+    assert seen["page_html"] == "<html>rendered body</html>"
