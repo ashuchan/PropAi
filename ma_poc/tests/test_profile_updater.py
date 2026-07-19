@@ -6,7 +6,7 @@ import pytest
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile
 from services.profile_store import ProfileStore
-from services.profile_updater import update_profile_after_extraction
+from services.profile_updater import _base_tier_num, update_profile_after_extraction
 
 
 @pytest.fixture
@@ -101,3 +101,64 @@ def test_navigation_hints_recorded_from_crawled_urls(store: ProfileStore) -> Non
     }
     updated = update_profile_after_extraction(p, result, 5, store)
     assert updated.navigation.availability_page_path == "/floor-plans"
+
+
+# ── 2026-07-19: suffixed-tier persistence fix (writer tier-string mismatch) ──
+
+
+@pytest.mark.parametrize(
+    "tier,expected",
+    [
+        ("TIER_1_API", 1),                       # bare — exact map
+        ("TIER_1_API_ENTRATA", 1),               # suffixed API
+        ("TIER_1_KNOCK_API", 1),
+        ("TIER_1_API_RENTCAFE_SECURECAFE", 1),
+        ("TIER_1_DOM_CAMDEN", 1),
+        ("TIER_3_DOM", 3),                       # bare
+        ("TIER_1_DOM_ENTRATA_PP_SSR", 1),
+        ("TIER_MERGED_CROSS_PAGE", None),        # no TIER_<n> leading token
+        ("generic:no_body_short_circuit", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_base_tier_num_tolerates_suffixes(tier, expected) -> None:
+    assert _base_tier_num(tier) == expected
+
+
+def test_suffixed_api_success_persists_preferred_and_endpoints(store: ProfileStore) -> None:
+    """A suffixed TIER_1_API_* win must now persist preferred_tier +
+    last_success_tier AND capture known_endpoints (pre-fix: all skipped)."""
+    p = ScrapeProfile(canonical_id="sfx-001")
+    store.save(p)
+    result = {
+        "extraction_tier_used": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "_raw_api_responses": [
+            {"url": "https://x.securecafe.com/api/units", "body": {"units": [{"rent": 1200}]}},
+        ],
+    }
+    up = update_profile_after_extraction(p, result, 44, store)
+    assert up.confidence.preferred_tier == 1
+    assert up.confidence.last_success_tier == 1
+    assert [e.url_pattern for e in up.api_hints.known_endpoints] == [
+        "https://x.securecafe.com/api/units"
+    ]
+
+
+def test_suffixed_dom_success_persists_preferred_tier(store: ProfileStore) -> None:
+    p = ScrapeProfile(canonical_id="sfx-002")
+    store.save(p)
+    result = {"extraction_tier_used": "TIER_1_DOM_CAMDEN"}
+    up = update_profile_after_extraction(p, result, 6, store)
+    # TIER_1_DOM_* resolves to family 1; preferred_tier now set (was null pre-fix)
+    assert up.confidence.preferred_tier == 1
+
+
+def test_seeded_preferred_tier_never_raised_by_lower_win(store: ProfileStore) -> None:
+    """Regression: preferred_tier only lowers — a later higher-tier win must not
+    overwrite a seeded/earned tier-1 (protects seeds)."""
+    p = ScrapeProfile(canonical_id="sfx-003")
+    p.confidence.preferred_tier = 1
+    store.save(p)
+    up = update_profile_after_extraction(p, {"extraction_tier_used": "TIER_4_LLM_DOM"}, 5, store)
+    assert up.confidence.preferred_tier == 1

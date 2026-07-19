@@ -232,6 +232,28 @@ _TIER_MAP: dict[str, int] = {
 }
 
 
+def _base_tier_num(tier: str | None) -> int | None:
+    """Resolve a tier string to its 1-5 family number, tolerating adapter
+    suffixes (2026-07-19 fix).
+
+    Adapters emit SUFFIXED tier codes (``TIER_1_API_ENTRATA``,
+    ``TIER_1_KNOCK_API``, ``TIER_1_DOM_CAMDEN``, ``TIER_1_API_RENTCAFE_SECURECAFE``
+    …) that were absent from ``_TIER_MAP`` (bare codes only), so
+    ``_TIER_MAP.get(tier)`` returned ``None`` for the MAJORITY of successful
+    extractions — silently skipping ``preferred_tier`` / ``last_success_tier``
+    and the ``known_endpoints`` capture, leaving those profiles stuck without
+    their learned method. This falls back to the leading ``TIER_<n>`` token so
+    every suffixed success resolves to its family number.
+    """
+    if not tier:
+        return None
+    exact = _TIER_MAP.get(tier)
+    if exact:
+        return exact
+    m = re.match(r"TIER_([1-5])", tier)
+    return int(m.group(1)) if m else None
+
+
 def _response_looks_like_units(body: Any) -> bool:
     """Quick check if an API response body looks like it contains unit data."""
     if not body:
@@ -663,7 +685,7 @@ def update_profile_after_extraction(
     if units_extracted > 0 and tier and tier != "FAILED":
         profile.confidence.consecutive_successes += 1
         profile.confidence.consecutive_failures = 0
-        tier_num = _TIER_MAP.get(tier)
+        tier_num = _base_tier_num(tier)
         if tier_num:
             profile.confidence.last_success_tier = tier_num
             if profile.confidence.preferred_tier is None or tier_num < profile.confidence.preferred_tier:
@@ -722,13 +744,11 @@ def update_profile_after_extraction(
         )
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
-    if tier in (
-        "TIER_1_API",
-        "TIER_1_PROFILE_MAPPING",
-        "TIER_1_5_EMBEDDED",
-        "TIER_1_WIDGET",
-        "TIER_5_5_EXPLORATORY",
-    ):
+    # 2026-07-19 fix: gate on the resolved tier FAMILY (base 1), not the exact
+    # bare code, so suffixed API wins (TIER_1_API_ENTRATA, TIER_1_KNOCK_API, …)
+    # also persist their endpoints. The _response_looks_like_units filter below
+    # still guards against noise, so broadening the gate is safe.
+    if _base_tier_num(tier) == 1 or tier == "TIER_5_5_EXPLORATORY":
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")
