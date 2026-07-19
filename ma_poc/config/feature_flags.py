@@ -108,11 +108,11 @@ ENABLE_EMPTY_EXIT_PLAN_TEXT: Final[bool] = (
 # tier. Measured: 155-191s burned per 404 guess-path in the link-hop crawl, the
 # dominant driver of the 600s per-property timeouts (615 props). The fetcher's own
 # INLINE loop already treats DEAD_URL terminal (fetcher.py:413-418); this makes the
-# escalator mirror it. Default OFF — a flag-on canary measures the throughput/gold
-# gain and guards against soft-404 false-positives (a DIRECT block misread as
-# DEAD_URL that residential would have cleared).
+# escalator mirror it. Default ON (2026-07-19, user-approved): DEAD_URL is keyed on
+# genuine HTTP 404/410/451 (soft-blocks are BOT_BLOCKED/403/503 and still escalate),
+# so the soft-404 false-positive risk is low. Set the env var to "false" to disable.
 ENABLE_FAILFAST_TERMINAL_FETCH: Final[bool] = (
-    os.environ.get("ENABLE_FAILFAST_TERMINAL_FETCH", "false").lower() == "true"
+    os.environ.get("ENABLE_FAILFAST_TERMINAL_FETCH", "true").lower() == "true"
 )
 
 # Link-hop crawl cheap-GET-gate (2026-07-18, timeout lever part 2). The link-hop
@@ -125,9 +125,9 @@ ENABLE_FAILFAST_TERMINAL_FETCH: Final[bool] = (
 # RENDER only for a GENUINE empty 404 (HTTP 404/410 with body < 10KB) — soft-404s
 # that carry a substantive unit-roster body (≥10KB, the ~9.5% ten68west-style
 # pages) are preserved and still rendered/extracted, as are 200s and walled
-# pages. Default OFF — a flag-on canary measures the timeout/throughput win.
+# pages. Default ON (2026-07-19, user-approved) — set env "false" to disable.
 ENABLE_CRAWL_GET_GATE: Final[bool] = (
-    os.environ.get("ENABLE_CRAWL_GET_GATE", "false").lower() == "true"
+    os.environ.get("ENABLE_CRAWL_GET_GATE", "true").lower() == "true"
 )
 
 
