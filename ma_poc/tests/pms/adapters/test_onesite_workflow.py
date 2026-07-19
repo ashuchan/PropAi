@@ -60,6 +60,41 @@ def test_extract_siteid_returns_empty_for_blank_body() -> None:
     assert _extract_onesite_site_ids("", "") == []
 
 
+# ----- Path A2: welcomehome portal siteId (2026-07-18 routing lever) ----
+
+
+def test_extract_siteid_from_welcomehome_portal_url() -> None:
+    """Path A2: property.onesite.realpage.com/welcomehome?siteId=N carries
+    the SiteId directly in the query (no widgetLoader.js indirection)."""
+    body = (
+        '<html><body><a href="https://property.onesite.realpage.com/'
+        'welcomehome?siteId=4789376">Apply Now</a></body></html>'
+    )
+    ids = _extract_onesite_site_ids(body, "https://property.onesite.realpage.com/")
+    assert ids == ["4789376"]
+
+
+def test_extract_siteid_from_welcomehome_with_extra_query_params() -> None:
+    """siteId may not be the first query param."""
+    body = (
+        '<a href="https://property.onesite.realpage.com/welcomehome'
+        '?lang=en&siteId=5061093&ref=cta">Residents</a>'
+    )
+    ids = _extract_onesite_site_ids(body, "")
+    assert ids == ["5061093"]
+
+
+def test_extract_siteid_welcomehome_and_widget_both_present_dedupe() -> None:
+    """Same SiteId reached via widgetLoader and welcomehome dedupes to one."""
+    body = (
+        '<script src=".../widgetLoader.js?siteId=12345"></script>'
+        '<a href="https://property.onesite.realpage.com/welcomehome'
+        '?siteId=12345">portal</a>'
+    )
+    ids = _extract_onesite_site_ids(body, "")
+    assert ids == ["12345"]
+
+
 # ----- xyz auth token generator (reverse-engineered from OLL JS bundle) -----
 
 

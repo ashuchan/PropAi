@@ -458,6 +458,30 @@ def test_onesite_still_wins_when_no_knock_co_resident() -> None:
     assert r.confidence >= 0.90
 
 
+def test_detect_onesite_from_welcomehome_host() -> None:
+    """2026-07-18 routing lever: a property whose own URL is the OneSite
+    welcomehome portal (property.onesite.realpage.com) must route to
+    onesite, not fall to generic."""
+    r = detect_pms("https://property.onesite.realpage.com/welcomehome?siteId=4789376")
+    assert r.pms == "onesite"
+    assert r.confidence >= 0.90
+
+
+def test_detect_onesite_from_welcomehome_html_marker() -> None:
+    """A marketing page linking to the welcomehome portal (no
+    onlineleasing.realpage.com marker present) still routes to onesite —
+    the siteId is parsed from the query by onesite.py Path A2."""
+    html = (
+        '<html><body>'
+        '<a href="https://property.onesite.realpage.com/welcomehome'
+        '?siteId=5061093">Apply Now</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-welcomehome-only.com/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence >= 0.90
+
+
 def test_knock_wins_with_only_doorway_script_no_init_call() -> None:
     """Knock can be co-resident with just the doorway script tag
     (no inline knockDoorway.init() call) — that's still a Knock-PMS

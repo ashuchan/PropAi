@@ -32,6 +32,7 @@ from ma_poc.pms.adapters.knock import KnockAdapter
 from ma_poc.pms.adapters.maac import MaacAdapter
 from ma_poc.pms.adapters.marketapts import MarketAptsAdapter
 from ma_poc.pms.adapters.onesite import OneSiteAdapter
+from ma_poc.pms.adapters.onsite_apply import OnSiteApplyAdapter
 from ma_poc.pms.adapters.realpage_cws import RealPageCwsAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
@@ -76,6 +77,7 @@ def _bootstrap_registry() -> None:
         EntrataAdapter,
         AppFolioAdapter,
         OneSiteAdapter,
+        OnSiteApplyAdapter,
         SightMapAdapter,
         RealPageOllAdapter,
         Repli360Adapter,

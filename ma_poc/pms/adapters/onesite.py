@@ -80,6 +80,15 @@ _ONESITE_SITEID_FROM_WIDGET_RE = re.compile(
     r"widgetLoader\.js\?siteId=(\d+)",
     re.IGNORECASE,
 )
+# 2026-07-18 (RealPage/OnSite routing lever): the OneSite "welcomehome"
+# portal surface — property.onesite.realpage.com/welcomehome?siteId=NNN —
+# carries the SiteId directly in the URL query (no widgetLoader.js indirection).
+# ~16 timeout/generic-family props link to this surface and previously fell to
+# generic because neither the detector nor the SiteId parser recognised it.
+_ONESITE_SITEID_FROM_WELCOMEHOME_RE = re.compile(
+    r"onesite\.realpage\.com/welcomehome\?[^\"'\\\s]*siteId=(\d+)",
+    re.IGNORECASE,
+)
 _ONESITE_SUBDOMAIN_RE = re.compile(
     r"https?://([\w-]+)\.onlineleasing\.realpage\.com",
     re.IGNORECASE,
@@ -107,6 +116,14 @@ def _extract_onesite_site_ids(body: str, base_url: str) -> list[str]:
 
     # Path A: direct widgetLoader.js?siteId reference
     for m in _ONESITE_SITEID_FROM_WIDGET_RE.finditer(body):
+        sid = m.group(1)
+        if sid and sid not in ids:
+            ids.append(sid)
+
+    # Path A2 (2026-07-18): welcomehome portal URL carries siteId in the query
+    # (property.onesite.realpage.com/welcomehome?siteId=NNN). Same downstream
+    # consumer — the SiteId feeds _probe_onesite_workflowstartup unchanged.
+    for m in _ONESITE_SITEID_FROM_WELCOMEHOME_RE.finditer(body):
         sid = m.group(1)
         if sid and sid not in ids:
             ids.append(sid)

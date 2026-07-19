@@ -131,6 +131,53 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
 )
 
 
+def enable_cws_getunits() -> bool:
+    """RealPage CWS GetUnits unit-level lever (2026-07-19, roster-confirmation gap #3).
+
+    When True, the ``realpage_cws`` adapter first tries the property-hosted
+    ``/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true`` endpoint,
+    which returns a clean ``{"units":[...]}`` roster (unitNumber/rent/squareFeet/
+    numberOfBeds/floorplanName/internalAvailableDate/leaseStatus) — a static GET,
+    no render. It falls back to the existing ``.rpfp-card`` DOM plan-level parse
+    when GetUnits yields no available units.
+
+    This refutes the adapter's own docstring ("RealPage CWS doesn't publish a
+    per-unit roster publicly") — it DOES. Live-probed identical across 3+ CWS
+    props (huntingtonwoods/keltonstation/thegarfield/capitalplace). Likely
+    generalizes to the whole CWS portfolio (upgrades plan-level → unit-level).
+
+    Default OFF: a new per-property HTTP call that changes the output tier, so a
+    flag-on canary measures the plan→unit upgrade and guards edge cases. Read
+    each call so an env flip needs no process restart.
+    """
+    return os.environ.get("ENABLE_CWS_GETUNITS", "false").lower() == "true"
+
+
+def enable_onsite_apply_adapter() -> bool:
+    """On-Site.com routing lever (2026-07-18, timeout-grind Surface C).
+
+    When True, the detector emits ``onsite_apply`` for a page carrying an
+    ``on-site.com/apply/property`` or ``on-site.com/web/online_app3`` portal
+    link (or whose own host is ``on-site.com``), routing it to
+    ``OnSiteApplyAdapter``. That adapter fetches the ``online_app3`` shell via
+    a static ``probe_get`` and parses the embedded React props island into
+    unit-level records (unit_number / per-unit rent / sqft / date / stable id).
+
+    Live-probed 3/3 as a genuine Tier-1 unit-level surface (pullmansantarosa,
+    sienavilla, tustin-view). ~24 timeout/generic-cohort props link out to it.
+    RealPage CWS's docstring calling the on-site.com apply link "not a public
+    unit roster" is WRONG for this surface.
+
+    Default OFF: a new detector route that can win co-residence against
+    knock/entrata at 0.91, so a flag-on canary measures the recovery and guards
+    the default config against regression. Read each call so an env flip does
+    not require a process restart (the detector reload trap).
+    """
+    return (
+        os.environ.get("ENABLE_ONSITE_APPLY_ADAPTER", "false").lower() == "true"
+    )
+
+
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.
 

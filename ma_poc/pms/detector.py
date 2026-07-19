@@ -40,6 +40,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal
 
+from ma_poc.config.feature_flags import enable_onsite_apply_adapter
+
 PmsName = Literal[
     "rentcafe",
     "entrata",
@@ -82,6 +84,7 @@ PmsName = Literal[
     "generic_plan_text",
     "squarespace_nopms",
     "wix_nopms",
+    "onsite_apply",
     "custom",
     "unknown",
 ]
@@ -137,6 +140,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "generic_plan_text": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
+    "onsite_apply": "portal_hop",
     "custom": "cascade",
     "unknown": "cascade",
 }
@@ -166,6 +170,14 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "onesite",
         0.95,
         "host matches OneSite numeric-prefix pattern",
+    ),
+    (
+        # OneSite "welcomehome" portal (2026-07-18): siteId lives in the query
+        # (property.onesite.realpage.com/welcomehome?siteId=NNN), not the host.
+        re.compile(r"^property\.onesite\.realpage\.com$"),
+        "onesite",
+        0.95,
+        "host matches OneSite welcomehome portal",
     ),
     (re.compile(r"(?:^|\.)rentcafe\.com$"), "rentcafe", 0.95, "host ends in rentcafe.com"),
     (re.compile(r"(?:^|\.)sightmap\.com$"), "sightmap", 0.95, "host ends in sightmap.com"),
@@ -464,6 +476,12 @@ def _detect_host(url: str) -> tuple[PmsName, float, list[str], str | None] | Non
         path = urllib.parse.urlparse(url).path or ""
     except (ValueError, TypeError):
         path = ""
+    # On-Site.com (2026-07-18, flag-gated Surface C): a property whose own URL
+    # IS the on-site.com apply/online_app3 portal. Handled before the static
+    # fingerprint list so the flag gate is respected (the list is import-time).
+    if enable_onsite_apply_adapter() and host in ("on-site.com", "www.on-site.com"):
+        if "/apply/property" in path or "/web/online_app3" in path:
+            return "onsite_apply", 0.95, [f"host is On-Site.com leasing portal ({host})"], None
     for pattern, pms, confidence, reason in _HOST_FINGERPRINTS:
         if pattern.search(host):
             return pms, confidence, [f"{reason} ({host})"], _client_id_for(pms, host, path)
@@ -598,7 +616,10 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # co-resident). Demote OneSite to 0.85 (below Knock's 0.90) in the
     # Knock+OneSite co-resident case so Knock wins the route.
     _has_knock_marker = "doorway.knck.io" in h or "knockdoorway" in h
-    if "onlineleasing.realpage.com" in h:
+    # 2026-07-18: also match the OneSite "welcomehome" portal link
+    # (property.onesite.realpage.com/welcomehome?siteId=NNN) — a distinct
+    # OneSite surface whose siteId is parsed from the query by onesite.py.
+    if "onlineleasing.realpage.com" in h or "onesite.realpage.com/welcomehome" in h:
         if _has_knock_marker:
             yield (
                 "onesite",
@@ -607,7 +628,31 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                  "— OneSite is the apply-link target, Knock is the real PMS"],
             )
         else:
-            yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+            yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing / welcomehome)"]
+
+    # On-Site.com (on-site.com) — DISTINCT from RealPage OneSite above. The
+    # marketing page links to ``on-site.com/apply/property/{id}`` (or
+    # ``/web/online_app3?property_id={id}``), whose "online_app3" React shell
+    # embeds a full UNIT-LEVEL roster as a props island (live-verified 2026-07-18
+    # on 3 props). Fires at 0.91 — above co-resident knock/entrata (0.90) — only
+    # for the specific apply/online_app3 path (never a bare on-site.com CDN ref),
+    # since that path with a property id is an unambiguous leasing-system signal
+    # and the surface carries real per-unit data. Flag-gated (default off) so the
+    # default config is unchanged and a canary measures the recovery; when off,
+    # these props route exactly as they do today.
+    if enable_onsite_apply_adapter() and (
+        "on-site.com/apply/property" in h
+        or "on-site.com/web/online_app3" in h
+        # backslash/entity-escaped hrefs (JSON-embedded links)
+        or "on-site.com\\/apply\\/property" in h
+        or "on-site.com\\/web\\/online_app3" in h
+    ):
+        yield (
+            "onsite_apply",
+            0.91,
+            ["On-Site.com leasing-portal marker in HTML "
+             "(on-site.com/apply/property or /web/online_app3)"],
+        )
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
     # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
