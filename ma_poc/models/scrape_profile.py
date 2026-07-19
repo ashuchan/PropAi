@@ -314,6 +314,15 @@ class QualitySignals(BaseModel):
     last_quality_flag: str = "UNKNOWN"
     #: Successive successes stuck at plan-level — a standing upgrade opportunity.
     consecutive_plan_level: int = 0
+    #: Circuit-breaker for the plan→unit render lever (task #45): number of
+    #: consecutive renders that were ATTEMPTED and HELD (no unit-level upgrade).
+    #: Distinct from ``consecutive_plan_level`` (which counts plan-level runs
+    #: whether or not a render fired) so flag-off periods can never suppress a
+    #: wanted first render, and PLAN↔CONTAMINATED flapping can't evade the cap.
+    #: Reset to 0 on any UNIT_LEVEL success.
+    plan_render_attempts_held: int = 0
+    #: When the last plan→unit render was attempted — drives the re-arm window.
+    last_plan_render_at: datetime | None = None
     updated_at: datetime | None = None
 
 

@@ -744,6 +744,16 @@ def update_profile_after_extraction(
         q.consecutive_plan_level = (
             q.consecutive_plan_level + 1 if _flag == "PLAN_LEVEL" else 0
         )
+        # task #45 circuit-breaker feedback loop. Counts only renders that were
+        # ATTEMPTED (runner stamps _plan_render_attempted) and HELD (final
+        # result still not unit-level) — so flag-off periods can never inflate
+        # the counter, and PLAN↔CONTAMINATED flapping can't evade the cap.
+        # ANY unit-level success clears it (organic or render-won upgrade).
+        if _flag == "UNIT_LEVEL":
+            q.plan_render_attempts_held = 0
+        elif scrape_result.get("_plan_render_attempted"):
+            q.plan_render_attempts_held += 1
+            q.last_plan_render_at = datetime.utcnow()
         q.updated_at = datetime.utcnow()
     else:
         profile.confidence.consecutive_failures += 1

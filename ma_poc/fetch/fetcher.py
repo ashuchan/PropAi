@@ -1396,6 +1396,27 @@ class Fetcher:
                     proxy_used=_redact_proxy(proxy),
                 )
 
+            # task #45: append OPEN shadow-root content before finalizing the
+            # render body. ``page.content()`` serializes only the light DOM,
+            # so web-component unit rosters (``<entrata-pp-unit-cards>``,
+            # RentCafe/Funnel widgets) render in the browser but never reach
+            # the DOM parsers — the exact failure that makes a plan→unit
+            # render "held" for the wrong reason. Behavior-preserving:
+            # light-DOM-only pages return the same body; errors keep the
+            # already-captured body_text. Placed AFTER all length-grew
+            # refinement steps so their plain page.content() comparisons are
+            # undistorted.
+            try:
+                from ma_poc.pms.adapters._render_capture import capture_rendered_dom
+
+                _shadow_body = await asyncio.wait_for(
+                    capture_rendered_dom(page, fallback=body_text), timeout=8.0
+                )
+                if _shadow_body and len(_shadow_body) > len(body_text):
+                    body_text = _shadow_body
+            except Exception:
+                pass
+
             body = body_text.encode("utf-8", errors="replace")
             final_url = page.url
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}

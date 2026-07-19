@@ -25,6 +25,7 @@ import logging
 import os
 import re as _re
 import sys
+import time as _time
 import uuid
 from dataclasses import replace as _dc_replace
 from datetime import UTC, date, datetime
@@ -934,6 +935,19 @@ def _unit_level_row_count(result: dict[str, Any]) -> int:
     return n
 
 
+def _is_plan_level(result: dict[str, Any]) -> bool:
+    """True iff *result* is a SUCCESS that stalled at PLAN level: rows present
+    but NONE carrying a real ``unit_number`` (floorplan placeholders). The
+    generic trigger for the task #45 plan→unit render lever — platform-agnostic;
+    the circuit-breaker (``_plan_render_allowed``), not tier scoping, is what
+    keeps legitimately plan-only adapters from being re-rendered forever.
+    Mirrors ``_compute_quality_signals``'s PLAN_LEVEL flag definition. Never
+    raises."""
+    if not (result.get("units") or []):
+        return False  # zero-units is the render-on-empty path, not this one
+    return _unit_level_row_count(result) == 0
+
+
 def _is_entrata_plan_level(result: dict[str, Any]) -> bool:
     """True iff *result* is an Entrata SUCCESS that stalled at PLAN level — the
     trigger for the #42 render lever. Such a result has floorplan rows present
@@ -947,9 +961,40 @@ def _is_entrata_plan_level(result: dict[str, Any]) -> bool:
         tier = str(result.get("extraction_tier_used") or "")
     if "ENTRATA" not in tier.upper():
         return False
-    if not (result.get("units") or []):
-        return False  # zero-units is the render-on-empty path, not this one
-    return _unit_level_row_count(result) == 0
+    return _is_plan_level(result)
+
+
+def _plan_render_allowed(profile: Any) -> bool:
+    """Circuit-breaker for the generic plan→unit render (task #45).
+
+    True (render allowed) when the property has NOT yet proven itself
+    plan-only: fewer than ``PLAN_RENDER_MAX_STREAK`` renders attempted-and-held.
+    Once the cap is reached the property is treated as verified plan-only and
+    the render stops firing — EXCEPT one fresh attempt is re-armed when the
+    last attempt is older than ``PLAN_RENDER_REARM_DAYS`` (a fully-leased
+    property that re-lists units recovers within a week). None-safe: a missing
+    profile or quality block allows the render (COLD property, nothing proven).
+    Never raises.
+    """
+    from ma_poc.config.feature_flags import (
+        PLAN_RENDER_MAX_STREAK,
+        PLAN_RENDER_REARM_DAYS,
+    )
+
+    try:
+        q = getattr(profile, "quality", None)
+        if q is None:
+            return True
+        held = int(getattr(q, "plan_render_attempts_held", 0) or 0)
+        if held < PLAN_RENDER_MAX_STREAK:
+            return True
+        last = getattr(q, "last_plan_render_at", None)
+        if last is None:
+            return True  # cap claims attempts but no timestamp — allow re-probe
+        age_days = (datetime.utcnow() - last).total_seconds() / 86400.0
+        return age_days >= PLAN_RENDER_REARM_DAYS
+    except Exception:
+        return True
 
 
 async def _process_property(
@@ -996,6 +1041,11 @@ async def _process_property(
     from ma_poc.pms.scraper import scrape_jugnu
     from ma_poc.reporting.verdict import compute as compute_verdict
     from ma_poc.validation.orchestrator import validate
+
+    # task #45: wall-clock anchor for the plan→unit render's elapsed-budget
+    # guard — the whole function runs inside one 600s asyncio.wait_for, so a
+    # late optional render must know how much budget is already spent.
+    _pp_t0 = _time.monotonic()
 
     # F6 — RentCafe direct-path dispatch (H4, H5, H6).
     # Strategy: when the profile says this is a RentCafe property and
@@ -1166,19 +1216,34 @@ async def _process_property(
     # waterfall lands in render_fetch so scrape_jugnu extracts from it.
     from ma_poc.config.feature_flags import (
         ENABLE_ENTRATA_PLAN_RENDER,
+        ENABLE_PLAN_UNIT_RENDER,
         ENABLE_RENDER_ON_EMPTY,
+        PLAN_RENDER_BUDGET_GUARD_S,
     )
     from ma_poc.fetch.contracts import RenderMode
 
-    # Two triggers share one render + re-extract (bounded to one/property):
+    # Three triggers share ONE render + re-extract (bounded to one/property):
     #   • render-on-empty (L3): a routed adapter extracted ZERO units.
     #   • Entrata plan→unit (#42): an Entrata SUCCESS stalled at plan-level
     #     (rows present, none with a real unit_number) — the jd-fp roster is
     #     client-rendered, so a render reveals it. See feature_flags.
+    #   • generic plan→unit (#45): ANY plan-level success, gated by the
+    #     per-property circuit-breaker (_plan_render_allowed — stops paying
+    #     for renders on verified plan-only properties) and an elapsed-budget
+    #     guard (never spends a render inside the last stretch of the 600s
+    #     per-property budget, so a slow/walled property can't be converted
+    #     from a plan-level SUCCESS into a timeout FAILED).
     _zero_units = not (result.get("units") or [])
     _entrata_plan = ENABLE_ENTRATA_PLAN_RENDER and _is_entrata_plan_level(result)
+    _generic_plan = (
+        ENABLE_PLAN_UNIT_RENDER
+        and _is_plan_level(result)
+        and _plan_render_allowed(profile)
+        and (_time.monotonic() - _pp_t0) < PLAN_RENDER_BUDGET_GUARD_S
+    )
+    _plan_triggered = _entrata_plan or _generic_plan
     if (
-        ((ENABLE_RENDER_ON_EMPTY and _zero_units) or _entrata_plan)
+        ((ENABLE_RENDER_ON_EMPTY and _zero_units) or _plan_triggered)
         and fetch_result.ok()
         and getattr(fetch_result, "render_mode", None) != RenderMode.RENDER
     ):
@@ -1203,6 +1268,15 @@ async def _process_property(
                 ):
                     result = render_result
                     fetch_result = render_fetch
+            # task #45: record that a plan-triggered render was ATTEMPTED on
+            # the surviving result (post-accept, so the stamp lands on
+            # whichever dict flows to the profile updater). The updater
+            # advances plan_render_attempts_held when the final result is
+            # still plan-level (attempted-and-HELD) and resets it on a
+            # unit-level upgrade — the feedback loop the circuit-breaker
+            # converges on.
+            if _plan_triggered:
+                result["_plan_render_attempted"] = True
         except Exception as _roe_exc:  # never let escalation crash a property
             log.debug(
                 "render-on-empty escalation failed for %s: %s",

@@ -134,6 +134,47 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
     os.environ.get("ENABLE_CRAWL_GET_GATE", "true").lower() == "true"
 )
 
+# Generalized plan→unit render lever (2026-07-19, task #45). Widens the
+# Entrata-scoped #42 trigger to ANY plan-level success (rows present, none
+# with a real unit_number) — non-Entrata plan-level properties previously got
+# no unit-level upgrade attempt at all. Same single render block, same
+# one-render/property bound, same strict unit-level-improvement accept guard.
+# Two cost guards make the generalization safe where the Entrata scoping used
+# to be the guard: (1) a per-property CIRCUIT-BREAKER on
+# profile.quality.plan_render_attempts_held — after PLAN_RENDER_MAX_STREAK
+# renders that were attempted and HELD (no upgrade), the property is treated
+# as verified plan-only and the render stops firing (re-armed after
+# PLAN_RENDER_REARM_DAYS so genuine re-listings recover); (2) an elapsed-budget
+# guard — the generic trigger only fires when less than
+# PLAN_RENDER_BUDGET_GUARD_S of the 600s per-property budget is spent, so a
+# walled slow property never converts a plan-level SUCCESS into a
+# per_property_timeout FAILED. Default OFF (repo convention for new
+# cost-surface routes) — flag-on canary measures the PLAN→UNIT flip rate.
+ENABLE_PLAN_UNIT_RENDER: Final[bool] = (
+    os.environ.get("ENABLE_PLAN_UNIT_RENDER", "false").lower() == "true"
+)
+
+
+def _int_env(name: str, default: int) -> int:
+    """Parse an int env var, falling back to *default* on unset/garbage."""
+    try:
+        return int(os.environ.get(name, "").strip() or default)
+    except (ValueError, TypeError):
+        return default
+
+
+# Circuit-breaker cap: render on attempts_held 0..N-1, stop at N. 3 matches
+# the repo's 3-strike convention (HOT at 3 successes, COLD demotion at 3
+# failures, drift at 3 timeouts).
+PLAN_RENDER_MAX_STREAK: Final[int] = _int_env("PLAN_RENDER_MAX_STREAK", 3)
+# Re-arm window: allow one fresh render when the last attempt is older than
+# this many days, so the circuit is never permanently latched open (mirrors
+# PR-02's days_since_full_scrape>=7 forced scrape).
+PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
+# Elapsed-budget guard (seconds): the generic plan→unit trigger only fires
+# when the property has consumed less than this much of its 600s budget.
+PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
+
 # Cluster/template cross-property warm-start (2026-07-19, arch-hardening #1).
 # The self-learning profile is per-property: every property in a shared PMS
 # client-account cluster (same RentCafe/Yardi account, same template & API
