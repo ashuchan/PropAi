@@ -125,3 +125,36 @@ JOIN mapping_success ms USING (canonical_id)
 WHERE ms.mapping_success_total > 0
 ORDER BY ms.mapping_success_total DESC
 LIMIT 25;
+
+-- :: Q8_method_population_slo
+-- 2026-07-19 SLO: of the profiles that HAVE succeeded (maturity WARM/HOT), what
+-- fraction actually persisted their learned METHOD (preferred_tier +
+-- known_endpoints)? A healthy self-learning loop keeps these HIGH. The
+-- 2026-07 suffixed-tier regression drove preferred_tier/known_endpoints to ~0%
+-- while maturity/winning_page_url stayed high — this query makes that split
+-- visible. Alert when preferred_tier_pct drops sharply among succeeded profiles.
+SELECT
+  count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+  )                                                                          AS succeeded_profiles,
+  round(100.0 * count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+      AND (payload::jsonb)->'confidence'->>'preferred_tier' IS NOT NULL
+  ) / NULLIF(count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+  ), 0), 1)                                                                  AS preferred_tier_pct,
+  round(100.0 * count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+      AND jsonb_array_length(
+        COALESCE((payload::jsonb)->'api_hints'->'known_endpoints','[]'::jsonb)
+      ) > 0
+  ) / NULLIF(count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+  ), 0), 1)                                                                  AS known_endpoints_pct,
+  round(100.0 * count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+      AND COALESCE((payload::jsonb)->'navigation'->>'winning_page_url','') <> ''
+  ) / NULLIF(count(*) FILTER (
+    WHERE COALESCE((payload::jsonb)->'confidence'->>'maturity','COLD') IN ('WARM','HOT')
+  ), 0), 1)                                                                  AS winning_url_pct
+FROM scrape_profiles;

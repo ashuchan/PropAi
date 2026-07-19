@@ -227,3 +227,83 @@ def test_full_writer_contract_survives_round_trip(
         "REGRESSION: field_patches lost on FS round-trip — Pydantic "
         "FieldPatch model drift or serializer issue."
     )
+
+
+# ── 2026-07-19: real-tier-vocabulary persistence guard (SLO-as-a-test) ──
+#
+# The 2026-07 suffixed-tier regression (commit 91b0c93) slipped through because
+# the contract above used TIER_4_LLM_API (a tier present in _TIER_MAP) and never
+# asserted preferred_tier / last_success_tier / known_endpoints on the SUFFIXED,
+# DETERMINISTIC tiers that adapters actually emit in production. This guard runs
+# the writer against the REAL tier vocabulary so a future _TIER_MAP-vs-emitted
+# drift fails CI in hours, not months.
+
+# Representative real adapter tier strings (grep pms/adapters/*.py + the 2026-07
+# canary tier distribution). API family MUST persist endpoints; every family
+# MUST persist a preferred_tier.
+_REAL_API_TIERS = [
+    "TIER_1_API_RENTCAFE_SECURECAFE",
+    "TIER_1_KNOCK_API",
+    "TIER_1_API_SIGHTMAP_IFRAME",
+    "TIER_1_API_APTS247",
+    "TIER_1_API_G5",
+    "TIER_1_API_RESMAN",
+    "TIER_1_API_ENTRATA",
+    "TIER_1_API_REALPAGE_CWS_UNITS",   # 2026-07 adapter
+    "TIER_1_API_ONSITE_APPLY",          # 2026-07 adapter
+]
+_REAL_DOM_TIERS = [
+    "TIER_1_DOM_APPFOLIO_VANITY",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT",
+    "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+    "TIER_1_DOM_CAMDEN",                 # 2026-07 adapter
+    "TIER_1_DOM_VENTERRA",              # 2026-07 adapter
+]
+
+
+@pytest.mark.parametrize("tier", _REAL_API_TIERS)
+def test_suffixed_api_tier_persists_preferred_and_endpoints(
+    store: ProfileStore, tier: str
+) -> None:
+    """Every real suffixed API-tier win must persist preferred_tier==1,
+    last_success_tier==1, AND capture its endpoint. Pre-91b0c93: all skipped."""
+    p = ScrapeProfile(canonical_id=f"rt-{tier}")
+    store.save(p)
+    result = {
+        "extraction_tier_used": tier,
+        "_raw_api_responses": [
+            {"url": "https://x.example.com/api/units", "body": {"units": [{"rent": 1200}]}},
+        ],
+    }
+    up = update_profile_after_extraction(p, result, 40, store)
+    assert up.confidence.preferred_tier == 1, f"{tier}: preferred_tier not persisted"
+    assert up.confidence.last_success_tier == 1, f"{tier}: last_success_tier not persisted"
+    assert any(
+        "x.example.com/api/units" in e.url_pattern for e in up.api_hints.known_endpoints
+    ), f"{tier}: known_endpoints not captured (family-gate regression)"
+
+
+@pytest.mark.parametrize("tier", _REAL_DOM_TIERS)
+def test_suffixed_dom_tier_persists_preferred_tier(store: ProfileStore, tier: str) -> None:
+    """Every real suffixed DOM-tier win must persist a preferred_tier (family 1)."""
+    p = ScrapeProfile(canonical_id=f"rt-{tier}")
+    store.save(p)
+    up = update_profile_after_extraction(p, {"extraction_tier_used": tier}, 12, store)
+    assert up.confidence.preferred_tier == 1, f"{tier}: preferred_tier not persisted"
+    assert up.confidence.last_success_tier == 1, f"{tier}: last_success_tier not persisted"
+
+
+def test_no_real_winning_tier_silently_drops_preferred(store: ProfileStore) -> None:
+    """Aggregate SLO: across the full real-tier vocabulary, ZERO successful wins
+    may leave preferred_tier unset. This is the invariant the months-long
+    regression violated (majority of wins had preferred_tier=null)."""
+    dropped = []
+    for tier in _REAL_API_TIERS + _REAL_DOM_TIERS:
+        p = ScrapeProfile(canonical_id=f"slo-{tier}")
+        store.save(p)
+        up = update_profile_after_extraction(
+            p, {"extraction_tier_used": tier, "_raw_api_responses": []}, 10, store
+        )
+        if up.confidence.preferred_tier is None:
+            dropped.append(tier)
+    assert not dropped, f"preferred_tier silently dropped for real tiers: {dropped}"
