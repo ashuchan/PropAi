@@ -170,7 +170,11 @@ async def _fetch_with_status(page: Page, url: str) -> tuple[int, str]:
     """
     evaluate = getattr(page, "evaluate", None)
     if not callable(evaluate):
-        return 0, ""
+        # page=None (production dispatch): fall back to a cheap curl_cffi GET so
+        # the sub-path probing still works. Task #37 Track 1.
+        from ma_poc.pms.adapters._probe import probe_fetch_status
+
+        return await probe_fetch_status(url)
     try:
         result = await evaluate(
             "(u) => fetch(u, {credentials: 'include'})"
@@ -210,20 +214,31 @@ async def recover_appfolio_embed(
     Never raises.
     """
     evaluate = getattr(page, "evaluate", None)
-    if not callable(evaluate):
-        return []
+    # NOTE: no longer a hard page-gate. Under the production page=None dispatch,
+    # step 1 scans the already-fetched RENDER body (the iframe src is in it) and
+    # the sub-path probes fall back to curl_cffi (via _fetch_with_status). Task
+    # #37 Track 1. The live-page path is unchanged when a page is present.
+    from ma_poc.pms.adapters._probe import body_html_from_ctx
 
-    # 1. Cheap path — AppFolio iframe already on the current page.
+    # 1. Cheap path — AppFolio iframe already on the page (live) or in the body.
     iframe_urls: list[str] = []
-    try:
-        live = await evaluate(_LIVE_APPFOLIO_SRC_JS)
-        if isinstance(live, list):
-            iframe_urls = [u for u in live if isinstance(u, str) and u]
-    except Exception as exc:
-        log.debug("AppFolio-embed live scan failed err=%s", exc)
+    if callable(evaluate):
+        try:
+            live = await evaluate(_LIVE_APPFOLIO_SRC_JS)
+            if isinstance(live, list):
+                iframe_urls = [u for u in live if isinstance(u, str) and u]
+        except Exception as exc:
+            log.debug("AppFolio-embed live scan failed err=%s", exc)
+    else:
+        body = body_html_from_ctx(ctx)
+        if body:
+            iframe_urls = list(dict.fromkeys(_APPFOLIO_IFRAME_RE.findall(body)))
 
     # 2. Probe the well-known sub-paths; pull the iframe src out of each.
-    if not iframe_urls:
+    #    PAGE-ONLY: the in-session probe is cheap, but at page=None it would fire
+    #    a blanket curl_cffi GET on every 0-unit property (cost/latency). At
+    #    page=None we rely on the body scan (step 1) + tenant body scan (2.5).
+    if not iframe_urls and callable(evaluate):
         origin = _origin(page, ctx)
         if origin:
             for path in _APPFOLIO_EMBED_SUBPATHS:
@@ -242,11 +257,20 @@ async def recover_appfolio_embed(
     # SYNDICATION_ONLY_WIX shells whose only AppFolio breadcrumb is a
     # /connect/users/sign_in or /request_access anchor. Dedup by URL.
     if not iframe_urls:
-        try:
-            tenants = await evaluate(_LIVE_APPFOLIO_TENANT_JS)
-        except Exception as exc:
-            log.debug("AppFolio-embed tenant scan failed err=%s", exc)
-            tenants = None
+        tenants: list[str] | None = None
+        if callable(evaluate):
+            try:
+                _t = await evaluate(_LIVE_APPFOLIO_TENANT_JS)
+                tenants = _t if isinstance(_t, list) else None
+            except Exception as exc:
+                log.debug("AppFolio-embed tenant scan failed err=%s", exc)
+                tenants = None
+        else:
+            # page=None: harvest any *.appfolio.com/* reference from the body.
+            body = body_html_from_ctx(ctx)
+            tenants = re.findall(
+                r"https?://[a-z0-9][a-z0-9-]*\.appfolio\.com/[^\s\"'<>]*", body, re.I
+            ) if body else None
         if isinstance(tenants, list):
             seen: set[str] = set()
             for u in tenants:

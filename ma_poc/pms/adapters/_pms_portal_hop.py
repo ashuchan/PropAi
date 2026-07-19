@@ -183,7 +183,11 @@ async def _fetch_with_status(page: Page, url: str) -> tuple[int, str]:
     """
     evaluate = getattr(page, "evaluate", None)
     if not callable(evaluate):
-        return 0, ""
+        # page=None (production dispatch): cheap curl_cffi GET fallback so the
+        # sub-path portal probing still works. Task #37 Track 1.
+        from ma_poc.pms.adapters._probe import probe_fetch_status
+
+        return await probe_fetch_status(url)
     try:
         result = await evaluate(
             "(u) => fetch(u, {credentials: 'include'})"
@@ -249,21 +253,31 @@ async def recover_pms_portal(
     site is unaffected). Never raises.
     """
     evaluate = getattr(page, "evaluate", None)
-    if not callable(evaluate):
-        return []
+    # No longer a hard page-gate: under page=None, step 1 scans the already-
+    # fetched RENDER body for the portal URL and the sub-path probes fall back
+    # to curl_cffi. Task #37 Track 1. Live-page path unchanged when present.
+    from ma_poc.pms.adapters._probe import body_html_from_ctx
 
-    # 1. Cheap path — portal URL already on the current page.
+    # 1. Cheap path — portal URL already on the page (live) or in the body.
     candidates: list[str] = []
-    try:
-        live = await evaluate(_LIVE_PORTAL_SRC_JS)
-        if isinstance(live, list):
-            candidates = [u for u in live if isinstance(u, str) and u]
-    except Exception as exc:
-        log.debug("PMS-portal live scan failed err=%s", exc)
+    if callable(evaluate):
+        try:
+            live = await evaluate(_LIVE_PORTAL_SRC_JS)
+            if isinstance(live, list):
+                candidates = [u for u in live if isinstance(u, str) and u]
+        except Exception as exc:
+            log.debug("PMS-portal live scan failed err=%s", exc)
+    else:
+        body = body_html_from_ctx(ctx)
+        if body:
+            found = _RESMAN_PORTAL_RE.findall(body) + _RENTCAFE_PORTAL_RE.findall(body)
+            candidates = list(dict.fromkeys(u for u in found if isinstance(u, str) and u))
 
     # 2. Probe well-known sub-paths; pull the portal URL out of each body.
-    #    First hit wins (probing order is by observed frequency).
-    if not candidates:
+    #    First hit wins (probing order is by observed frequency). PAGE-ONLY:
+    #    at page=None a blanket curl_cffi probe on every 0-unit property is a
+    #    cost/latency risk; the body scan (step 1) covers the in-body case.
+    if not candidates and callable(evaluate):
         origin = _origin(page, ctx)
         if origin:
             for path in _PORTAL_SUBPATHS:

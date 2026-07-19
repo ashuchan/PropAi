@@ -1962,7 +1962,20 @@ async def scrape(
     # Idempotent: ``recover_universal_embed`` sets
     # ``ctx._embed_recovery_attempted`` so the syndication adapters' inline
     # run (when this is a wix/squarespace property) isn't repeated.
-    if not adapter_result.units and page is not None:
+    # Track 1 (task #37): un-gate at page=None. The sub-recoveries are now body/
+    # probe-capable (appfolio-embed + pms-portal-hop scan the body / fall back to
+    # curl_cffi; generic_dom Track B + g5 + sightmap_subpage already work off
+    # ctx.fetch_result), so the misroute net fires in production too. Flag-gated
+    # (ENABLE_BODY_RESOLVER) + requires a body; degrades to no-op otherwise.
+    _ur_page_none_ok = False
+    if page is None:
+        try:
+            from ma_poc.config.feature_flags import ENABLE_BODY_RESOLVER
+
+            _ur_page_none_ok = bool(ENABLE_BODY_RESOLVER and page_html)
+        except Exception:
+            _ur_page_none_ok = False
+    if not adapter_result.units and (page is not None or _ur_page_none_ok):
         try:
             from ma_poc.pms.adapters._universal_recovery import (
                 already_attempted as _ur_attempted,

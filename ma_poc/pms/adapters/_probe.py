@@ -26,6 +26,7 @@ unset ⇒ no escalation (safe default, no functional change off-canary).
 """
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import json
 import logging
@@ -433,3 +434,48 @@ def probe_post(url: str, data: Any = None, **kw: Any) -> Any:
         opts.setdefault("verify", False)  # BrightData edge TLS termination
     with _host_throttle(url):
         return _creq.post(url, data=data, **opts)
+
+
+# ── page=None recovery helpers (task #37 Track 1, 2026-07-19) ──
+
+
+async def probe_fetch_status(url: str, *, timeout: int = 20) -> tuple[int, str]:
+    """curl_cffi fallback for in-session ``page.evaluate(fetch(url))`` when there
+    is no live page (production dispatches L3 with page=None). Runs off the event
+    loop via ``asyncio.to_thread`` so a per-property probe can't stall the shared
+    AsyncPool loop. Returns ``(status, body)``; body is ``""`` on any non-2xx or
+    error so callers never parse a bot-wall payload. Never raises.
+    ``unlocker=False`` keeps it on the cheap tier."""
+
+    def _run() -> tuple[int, str]:
+        try:
+            resp = probe_get(url, unlocker=False, timeout=timeout)
+        except Exception:
+            return 0, ""
+        try:
+            status = int(getattr(resp, "status_code", 0) or 0)
+        except (TypeError, ValueError):
+            status = 0
+        if not (200 <= status < 300):
+            return status, ""
+        body = getattr(resp, "text", "") or ""
+        return status, body if isinstance(body, str) else ""
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception:
+        return 0, ""
+
+
+def body_html_from_ctx(ctx: Any) -> str:
+    """Decode the L1-fetched body from an AdapterContext (bytes or str); ``""``
+    when absent. Lets page-gated recoveries scan the already-fetched RENDER body
+    for their embed/portal markers at page=None (the marker is in the body)."""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None)
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    return body if isinstance(body, str) else ""
