@@ -1028,6 +1028,43 @@ class SqlProfileStore(IProfileStore):
             )
             return list(rows)
 
+    def iter_profiles_by_cluster_key(
+        self, cluster_key: str, limit: int = 100
+    ) -> list[ScrapeProfile]:
+        """Return profiles sharing ``cluster_key`` (arch-hardening #1 warm-start).
+
+        ``cluster_key`` lives inside the JSON ``payload`` column, so this filters
+        with the dialect-portable JSON accessor (``payload ->> 'cluster_key'`` on
+        Postgres, ``JSON_EXTRACT`` on SQLite) and bounds the result with LIMIT.
+
+        NOTE (prod scale): there is no index on the JSON key today, so this is a
+        sequential scan. It only runs for COLD properties that carry a
+        cluster_key (a small subset), but a production rollout at 5k+ profiles
+        should add a generated ``cluster_key`` column + b-tree index. Defensive:
+        any error (dialect/type edge) returns [] so warm-start no-ops rather
+        than failing the scrape.
+        """
+        if not cluster_key:
+            return []
+        try:
+            with self._h.scope() as s:
+                stmt = (
+                    select(ScrapeProfileRow.payload)
+                    .where(ScrapeProfileRow.payload["cluster_key"].as_string() == cluster_key)
+                    .limit(limit)
+                )
+                payloads = s.execute(stmt).scalars().all()
+            out: list[ScrapeProfile] = []
+            for p in payloads:
+                try:
+                    out.append(ScrapeProfile.model_validate(p))
+                except Exception:
+                    continue
+            return out
+        except Exception as exc:  # dialect/type edge — degrade to no-op
+            log.warning("iter_profiles_by_cluster_key failed: %s", exc)
+            return []
+
     def delete(self, canonical_id: str) -> bool:
         with self._h.scope() as s:
             row = s.get(ScrapeProfileRow, canonical_id)

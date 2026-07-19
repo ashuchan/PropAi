@@ -1124,6 +1124,30 @@ async def _process_property(
     profile = profile_store.get_profile(task.property_id)
     if profile is None and hasattr(profile_store, "bootstrap"):
         profile = profile_store.bootstrap(task.property_id, {}, task.url)
+
+    # arch-hardening #1: cluster/template cross-property warm-start. A COLD
+    # property that shares a PMS client-account cluster with ≥1 HOT sibling
+    # borrows the sibling's proven llm_field_mappings (and modal availability
+    # path) so the $0 deterministic replay tier attempts them before any LLM
+    # call. Purely additive + independently re-validated at replay → safe;
+    # flag-gated (default on). Non-fatal: never blocks a scrape.
+    from ma_poc.config.feature_flags import ENABLE_CLUSTER_WARM_START
+
+    if ENABLE_CLUSTER_WARM_START and profile is not None:
+        try:
+            from ma_poc.services.cluster_store import warm_start_profile_from_cluster
+
+            _borrowed = warm_start_profile_from_cluster(profile, profile_store)
+            if _borrowed:
+                log.info(
+                    "cluster warm-start: %s borrowed %d mapping(s) from cluster %s",
+                    task.property_id,
+                    _borrowed,
+                    (profile.cluster_key or "")[:30],
+                )
+        except Exception as _ws_exc:  # defensive — never block the scrape
+            log.debug("cluster warm-start skipped for %s: %s", task.property_id, _ws_exc)
+
     result = await scrape_jugnu(
         task=task,
         fetch_result=fetch_result,
@@ -3485,6 +3509,35 @@ class _SimpleProfileStore:
     # interface call ``store.put(profile)`` instead of ``store.save(profile)``.
     def put(self, profile: Any) -> None:
         self.save(profile)
+
+    def iter_profiles_by_cluster_key(
+        self, cluster_key: str, limit: int = 100
+    ) -> list[Any]:
+        """Delegate cluster-mate lookup to whichever backing implements it.
+
+        Used by ``services.cluster_store`` for cross-property warm-start. The
+        FS ``ProfileStore`` and the SQL ``SqlProfileStore`` both expose this;
+        if a backing doesn't, we return [] so warm-start cleanly no-ops. On a
+        durable-backing error we fall back to the FS store (same resilience
+        contract as ``get_profile``).
+        """
+        if not cluster_key:
+            return []
+        target = self._backing
+        fn = getattr(target, "iter_profiles_by_cluster_key", None)
+        try:
+            if callable(fn):
+                return list(fn(cluster_key, limit))
+        except Exception as exc:
+            log.warning("cluster iter failed via backing: %s — trying FS", exc)
+        if self._uses_data_provider:
+            fs_fn = getattr(self._fs_backing, "iter_profiles_by_cluster_key", None)
+            try:
+                if callable(fs_fn):
+                    return list(fs_fn(cluster_key, limit))
+            except Exception:
+                return []
+        return []
 
 
 def _build_profile_store(profiles_dir: Path) -> _SimpleProfileStore:

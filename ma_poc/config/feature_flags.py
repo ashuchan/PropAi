@@ -134,6 +134,27 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
     os.environ.get("ENABLE_CRAWL_GET_GATE", "true").lower() == "true"
 )
 
+# Cluster/template cross-property warm-start (2026-07-19, arch-hardening #1).
+# The self-learning profile is per-property: every property in a shared PMS
+# client-account cluster (same RentCafe/Yardi account, same template & API
+# shape — 1,678 rentcafe props, etc.) learns its winning API mapping
+# INDEPENDENTLY, re-paying the LLM discovery cost that a sibling already paid.
+# When a COLD property (never cracked, or demoted after failures) shares a
+# cluster_key with ≥1 HOT sibling, this borrows the siblings' top-proven
+# llm_field_mappings and injects them into the COLD profile's in-memory
+# api_hints BEFORE dispatch, so the existing deterministic replay tier
+# (generic:profile_replay, $0) can attempt them ahead of any LLM call.
+# SAFE-BY-CONSTRUCTION: the replay path independently validates every mapping
+# against THIS property's captured responses (normalized-URL substring match +
+# apply_saved_mapping must yield real units), so a borrowed mapping that
+# doesn't fit simply no-ops. Borrows carry a cleared source_envelope_hash
+# (two properties never share a body hash, so keeping the mate's hash would
+# make the drift-guard skip every borrow) and success_count=0 (unproven here).
+# Purely additive to a COLD profile → default ON. Env "false" disables.
+ENABLE_CLUSTER_WARM_START: Final[bool] = (
+    os.environ.get("ENABLE_CLUSTER_WARM_START", "true").lower() == "true"
+)
+
 
 def enable_resurface_maintenance() -> bool:
     """Post-daily hot-URL migration-detector stage (2026-07-19).
