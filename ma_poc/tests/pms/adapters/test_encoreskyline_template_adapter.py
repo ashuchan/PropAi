@@ -10,11 +10,16 @@ Jonah widget to insert its rendered rows, and parses
 
 from __future__ import annotations
 
+import types
+
 import pytest
 
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.encoreskyline_template import (
     EncoreSkylineTemplateAdapter,
+    _get_page_html,
+    _html_from_ctx,
+    _plan_urls_from_html,
 )
 from ma_poc.pms.detector import detect_pms
 
@@ -306,3 +311,95 @@ def test_adapter_is_registered() -> None:
 
     adapter = get_adapter("encoreskyline_template")
     assert adapter.pms_name == "encoreskyline_template"
+
+
+# ── 2026-07-19 (task #37): fetched-body fallback under page=None dispatch ──
+# Production calls adapter.extract(page=None, ctx); the adapter previously read
+# HTML only from page.content() → gate saw "" → every encore prop falsely
+# failed NOT_ENCORESKYLINE_TEMPLATE. It must fall back to ctx.fetch_result.body.
+
+_RENTPRESS_BODY = (
+    "<html><body>"
+    "<script>window.jonahdigital = 1;</script>"
+    "<div id='rentpress-app' data-floorplans='"
+    '[{"floorplan_name":"A1","floorplan_bedrooms":"1","units":['
+    '{"unit_name":"101","unit_rent_best":"1500","unit_bedrooms":"1",'
+    '"unit_sqft":"650","unit_available":"1","unit_available_on":"2026-09-01"},'
+    '{"unit_name":"102","unit_rent_best":"1600","unit_bedrooms":"1",'
+    '"unit_sqft":"675","unit_available":"1","unit_available_on":"2026-10-01"}]}]'
+    "'></div></body></html>"
+)
+_JONAH_ONLY_BODY = "<html><body><script>jonahdigital.init()</script>no plans here</body></html>"
+_PLAIN_BODY = "<html><body>plain marketing site, no widget</body></html>"
+
+
+def _ctx_with_body(body, url="https://www.example-encore.com/"):
+    from ma_poc.pms.detector import detect_pms
+    fr = types.SimpleNamespace(body=body)
+    return AdapterContext(
+        base_url=url,
+        detected=detect_pms(url),
+        profile=None,
+        expected_total_units=None,
+        property_id="enc-test",
+        fetch_result=fr,
+    )
+
+
+def test_html_from_ctx_decodes_bytes_and_str() -> None:
+    assert _html_from_ctx(_ctx_with_body(b"<html>hi</html>")) == "<html>hi</html>"
+    assert _html_from_ctx(_ctx_with_body("<html>hi</html>")) == "<html>hi</html>"
+    assert _html_from_ctx(_ctx_with_body(None)) == ""
+    assert _html_from_ctx(None) == ""
+
+
+@pytest.mark.asyncio
+async def test_get_page_html_falls_back_to_ctx_when_page_none() -> None:
+    assert await _get_page_html(None, _ctx_with_body("<html>body</html>")) == "<html>body</html>"
+
+
+@pytest.mark.asyncio
+async def test_get_page_html_prefers_live_page() -> None:
+    page = _FakePage("u", {"u": "<html>live</html>"}, {})
+    # live page content wins over the ctx body
+    assert await _get_page_html(page, _ctx_with_body("<html>fetched</html>")) == "<html>live</html>"
+
+
+def test_plan_urls_from_html_harvests_and_dedups() -> None:
+    html = (
+        "<a href='/floorplans/a1/'>A1</a><a href=\"/floorplans/b2/\">B2</a>"
+        "<a href='/floorplans/a1/'>dup</a><a href='/floorplans/'>index-backlink</a>"
+        "<a href='/gallery/'>no</a>"
+    )
+    out = _plan_urls_from_html(html, "https://x.com/")
+    assert out == ["https://x.com/floorplans/a1/", "https://x.com/floorplans/b2/"]
+    assert _plan_urls_from_html("", "https://x.com/") == []
+
+
+@pytest.mark.asyncio
+async def test_extract_page_none_recovers_rentpress_from_body() -> None:
+    """THE WIN: production page=None but the fetched body carries the static
+    RentPress inventory → recovers unit-level, no live page needed."""
+    adapter = EncoreSkylineTemplateAdapter()
+    res = await adapter.extract(None, _ctx_with_body(_RENTPRESS_BODY))
+    assert res.tier_used == "TIER_1_DOM_RENTPRESS"
+    assert len(res.units) == 2
+    assert {u["unit_number"] for u in res.units} == {"101", "102"}
+
+
+@pytest.mark.asyncio
+async def test_extract_page_none_gate_passes_on_body_marker() -> None:
+    """Gate must no longer false-fail: a jonahdigital body with no plans now
+    gets PAST the marker gate to an honest no-plan-links verdict."""
+    adapter = EncoreSkylineTemplateAdapter()
+    res = await adapter.extract(None, _ctx_with_body(_JONAH_ONLY_BODY))
+    assert res.tier_used != "NOT_ENCORESKYLINE_TEMPLATE"
+    assert res.tier_used in ("ENCORESKYLINE_NO_PLAN_LINKS", "ENCORESKYLINE_NO_UNITS")
+
+
+@pytest.mark.asyncio
+async def test_extract_page_none_plain_body_still_rejected() -> None:
+    """Regression: a genuinely non-Jonah body is still correctly rejected."""
+    adapter = EncoreSkylineTemplateAdapter()
+    res = await adapter.extract(None, _ctx_with_body(_PLAIN_BODY))
+    assert res.tier_used == "NOT_ENCORESKYLINE_TEMPLATE"

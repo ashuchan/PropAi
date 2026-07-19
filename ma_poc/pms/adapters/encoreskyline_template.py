@@ -34,6 +34,7 @@ strictly scoped.
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._encoreskyline_units import (
@@ -88,10 +89,56 @@ async def _safe_call(coro_factory: Any, *args: Any) -> Any:
         return None
 
 
-async def _get_page_html(page: Page) -> str:
-    """Return current page HTML via ``content()`` (degrades to ``""``)."""
+def _html_from_ctx(ctx: Any) -> str:
+    """Recover the already-fetched body HTML from the AdapterContext.
+
+    Production dispatches ``adapter.extract(page=None, ctx)`` (the runner
+    fetches via L1 and hands the adapter the FetchResult, not a live page).
+    ``scrape()`` computes the body — a RENDER-mode fetch carries the fully
+    rendered HTML incl. the JS-injected Jonah marker + ``/floorplans/{slug}/``
+    anchors. Mirrors ``scrape()``'s own bytes/str decode.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None)
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    return body if isinstance(body, str) else ""
+
+
+async def _get_page_html(page: Page, ctx: Any = None) -> str:
+    """Return the page HTML: live ``page.content()`` first, else the fetched
+    body from ``ctx``. The page-only version silently returned ``""`` under the
+    production ``page=None`` dispatch, so the Jonah gate (and the static
+    RentPress fast-path) never saw the marker that WAS in the fetched body —
+    every encore property failed ``NOT_ENCORESKYLINE_TEMPLATE``. Other render
+    adapters already fall back to the fetch body (scraper.py:598); this aligns
+    encoreskyline with that contract."""
     out = await _safe_call(getattr(page, "content", lambda: ""))
-    return out if isinstance(out, str) else ""
+    if isinstance(out, str) and out:
+        return out
+    return _html_from_ctx(ctx) if ctx is not None else ""
+
+
+def _plan_urls_from_html(html: str, base_url: str) -> list[str]:
+    """Fallback plan-link discovery from HTML when ``page.evaluate`` is
+    unavailable (page=None). Mirrors ``_PER_PLAN_URLS_JS``: harvest
+    ``/floorplans/{slug}/`` anchors, absolutise, dedup, cap. In RENDER mode the
+    fetched body already carries the rendered anchor set."""
+    if not html:
+        return []
+    from urllib.parse import urljoin
+
+    seen: dict[str, None] = {}
+    for m in re.finditer(r"""href\s*=\s*["']([^"']*/floorplans/[a-z0-9-]+/?)["']""", html, re.I):
+        href = m.group(1)
+        # index page itself and the bare /floorplans back-link are not per-plan
+        if re.search(r"/floorplans/[a-z0-9-]+/?$", href, re.I):
+            abs_url = urljoin(base_url or "", href).split("?")[0].split("#")[0]
+            seen.setdefault(abs_url, None)
+    return list(seen)[:_MAX_PLANS]
 
 
 async def _evaluate(page: Page, js: str, *args: Any) -> Any:
@@ -172,7 +219,7 @@ class EncoreSkylineTemplateAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         # 1. Marker gate — strict; the RealPage variant of the same visual
         #    template must NOT route here (it lacks the Jonah marker).
-        html = await _get_page_html(page)
+        html = await _get_page_html(page, ctx)
         if not is_encoreskyline_template_page(html):
             return AdapterResult(
                 tier_used="NOT_ENCORESKYLINE_TEMPLATE",
@@ -220,6 +267,13 @@ class EncoreSkylineTemplateAdapter:
                         plans = [
                             str(u) for u in again if isinstance(u, str)
                         ][:_MAX_PLANS]
+
+        # Body fallback: when the live page can't be evaluated (page=None under
+        # the production dispatch), harvest the per-plan anchors from the
+        # already-fetched HTML. A RENDER-mode body carries the JS-rendered
+        # anchor set, so discovery still works even without a live page.
+        if not plans:
+            plans = _plan_urls_from_html(html, getattr(ctx, "base_url", "") or "")
 
         if not plans:
             return AdapterResult(
