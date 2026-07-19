@@ -15,23 +15,45 @@ from typing import Any
 # Emits ONLY the open-shadow-root subtrees (each wrapped in a marker element),
 # newline-joined — empty string when the page has no shadow DOM. Uses
 # ``innerHTML`` so text nodes (unit numbers, rents) are preserved.
+# SELF-TERMINATING (2026-07-19 render-hang fix). The original walk had NO bounds
+# — on a huge DOM or a shadow-root reference cycle it could run away, and because
+# a hung/slow ``page.evaluate`` is NOT interruptible by the caller's
+# ``asyncio.wait_for`` (JS execution is not bound by page.set_default_timeout),
+# that manifested as a full 600s per-property timeout (test100: 27/33 timeouts
+# were fetches that started and never completed). These hard caps make the JS
+# ALWAYS return within ~1.5s regardless of the DOM: a wall-clock budget, a total
+# node cap, a recursion-depth cap, an output-size cap, and a visited-Set cycle
+# guard. The outer wait_for stays as a belt-and-suspenders backstop.
 _SHADOW_SERIALIZE_JS = r"""
 () => {
   try {
+    const T0 = Date.now();
+    const TIME_MS = 1500, MAX_NODES = 30000, MAX_DEPTH = 15, MAX_OUT = 3000000;
     const parts = [];
-    const walk = (root) => {
+    const seen = new Set();
+    let nodes = 0, outLen = 0;
+    const budgetHit = () =>
+      (Date.now() - T0) > TIME_MS || nodes > MAX_NODES || outLen > MAX_OUT;
+    const walk = (root, depth) => {
+      if (depth > MAX_DEPTH || budgetHit()) return;
       const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
       for (const el of all) {
-        if (el.shadowRoot) {
+        nodes++;
+        if (budgetHit()) return;
+        const sr = el.shadowRoot;
+        if (sr && !seen.has(sr)) {
+          seen.add(sr);  // cycle guard — never revisit a shadow root
           const tag = (el.tagName || 'shadow').toLowerCase();
+          const html = sr.innerHTML || '';
           parts.push('<shadow-content data-shadow-host="' + tag + '">');
-          parts.push(el.shadowRoot.innerHTML || '');
-          walk(el.shadowRoot);
+          parts.push(html);
           parts.push('</shadow-content>');
+          outLen += html.length + 60;
+          walk(sr, depth + 1);
         }
       }
     };
-    walk(document);
+    walk(document, 0);
     return parts.join('\n');
   } catch (e) { return ''; }
 }

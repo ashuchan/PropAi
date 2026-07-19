@@ -256,3 +256,21 @@ async def test_capture_none_page_returns_fallback() -> None:
     from pms.adapters._render_capture import capture_rendered_dom
 
     assert await capture_rendered_dom(None, fallback="prior") == "prior"
+
+
+# ── 2026-07-19: shadow-walk JS must stay self-terminating (render-hang fix) ──
+
+
+def test_shadow_serialize_js_is_bounded() -> None:
+    """The shadow-DOM walk must carry hard internal bounds — a hung/slow
+    page.evaluate is NOT cancellable by the caller's asyncio.wait_for, so the
+    only reliable guard is the JS terminating itself. Pin the caps so they
+    can't be silently dropped (which reintroduces the 600s render-hang)."""
+    from pms.adapters._render_capture import _SHADOW_SERIALIZE_JS as JS
+
+    assert "TIME_MS" in JS and "Date.now()" in JS  # wall-clock budget
+    assert "MAX_NODES" in JS  # total node cap
+    assert "MAX_DEPTH" in JS  # recursion depth cap
+    assert "MAX_OUT" in JS  # output-size cap
+    assert "seen" in JS and "new Set()" in JS  # shadow-root cycle guard
+    assert "budgetHit" in JS

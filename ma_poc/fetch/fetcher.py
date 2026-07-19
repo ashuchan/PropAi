@@ -1412,16 +1412,23 @@ class Fetcher:
             # already-captured body_text. Placed AFTER all length-grew
             # refinement steps so their plain page.content() comparisons are
             # undistorted.
-            try:
-                from ma_poc.pms.adapters._render_capture import capture_rendered_dom
+            # 2026-07-19: no-rebuild kill-switch (SHADOW_DOM_CAPTURE, default on).
+            # The shadow-walk JS is now self-terminating (see _render_capture);
+            # this env lets a run disable the whole pass without a rebuild if a
+            # hang is ever traced back here again. The wait_for is a backstop —
+            # NOT the real bound (it can't cancel a hung page.evaluate); the JS's
+            # internal time/node/depth caps are.
+            if os.getenv("SHADOW_DOM_CAPTURE", "1").strip().lower() not in ("0", "false", "no"):
+                try:
+                    from ma_poc.pms.adapters._render_capture import capture_rendered_dom
 
-                _shadow_body = await asyncio.wait_for(
-                    capture_rendered_dom(page, fallback=body_text), timeout=8.0
-                )
-                if _shadow_body and len(_shadow_body) > len(body_text):
-                    body_text = _shadow_body
-            except Exception:
-                pass
+                    _shadow_body = await asyncio.wait_for(
+                        capture_rendered_dom(page, fallback=body_text), timeout=6.0
+                    )
+                    if _shadow_body and len(_shadow_body) > len(body_text):
+                        body_text = _shadow_body
+                except Exception:
+                    pass
 
             body = body_text.encode("utf-8", errors="replace")
             final_url = page.url
