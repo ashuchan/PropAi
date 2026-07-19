@@ -131,6 +131,26 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
 )
 
 
+def enable_camden_adapter() -> bool:
+    """Camden Property Trust REIT unit-level lever (2026-07-19, gap #14).
+
+    When True, the detector routes ``camdenliving.com`` (a Next.js REIT site with
+    no adapter) to the ``camden`` adapter, which parses the
+    ``props.pageProps.suggestedFloorPlans`` array from the page's ``__NEXT_DATA__``
+    island — per-floorplan objects each carrying a representative available unit
+    (unitNumber, monthlyRent, squareFeet, bedrooms/bathrooms, moveInDate,
+    realPageUnitId). Static, no render; present on both the landing page and
+    ``/availability``.
+
+    Live-verified across 6 Camden props (fallsgrove/south-charlotte/gallery/
+    southline/buckhead/noma); generalizes portfolio-wide (~170 properties).
+    Fully-leased props carry no suggestedFloorPlans and fall through cleanly.
+
+    Default OFF: a new REIT route, canary-measured. Read each call.
+    """
+    return os.environ.get("ENABLE_CAMDEN_ADAPTER", "false").lower() == "true"
+
+
 def enable_venterra_adapter() -> bool:
     """Venterra in-house (eOnlineLease) unit-level lever (2026-07-19, gap #4).
 

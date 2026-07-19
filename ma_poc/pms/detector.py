@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from ma_poc.config.feature_flags import (
+    enable_camden_adapter,
     enable_onsite_apply_adapter,
     enable_venterra_adapter,
 )
@@ -89,6 +90,7 @@ PmsName = Literal[
     "wix_nopms",
     "onsite_apply",
     "venterra",
+    "camden",
     "custom",
     "unknown",
 ]
@@ -146,6 +148,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "wix_nopms": "syndication_only",
     "onsite_apply": "portal_hop",
     "venterra": "dom_first",
+    "camden": "dom_first",
     "custom": "cascade",
     "unknown": "cascade",
 }
@@ -487,6 +490,11 @@ def _detect_host(url: str) -> tuple[PmsName, float, list[str], str | None] | Non
     if enable_onsite_apply_adapter() and host in ("on-site.com", "www.on-site.com"):
         if "/apply/property" in path or "/web/online_app3" in path:
             return "onsite_apply", 0.95, [f"host is On-Site.com leasing portal ({host})"], None
+    # Camden REIT (2026-07-19, flag-gated gap #14) — camdenliving.com is a
+    # proprietary Next.js site with no PMS host fingerprint; route it to the
+    # camden adapter (parses suggestedFloorPlans from __NEXT_DATA__).
+    if enable_camden_adapter() and (host == "camdenliving.com" or host.endswith(".camdenliving.com")):
+        return "camden", 0.95, [f"host is Camden REIT ({host})"], None
     for pattern, pms, confidence, reason in _HOST_FINGERPRINTS:
         if pattern.search(host):
             return pms, confidence, [f"{reason} ({host})"], _client_id_for(pms, host, path)
