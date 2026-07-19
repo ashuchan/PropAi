@@ -39,23 +39,26 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
-_HERE = Path(__file__).resolve()
-_MA_POC = _HERE.parents[1]
-_ROOT = _MA_POC.parent
-# When run as __main__, Python puts this script's own dir (ma_poc/scripts/) on
-# sys.path[0], where its bare-name modules (identity.py, validation.py, …) shadow
-# imports pulled in transitively by probe_get — the probe then raises and every
-# surface is falsely marked dead. Drop the script dir before adding the roots.
-_SCRIPTDIR = str(_HERE.parent)
-sys.path[:] = [p for p in sys.path if p not in ("", _SCRIPTDIR)]
-for _p in (str(_ROOT), str(_MA_POC)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+if __name__ == "__main__":
+    # Run directly: Python puts ma_poc/scripts/ on sys.path[0], whose bare-name
+    # modules (identity.py, validation.py, …) shadow imports probe_get pulls in,
+    # so the probe raises and every surface is falsely flagged dead. Drop the
+    # script dir + add the roots so the bare services/models imports below
+    # resolve. When IMPORTED (daily runner / tests) the importer already has
+    # ma_poc on the path, so this bootstrap is skipped — it must not mutate a
+    # host process's sys.path.
+    _here = Path(__file__).resolve()
+    _scriptdir = str(_here.parent)
+    sys.path[:] = [p for p in sys.path if p not in ("", _scriptdir)]
+    for _p in (str(_here.parents[2]), str(_here.parents[1])):
+        if _p not in sys.path:
+            sys.path.insert(0, _p)
 
 from services.llm_api_rescue import response_looks_like_units  # noqa: E402
 from services.profile_store import ProfileStore  # noqa: E402
@@ -101,16 +104,28 @@ def surface_is_alive(url: str) -> bool:
     return True
 
 
+def _sha_bucket(cid: str, stride: int) -> int:
+    """Deterministic bucket for a canonical_id (sha256, NOT builtin hash which
+    is non-deterministic across processes). Used to spread the sweep across
+    ``stride`` days so each profile is re-probed ~once per stride, not daily."""
+    if stride <= 1:
+        return 0
+    return int(hashlib.sha256(cid.encode("utf-8")).hexdigest(), 16) % stride
+
+
 def resurface(
     profiles_dir: Path,
     stale_log: Path,
     limit: int | None = None,
     dry_run: bool = False,
+    stride: int = 1,
+    offset: int = 0,
 ) -> dict[str, Any]:
     store = ProfileStore(profiles_dir)
     stats = {
         "checked": 0,
         "no_surface": 0,
+        "skipped_stride": 0,
         "alive": 0,
         "invalidated_winning_url": 0,
         "invalidated_endpoints": 0,
@@ -123,6 +138,11 @@ def resurface(
 
     for path in files:
         cid = path.stem
+        # Stride: only this run's share of the profile set (spreads the sweep
+        # over ``stride`` days so daily probe volume is ~1/stride of the cache).
+        if stride > 1 and _sha_bucket(cid, stride) != (offset % stride):
+            stats["skipped_stride"] += 1
+            continue
         try:
             profile = store.load(cid)
         except Exception:  # noqa: BLE001
@@ -187,9 +207,16 @@ def main() -> int:
     ap.add_argument("--stale-log", required=True, type=Path)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--stride", type=int, default=1,
+                    help="check only 1/stride of profiles this run (spread over N days)")
+    ap.add_argument("--offset", type=int, default=0,
+                    help="which stride bucket to check this run (e.g. day-of-year %% stride)")
     args = ap.parse_args()
 
-    stats = resurface(args.profiles_dir, args.stale_log, args.limit, args.dry_run)
+    stats = resurface(
+        args.profiles_dir, args.stale_log, args.limit, args.dry_run,
+        stride=args.stride, offset=args.offset,
+    )
     print(json.dumps(stats, indent=2, sort_keys=True))
     print(
         f"\nResurfaced {stats['checked']} cached profiles: "

@@ -135,6 +135,30 @@ def test_resurface_dry_run_writes_nothing(tmp_path, monkeypatch) -> None:
     assert not stale_log.exists()
 
 
+def test_stride_partitions_deterministically(tmp_path, monkeypatch) -> None:
+    """With stride=N, each profile is checked in exactly one of the N offsets,
+    and the partition is deterministic (sha256, not builtin hash)."""
+    pdir = tmp_path / "profiles"
+    store = ProfileStore(pdir)
+    cids = [f"P{i:03d}" for i in range(30)]
+    for c in cids:
+        _seed_profile(store, c, f"https://ok.com/{c}", None)
+    _patch_probe(monkeypatch, {f"https://ok.com/{c}": _Resp(200, _ROSTER) for c in cids})
+
+    stride = 5
+    checked_total = 0
+    for offset in range(stride):
+        stats = rs.resurface(pdir, tmp_path / f"s{offset}.jsonl", stride=stride, offset=offset)
+        checked_total += stats["checked"]
+    # every profile checked exactly once across the full stride cycle
+    assert checked_total == len(cids)
+    # a single offset checks only its share (deterministic + repeatable)
+    s0a = rs.resurface(pdir, tmp_path / "a.jsonl", stride=stride, offset=0)
+    s0b = rs.resurface(pdir, tmp_path / "b.jsonl", stride=stride, offset=0)
+    assert s0a["checked"] == s0b["checked"]
+    assert 0 < s0a["checked"] < len(cids)
+
+
 def test_resurface_skips_profiles_without_surface(tmp_path, monkeypatch) -> None:
     pdir = tmp_path / "profiles"
     store = ProfileStore(pdir)

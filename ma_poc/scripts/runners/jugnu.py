@@ -113,6 +113,47 @@ def _push_profiles_to_gcs(profiles_dir: Path) -> None:
         log.warning("profile GCS push failed (learning not persisted): %s", exc)
 
 
+def _resurface_stale_profiles(profiles_dir: Path, run_dir: Path) -> None:
+    """End-of-run migration detector: re-probe cached hot URLs and invalidate the
+    ones that have migrated so the pipeline re-discovers them next run.
+
+    Strided over ``RESURFACE_STRIDE`` days (default 7) — the offset is derived
+    from the run date so consecutive days cover the whole cache. Flag-gated
+    (``ENABLE_RESURFACE_MAINTENANCE``) and fully non-fatal: a maintenance error
+    must never break or fail the run. Runs before the GCS push so the cleaned
+    profiles persist.
+    """
+    from ma_poc.config.feature_flags import enable_resurface_maintenance
+
+    if not enable_resurface_maintenance() or not _PROFILE_GCS_PREFIX:
+        return
+    try:
+        import datetime as _dt
+
+        from ma_poc.scripts.resurface_profiles import resurface
+
+        stride = max(1, int(os.getenv("RESURFACE_STRIDE", "7")))
+        try:
+            offset = _dt.date.fromisoformat(run_dir.name).toordinal() % stride
+        except ValueError:
+            offset = 0
+        stats = resurface(
+            profiles_dir,
+            run_dir / "stale_surfaces.jsonl",
+            stride=stride,
+            offset=offset,
+        )
+        log.info(
+            "resurface maintenance (stride=%d offset=%d): checked=%d alive=%d "
+            "migrated=%d (winning=%d endpoints=%d)",
+            stride, offset, stats.get("checked", 0), stats.get("alive", 0),
+            stats.get("stale_flagged", 0), stats.get("invalidated_winning_url", 0),
+            stats.get("invalidated_endpoints", 0),
+        )
+    except Exception as exc:  # never block the runner on a maintenance blip
+        log.warning("resurface maintenance failed (non-fatal): %s", exc)
+
+
 def _resolve_per_property_timeout() -> float:
     """Per-property wall-clock cap for the full L1→L4 pipeline.
 
@@ -790,6 +831,12 @@ async def run_jugnu(
     properties_path = run_dir / "properties.json"
     merged_properties = _merge_with_existing_properties(properties_path, properties)
     _write_properties_incremental(properties_path, merged_properties)
+
+    # Durable maintenance: re-probe cached hot URLs and invalidate any that have
+    # MIGRATED so the next run re-discovers them (success→cache; migration→
+    # invalidate+flag). Strided/flag-gated/non-fatal. Runs BEFORE the push so the
+    # cleaned profiles persist. See scripts/resurface_profiles.py.
+    _resurface_stale_profiles(_profiles_dir, run_dir)
 
     # Persist this run's profile learnings (winning_page_url, llm field
     # mappings, dom hints) durably so the NEXT run starts warm. No-op

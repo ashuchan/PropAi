@@ -135,6 +135,23 @@ ENABLE_CRAWL_GET_GATE: Final[bool] = (
 )
 
 
+def enable_resurface_maintenance() -> bool:
+    """Post-daily hot-URL migration-detector stage (2026-07-19).
+
+    When True, the Jugnu runner runs ``scripts/resurface_profiles.py`` over the
+    warm-started profile set at end-of-run (before the GCS push): re-probes each
+    cached ``winning_page_url`` / ``known_endpoints`` and invalidates the ones
+    that have MIGRATED (404/410/451 or a 200 empty-shell) so the pipeline
+    re-discovers them, flagging each to ``{run_dir}/stale_surfaces.jsonl``. The
+    sweep is strided (``RESURFACE_STRIDE`` days, default 7) so daily probe volume
+    is ~1/stride of the cache. Non-fatal; a maintenance error never fails the run.
+
+    Default OFF — enable in the daily job once the profile set is GCS-backed
+    (needs ``PROFILE_GCS_PREFIX``). Read each call so an env flip needs no restart.
+    """
+    return os.environ.get("ENABLE_RESURFACE_MAINTENANCE", "false").lower() == "true"
+
+
 def enable_camden_adapter() -> bool:
     """Camden Property Trust REIT unit-level lever (2026-07-19, gap #14).
 
