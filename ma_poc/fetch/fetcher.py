@@ -1396,6 +1396,12 @@ class Fetcher:
                     proxy_used=_redact_proxy(proxy),
                 )
 
+            # task #37 Track 2: drive a collapsed-reveal click on the still-open
+            # page BEFORE the body is finalized, so the revealed rents fold into
+            # the body via the shadow-DOM capture below (which re-reads
+            # page.content()). Flag-gated (INTERACTION_REVEAL), never-fail.
+            await _drive_reveal_in_render(page)
+
             # task #45: append OPEN shadow-root content before finalizing the
             # render body. ``page.content()`` serializes only the light DOM,
             # so web-component unit rosters (``<entrata-pp-unit-cards>``,
@@ -1559,6 +1565,30 @@ _CTA_CLICK_JS = r"""
   return picked.length;
 }
 """
+
+
+async def _drive_reveal_in_render(page: Any) -> bool:
+    """task #37 Track 2: fire a collapsed-reveal click ("View Availability" /
+    "Show Units") on the still-open render page so the revealed rents land in
+    the body — the same way ``capture_rendered_dom`` folds shadow DOM. This is
+    the L1-push for the click-to-reveal (Pattern B) cohort: production dispatches
+    L3 with page=None, so ``interactive_reveal.maybe_reveal(page=None)`` there
+    no-ops; the click can only fire here, where the browser page is still open.
+
+    ``maybe_reveal`` is itself never-raising and self-gating (it no-ops unless
+    reveal-text is present AND rents are absent), so on the vast majority of
+    pages this costs one extra ``page.content()`` read. Env-gated by
+    ``INTERACTION_REVEAL`` (matching ``INTERACTION_CTA_HOP``), default off.
+    Returns True iff a reveal was triggered. Never raises."""
+    if os.getenv("INTERACTION_REVEAL", "").strip().lower() not in ("1", "true", "yes"):
+        return False
+    try:
+        from ma_poc.pms.interactive_reveal import maybe_reveal
+
+        res = await asyncio.wait_for(maybe_reveal(page), timeout=10.0)
+        return bool(isinstance(res, dict) and res.get("triggered"))
+    except Exception:
+        return False
 
 
 async def _drive_cta_hop(page: Any) -> None:
