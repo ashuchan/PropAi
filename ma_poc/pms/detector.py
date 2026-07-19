@@ -947,21 +947,25 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # hydration payload. Operator marketing sites are typically Squarespace
     # shells (PRG Property Resources Group portfolio) that embed
     # ``<iframe src=…(availability|embed).fortresstech.io/unit-availability/
-    # {orgId}/{propertyId}/…>``. The auth-only ``portal.fortresstech.io``
-    # subdomain is excluded — it never carries unit data. Detector fires on
-    # the iframe-host substring; the adapter then refetches the iframe URL
-    # and parses ``self.__next_f.push`` React-Query chunks.
+    # {orgId}/{propertyId}/…>``. 2026-07-19 (gap #6): many marketing pages carry
+    # ONLY the ``portal.fortresstech.io/{orgId}/{propertyId}/register`` link (no
+    # embed iframe) — previously excluded as "auth-only", but that URL carries
+    # the same org/property id pair, and the adapter now builds the SSR
+    # availability URL from it (fortresstech_availability_url). So route on any
+    # ``portal.`` id-pair reference too. Detector fires on the host substring;
+    # the adapter refetches the SSR availability URL and parses ``__next_f``.
     if (
         "availability.fortresstech.io/unit-availability" in h
         or "embed.fortresstech.io/unit-availability" in h
+        or "portal.fortresstech.io/" in h
     ):
         yield (
             "fortresstech",
             0.90,
             [
-                "FortressTech unit-availability iframe marker in HTML "
-                "((availability|embed).fortresstech.io/unit-availability/"
-                "{orgId}/{propertyId}/)"
+                "FortressTech marker in HTML "
+                "((availability|embed).fortresstech.io/unit-availability or "
+                "portal.fortresstech.io/{orgId}/{propertyId})"
             ],
         )
     # Encoreskyline-template marketing family driven by the Jonah Digital /

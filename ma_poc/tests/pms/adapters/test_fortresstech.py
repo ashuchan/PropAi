@@ -13,8 +13,10 @@ Acceptance (canary 1ef1060 regr#14, 2026-05-25):
 - Money / bed / bath parsing handles the FortressTech payload conventions
   (``unitQuotingRent`` as a number, ``floorPlanBeds`` 0 = Studio, decimal
   baths like 1.5 preserved).
-- Detector routes the FortressTech iframe HTML marker to pms="fortresstech";
-  ``portal.fortresstech.io`` (auth/contact) alone does NOT route here.
+- Detector routes the FortressTech iframe HTML marker to pms="fortresstech".
+  2026-07-19 (gap #6): ``portal.fortresstech.io/{orgId}/{propertyId}`` now ALSO
+  routes here — those ids build the SSR availability URL — reversing the earlier
+  "auth-only, no data" exclusion.
 - Adapter is registered and ``matches_response_body`` accepts SSR / iframe
   fingerprints.
 """
@@ -24,12 +26,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import ma_poc.pms.adapters  # noqa: F401  # populate adapter registry
+from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.fortresstech import (
     FortressTechAdapter,
     _balanced_json_array,
     _extract_units_from_ssr_chunk,
     _items_to_units,
+    _prefer_availability_host,
     find_fortresstech_iframe_url,
+    fortresstech_availability_url,
     parse_fortresstech_iframe_html,
 )
 from ma_poc.pms.adapters.registry import get_adapter
@@ -235,9 +240,11 @@ def test_detector_routes_fortresstech_iframe_marker() -> None:
     assert res[0] == "fortresstech"
 
 
-def test_detector_does_not_route_portal_only_iframe() -> None:
-    """A page with ONLY the portal.fortresstech.io contact-us iframe is not
-    a FortressTech unit-data source — detector must not route there.
+def test_detector_routes_portal_with_id_pair() -> None:
+    """2026-07-19 (gap #6): the portal.fortresstech.io link carries the org/
+    property id pair that unlocks the SSR availability roster, so a page with
+    only the portal reference now DOES route to fortresstech (the adapter builds
+    the availability URL from those ids). Reverses the earlier "auth-only" call.
     """
     html = (
         "<html><body><iframe src='https://www.portal.fortresstech.io/"
@@ -246,8 +253,8 @@ def test_detector_does_not_route_portal_only_iframe() -> None:
         "</body></html>"
     ).lower()
     res = _detect_html_markers(html)
-    if res is not None:
-        assert res[0] != "fortresstech"
+    assert res is not None
+    assert res[0] == "fortresstech"
 
 
 def test_adapter_registered_and_matches_body() -> None:
@@ -269,3 +276,88 @@ def test_static_fingerprints_includes_both_subdomains() -> None:
     fps = a.static_fingerprints()
     assert any("availability.fortresstech.io" in f for f in fps)
     assert any("embed.fortresstech.io" in f for f in fps)
+
+
+# --- gap #6 (2026-07-19): portal-only landing + embed->availability rewrite ---
+
+_PORTAL_LANDING = (
+    '<html><body>'
+    '&quot;breakthroughUrl&quot;:{&quot;url&quot;:&quot;'
+    'https://www.portal.fortresstech.io/'
+    '4e8caee8-c99e-406c-864c-c8a5ba3e4a03/'
+    'ec66b2c0-571e-4bdc-95ae-6e859ea18166/register&quot;}'
+    '</body></html>'
+)
+
+
+def test_fortresstech_availability_url_from_portal_ids() -> None:
+    """Portal-only landing (no embed iframe) -> build the SSR availability URL
+    from the org/property id pair in the portal.register link."""
+    assert find_fortresstech_iframe_url(_PORTAL_LANDING) is None  # no iframe
+    url = fortresstech_availability_url(_PORTAL_LANDING)
+    assert url == (
+        "https://www.availability.fortresstech.io/unit-availability/"
+        "4e8caee8-c99e-406c-864c-c8a5ba3e4a03/"
+        "ec66b2c0-571e-4bdc-95ae-6e859ea18166/"
+    )
+
+
+def test_fortresstech_availability_url_none_when_absent() -> None:
+    assert fortresstech_availability_url("<html>no fortresstech here</html>") is None
+    assert fortresstech_availability_url("") is None
+
+
+def test_prefer_availability_host_rewrites_embed() -> None:
+    src = "https://www.embed.fortresstech.io/unit-availability/a/b/"
+    assert _prefer_availability_host(src) == (
+        "https://www.availability.fortresstech.io/unit-availability/a/b/"
+    )
+    bare = "https://embed.fortresstech.io/unit-availability/a/b/"
+    assert "www.availability.fortresstech.io" in _prefer_availability_host(bare)
+
+
+def test_prefer_availability_host_noop_on_availability() -> None:
+    src = "https://www.availability.fortresstech.io/unit-availability/a/b/"
+    assert _prefer_availability_host(src) == src
+
+
+def test_detector_routes_portal_only_landing() -> None:
+    """A page carrying only the portal.fortresstech.io link now routes to
+    fortresstech (the adapter recovers the roster via the id-built SSR URL)."""
+    hit = _detect_html_markers(_PORTAL_LANDING)
+    assert hit is not None
+    assert hit[0] == "fortresstech"
+
+
+async def test_adapter_recovers_units_via_id_builder(monkeypatch) -> None:
+    """Portal-only landing -> id-built availability URL -> _fetch SSR -> units."""
+    ssr = _load_iframe_html()
+    captured: dict[str, str] = {}
+
+    async def _fake_fetch(url: str):
+        captured["url"] = url
+        return 200, ssr
+
+    monkeypatch.setattr("ma_poc.pms.adapters.fortresstech._fetch", _fake_fetch)
+
+    class _FR:
+        body = _PORTAL_LANDING
+
+    class _Page:
+        url = "https://www.theeastlandnashville.com/"
+
+    from ma_poc.pms.detector import detect_pms
+
+    ctx = AdapterContext(
+        base_url="https://www.theeastlandnashville.com/",
+        detected=detect_pms("https://www.theeastlandnashville.com/"),
+        profile=None,
+        expected_total_units=None,
+        property_id="P_FT",
+        fetch_result=_FR(),
+    )
+    result = await FortressTechAdapter().extract(_Page(), ctx)
+    # fetched the SSR availability. host built from the portal id pair
+    assert "availability.fortresstech.io/unit-availability" in captured["url"]
+    assert "4e8caee8-c99e-406c-864c-c8a5ba3e4a03" in captured["url"]
+    assert len(result.units) >= 1

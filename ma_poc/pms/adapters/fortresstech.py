@@ -99,6 +99,52 @@ def find_fortresstech_iframe_url(html: str) -> str | None:
     return m.group("url") if m else None
 
 
+def _prefer_availability_host(url: str) -> str:
+    """Rewrite an ``embed.fortresstech.io`` iframe URL to the ``availability.``
+    host (2026-07-19 roster-confirmation gap #6).
+
+    The ``embed.`` subdomain now serves an empty ~437B client-only shell (no
+    ``self.__next_f`` SSR chunk), so the parser found 0 units. The identical
+    Next.js app is still SSR-rendered on the ``www.availability.`` alias, which
+    carries the hydration chunks. Rewriting is safe when ``embed.`` already
+    worked (same app, host alias only). No-op for non-``embed.`` URLs.
+    """
+    if not url:
+        return url
+    return url.replace(
+        "://www.embed.fortresstech.io", "://www.availability.fortresstech.io"
+    ).replace("://embed.fortresstech.io", "://www.availability.fortresstech.io")
+
+
+# ``<host>.fortresstech.io/{orgId}/{propertyId}/…`` — the org/property UUID pair,
+# present on the ``portal.`` register link even when no embed iframe is emitted.
+_FT_ORG_PROP_RE = re.compile(
+    r"fortresstech\.io/([0-9a-f]{8}-[0-9a-f-]{20,})/([0-9a-f]{8}-[0-9a-f-]{20,})",
+    re.IGNORECASE,
+)
+
+
+def fortresstech_availability_url(html: str) -> str | None:
+    """Build the SSR availability URL from any FortressTech id pair in *html*.
+
+    Real-world FortressTech marketing pages often embed only the auth-host
+    ``portal.fortresstech.io/{orgId}/{propertyId}/register`` link (HTML-entity
+    encoded), NOT an ``<iframe>`` to the availability widget. The org/property
+    UUIDs are identical across hosts, so we extract them and build the
+    ``www.availability.`` SSR URL that carries the ``self.__next_f`` roster.
+    Returns ``None`` when no id pair is present.
+    """
+    if not html:
+        return None
+    m = _FT_ORG_PROP_RE.search(html)
+    if not m:
+        return None
+    return (
+        "https://www.availability.fortresstech.io/unit-availability/"
+        f"{m.group(1)}/{m.group(2)}/"
+    )
+
+
 def _balanced_json_array(chunk: str, start: int) -> str | None:
     """Return the JSON array substring beginning at ``chunk[start]`` (which
     must be ``[``), balanced over nested brackets and string literals.
@@ -321,14 +367,23 @@ class FortressTechAdapter:
         elif isinstance(body, str):
             html = body
 
+        # gap #6 (2026-07-19): embed. now serves an empty client shell, and many
+        # marketing pages carry only the ``portal.fortresstech.io/{org}/{prop}``
+        # register link (no embed iframe). Prefer a direct iframe (rewritten to
+        # the SSR availability. host); else build the availability URL from the
+        # org/property id pair found anywhere in the HTML.
         iframe_url = find_fortresstech_iframe_url(html)
+        if iframe_url:
+            iframe_url = _prefer_availability_host(iframe_url)
+        else:
+            iframe_url = fortresstech_availability_url(html)
         if not iframe_url:
             result.tier_used = _TIER_NO_IFRAME
             result.confidence = 0.0
             result.errors.append(
                 "FORTRESSTECH_NO_IFRAME: no "
-                "<iframe src=…(availability|embed).fortresstech.io/unit-availability/…> "
-                "found in HTML"
+                "(availability|embed|portal).fortresstech.io/{orgId}/{propertyId} "
+                "reference found in HTML"
             )
             return result
 
