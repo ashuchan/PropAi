@@ -288,6 +288,35 @@ class ExtractionConfidence(BaseModel):
     last_sources_run: list[str] = Field(default_factory=list)
 
 
+class QualitySignals(BaseModel):
+    """Per-property data-QUALITY signals from the last successful extraction
+    (2026-07-19).
+
+    The self-learning loop historically recorded only "did it succeed?", so a
+    plan-level result or a contaminated PMC-wide dump counted the same as clean
+    unit-level gold (the 77.7%-headline-vs-76%-honest gap). These signals let a
+    downstream policy prefer clean unit-level methods and flag upgrade
+    opportunities, without changing what counts as a success.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    #: Rows carrying a real (non-empty) unit_number — the gold, unit-level count.
+    last_unit_level_count: int = 0
+    #: Rows without a unit_number — plan-level/floorplan placeholders.
+    last_plan_level_count: int = 0
+    #: units_extracted / expected_total_units (None when expectation unknown).
+    last_coverage_ratio: float | None = None
+    #: fraction of units carrying a rent value (catches the rent-zero failure).
+    last_rent_present_ratio: float | None = None
+    #: Dominant quality concern of the last success. One of:
+    #: UNIT_LEVEL | PLAN_LEVEL | CONTAMINATED | THIN | UNKNOWN.
+    last_quality_flag: str = "UNKNOWN"
+    #: Successive successes stuck at plan-level — a standing upgrade opportunity.
+    consecutive_plan_level: int = 0
+    updated_at: datetime | None = None
+
+
 class LlmArtifacts(BaseModel):
     """Artifacts from LLM extraction calls, used for drift detection."""
 
@@ -358,6 +387,8 @@ class ScrapeProfile(BaseModel):
     llm_artifacts: LlmArtifacts = Field(default_factory=LlmArtifacts)
     stats: ProfileStats = Field(default_factory=ProfileStats)
     fetch: FetchProfile = Field(default_factory=FetchProfile)
+    # Phase Q (2026-07-19): data-quality signals from the last success.
+    quality: QualitySignals = Field(default_factory=QualitySignals)
     # Phase 12: cluster bootstrap — populated from detector's pms_client_account_id
     cluster_key: str = ""
     # Aggregated property-level amenities. Populated either from the LLM's

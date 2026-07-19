@@ -254,6 +254,45 @@ def _base_tier_num(tier: str | None) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def _compute_quality_signals(
+    units: list, expected: int | None
+) -> tuple[int, int, float | None, float | None, str]:
+    """Compute data-quality signals from an extracted units list (2026-07-19).
+
+    Returns ``(unit_level_count, plan_level_count, coverage_ratio,
+    rent_present_ratio, quality_flag)``. "Unit-level" = a non-empty
+    ``unit_number`` (matches ``jugnu._unit_level_row_count``). ``coverage`` and
+    the CONTAMINATED flag require a known ``expected`` total; otherwise the flag
+    is decided from unit-vs-plan presence alone. Never raises.
+    """
+    ulist = units or []
+    total = len(ulist)
+    unit_level = 0
+    rent_present = 0
+    for u in ulist:
+        try:
+            if str(u.get("unit_number") or u.get("unit_id") or "").strip():
+                unit_level += 1
+            if u.get("market_rent_low") or u.get("rent_low") or u.get("asking_rent"):
+                rent_present += 1
+        except Exception:  # noqa: BLE001
+            continue
+    plan_level = max(0, total - unit_level)
+    coverage = (total / expected) if (expected and expected > 0) else None
+    rent_ratio = (rent_present / total) if total else None
+    if expected and expected > 0 and total > max(30, 3 * expected):
+        flag = "CONTAMINATED"          # e.g. AppFolio PMC-wide dump
+    elif total == 0:
+        flag = "UNKNOWN"
+    elif unit_level == 0:
+        flag = "PLAN_LEVEL"
+    elif coverage is not None and coverage < 0.3:
+        flag = "THIN"                  # unit-level but far below expected
+    else:
+        flag = "UNIT_LEVEL"
+    return unit_level, plan_level, coverage, rent_ratio, flag
+
+
 def _response_looks_like_units(body: Any) -> bool:
     """Quick check if an API response body looks like it contains unit data."""
     if not body:
@@ -691,6 +730,21 @@ def update_profile_after_extraction(
             if profile.confidence.preferred_tier is None or tier_num < profile.confidence.preferred_tier:
                 profile.confidence.preferred_tier = tier_num
         profile.confidence.last_unit_count = units_extracted
+        # Phase Q (2026-07-19): capture data-quality of this success so a policy
+        # can prefer clean unit-level methods + spot plan-level upgrade chances.
+        _ul, _pl, _cov, _rent, _flag = _compute_quality_signals(
+            scrape_result.get("units"), scrape_result.get("_expected_total_units")
+        )
+        q = profile.quality
+        q.last_unit_level_count = _ul
+        q.last_plan_level_count = _pl
+        q.last_coverage_ratio = _cov
+        q.last_rent_present_ratio = _rent
+        q.last_quality_flag = _flag
+        q.consecutive_plan_level = (
+            q.consecutive_plan_level + 1 if _flag == "PLAN_LEVEL" else 0
+        )
+        q.updated_at = datetime.utcnow()
     else:
         profile.confidence.consecutive_failures += 1
         profile.confidence.consecutive_successes = 0

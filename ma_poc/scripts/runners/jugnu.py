@@ -1193,6 +1193,18 @@ async def _process_property(
     if rc_direct_property_id is not None:
         result["_rentcafe_property_id"] = rc_direct_property_id
 
+    # Phase Q (2026-07-19): surface the CSV's expected unit total so the profile
+    # updater can compute coverage + flag CONTAMINATED (PMC-wide) / THIN results.
+    if csv_row and "_expected_total_units" not in result:
+        for _euk in ("Total Units", "Total Units (Est.)", "total_units"):
+            _euv = csv_row.get(_euk)
+            if _euv:
+                try:
+                    result["_expected_total_units"] = int(str(_euv).strip())
+                    break
+                except (ValueError, TypeError):
+                    continue
+
     # ── Profile self-learning loop ────────────────────────────────────
     # After every scrape, update what the profile knows: winning URL,
     # known_endpoints, blocked_endpoints, consecutive_successes/failures,

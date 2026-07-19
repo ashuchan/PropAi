@@ -6,7 +6,11 @@ import pytest
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile
 from services.profile_store import ProfileStore
-from services.profile_updater import _base_tier_num, update_profile_after_extraction
+from services.profile_updater import (
+    _base_tier_num,
+    _compute_quality_signals,
+    update_profile_after_extraction,
+)
 
 
 @pytest.fixture
@@ -162,3 +166,80 @@ def test_seeded_preferred_tier_never_raised_by_lower_win(store: ProfileStore) ->
     store.save(p)
     up = update_profile_after_extraction(p, {"extraction_tier_used": "TIER_4_LLM_DOM"}, 5, store)
     assert up.confidence.preferred_tier == 1
+
+
+# ── 2026-07-19: quality-aware learning (#2) ──
+
+
+def test_compute_quality_unit_level() -> None:
+    units = [
+        {"unit_number": "101", "market_rent_low": 1200},
+        {"unit_number": "102", "market_rent_low": 1300},
+    ]
+    ul, pl, cov, rent, flag = _compute_quality_signals(units, expected=2)
+    assert (ul, pl, flag) == (2, 0, "UNIT_LEVEL")
+    assert cov == 1.0 and rent == 1.0
+
+
+def test_compute_quality_plan_level() -> None:
+    units = [{"unit_number": "", "floor_plan_name": "A", "market_rent_low": 1200}]
+    ul, pl, _cov, _rent, flag = _compute_quality_signals(units, expected=None)
+    assert (ul, pl, flag) == (0, 1, "PLAN_LEVEL")
+
+
+def test_compute_quality_contaminated_pmc_dump() -> None:
+    # 200 units where only ~20 expected → PMC-wide contamination (AppFolio class)
+    units = [{"unit_number": str(i)} for i in range(200)]
+    _ul, _pl, _cov, _rent, flag = _compute_quality_signals(units, expected=20)
+    assert flag == "CONTAMINATED"
+
+
+def test_compute_quality_thin_under_extraction() -> None:
+    units = [{"unit_number": "1", "market_rent_low": 1000}]
+    _ul, _pl, cov, _rent, flag = _compute_quality_signals(units, expected=100)
+    assert flag == "THIN" and cov is not None and cov < 0.3
+
+
+def test_compute_quality_rent_present_ratio() -> None:
+    units = [{"unit_number": "1", "market_rent_low": 1000}, {"unit_number": "2"}]
+    _ul, _pl, _cov, rent, _flag = _compute_quality_signals(units, expected=None)
+    assert rent == 0.5
+
+
+def test_writer_records_quality_and_plan_streak(store: ProfileStore) -> None:
+    p = ScrapeProfile(canonical_id="q-001")
+    store.save(p)
+    plan = {
+        "extraction_tier_used": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": [{"unit_number": "", "market_rent_low": 1200}],
+    }
+    up = update_profile_after_extraction(p, plan, 1, store)
+    assert up.quality.last_quality_flag == "PLAN_LEVEL"
+    assert up.quality.consecutive_plan_level == 1
+    # a second plan-level success advances the upgrade-opportunity streak
+    up = update_profile_after_extraction(up, plan, 1, store)
+    assert up.quality.consecutive_plan_level == 2
+    # a unit-level success resets the streak and records clean gold
+    unit = {
+        "extraction_tier_used": "TIER_1_API_ENTRATA",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+    }
+    up = update_profile_after_extraction(up, unit, 1, store)
+    assert up.quality.last_quality_flag == "UNIT_LEVEL"
+    assert up.quality.consecutive_plan_level == 0
+    assert up.quality.last_unit_level_count == 1
+
+
+def test_quality_survives_round_trip(store: ProfileStore) -> None:
+    p = ScrapeProfile(canonical_id="q-002")
+    store.save(p)
+    r = {
+        "extraction_tier_used": "TIER_1_API_ENTRATA",
+        "units": [{"unit_number": "5", "market_rent_low": 1400}],
+        "_expected_total_units": 1,
+    }
+    update_profile_after_extraction(p, r, 1, store)
+    loaded = ProfileStore(store._base).load("q-002")  # type: ignore[attr-defined]
+    assert loaded is not None
+    assert loaded.quality.last_quality_flag == "UNIT_LEVEL"
+    assert loaded.quality.last_coverage_ratio == 1.0
