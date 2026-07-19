@@ -1020,6 +1020,74 @@ def _plan_render_allowed(profile: Any) -> bool:
         return True
 
 
+def _result_tier(result: dict[str, Any]) -> str:
+    """The extraction tier string from a scrape result (either shape)."""
+    er = result.get("_extract_result")
+    tier = (getattr(er, "tier_used", "") or "") if er else ""
+    return tier or str(result.get("extraction_tier_used") or "")
+
+
+async def _encore_plan_render_units(
+    task: Any,
+    entry_html: str,
+    base_url: str,
+    fetch_fn: Any,
+    *,
+    started_monotonic: float,
+    budget_guard_s: float,
+    max_plans: int,
+) -> list[dict[str, Any]]:
+    """Encore per-plan render fan-out (task #37 Track 2b). At page=None the
+    encoreskyline adapter discovers the ``/floorplans/{slug}/`` URLs from the
+    body but can't fetch+click them → 0 units. This renders each plan URL via
+    ``fetch_fn`` (which, with INTERACTION_REVEAL on, fires the Check-Availability
+    reveal during the render) and parses the post-click roster from the rendered
+    body (tag-stripped to approximate innerText). Bounded by ``max_plans`` and
+    the elapsed budget guard. Returns post-processed unit dicts (deduped by
+    unit_number). Never raises."""
+    from ma_poc.fetch.contracts import RenderMode
+    from ma_poc.pms.adapters._encoreskyline_units import parse_encoreskyline_units
+    from ma_poc.pms.adapters.encoreskyline_template import _plan_urls_from_html
+
+    try:
+        plans = _plan_urls_from_html(entry_html or "", base_url)[:max_plans]
+    except Exception:
+        plans = []
+    all_units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for plan_url in plans:
+        if (_time.monotonic() - started_monotonic) >= budget_guard_s:
+            break
+        try:
+            rtask = _dc_replace(task, url=plan_url, render_mode=RenderMode.RENDER)
+            rf = await fetch_fn(rtask)
+        except Exception:
+            continue
+        if rf is None or not getattr(rf, "ok", lambda: False)() or not getattr(rf, "body", None):
+            continue
+        body = rf.body
+        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+        text = _re.sub(r"<[^>]+>", " ", html)  # innerText approximation for the parser
+        try:
+            parsed = parse_encoreskyline_units(text, plan_url)
+        except Exception:
+            parsed = []
+        for u in parsed:
+            k = str(u.get("unit_number") or "").strip()
+            if k and k not in seen:
+                seen.add(k)
+                all_units.append(u)
+    if not all_units:
+        return []
+    try:
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(all_units, property_id=getattr(task, "property_id", None))
+        return list(pp.admitted) if pp.n_admitted > 0 else []
+    except Exception:
+        return all_units
+
+
 async def _process_property(
     task: Any,
     cost_ledger: Any,
@@ -1306,6 +1374,50 @@ async def _process_property(
                 task.property_id,
                 _roe_exc,
             )
+
+    # ── Track 2b (task #37): encore per-plan render fan-out ──
+    # When the encoreskyline adapter discovered plan URLs from the body but
+    # couldn't click them (page=None → 0 units, tier ENCORESKYLINE_*), render
+    # each plan URL (INTERACTION_REVEAL fires the Check-Availability click) and
+    # parse the post-click roster. Flag-gated (default off), bounded +
+    # elapsed-budget-guarded, never-fail.
+    from ma_poc.config.feature_flags import (
+        ENABLE_ENCORE_PLAN_RENDER,
+        ENCORE_PLAN_RENDER_MAX_PLANS,
+        PLAN_RENDER_BUDGET_GUARD_S,
+    )
+
+    if (
+        ENABLE_ENCORE_PLAN_RENDER
+        and not (result.get("units") or [])
+        and "ENCORESKYLINE" in _result_tier(result).upper()
+        and fetch_result.ok()
+        and (_time.monotonic() - _pp_t0) < PLAN_RENDER_BUDGET_GUARD_S
+    ):
+        try:
+            _eb = fetch_result.body
+            _entry_html = (
+                _eb.decode("utf-8", "replace") if isinstance(_eb, bytes) else str(_eb or "")
+            )
+            _enc_units = await _encore_plan_render_units(
+                task,
+                _entry_html,
+                task.url,
+                lambda t: jugnu_fetch(t, profile=profile_for_dispatch),
+                started_monotonic=_pp_t0,
+                budget_guard_s=float(PLAN_RENDER_BUDGET_GUARD_S),
+                max_plans=ENCORE_PLAN_RENDER_MAX_PLANS,
+            )
+            if _enc_units:
+                result["units"] = _enc_units
+                result["extraction_tier_used"] = "TIER_1_DOM_ENCORESKYLINE_PP_RENDER"
+                log.info(
+                    "encore plan-render recovered %d units for %s",
+                    len(_enc_units),
+                    task.property_id,
+                )
+        except Exception as _enc_exc:  # never let the fan-out crash a property
+            log.debug("encore plan-render fan-out failed for %s: %s", task.property_id, _enc_exc)
 
     # F6 (H6/H11) — surface the propertyId we used (resolved or cached)
     # so the profile_updater can persist it. Read by

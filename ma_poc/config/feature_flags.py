@@ -175,6 +175,22 @@ PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
 # when the property has consumed less than this much of its 600s budget.
 PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
 
+# Encore per-plan render fan-out (2026-07-19, task #37 Track 2b). The
+# encoreskyline (Jonah Digital) unit roster lives on N per-plan
+# /floorplans/{slug}/ pages and appears only after a "Check Availability" JS
+# click. At page=None the adapter discovers the plan URLs from the body but
+# can't fetch+click them → 0 units. This renders each plan URL and — composed
+# with INTERACTION_REVEAL, which fires the Check-Availability reveal during the
+# render — parses the post-click roster. Bounded by ENCORE_PLAN_RENDER_MAX_PLANS
+# and the shared PLAN_RENDER_BUDGET_GUARD_S elapsed guard; never-fail. Small
+# cohort (single-digit-to-low-tens). Default OFF — REQUIRES INTERACTION_REVEAL=1
+# for the click; a flag-on canary measures the roster recovery + validates the
+# innerText-from-render-HTML parse approximation.
+ENABLE_ENCORE_PLAN_RENDER: Final[bool] = (
+    os.environ.get("ENABLE_ENCORE_PLAN_RENDER", "false").lower() == "true"
+)
+ENCORE_PLAN_RENDER_MAX_PLANS: Final[int] = _int_env("ENCORE_PLAN_RENDER_MAX_PLANS", 6)
+
 # Body-capable resolver (2026-07-19, task #37 Track 1). Production dispatches L3
 # with page=None, so the live resolver (CTA-hop / iframe scan / redirect follow)
 # is skipped entirely — the confirmed root of the SightMap-iframe / leasing-portal
