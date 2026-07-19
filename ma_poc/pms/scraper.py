@@ -496,6 +496,32 @@ def _empty_exit_subpage_plan_text(base_url: str) -> list[dict[str, Any]]:
     return []
 
 
+def _crawl_get_gate_should_skip(url: str) -> bool:
+    """True iff *url* is a GENUINE empty 404 subpath that the link-hop crawl
+    should skip WITHOUT the expensive RENDER (#timeout part 2).
+
+    The crawl RENDERs every guessed subpath, so a path that 404s still burns
+    ~155-191s (browser render + curl_cffi/Web-Unlocker fallback) on the 404 —
+    the dominant driver of the 600s per-property timeouts. This gates each
+    subpath with a single cheap ``probe_get`` (curl_cffi, no escalation, no
+    unlocker): skip only when the response is HTTP 404/410 AND the body is under
+    10 KB. A soft-404 that carries a substantive unit-roster body (≥10 KB — the
+    ten68west-style pages the crawl's soft-404 recovery salvages), a 200, or a
+    walled/non-404 response all return False, so they fall through to the normal
+    RENDER fetch. Never raises — returns False on any error (fail-open to the
+    existing behaviour).
+    """
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+
+        r = probe_get(url, timeout=10, unlocker=False)
+        return getattr(r, "status_code", 0) in (404, 410) and (
+            len(getattr(r, "text", "") or "") < 10_000
+        )
+    except Exception:
+        return False
+
+
 async def scrape(
     base_url: str,
     proxy: str | None = None,
@@ -2986,6 +3012,25 @@ async def _try_link_hop(
             # double-check to enforce H5 invariant under all code paths.
             continue
         visited.add(sub_url)
+        # #timeout part 2: cheap-GET-gate. The RENDER sub-fetch below burns
+        # ~155-191s rendering + curl_cffi/Web-Unlocker-falling-back on a GUESSED
+        # subpath that 404s — the dominant driver of the 600s per-property
+        # timeouts. Gate with a single cheap probe_get (curl_cffi, no escalation,
+        # no unlocker) and skip the RENDER only for a GENUINE empty 404
+        # (404/410 + body < 10KB). Soft-404s that carry a substantive unit-roster
+        # body (≥10KB — the ten68west-style pages recovered at :3019 below), 200s,
+        # and walled/non-404 pages all fall through to the normal RENDER fetch.
+        from ma_poc.config.feature_flags import ENABLE_CRAWL_GET_GATE
+
+        if ENABLE_CRAWL_GET_GATE and _crawl_get_gate_should_skip(sub_url):
+            emit(
+                EventKind.LINK_HOP_FETCHED,
+                property_id,
+                url=sub_url,
+                outcome="DEAD_URL_GATED",
+                hop_index=idx,
+            )
+            continue
         sub_task = CrawlTask(
             url=sub_url,
             property_id=property_id,

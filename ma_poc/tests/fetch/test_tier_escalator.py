@@ -266,3 +266,54 @@ def test_merge_attempts_preserves_all_fields() -> None:
 
 def test_max_escalations_constant() -> None:
     assert MAX_ESCALATIONS_PER_RUN == 3
+
+
+# ── DEAD_URL fail-fast (timeout lever, #timeout) ─────────────────────────────
+
+@pytest.mark.asyncio
+async def test_dead_url_failfast_returns_without_escalation() -> None:
+    """With ENABLE_FAILFAST_TERMINAL_FETCH on, a 404 (DEAD_URL) at DIRECT returns
+    immediately and must NOT walk the paid ladder — this is the fix for the
+    155-191s-per-404 waste that drove the 600s per-property timeouts."""
+    task = _make_task()
+    profile = _make_profile(FetchTier.DIRECT)
+    dead = _make_result(FetchOutcome.DEAD_URL, tier=0, block_sig="HTTP_404")
+    direct_mock = AsyncMock(return_value=dead)
+    dc_mock = AsyncMock(return_value=_make_result(FetchOutcome.OK, tier=2))
+    with (
+        patch("ma_poc.fetch.tier_escalator.ENABLE_TIER_ESCALATION", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_FAILFAST_TERMINAL_FETCH", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_DC_PROXY_TIER", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_RESIDENTIAL_TIER", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_UNLOCKER_TIER", False),
+        patch("ma_poc.fetch.providers.direct.DirectProvider.fetch", direct_mock),
+        patch("ma_poc.fetch.providers.dc_proxy.DcProxyProvider.fetch", dc_mock),
+        patch("ma_poc.fetch.providers.dc_proxy.BrightDataProvider.__init__", return_value=None),
+    ):
+        result = await fetch_with_escalation(task, profile)
+    assert result.outcome == FetchOutcome.DEAD_URL
+    assert result.fetch_tier_used == int(FetchTier.DIRECT)
+    dc_mock.assert_not_called()  # never escalated past DIRECT
+
+
+@pytest.mark.asyncio
+async def test_dead_url_escalates_when_flag_off() -> None:
+    """Flag off = legacy behaviour: a DEAD_URL still escalates. Guards that the
+    fix is gated and default-off changes nothing."""
+    task = _make_task()
+    profile = _make_profile(FetchTier.DIRECT)
+    dead = _make_result(FetchOutcome.DEAD_URL, tier=0, block_sig="HTTP_404")
+    direct_mock = AsyncMock(return_value=dead)
+    dc_mock = AsyncMock(return_value=_make_result(FetchOutcome.OK, tier=2))
+    with (
+        patch("ma_poc.fetch.tier_escalator.ENABLE_TIER_ESCALATION", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_FAILFAST_TERMINAL_FETCH", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_DC_PROXY_TIER", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_RESIDENTIAL_TIER", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_UNLOCKER_TIER", False),
+        patch("ma_poc.fetch.providers.direct.DirectProvider.fetch", direct_mock),
+        patch("ma_poc.fetch.providers.dc_proxy.DcProxyProvider.fetch", dc_mock),
+        patch("ma_poc.fetch.providers.dc_proxy.BrightDataProvider.__init__", return_value=None),
+    ):
+        result = await fetch_with_escalation(task, profile)
+    dc_mock.assert_called()  # escalated past DIRECT (legacy path)

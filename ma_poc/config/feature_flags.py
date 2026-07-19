@@ -100,6 +100,36 @@ ENABLE_EMPTY_EXIT_PLAN_TEXT: Final[bool] = (
     os.environ.get("ENABLE_EMPTY_EXIT_PLAN_TEXT", "false").lower() == "true"
 )
 
+# Fail-fast on terminal DEAD_URL in the tier escalator (2026-07-18, timeout lever).
+# BUG: tier_escalator's cascade loop early-returns on OK/NOT_MODIFIED/HARD_FAIL and
+# escalates BOT_BLOCKED, but DEAD_URL (HTTP 404/410/451, soft-404, parked) falls
+# through to the implicit "escalate" branch — so a 404 walks the whole paid ladder
+# (residential → Web-Unlocker 120s → render) even though a 404 is a 404 from every
+# tier. Measured: 155-191s burned per 404 guess-path in the link-hop crawl, the
+# dominant driver of the 600s per-property timeouts (615 props). The fetcher's own
+# INLINE loop already treats DEAD_URL terminal (fetcher.py:413-418); this makes the
+# escalator mirror it. Default OFF — a flag-on canary measures the throughput/gold
+# gain and guards against soft-404 false-positives (a DIRECT block misread as
+# DEAD_URL that residential would have cleared).
+ENABLE_FAILFAST_TERMINAL_FETCH: Final[bool] = (
+    os.environ.get("ENABLE_FAILFAST_TERMINAL_FETCH", "false").lower() == "true"
+)
+
+# Link-hop crawl cheap-GET-gate (2026-07-18, timeout lever part 2). The link-hop
+# crawl fetches each guessed subpath (/floorplans, /availability, …) with
+# RenderMode.RENDER — so a guessed path that 404s still runs a full browser
+# render (~20-30s) + curl_cffi/Web-Unlocker fallback (~120s) on the 404 before
+# the crawl advances. Measured: 155-191s per 404 guess-path, the dominant driver
+# of the 600s per-property timeouts. This gates each subpath with a single cheap
+# probe_get (curl_cffi, no escalation, no unlocker) FIRST and skips the expensive
+# RENDER only for a GENUINE empty 404 (HTTP 404/410 with body < 10KB) — soft-404s
+# that carry a substantive unit-roster body (≥10KB, the ~9.5% ten68west-style
+# pages) are preserved and still rendered/extracted, as are 200s and walled
+# pages. Default OFF — a flag-on canary measures the timeout/throughput win.
+ENABLE_CRAWL_GET_GATE: Final[bool] = (
+    os.environ.get("ENABLE_CRAWL_GET_GATE", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 from ma_poc.config.feature_flags import (
     ENABLE_DC_PROXY_TIER,
+    ENABLE_FAILFAST_TERMINAL_FETCH,
     ENABLE_FLARESOLVERR_TIER,
     ENABLE_RESIDENTIAL_RENDER_TIER,
     ENABLE_RESIDENTIAL_TIER,
@@ -255,6 +256,17 @@ async def fetch_with_escalation(
             return _merge_attempts(result, all_attempts)
 
         if outcome == FetchOutcome.HARD_FAIL:
+            return _merge_attempts(result, all_attempts)
+
+        # DEAD_URL (HTTP 404/410/451, soft-404, parked) is terminal — a 404 is a
+        # 404 from every tier, so escalating it through residential → Web-Unlocker
+        # (120s) → render is pure waste (155-191s per 404 guess-path — the dominant
+        # driver of the 600s per-property timeouts). Mirror the fetcher's inline
+        # loop (fetcher.py) and return immediately. Flag-gated (default off) so a
+        # canary can A/B the gain and catch soft-404 false-positives.
+        if ENABLE_FAILFAST_TERMINAL_FETCH and outcome == FetchOutcome.DEAD_URL:
+            emit(EventKind.FETCH_TIER_PROBE_FAILED, task.property_id,
+                 tier=tier.name, block_sig="DEAD_URL_FAILFAST")
             return _merge_attempts(result, all_attempts)
 
         if outcome == FetchOutcome.BOT_BLOCKED:
