@@ -175,6 +175,21 @@ PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
 # when the property has consumed less than this much of its 600s budget.
 PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
 
+# Body-capable resolver (2026-07-19, task #37 Track 1). Production dispatches L3
+# with page=None, so the live resolver (CTA-hop / iframe scan / redirect follow)
+# is skipped entirely — the confirmed root of the SightMap-iframe / leasing-portal
+# / JS-injected-marker misroute mass (the large body-recoverable pool from the
+# page=None scope). This runs the SAME resolver scoring over the already-fetched
+# RENDER body's anchors + iframes + final_url — no live page, no new render, no
+# memory/timeout cost (unlike holding a page across L3, which was rejected).
+# Never-fail: degrades to today's fetch_only no-hop on any miss, so it can only
+# ADD correct hops, never regress a working property. Default OFF (repo
+# convention for a new routing surface) — a flag-on canary measures the
+# misroute-recovery before default-on.
+ENABLE_BODY_RESOLVER: Final[bool] = (
+    os.environ.get("ENABLE_BODY_RESOLVER", "false").lower() == "true"
+)
+
 # Cluster/template cross-property warm-start (2026-07-19, arch-hardening #1).
 # The self-learning profile is per-property: every property in a shared PMS
 # client-account cluster (same RentCafe/Yardi account, same template & API

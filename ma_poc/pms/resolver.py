@@ -649,3 +649,106 @@ async def resolve_target(
         result.method = "failed"
         result.hop_path = [original_url]
         return result
+
+
+class _BodyPage:
+    """A minimal page-shim that replays body-parsed signals through the
+    EXISTING ``resolve_target`` scoring logic (CTA-candidate ranking, portal
+    match, iframe check, redirect). Production dispatches L3 with page=None, so
+    the live resolver was skipped entirely — the confirmed root of the
+    SightMap-iframe / portal-hop / JS-injected-marker misroute mass. Feeding a
+    RENDER-mode body's anchors + iframes + final_url through the same resolver
+    recovers those hops with ZERO live-page requirement and ZERO change to the
+    (misroute-prone) scoring path.
+    """
+
+    __slots__ = ("url", "_links", "_iframes")
+
+    def __init__(self, url: str, links: list[dict[str, str]], iframes: list[str]) -> None:
+        self.url = url  # resolve_target reads page.url for the redirect check
+        self._links = links
+        self._iframes = iframes
+
+    async def evaluate(self, js: str, *_args: object) -> object:
+        # Pattern-match the two querySelectorAll calls resolve_target issues.
+        if "iframe" in js:
+            return self._iframes
+        if "a[href]" in js or "anchors" in js or "querySelectorAll('a" in js:
+            return self._links
+        return []
+
+
+def _links_and_iframes_from_body(
+    body: str, base_url: str
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Extract absolute anchor hrefs (+text) and iframe srcs from HTML, mirroring
+    the shape resolve_target's page.evaluate returns. Relative URLs are resolved
+    against ``base_url`` (the page's final URL, exactly what the browser would
+    do). Never raises — returns ([], []) on any parse failure."""
+    from urllib.parse import urljoin
+
+    try:
+        from bs4 import BeautifulSoup
+    except Exception:
+        return [], []
+    try:
+        soup = BeautifulSoup(body, "html.parser")
+    except Exception:
+        return [], []
+
+    links: list[dict[str, str]] = []
+    for a in soup.find_all("a", href=True):
+        try:
+            href = urljoin(base_url, str(a["href"]).strip())
+        except Exception:
+            continue
+        if not href.startswith(("http://", "https://")):
+            continue
+        text = a.get_text(" ", strip=True)[:100]
+        links.append({"href": href, "text": text})
+
+    iframes: list[str] = []
+    for f in soup.find_all("iframe", src=True):
+        try:
+            src = urljoin(base_url, str(f["src"]).strip())
+        except Exception:
+            continue
+        if src.startswith(("http://", "https://")):
+            iframes.append(src)
+
+    return links, iframes
+
+
+async def resolve_target_from_body(
+    body: str | None,
+    original_url: str,
+    final_url: str,
+    initial_detection: DetectedPMS,
+) -> ResolvedTarget:
+    """page=None equivalent of ``resolve_target`` (Track 1). Parses CTA anchors
+    + iframes from the already-fetched RENDER body and the redirect from
+    ``final_url``, then runs them through the identical resolver scoring so a
+    vanity site still hops to its SightMap iframe / leasing portal / redirected
+    PMS host without a live page. Never-fail: any parse/resolve error degrades
+    to a ``fetch_only`` no-hop (today's behaviour), so it can only ADD hops,
+    never regress a currently-working property."""
+    if not body:
+        return ResolvedTarget(
+            original_url=original_url,
+            resolved_url=original_url,
+            hop_path=[original_url],
+            final_detection=initial_detection,
+            method="fetch_only",
+        )
+    try:
+        links, iframes = _links_and_iframes_from_body(body, final_url or original_url)
+        shim = _BodyPage(final_url or original_url, links, iframes)
+        return await resolve_target(shim, original_url, initial_detection)  # type: ignore[arg-type]
+    except Exception:
+        return ResolvedTarget(
+            original_url=original_url,
+            resolved_url=original_url,
+            hop_path=[original_url],
+            final_detection=initial_detection,
+            method="fetch_only",
+        )

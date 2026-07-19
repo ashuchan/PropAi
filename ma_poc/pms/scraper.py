@@ -912,13 +912,33 @@ async def scrape(
                 method="failed",
             )
     else:
-        resolved = ResolvedTarget(
-            original_url=base_url,
-            resolved_url=base_url,
-            hop_path=[base_url],
-            final_detection=initial_detection,
-            method="fetch_only",
-        )
+        # Track 1 (task #37): page=None body-capable resolver. Run the SAME
+        # resolver scoring over the already-fetched RENDER body so a vanity site
+        # still hops to its SightMap iframe / leasing portal / redirected PMS
+        # host without a live page. Flag-gated (default off), never-fail →
+        # degrades to the fetch_only no-hop below on any miss.
+        resolved = None
+        try:
+            from ma_poc.config.feature_flags import ENABLE_BODY_RESOLVER
+        except Exception:
+            ENABLE_BODY_RESOLVER = False
+        if ENABLE_BODY_RESOLVER and page_html:
+            try:
+                from ma_poc.pms.resolver import resolve_target_from_body
+
+                resolved = await resolve_target_from_body(
+                    page_html, base_url, _effective_url, initial_detection
+                )
+            except Exception:
+                resolved = None
+        if resolved is None:
+            resolved = ResolvedTarget(
+                original_url=base_url,
+                resolved_url=base_url,
+                hop_path=[base_url],
+                final_detection=initial_detection,
+                method="fetch_only",
+            )
     result["_resolved_target"] = _resolved_to_dict(resolved)
 
     # Use the final detection from resolver (may have improved via hop)
