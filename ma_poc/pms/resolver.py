@@ -273,7 +273,9 @@ class ResolvedTarget:
     resolved_url: str
     hop_path: list[str] = field(default_factory=list)
     final_detection: DetectedPMS = field(default_factory=lambda: detect_pms(""))
-    method: Literal["no_hop", "cta_link", "iframe", "redirect", "failed", "fetch_only"] = "failed"
+    method: Literal[
+        "no_hop", "cta_link", "iframe", "redirect", "failed", "fetch_only", "no_hop_known_pms"
+    ] = "failed"
 
 
 def _get_priority(text: str) -> int:
@@ -331,6 +333,12 @@ def _url_matches_pms_fingerprints(url: str) -> bool:
 # links ate the cap, dropping the AppFolio "Resident Portal" link at P=30
 # before its URL was even checked).
 _CANDIDATE_CAP = 8
+
+# PMS names that route to the fallback DOM/plan-text tier rather than a
+# unit-capable adapter. Used by the page=None resolver's downgrade guard: a
+# confident body-detected known PMS must never be silently rewritten to one of
+# these by a same-host CTA hop. Kept in sync with detector.py's fallback names.
+_GENERIC_PMS = frozenset({"generic_plan_text", "unknown"})
 
 
 def _candidate_dedup_key(href: str) -> str:
@@ -743,7 +751,33 @@ async def resolve_target_from_body(
     try:
         links, iframes = _links_and_iframes_from_body(body, final_url or original_url)
         shim = _BodyPage(final_url or original_url, links, iframes)
-        return await resolve_target(shim, original_url, initial_detection)  # type: ignore[arg-type]
+        resolved = await resolve_target(shim, original_url, initial_detection)  # type: ignore[arg-type]
+        # Downgrade guard (2026-07-19 regression fix). At page=None the adapter
+        # runs on the ALREADY-FETCHED body regardless of resolved_url (there is
+        # no re-fetch after the hop), so the ONLY thing a hop changes is which
+        # adapter is selected. A confident body-detected PMS on a *vanity* URL
+        # (parkplacejville.com → rentcafe) fails Step-1's url-fingerprint gate
+        # and falls to Pass-3b, which hops to a same-host /floorplans CTA and
+        # re-detects it as generic — silently demoting a RentCafe/Entrata/Knock
+        # UNIT-level gold to TIER_3_DOM_GENERIC plan-level (8/44 test100c
+        # gold→plan demotions). Only UNKNOWN/GENERIC initial detections should
+        # hop (those are the legit vanity→SightMap/portal recoveries, which are
+        # unaffected here); a confident known unit-capable adapter keeps its
+        # routing. Cross-known-PMS hops (rentcafe→securecafe) still pass — the
+        # guard only fires when the hop DOWNGRADES to generic/unknown.
+        if (
+            initial_detection.pms not in _GENERIC_PMS
+            and initial_detection.confidence >= 0.7
+            and resolved.final_detection.pms in _GENERIC_PMS
+        ):
+            return ResolvedTarget(
+                original_url=original_url,
+                resolved_url=original_url,
+                hop_path=[original_url],
+                final_detection=initial_detection,
+                method="no_hop_known_pms",
+            )
+        return resolved
     except Exception:
         return ResolvedTarget(
             original_url=original_url,
