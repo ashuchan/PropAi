@@ -479,3 +479,52 @@ def _stamp(result: FetchResult) -> FetchResult:
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+# ── in-page raw GET (task #21 warm=fast direct-GET shortcuts) ────────────────
+# HB's residential proxy is BROWSER-ONLY (no standalone endpoint for curl). To
+# get a RAW parseable response (JSON / raw server HTML) through it — NOT the
+# mutated rendered DOM that page.content() returns, and which HB's network_log
+# does not capture for a top-level navigation — navigate the HB browser to the
+# resource's OWN origin (CF cleared by the residential proxy) then run a
+# SAME-ORIGIN fetch() in-page. A cross-origin fetch throws "Failed to fetch"
+# (CORS), so the goto MUST land on the resource origin and the fetch uses a
+# same-origin relative path. Returns the raw body through HB's residential IP,
+# free (no BrightData — Ankur's standing HB-over-BrightData preference).
+_INPAGE_FETCH_JS = """async (p) => {
+  try {
+    const r = await fetch(p, {headers: {'Accept': 'application/json, text/html'}, credentials: 'include'});
+    return {status: r.status, body: await r.text()};
+  } catch (e) { return {status: -1, body: ''}; }
+}"""
+
+
+async def hb_raw_get(
+    url: str, property_id: str = "?", *, session_factory: Any = None
+) -> tuple[int, str]:
+    """Fetch *url* as a RAW response through HB's residential proxy via an
+    in-page same-origin fetch (see _INPAGE_FETCH_JS). Returns ``(status, body)``
+    — ``(0, "")`` on any failure. Never raises; always stops the HB session.
+
+    ``session_factory`` lets tests inject a fake _HbSession-shaped object.
+    """
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    rel = parts.path + (("?" + parts.query) if parts.query else "")
+    sess = (session_factory or (lambda: _HbSession(mode="render")))()
+    try:
+        page = await sess.open()
+        await page.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT_MS)
+        res = await page.evaluate(_INPAGE_FETCH_JS, rel)
+        status = int((res or {}).get("status") or 0)
+        body = (res or {}).get("body") or ""
+        return (status, body) if status > 0 else (0, "")
+    except Exception as exc:
+        log.debug("hb_raw_get failed for %s (%s): %s", url, property_id, exc)
+        return 0, ""
+    finally:
+        try:
+            await sess.close()
+        except Exception as exc:
+            log.debug("hb_raw_get session close failed: %s", exc)

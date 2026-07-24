@@ -1189,7 +1189,11 @@ async def _process_property(
     # api_provider (Knock profiles carry api_provider='unknown'). Self-gates on
     # ENABLE_KNOCK_DIRECT_GET (default off) + WARM/HOT + endpoint + non-empty
     # roster; None → fall through to the normal render fetch below. Never-fail.
-    _knock_direct_result: dict[str, Any] | None = None
+    # Shared holder for a warm direct-GET shortcut's pre-extracted result
+    # (Knock / RentCafe / … — all fit the same shape: WARM profile → stored
+    # endpoint → canonical parser → complete result dict used verbatim in place
+    # of scrape_jugnu). None → fall through to the normal render + scrape_jugnu.
+    _direct_shortcut_result: dict[str, Any] | None = None
     if fetch_result is None:
         try:
             from ma_poc.pms.knock_direct import try_knock_direct
@@ -1197,7 +1201,7 @@ async def _process_property(
             _kd = await try_knock_direct(task, profile_for_dispatch, csv_row)
             if _kd is not None:
                 fetch_result = _kd["fetch_result"]
-                _knock_direct_result = _kd["result"]
+                _direct_shortcut_result = _kd["result"]
         except Exception as exc:
             log.warning(
                 "knock_direct dispatch failed for %s: %s — falling back",
@@ -1205,7 +1209,31 @@ async def _process_property(
                 exc,
             )
             fetch_result = None
-            _knock_direct_result = None
+            _direct_shortcut_result = None
+
+    # RentCafe/SecureCafe direct raw-GET (task #21, warm=fast). The unit-level
+    # gold is on securecafe availableunits.aspx; a WARM profile stores it in
+    # winning_page_url, so we fetch it via HB in-page fetch (residential proxy
+    # clears CF, returns RAW HTML the canonical parser needs — no BrightData) and
+    # skip the marketing-page render + link-hop. Self-gates on
+    # ENABLE_RENTCAFE_DIRECT_GET (default off) + WARM/HOT + a stored securecafe
+    # availableunits URL + a non-empty roster; None → fall through. Never-fail.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.securecafe_direct import try_rentcafe_direct
+
+            _rc = await try_rentcafe_direct(task, profile_for_dispatch, csv_row)
+            if _rc is not None:
+                fetch_result = _rc["fetch_result"]
+                _direct_shortcut_result = _rc["result"]
+        except Exception as exc:
+            log.warning(
+                "rentcafe_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
 
     # H4 — unconditional vanity-domain fallback. Runs whenever the
     # direct path didn't produce a usable result (any failure tier or
@@ -1317,11 +1345,12 @@ async def _process_property(
         except Exception as _ws_exc:  # defensive — never block the scrape
             log.debug("cluster warm-start skipped for %s: %s", task.property_id, _ws_exc)
 
-    if _knock_direct_result is not None:
-        # Knock direct-GET already produced a complete, canonically-parsed
-        # result (real unit numbers) — use it verbatim; skipping scrape_jugnu is
-        # the whole point (no render, no generic-cascade misroute).
-        result = _knock_direct_result
+    if _direct_shortcut_result is not None:
+        # A warm direct-GET shortcut (Knock / RentCafe) already produced a
+        # complete, canonically-parsed result (real unit numbers) — use it
+        # verbatim; skipping scrape_jugnu is the whole point (no render, no
+        # generic-cascade misroute).
+        result = _direct_shortcut_result
     else:
         result = await scrape_jugnu(
             task=task,

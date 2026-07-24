@@ -187,6 +187,18 @@ ENABLE_KNOCK_DIRECT_GET: Final[bool] = os.environ.get(
     "ENABLE_KNOCK_DIRECT_GET", "false"
 ).strip().lower() in ("1", "true", "yes", "on")
 
+# RentCafe/SecureCafe direct raw-GET shortcut (task #21, warm=fast). The
+# unit-level gold lives on the securecafe availableunits.aspx page — CF-fronted +
+# the parser needs RAW HTML (a render mutates the DOM → parser returns 0). A WARM
+# profile stores that URL in navigation.winning_page_url, so subsequent runs can
+# skip the marketing-page render + link-hop and fetch it via hb_raw_get (HB
+# in-page same-origin fetch — residential proxy clears CF, returns raw HTML, no
+# BrightData). Proven 2026-07-24: grantparkvillage → 25 gold units via HB.
+# Default OFF — flag-on canary measures the render-skip rate + unit parity.
+ENABLE_RENTCAFE_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_RENTCAFE_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was
