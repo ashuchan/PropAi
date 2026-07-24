@@ -1257,6 +1257,29 @@ async def _process_property(
             fetch_result = None
             _direct_shortcut_result = None
 
+    # RealPage CWS direct raw-GET (task #21, warm=fast). WARM CWS profile (stored
+    # api.ws.realpage.com endpoint; OLL excluded) → hb_raw_get the property page
+    # (HB clears CF, no BrightData) → generic._probe_realpage_cws harvests the
+    # public apiKey + GETs /units (no proxy — Akamai auth-gated, not CF-IP-
+    # blocked). Skips the render; the probe today only runs post-render. Self-
+    # gates on ENABLE_REALPAGE_DIRECT_GET (default off); None → fall through.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.realpage_direct import try_realpage_direct
+
+            _rp = await try_realpage_direct(task, profile_for_dispatch, csv_row)
+            if _rp is not None:
+                fetch_result = _rp["fetch_result"]
+                _direct_shortcut_result = _rp["result"]
+        except Exception as exc:
+            log.warning(
+                "realpage_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
+
     # H4 — unconditional vanity-domain fallback. Runs whenever the
     # direct path didn't produce a usable result (any failure tier or
     # routing skip).

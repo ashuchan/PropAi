@@ -210,6 +210,17 @@ ENABLE_SIGHTMAP_DIRECT_GET: Final[bool] = os.environ.get(
     "ENABLE_SIGHTMAP_DIRECT_GET", "false"
 ).strip().lower() in ("1", "true", "yes", "on")
 
+# RealPage CWS/LeaseStar direct raw-GET shortcut (task #21, warm=fast). The
+# api.ws.realpage.com floorplans+units API is render-free — auth-gated by
+# x-ws-authkey, a PUBLIC per-property key in the property page's static HTML
+# (RPFP_config). For a WARM CWS profile: fetch the property page via hb_raw_get
+# (HB clears any CF, no BrightData) → reuse generic._probe_realpage_cws (regex
+# key + GET /units via httpx; the API is Akamai auth-gated, not CF-IP-blocked, so
+# no proxy). EXCLUDES OLL (leasing.realpage.com — render-required). Default OFF.
+ENABLE_REALPAGE_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_REALPAGE_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was
