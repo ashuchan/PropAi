@@ -199,6 +199,17 @@ ENABLE_RENTCAFE_DIRECT_GET: Final[bool] = os.environ.get(
     "ENABLE_RENTCAFE_DIRECT_GET", "false"
 ).strip().lower() in ("1", "true", "yes", "on")
 
+# SightMap direct raw-GET shortcut (task #21, warm=fast). The SightMap unit API
+# (sightmap.com/app/api/v1/{key}/sightmaps/{id}) is CF-fronted + content-
+# negotiates (browser nav → HTML embed, not JSON), so a WARM profile's stored API
+# URL is fetched via hb_raw_get (HB in-page same-origin fetch → raw JSON, CF
+# cleared by residential proxy, no BrightData), then parse_sightmap_payload +
+# json.loads. Content-guarded (≥1 rent-bearing unit) so Entrata-hint props fall
+# through to render. Default OFF — flag-on canary measures render-skip + parity.
+ENABLE_SIGHTMAP_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_SIGHTMAP_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was

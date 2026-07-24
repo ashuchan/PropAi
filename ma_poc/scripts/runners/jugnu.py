@@ -1235,6 +1235,28 @@ async def _process_property(
             fetch_result = None
             _direct_shortcut_result = None
 
+    # SightMap direct raw-GET (task #21, warm=fast). WARM profile with a stored
+    # sightmap /sightmaps/ API URL → hb_raw_get (HB in-page fetch → raw JSON, CF
+    # cleared, no BrightData) → parse_sightmap_payload. Content-guarded (≥1
+    # rent-bearing unit) so Entrata-hint props fall through to render. Self-gates
+    # on ENABLE_SIGHTMAP_DIRECT_GET (default off); None → fall through. Never-fail.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.sightmap_direct import try_sightmap_direct
+
+            _sm = await try_sightmap_direct(task, profile_for_dispatch, csv_row)
+            if _sm is not None:
+                fetch_result = _sm["fetch_result"]
+                _direct_shortcut_result = _sm["result"]
+        except Exception as exc:
+            log.warning(
+                "sightmap_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
+
     # H4 — unconditional vanity-domain fallback. Runs whenever the
     # direct path didn't produce a usable result (any failure tier or
     # routing skip).
