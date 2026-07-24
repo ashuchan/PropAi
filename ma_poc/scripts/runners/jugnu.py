@@ -1179,6 +1179,34 @@ async def _process_property(
             fetch_result = None
             rc_direct_property_id = None
 
+    # Knock direct-GET shortcut (task #21, warm=fast). Knock's doorway-api is a
+    # PUBLIC GET, so a WARM Knock profile can skip the ~10-45s render and GET its
+    # stored /units endpoint directly (<1s). try_knock_direct parses the roster
+    # with the CANONICAL parse_knock_units (real unit numbers, not synthetic
+    # ids) and returns a COMPLETE result dict — used verbatim below in place of
+    # scrape_jugnu (routing the raw JSON through scrape_jugnu would misroute to
+    # the generic cascade → inferred_* ids). Trigger = the stored endpoint, NOT
+    # api_provider (Knock profiles carry api_provider='unknown'). Self-gates on
+    # ENABLE_KNOCK_DIRECT_GET (default off) + WARM/HOT + endpoint + non-empty
+    # roster; None → fall through to the normal render fetch below. Never-fail.
+    _knock_direct_result: dict[str, Any] | None = None
+    if fetch_result is None:
+        try:
+            from ma_poc.pms.knock_direct import try_knock_direct
+
+            _kd = await try_knock_direct(task, profile_for_dispatch, csv_row)
+            if _kd is not None:
+                fetch_result = _kd["fetch_result"]
+                _knock_direct_result = _kd["result"]
+        except Exception as exc:
+            log.warning(
+                "knock_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _knock_direct_result = None
+
     # H4 — unconditional vanity-domain fallback. Runs whenever the
     # direct path didn't produce a usable result (any failure tier or
     # routing skip).
@@ -1289,14 +1317,20 @@ async def _process_property(
         except Exception as _ws_exc:  # defensive — never block the scrape
             log.debug("cluster warm-start skipped for %s: %s", task.property_id, _ws_exc)
 
-    result = await scrape_jugnu(
-        task=task,
-        fetch_result=fetch_result,
-        page=None,  # Would be provided in full RENDER mode
-        profile=profile,
-        csv_row=csv_row,
-        partial_state=partial_state,
-    )
+    if _knock_direct_result is not None:
+        # Knock direct-GET already produced a complete, canonically-parsed
+        # result (real unit numbers) — use it verbatim; skipping scrape_jugnu is
+        # the whole point (no render, no generic-cascade misroute).
+        result = _knock_direct_result
+    else:
+        result = await scrape_jugnu(
+            task=task,
+            fetch_result=fetch_result,
+            page=None,  # Would be provided in full RENDER mode
+            profile=profile,
+            csv_row=csv_row,
+            partial_state=partial_state,
+        )
 
     # ── L3: render-on-empty escalation (2026-07-16, flag-gated, default off) ──
     # When a routed adapter extracts 0 units from a fetch that SUCCEEDED (a 200

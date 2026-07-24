@@ -175,6 +175,18 @@ PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
 # when the property has consumed less than this much of its 600s budget.
 PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
 
+# Knock direct-GET shortcut (task #21, warm=fast). Knock's doorway-api /units
+# endpoint is a PUBLIC GET (no auth/CF/cookies) — proven 2026-07-24, 6/6 warm
+# props returned the full gold roster (unit+rent) via plain GET. A WARM Knock
+# profile stores that endpoint in known_endpoints, so subsequent runs can skip
+# the ~10-45s render and GET it directly (<1s), feeding the JSON to the existing
+# TIER_1_KNOCK_API parser via network_log. Default OFF — flag-on canary measures
+# the render-skip rate + confirms unit parity vs the render path. Never-fail:
+# any GET failure falls through to the normal render.
+ENABLE_KNOCK_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_KNOCK_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was
