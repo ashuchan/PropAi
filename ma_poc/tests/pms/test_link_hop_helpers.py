@@ -516,6 +516,7 @@ async def test_link_hop_dedups_profile_against_pms_prior_for_same_url() -> None:
     """
     from unittest.mock import patch
 
+    from ma_poc.pms import scraper as pms_scraper
     from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
     from ma_poc.pms.scraper import _try_link_hop
 
@@ -567,6 +568,8 @@ async def test_link_hop_dedups_profile_against_pms_prior_for_same_url() -> None:
     with (
         patch("ma_poc.fetch.fetch", _fake_fetch, create=True),
         patch.object(obs_events, "emit", _spy_emit),
+        # Cheap-GET gate off — it probe_get()s the live network per hop.
+        patch.object(pms_scraper, "_crawl_get_gate_should_skip", lambda url: False),
     ):
         await _try_link_hop(
             entry_url="https://example.com/",
@@ -601,9 +604,19 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
     for known dead ends just because the template says so.
 
     Documents the dead-end skip-list contract for the new prior layer.
+
+    Asserts on the emitted ``LINK_HOP_FETCHED`` events — the honest
+    per-hop signal — rather than on the fetch mock alone: the cheap-GET
+    gate (``ENABLE_CRAWL_GET_GATE``) can retire a hop as
+    ``DEAD_URL_GATED`` before the sub-fetch is reached, so an empty
+    ``fetch_calls`` does not by itself mean a candidate was skipped.
+    The gate is stubbed off here so the hop is exercised end-to-end
+    (and so the test does not depend on live network responses for
+    ``example.com`` subpaths).
     """
     from unittest.mock import patch
 
+    from ma_poc.pms import scraper as pms_scraper
     from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
     from ma_poc.pms.scraper import _try_link_hop
 
@@ -615,6 +628,7 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
     )
 
     fetch_calls: list[str] = []
+    hop_fetched: list[str] = []
 
     async def _fake_fetch(task: Any) -> Any:
         fetch_calls.append(getattr(task, "url", ""))
@@ -640,9 +654,28 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
 
         return _R()
 
+    # Every attempted hop emits LINK_HOP_FETCHED (success, error, or
+    # gated) — that is the signal the skip-list contract lives on.
+    from ma_poc.observability import events as obs_events
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> Any:
+        kind_value = getattr(kind, "value", str(kind))
+        if "link_hop_fetched" in kind_value.lower():
+            hop_fetched.append(str(payload.get("url", "")))
+        return original_emit(kind, property_id, **payload)
+
     # Profile says /floorplans was explored and had no data (skip it).
     # RentCafe prior would otherwise inject /floorplans as candidate #1.
-    with patch("ma_poc.fetch.fetch", _fake_fetch, create=True):
+    with (
+        patch("ma_poc.fetch.fetch", _fake_fetch, create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+        # Cheap-GET gate off: it would otherwise probe_get() the live
+        # network and retire every prior as DEAD_URL_GATED before the
+        # sub-fetch, masking whichever candidates were really attempted.
+        patch.object(pms_scraper, "_crawl_get_gate_should_skip", lambda url: False),
+    ):
         await _try_link_hop(
             entry_url="https://example.com/",
             entry_page_html="<html></html>",
@@ -654,15 +687,27 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
             max_hops=3,
         )
 
-    assert "https://example.com/floorplans" not in fetch_calls, (
+    # Guard the mock itself: an empty fetch_calls means the patch target
+    # stopped intercepting the hop sub-fetch, not that priors were skipped.
+    assert fetch_calls, (
+        "No sub-fetch was intercepted — the ma_poc.fetch.fetch patch target "
+        "no longer covers _try_link_hop's sub-fetch, so the assertions below "
+        "would pass vacuously."
+    )
+    assert hop_fetched, "No LINK_HOP_FETCHED event emitted"
+
+    assert "https://example.com/floorplans" not in hop_fetched, (
         f"Prior URL was in profile.explored_links but still got fetched: "
-        f"{fetch_calls}. The skip-list must apply to priors the same way "
+        f"{hop_fetched}. The skip-list must apply to priors the same way "
         f"it applies to keyword candidates."
     )
+    assert "https://example.com/floorplans" not in fetch_calls, (
+        f"Skip-listed prior reached the sub-fetch: {fetch_calls}"
+    )
     # The OTHER priors (/availability, /apartments) should still fire.
-    assert any("availability" in u or "apartments" in u for u in fetch_calls), (
+    assert any("availability" in u or "apartments" in u for u in hop_fetched), (
         f"Skipping /floorplans should not suppress the rest of the "
-        f"RentCafe priors; got fetch_calls={fetch_calls}"
+        f"RentCafe priors; got hop_fetched={hop_fetched}"
     )
 
 
