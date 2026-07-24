@@ -29,3 +29,9 @@ class FetchTier(IntEnum):
     # i.e. always available when its flag is on. See
     # fetch/providers/residential_render.py for the legal posture.
     RESIDENTIAL_RENDER = 7
+    # Hyperbrowser cloud-browser vendor (2026-07-20). NOT a cost-ladder rung —
+    # a STAMP value only, so ``fetch_tier_used`` cleanly attributes cost when
+    # the FETCH_BACKEND=hyperbrowser switch swaps HB in behind the
+    # RESIDENTIAL_RENDER / UNLOCKER rungs. Never added to _build_ladder or
+    # TIER_SKIP_RULES; appended (not inserted) to honor "never reorder".
+    HYPERBROWSER = 8

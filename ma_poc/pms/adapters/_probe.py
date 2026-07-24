@@ -279,6 +279,16 @@ def web_unlocker_get(url: str, timeout: int = 120) -> _WUResponse:
     contacting BD — caller sees the same shape as an unconfigured
     key, so the cascade falls through to the next rung naturally.
     """
+    # Compliance kill-switch (RealPage legal 2026-07-22): under COMPLIANCE_MODE
+    # the Web Unlocker is a no-fly zone. Return the same empty shape callers
+    # already handle for missing-key / cap / transport-error, so every
+    # adapter-internal unlocker path (rentcafe attempt-3, onesite rescue,
+    # entrata static-fetch, probe_get(unlocker=True)) falls through to the
+    # legal cascade with zero special-casing. This is the single chokepoint.
+    from ma_poc.config.feature_flags import web_unlocker_allowed
+
+    if not web_unlocker_allowed():
+        return _WUResponse(0, "", url)
     key = web_unlocker_key()
     if not key:
         return _WUResponse(0, "", url)
@@ -361,8 +371,14 @@ def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
+    from ma_poc.config.feature_flags import web_unlocker_allowed
     from ma_poc.fetch.host_throttle import throttle as _host_throttle
 
+    # Compliance (RealPage legal): never escalate to the Web Unlocker. The
+    # web_unlocker_get chokepoint already no-ops, but drop the attempt here too
+    # so telemetry doesn't log a spurious unlock escalation.
+    if unlocker and not web_unlocker_allowed():
+        unlocker = False
     opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw}, url=url)
     px = probe_proxies()
     if px:

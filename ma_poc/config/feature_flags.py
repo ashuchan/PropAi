@@ -409,3 +409,74 @@ def enable_degraded_dom_persist() -> bool:
     a process restart.
     """
     return os.environ.get("ENABLE_DEGRADED_DOM_PERSIST", "true").lower() == "true"
+
+
+# ── Hyperbrowser fetch-backend switch (2026-07-20) ──────────────────────────
+# A vendor switch that swaps the Hyperbrowser cloud browser in BEHIND the
+# existing RESIDENTIAL_RENDER / UNLOCKER rungs — NOT a new cost tier. Default
+# ``brightdata`` so the code path is never constructed unless explicitly opted
+# in. Function-form (read env each call) so an ops flip needs no restart, and
+# because the seams (_make_provider / _try_unlocker_fallback) are hot.
+# "HB for the CF-walled cohort only" recipe:
+#   FETCH_BACKEND=hyperbrowser ENABLE_TIER_ESCALATION=true ENABLE_UNLOCKER_TIER=true
+# — HB then bites ONLY on rungs a blocked property escalates into; a property
+# that succeeds cheap (DIRECT/DC/residential/patchright-render) never reaches it.
+
+
+def fetch_backend() -> str:
+    """``FETCH_BACKEND`` = ``brightdata`` (default) | ``hyperbrowser``.
+
+    Master vendor switch. Read each call so a flip needs no process restart.
+    """
+    return os.environ.get("FETCH_BACKEND", "brightdata").strip().lower()
+
+
+def hb_enabled() -> bool:
+    """True when the Hyperbrowser backend is selected (``FETCH_BACKEND=hyperbrowser``)."""
+    return fetch_backend() == "hyperbrowser"
+
+
+def hb_tiers() -> frozenset[str]:
+    """Which ladder rungs HB replaces (``HYPERBROWSER_TIERS``, default ``UNLOCKER``).
+
+    Comma list of ``FetchTier`` names. Default ``UNLOCKER`` — HB replaces only
+    the solver rung; DIRECT/DC/residential/patchright-render stay on the cheap
+    BrightData/httpx path. Add ``RESIDENTIAL_RENDER`` only when the compliance-
+    posture change (2a is non-solver by design) is intended.
+    """
+    raw = os.environ.get("HYPERBROWSER_TIERS", "UNLOCKER").strip().upper()
+    return frozenset(t.strip() for t in raw.split(",") if t.strip())
+
+
+def compliance_mode() -> bool:
+    """``COMPLIANCE_MODE=1`` forces OFF every challenge-solver / bot-detection-
+    defeating path — Web Unlocker, FlareSolverr, CAPTCHA-solving — regardless of
+    their individual flags.
+
+    RealPage legal (2026-07-22) ruled these a "no-go / no-fly zone" for this
+    scrape (see feedback_realpage_scraping_legal_constraints memory). The code
+    is KEPT, not deleted — this switch just holds it OFF, so it stays available
+    for any separately-authorized context. **Set COMPLIANCE_MODE=1 on every
+    RealPage run.** Read each call so an ops flip needs no restart.
+    """
+    return os.environ.get("COMPLIANCE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def web_unlocker_allowed() -> bool:
+    """False under compliance mode — the Web Unlocker (BrightData) is a no-fly zone."""
+    return not compliance_mode()
+
+
+def flaresolverr_allowed() -> bool:
+    """False under compliance mode — FlareSolverr is a CF-challenge solver (no-go)."""
+    return not compliance_mode()
+
+
+def hb_covers_render_primary() -> bool:
+    """Aggressive mode: HB as the PRIMARY renderer for every RENDER task
+    (``RENDER_BACKEND=hyperbrowser``), not just the blocked-render fallback.
+
+    Default off — much bigger spend (HB renders every RENDER task, not only
+    the walled cohort a blocked render escalates into).
+    """
+    return os.environ.get("RENDER_BACKEND", "").strip().lower() == "hyperbrowser"

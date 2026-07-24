@@ -630,20 +630,36 @@ class Fetcher:
         failure here just leaves the original BOT_BLOCKED result standing.
         """
         try:
-            from .providers.unlocker import UnlockerProvider
+            # Vendor switch (task #46): the RENDER cohort reaches the unlock
+            # rung HERE (not via _make_provider), so the switch must be mirrored
+            # or HB never touches the walled render pages it's wanted for.
+            from ma_poc.config.feature_flags import compliance_mode, hb_enabled
 
-            provider = UnlockerProvider()
+            if hb_enabled():
+                from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
+
+                provider = HyperbrowserProvider(mode="unlock")
+                _unlock_tier = "HYPERBROWSER"
+            elif compliance_mode():
+                # Web Unlocker is a no-fly zone (RealPage legal). No compliant
+                # provider on this branch → leave the BOT_BLOCKED result standing.
+                return None
+            else:
+                from .providers.unlocker import UnlockerProvider
+
+                provider = UnlockerProvider()
+                _unlock_tier = "UNLOCKER"
         except Exception as exc:
             log.warning("unlocker fallback unavailable: %s", exc)
             return None
         try:
-            # UnlockerProvider ignores the profile arg on every transport
-            # path; None is safe and avoids threading a profile this deep.
+            # UnlockerProvider / HyperbrowserProvider ignore the profile arg on
+            # this path; None is safe and avoids threading a profile this deep.
             result = await provider.fetch(task, None)  # type: ignore[arg-type]
             emit(
                 EventKind.FETCH_TIER_ESCALATED,
                 task.property_id,
-                tier="UNLOCKER",
+                tier=_unlock_tier,
                 reason="render_bot_blocked",
             )
             return result
