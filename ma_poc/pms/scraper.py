@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import urllib.parse
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -3032,10 +3033,34 @@ async def _try_link_hop(
     # Passed via shared_budget so subsequent sub-pages skip the LLM DOM call.
     _fp_llm_selectors: dict[str, Any] | None = None
 
+    # Wall-clock budget for the whole hop loop. link-hop was bounded ONLY by a
+    # page COUNT (max_hops + dynamic appends → up to ~14 sequential RENDER
+    # sub-fetches), never by elapsed time — the dominant driver of the 600s
+    # per-property timeouts when a host tarpits under load. Stop STARTING new
+    # hops once the budget is spent so the property fails-fast and frees its
+    # pool slot instead of wedging it for 10 minutes.
+    from ma_poc.config.feature_flags import LINK_HOP_BUDGET_S
+
+    _hop_deadline = time.monotonic() + float(LINK_HOP_BUDGET_S)
+
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
         queue_idx += 1
+
+        # Hop wall-clock guard (see _hop_deadline above). Checked before the
+        # RENDER sub-fetch so an in-flight hop always completes, but no NEW hop
+        # starts past the deadline. Any units already accumulated are returned
+        # by the normal fall-through below.
+        if time.monotonic() >= _hop_deadline:
+            emit(
+                EventKind.LINK_HOP_FETCHED,
+                property_id,
+                url=sub_url,
+                outcome="HOP_BUDGET_EXCEEDED",
+                hop_index=idx,
+            )
+            break
 
         # Skip lower-scored priors once the profile winning page delivered data.
         if _winning_page_satisfied and score < _LLM_HINT_SCORE and not _in_floorplan_accumulation:

@@ -175,6 +175,17 @@ PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
 # when the property has consumed less than this much of its 600s budget.
 PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
 
+# Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
+# RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
+# DOMINANT driver of the 600s per-property timeouts, because the hop loop was
+# bounded only by a page COUNT (max_hops), never by elapsed time. When a host
+# tarpits (slow-walls under load, e.g. throttle-off), every hop render stretches
+# and the property blows the whole budget. This cap stops STARTING new hops once
+# the budget is spent, so a slow property fails-fast and frees its pool slot
+# instead of monopolising it for 10 minutes. 150s ≈ 3-4 healthy hops and leaves
+# room under the 600s ceiling for the escalation ladder that ran before it.
+LINK_HOP_BUDGET_S: Final[int] = _int_env("LINK_HOP_BUDGET_S", 150)
+
 # Encore per-plan render fan-out (2026-07-19, task #37 Track 2b). The
 # encoreskyline (Jonah Digital) unit roster lives on N per-plan
 # /floorplans/{slug}/ pages and appears only after a "Check Availability" JS
