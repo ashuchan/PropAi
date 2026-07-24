@@ -2946,6 +2946,44 @@ class GenericAdapter:
                         duration_ms=int((_time.monotonic() - _t0) * 1000),
                     )
 
+        # Sub-tier 5.95: marketing-page floor-plan TEXT (task #21) ---------
+        # Last $0 deterministic attempt before the LLM: many small/independent
+        # sites publish their floor plans as free TEXT ("Unit Layouts: Studio |
+        # 288 sq ft | from $1125") that the CSS-selector dom_scan can't see, so
+        # they mis-verdict FAILED_NO_DATA despite publishing PLAN-LEVEL data.
+        # Recover those as plan-level records (unit_number="" → SUCCESS_PLAN_LEVEL,
+        # not gold). Flag-gated (ENABLE_PLAN_TEXT, default off); never-fail.
+        from ma_poc.config.feature_flags import ENABLE_PLAN_TEXT
+
+        if ENABLE_PLAN_TEXT and not result.units:
+            _t0 = _time.monotonic()
+            try:
+                from ma_poc.pms.adapters.plan_text import parse_marketing_plan_text
+
+                _html = await _get_page_html(page, ctx)
+                _plan_units = parse_marketing_plan_text(_html or "", ctx.base_url)
+                if _plan_units:
+                    result.units = _plan_units
+                    result.tier_used = "TIER_3_PLAN_TEXT"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.7
+                    _log_attempt(
+                        "generic:plan_text", "ran_units",
+                        units=len(_plan_units),
+                        duration_ms=int((_time.monotonic() - _t0) * 1000),
+                    )
+                    return result
+                _log_attempt(
+                    "generic:plan_text", "ran_empty",
+                    duration_ms=int((_time.monotonic() - _t0) * 1000),
+                )
+            except Exception as _exc:
+                _log_attempt(
+                    "generic:plan_text", "error",
+                    reason=str(_exc)[:80],
+                    duration_ms=int((_time.monotonic() - _t0) * 1000),
+                )
+
         # Sub-tier 6: LLM extraction --------------------------------------
         # Originally gated ON only for ``pms=unknown``. Option C relaxes
         # that gate: if the detected adapter returned empty BUT the page

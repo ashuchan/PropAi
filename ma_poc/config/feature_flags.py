@@ -231,6 +231,18 @@ ENABLE_ROUTE_SHADOW: Final[bool] = os.environ.get(
     "ENABLE_ROUTE_SHADOW", "false"
 ).strip().lower() in ("1", "true", "yes", "on")
 
+# Marketing-page floor-plan TEXT parser (task #21 plan-level recovery). Many
+# small/independent sites publish floor plans as free text ("Unit Layouts:
+# Studio | 288 sq ft | from $1125") that the CSS-selector dom_scan misses → they
+# mis-verdict FAILED_NO_DATA despite publishing PLAN-LEVEL data. This runs
+# parse_marketing_plan_text as the last deterministic tier before the LLM, when
+# the cascade extracted 0 units. Emits plan-level records (unit_number="") →
+# SUCCESS_PLAN_LEVEL (coverage, not gold). Default OFF — flag-on canary measures
+# the FAILED_NO_DATA → SUCCESS_PLAN_LEVEL flip rate. Proven: cottagesatsanford → 4 plans.
+ENABLE_PLAN_TEXT: Final[bool] = os.environ.get(
+    "ENABLE_PLAN_TEXT", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was
