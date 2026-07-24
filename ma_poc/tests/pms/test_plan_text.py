@@ -58,6 +58,22 @@ def test_sqft_rent_format_variety() -> None:
     assert plans[0]["_sqft"] == "950" and plans[0]["market_rent_low"] == 1095
 
 
+def test_prose_marketing_is_not_a_plan() -> None:
+    # FALSE-POSITIVE guard: marketing PROSE that mentions bed types + sqft must
+    # NOT become a junk single "plan" (measured 2026-07-24: this was ~44% of
+    # firings before the guard).
+    prose = (
+        "<p>Choose from studio to 2-bedroom layouts, ranging from 600 to 850 "
+        "square feet. Each floor plan features comfortable finishes.</p>"
+    )
+    assert parse_marketing_plan_text(prose, "") == []
+    prose2 = (
+        "<p>Behind its classic facade you'll find one, two, and three-bedroom "
+        "floor plans ranging from 726 to 3,100 square feet.</p>"
+    )
+    assert parse_marketing_plan_text(prose2, "") == []
+
+
 def test_empty_and_garbage_never_raise() -> None:
     assert parse_marketing_plan_text("", "") == []
     assert parse_marketing_plan_text("<html>no plans here, just $5 coffee</html>", "") == []

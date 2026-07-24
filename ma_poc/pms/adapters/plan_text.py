@@ -101,6 +101,13 @@ def parse_marketing_plan_text(html: str, url: str = "") -> list[dict[str, Any]]:
         name = name.strip().rstrip(":").strip()
         if not name:
             return
+        # FALSE-POSITIVE guard (measured 2026-07-24): the parser was grabbing
+        # marketing PROSE that mentions bed types + sqft ("Choose from studio to
+        # 2-bedroom layouts ranging from 600 to 850 square feet…") as a single
+        # junk "plan". Real plan names are short. Reject a name that's too long or
+        # reads like a sentence (multiple spaces / sentence punctuation).
+        if len(name) > 45 or name.count(" ") > 7 or re.search(r"[.,!?;] |\.\s*$", name):
+            return
         beds = _beds(name)
         baths = _baths(name)
         key = (name.lower(), sqft, rent)
