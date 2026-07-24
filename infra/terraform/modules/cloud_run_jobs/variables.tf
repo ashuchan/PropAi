@@ -19,6 +19,7 @@ variable "bucket_name" { type = string }
 variable "openrouter_secret_id" { type = string }
 variable "anthropic_secret_id" { type = string }
 variable "proxy_credentials_secret_id" { type = string }
+variable "hyperbrowser_secret_id" { type = string }
 
 # Selects which provider ma_poc/llm/factory.py instantiates at runtime.
 # Valid values: "anthropic", "openrouter", "azure". Default is "anthropic"

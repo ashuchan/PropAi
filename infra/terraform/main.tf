@@ -49,6 +49,7 @@ module "cloud_run_jobs" {
   openrouter_secret_id         = module.secrets.openrouter_secret_id
   anthropic_secret_id          = module.secrets.anthropic_secret_id
   proxy_credentials_secret_id  = module.secrets.proxy_credentials_secret_id
+  hyperbrowser_secret_id       = module.secrets.hyperbrowser_secret_id
   llm_provider                 = var.llm_provider
   openrouter_model             = var.openrouter_model
   openrouter_vision_model      = var.openrouter_vision_model
