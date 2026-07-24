@@ -1310,6 +1310,7 @@ async def _process_property(
         ENABLE_PLAN_UNIT_RENDER,
         ENABLE_RENDER_ON_EMPTY,
         PLAN_RENDER_BUDGET_GUARD_S,
+        hb_enabled,
     )
     from ma_poc.fetch.contracts import RenderMode
 
@@ -1373,6 +1374,49 @@ async def _process_property(
                 "render-on-empty escalation failed for %s: %s",
                 task.property_id,
                 _roe_exc,
+            )
+
+    # ── HB-on-shell recovery (task #46, 2026-07-24 canary finding) ──
+    # The CF-walled cohort (SecureCafe / SightMap / Knock) returns an
+    # OK-CLASSIFIED shell: the static fetch (and the patchright render-on-empty
+    # above) reach the page but the unit XHR never fires, so we still have ZERO
+    # units — and because nothing was BOT_BLOCKED, the escalator's HB rung never
+    # triggered (it only fires on BOT_BLOCKED). The 2026-07-24 250-prop canary
+    # showed HB firing only ~10x for this exact reason. Give HB an explicit shot
+    # here: it renders through a fresh cloud IP + basic stealth (clears CF by
+    # WAITING — no solve, compliant) and CAPTURES the XHR into network_log, which
+    # scrape_jugnu promotes to the Tier-1 API surface. Only when
+    # FETCH_BACKEND=hyperbrowser (default off → BrightData runs untouched); the
+    # budget guard bounds spend, and a single HB fetch is internally timeout-
+    # bounded (~40-60s), so this cannot itself cause a 600s hang.
+    if (
+        hb_enabled()
+        and not (result.get("units") or [])
+        and fetch_result.ok()
+        and (_time.monotonic() - _pp_t0) < PLAN_RENDER_BUDGET_GUARD_S
+    ):
+        try:
+            from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
+
+            hb_task = _dc_replace(task, render_mode=RenderMode.RENDER)
+            hb_fetch = await HyperbrowserProvider(mode="render").fetch(
+                hb_task, profile_for_dispatch
+            )
+            if hb_fetch.ok():
+                hb_result = await scrape_jugnu(
+                    task=hb_task,
+                    fetch_result=hb_fetch,
+                    page=None,
+                    profile=profile,
+                    csv_row=csv_row,
+                    partial_state=partial_state,
+                )
+                if len(hb_result.get("units") or []) > 0:
+                    result = hb_result
+                    fetch_result = hb_fetch
+        except Exception as _hb_exc:  # never let recovery crash a property
+            log.debug(
+                "hb-shell recovery failed for %s: %s", task.property_id, _hb_exc
             )
 
     # ── Track 2b (task #37): encore per-plan render fan-out ──
