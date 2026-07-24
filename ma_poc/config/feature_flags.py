@@ -221,6 +221,16 @@ ENABLE_REALPAGE_DIRECT_GET: Final[bool] = os.environ.get(
     "ENABLE_REALPAGE_DIRECT_GET", "false"
 ).strip().lower() in ("1", "true", "yes", "on")
 
+# Agentic router SHADOW mode (Phase 2). When on, _process_property computes what
+# the deterministic router (services/route_policy.py) WOULD decide from the fetch
+# signals and logs it to a per-run route_shadow.jsonl next to what the pipeline
+# actually did (tier/verdict/units) — OBSERVE-ONLY, the decision is never acted
+# on, zero behavior change. The divergence measures whether wiring the agent
+# (Phase 3) to act is worth it. Default OFF (pure measurement instrument).
+ENABLE_ROUTE_SHADOW: Final[bool] = os.environ.get(
+    "ENABLE_ROUTE_SHADOW", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
 # Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
 # RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
 # DOMINANT driver of the 600s per-property timeouts, because the hop loop was

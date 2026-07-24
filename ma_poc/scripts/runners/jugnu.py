@@ -1088,6 +1088,48 @@ async def _encore_plan_render_units(
         return all_units
 
 
+def _emit_route_shadow(
+    fetch_result: Any,
+    result: dict[str, Any],
+    task: Any,
+    run_dir: Any,
+    profile: Any,
+    actual_tier: Any,
+    actual_verdict: str,
+) -> None:
+    """Append one route-shadow record (agentic router Phase 2, observe-only).
+
+    Computes what the deterministic router WOULD decide from the fetch signals and
+    writes it next to what the pipeline actually did, to ``{run_dir}/route_shadow.jsonl``.
+    Never acts, never raises. The divergence between ``router_action`` and
+    ``actual_tier``/``actual_verdict`` on the failed cohort is the signal that tells
+    us whether wiring the agent to act (Phase 3) is worth it.
+    """
+    try:
+        import dataclasses as _dc
+        import json as _json
+
+        from ma_poc.services.route_policy import compute_signals, route
+
+        units = result.get("units") or []
+        sig = compute_signals(fetch_result, None, profile, units_extracted=len(units))
+        dec = route(sig, profile)
+        rec = {
+            "property_id": getattr(task, "property_id", "?"),
+            "signals": _dc.asdict(sig),
+            "router_action": dec.action,
+            "router_target": dec.target_field_group,
+            "router_rationale": dec.rationale,
+            "actual_tier": str(actual_tier) if actual_tier else None,
+            "actual_verdict": actual_verdict,
+            "actual_units": len(units),
+        }
+        with open(run_dir / "route_shadow.jsonl", "a", encoding="utf-8") as f:
+            f.write(_json.dumps(rec) + "\n")
+    except Exception:  # observe-only — must never affect a property record
+        pass
+
+
 async def _process_property(
     task: Any,
     cost_ledger: Any,
@@ -1710,6 +1752,21 @@ async def _process_property(
     meta["canonical_id"] = task.property_id
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
+
+    # Agentic router SHADOW observer (Phase 2, flag ENABLE_ROUTE_SHADOW, default
+    # off). ADDITIVE + never-fail: logs what the deterministic router WOULD decide
+    # from the fetch signals next to what the pipeline actually did — observe-only,
+    # never acted on. Same additive-block contract as _provenance below.
+    try:
+        from ma_poc.config.feature_flags import ENABLE_ROUTE_SHADOW
+
+        if ENABLE_ROUTE_SHADOW and run_dir is not None:
+            _emit_route_shadow(
+                fetch_result, result, task, run_dir, profile,
+                getattr(extract_result, "tier_used", None), verdict.verdict.value,
+            )
+    except Exception:
+        pass
 
     # Property-level provenance — surface the diagnostics we already captured
     # (confidence, adapter/PMS, tiers attempted, fetch method/latency, and a
