@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -135,6 +136,46 @@ def _push_profiles_to_gcs(profiles_dir: Path) -> None:
         )
     except Exception as exc:
         log.warning("profile GCS push failed (learning not persisted): %s", exc)
+
+
+def _profile_push_interval_s() -> float:
+    """Seconds between periodic profile flushes. ``0`` disables (end-of-run only)."""
+    try:
+        return max(0.0, float(os.environ.get("PROFILE_PUSH_INTERVAL_S", "300")))
+    except (TypeError, ValueError):
+        return 300.0
+
+
+async def _periodic_profile_push(profiles_dir: Path, interval_s: float) -> None:
+    """Flush learned profiles to GCS every *interval_s* until cancelled.
+
+    Why this exists (2026-07-25): profile learning was pushed exactly ONCE, after
+    the whole property loop. Profiles are written to the container's local
+    ``/tmp``, which dies with the task — so **task completion was the unit of
+    durability**. When all 24 tasks of the 5k canary were killed at the Cloud Run
+    7200s task timeout, ~4,471 properties' worth of learning was lost and GCS
+    still held only the previous day's 251 profiles. A task killed at 99% lost
+    100% of its learning.
+
+    Flushing periodically makes a killed task cost only the last interval. The
+    upload is watermark-based and shard-safe (see ``_push_profiles_to_gcs``), so
+    repeated calls only re-send what this shard actually modified.
+
+    The upload is BLOCKING network I/O, so it runs via ``asyncio.to_thread`` —
+    calling it inline would freeze every property coroutine sharing this loop
+    (the event-loop starvation this pipeline was just fixed for).
+
+    Never raises: cancellation is expected (the caller cancels at end of run) and
+    any push error is already swallowed by ``_push_profiles_to_gcs``.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_s)
+            await asyncio.to_thread(_push_profiles_to_gcs, profiles_dir)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # pragma: no cover — defensive only
+            log.warning("periodic profile push failed (non-fatal): %s", exc)
 
 
 def _resurface_stale_profiles(profiles_dir: Path, run_dir: Path) -> None:
@@ -801,7 +842,27 @@ async def run_jugnu(
                 schema_version,
             )
 
-    results = await pool.map(_process_one, [(t,) for t in tasks])
+    # Flush profile learning to GCS DURING the run, not only at the end. A task
+    # killed mid-run (Cloud Run task timeout, preemption, crash) otherwise loses
+    # every profile it learned — see _periodic_profile_push. Cancelled in the
+    # finally block; the authoritative end-of-run push still runs below.
+    _push_interval = _profile_push_interval_s()
+    _profile_pusher: asyncio.Task[None] | None = None
+    if _push_interval > 0 and _PROFILE_GCS_PREFIX:
+        _profile_pusher = asyncio.create_task(
+            _periodic_profile_push(_profiles_dir, _push_interval)
+        )
+        log.info(
+            "profile persistence: periodic push every %.0fs (task-death insurance)",
+            _push_interval,
+        )
+    try:
+        results = await pool.map(_process_one, [(t,) for t in tasks])
+    finally:
+        if _profile_pusher is not None:
+            _profile_pusher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await _profile_pusher
 
     # End-of-run transient retry pass (opt-in via ENABLE_END_OF_RUN_RETRY).
     # Re-drives ONLY the transient-class fetch failures through the SAME

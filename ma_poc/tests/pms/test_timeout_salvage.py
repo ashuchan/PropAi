@@ -16,6 +16,7 @@ in the 5k canary:
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from ma_poc.pms.scraper import checkpoint_partial
@@ -219,3 +220,71 @@ def test_timeout_persist_never_raises_on_bad_inputs() -> None:
         def save(self, _p): ...
 
     assert p(_Boom(), "P1", {"profile_hints": {"winning_page_url": "u"}}) is False
+
+
+# ── periodic profile push: task-death insurance ─────────────────────────────
+
+def test_profile_push_interval_default_and_override(monkeypatch) -> None:
+    from ma_poc.scripts.runners.jugnu import _profile_push_interval_s
+
+    monkeypatch.delenv("PROFILE_PUSH_INTERVAL_S", raising=False)
+    assert _profile_push_interval_s() == 300.0          # sane default
+    monkeypatch.setenv("PROFILE_PUSH_INTERVAL_S", "60")
+    assert _profile_push_interval_s() == 60.0
+    monkeypatch.setenv("PROFILE_PUSH_INTERVAL_S", "0")   # 0 disables
+    assert _profile_push_interval_s() == 0.0
+    monkeypatch.setenv("PROFILE_PUSH_INTERVAL_S", "junk")
+    assert _profile_push_interval_s() == 300.0           # never raises
+
+
+async def test_periodic_push_flushes_repeatedly_and_offloads(monkeypatch) -> None:
+    """The pusher must fire more than once and never run on the event loop.
+
+    Running the blocking upload inline would freeze every property coroutine
+    sharing the loop — the exact starvation this pipeline was just fixed for.
+    """
+    import asyncio as _a
+    import threading
+
+    from ma_poc.scripts.runners import jugnu as J
+
+    loop_thread = threading.get_ident()
+    calls: list[int] = []
+
+    def _fake_push(_dir):
+        calls.append(threading.get_ident())
+
+    monkeypatch.setattr(J, "_push_profiles_to_gcs", _fake_push)
+
+    task = _a.create_task(J._periodic_profile_push(None, 0.02))
+    await _a.sleep(0.13)
+    task.cancel()
+    with contextlib.suppress(_a.CancelledError):
+        await task
+
+    assert len(calls) >= 2, f"expected repeated flushes, got {len(calls)}"
+    assert all(t != loop_thread for t in calls), "upload ran on the event loop"
+
+
+async def test_periodic_push_survives_a_failing_upload(monkeypatch) -> None:
+    """One bad flush must not kill the pusher — learning keeps being saved."""
+    import asyncio as _a
+
+    from ma_poc.scripts.runners import jugnu as J
+
+    n = {"i": 0}
+
+    def _flaky(_dir):
+        n["i"] += 1
+        if n["i"] == 1:
+            raise RuntimeError("GCS blip")
+
+    monkeypatch.setattr(J, "_push_profiles_to_gcs", _flaky)
+
+    task = _a.create_task(J._periodic_profile_push(None, 0.02))
+    await _a.sleep(0.13)
+    task.cancel()
+    with contextlib.suppress(_a.CancelledError):
+        await task
+
+    assert n["i"] >= 2, "pusher died on the first failed upload"
