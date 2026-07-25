@@ -1270,9 +1270,20 @@ async def scrape(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
 
+        def _rows_are_plan_level(units: list[dict[str, Any]]) -> bool:
+            """True when NOT ONE row carries a real per-apartment identity.
+
+            Uses the same anchor predicate identity itself resolves against,
+            so "plan-level" means exactly what it means everywhere else.
+            """
+            from ma_poc.core.identity import unit_has_real_anchor
+
+            return bool(units) and not any(unit_has_real_anchor(u) for u in units)
+
         def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
-            / ``"no_area"`` / None. None means the adapter is fine."""
+            / ``"no_area"`` / ``"plan_level_only"`` / None. None means the
+            adapter is fine."""
             if is_empty_exit(res.tier_used) and not res.units:
                 return "empty_exit"
             if res.units:
@@ -1282,6 +1293,27 @@ async def scrape(
                     return "no_rent"
                 if not _retry_area_signal(res.units):
                     return "no_area"
+                # 2026-07-25 — PLAN-LEVEL IS NOT "FINE".
+                #
+                # The four checks above all pass for a plan-level extraction:
+                # it HAS units (floor-plan rows), they clear the dimension
+                # gate, and they carry rent and area. So the trigger returned
+                # None and the multi-candidate retry — which is enabled by
+                # default and was sitting right here — never fired for a
+                # single one of the 1,127 plan-level properties in the
+                # 2026-07-25 run. The pipeline considered them successful.
+                #
+                # They are not. A live 42-property probe with two-way
+                # adversarial refutation found 39 recoverable and only 3 true
+                # ceilings: the unit data is published, we just stopped at the
+                # first adapter that returned something.
+                #
+                # This is where "try the other signals we detected" pays off,
+                # because the detector usually DID see another candidate — 21
+                # onesite-detected properties in that run were ultimately
+                # served by SightMap.
+                if _rows_are_plan_level(res.units):
+                    return "plan_level_only"
             return None
 
         def _retry_win_condition(res: AdapterResult) -> bool:
@@ -1292,6 +1324,21 @@ async def scrape(
                 and _retry_quality_gate(res.units)
                 and _retry_rent_signal(res.units)
             )
+
+        def _retry_win_condition_for(res: AdapterResult, trigger: str | None) -> bool:
+            """Win condition, tightened for the plan_level_only trigger.
+
+            Swapping one plan-level result for another plan-level result is
+            not a win — it changes the tier label without adding a single
+            apartment, and it would discard a baseline that may well be the
+            better of the two. When plan-level is what triggered the retry,
+            the replacement must be genuinely unit-level.
+            """
+            if not _retry_win_condition(res):
+                return False
+            if trigger == "plan_level_only":
+                return not _rows_are_plan_level(res.units)
+            return True
 
         # Preserve the baseline (initial-adapter) result so plan-level
         # data isn't lost if all retries fail. Only relevant when the
@@ -1371,7 +1418,11 @@ async def scrape(
                 break
 
             fallback_chain.append(f"retry:{_new_adapter_name}")
-            if _retry_win_condition(_new_result):
+            # Trigger-aware: a plan_level_only retry must come back genuinely
+            # unit-level to be promoted, otherwise we would swap one
+            # plan-level result for another and discard a baseline that may
+            # be the better of the two.
+            if _retry_win_condition_for(_new_result, _initial_trigger_reason):
                 # WIN — promote
                 _retry_emit(
                     _RetryEventKind.RETRY_SUCCESS,
