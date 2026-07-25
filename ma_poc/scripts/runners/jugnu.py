@@ -2163,6 +2163,14 @@ def _provenance_block(
             "render_mode": getattr(rm, "value", rm),
             "proxied": bool(getattr(fetch_result, "proxy_label", None)),
             "page_load_ms": getattr(fetch_result, "elapsed_ms", None),
+            # 2026-07-25 RCA: "fetch outcome: TRANSIENT" was undecomposable from
+            # the run artifacts — diagnosing a 336-property regression required
+            # reconstructing error classes from Cloud Logging. Persist the
+            # signature, HTTP status and body size so the SAME question is
+            # answerable offline from properties.json next time.
+            "error_signature": getattr(fetch_result, "error_signature", None),
+            "status_code": getattr(fetch_result, "status_code", None),
+            "body_bytes": len(getattr(fetch_result, "body", None) or ""),
         },
         "data_quality": {
             "by_tier_family": by_family,

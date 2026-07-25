@@ -229,7 +229,20 @@ class Fetcher:
         from .host_throttle import registrable_domain as _rl_domain
         rl_host = _rl_domain(task.url) or host
         identity = self._identities.pick(sticky_key=task.property_id)
-        proxy = self._proxy_pool.pick(sticky_key=task.property_id)
+        # Only route through the datacentre proxy pool when that tier is
+        # actually enabled. 2026-07-25 RCA: ENABLE_DC_PROXY_TIER was false, yet
+        # every fetch — RENDER included — was still assigned a pool proxy. When
+        # the pool's single entry started black-holing TCP connects, Chromium
+        # failed EVERY navigation (0 usable bodies out of 10,677 fetch attempts
+        # across a 5k run) and the whole run silently degraded to static-HTML
+        # fallback only. A disabled tier must not be able to take down rendering.
+        from ma_poc.config.feature_flags import ENABLE_DC_PROXY_TIER
+
+        proxy = (
+            self._proxy_pool.pick(sticky_key=task.property_id)
+            if ENABLE_DC_PROXY_TIER
+            else None
+        )
 
         # 2026-05-26 (blockwall v2 Action 3): derive a path-scope clearance
         # hint URL from profile.navigation.winning_page_url. _do_render
@@ -420,6 +433,17 @@ class Fetcher:
             if result.outcome == FetchOutcome.BOT_BLOCKED:
                 emit(EventKind.FETCH_BOT_BLOCKED, task.property_id, url=task.url, attempt=attempt)
 
+            # Degrade this proxy's health on ANY failed proxied attempt.
+            # 2026-07-25 RCA: mark_failure used to be reachable ONLY inside the
+            # `decision.rotate_identity` branch below, and TRANSIENT never sets
+            # rotate_identity — so a proxy that black-holes every connection
+            # stayed pinned at health=1.0 forever and kept being picked. One dead
+            # IP in PROXY_POOL_URLS became an unbounded, silent, run-wide outage
+            # (0 usable rendered bodies across a whole 5k run). Health decay is
+            # what lets `pick()` quarantine it at health<0.25.
+            if proxy:
+                self._proxy_pool.mark_failure(proxy, result.outcome.value)
+
             # 7. Retry decision
             retry_after = result.headers.get("retry-after")
             decision = self._retry.decide(result.outcome, attempt, retry_after)
@@ -450,6 +474,29 @@ class Fetcher:
                 )
                 break
 
+            # A proxied RENDER that came back TRANSIENT with an empty body is
+            # the dead-proxy signature (Chromium never reached the origin).
+            # Retry the SAME render DIRECT before burning further attempts or
+            # falling through to the static-HTML rescue — 2026-07-25 RCA: this
+            # alone would have recovered the 336-property regression, where
+            # 95.6% of the cohort's attempts were TRANSIENT with body_bytes=0
+            # through one black-holing pool IP.
+            if (
+                proxy
+                and result.outcome == FetchOutcome.TRANSIENT
+                and task.render_mode == RenderMode.RENDER
+                and not (result.body or "")
+            ):
+                emit(
+                    EventKind.FETCH_RETRY,
+                    task.property_id,
+                    wait_ms=0,
+                    reason="PROXIED_RENDER_EMPTY_RETRY_DIRECT",
+                    error_signature=result.error_signature,
+                )
+                proxy = None
+                continue
+
             if not decision.should_retry:
                 break
 
@@ -460,8 +507,8 @@ class Fetcher:
             if decision.rotate_identity:
                 self._identities.rotate(task.property_id)
                 identity = self._identities.pick(sticky_key=task.property_id)
-                if proxy:
-                    self._proxy_pool.mark_failure(proxy, result.outcome.value)
+                # (health already degraded above for every failed proxied
+                # attempt — don't double-penalise here.)
                 proxy = self._proxy_pool.pick(sticky_key=None)  # Fresh proxy
                 emit(EventKind.FETCH_ROTATED_IDENTITY, task.property_id)
             elif (
@@ -560,8 +607,14 @@ class Fetcher:
             # Force-disable proxy on this call regardless of PROBE_PROXY_URL.
             # probe_get is BLOCKING curl_cffi — off-load it, or it freezes the
             # whole shard's event loop (all pool workers) for up to `timeout`.
+            # verify=False to match the scraper-level salvage (scraper.py
+            # ~3973). 2026-07-25 RCA: with verify=True this rung threw away 30+
+            # recoverable properties on "unable to get local issuer certificate"
+            # / cert-name-mismatch — hosts curl fetches fine with verification
+            # off. This is a rescue path for a page we already failed to render;
+            # a strict chain check here only costs coverage.
             r = await asyncio.to_thread(
-                probe_get, task.url, timeout=20, proxies={}, verify=True
+                probe_get, task.url, timeout=20, proxies={}, verify=False
             )
         except Exception as exc:
             log.warning(
@@ -575,9 +628,11 @@ class Fetcher:
         # If direct didn't bypass AND a residential proxy is configured,
         # try the proxied path as a second attempt (handles Yardi/CF
         # tenancy that blocks GCP IPs).
-        if (status != 200 or len(body) < 1024) and os.environ.get(
-            "PROBE_PROXY_URL", ""
-        ).strip():
+        if (
+            (status != 200 or len(body) < 1024)
+            and os.environ.get("PROBE_PROXY_URL", "").strip()
+            and not _probe_proxy_circuit_open()
+        ):
             try:
                 r2 = await asyncio.to_thread(probe_get, task.url, timeout=20)
             except Exception as exc:
@@ -585,6 +640,7 @@ class Fetcher:
                     "curl_cffi proxied fallback fetch failed for %s: %s",
                     task.property_id, exc,
                 )
+                _probe_proxy_note_failure(str(exc))
                 r2 = None
             if r2 is not None:
                 status2 = getattr(r2, "status_code", 0)
@@ -599,6 +655,13 @@ class Fetcher:
         # but flagged by patchright); honest content is always larger.
         # We accept 200 OK with reasonable body size.
         if r is None or status != 200 or len(body) < 1024:
+            # Log WHY the rescue declined. 2026-07-25 RCA: this exit was silent,
+            # so an in-run salvage yield of 11% against 53% for the identical
+            # call run by hand was undiagnosable from the artifacts alone.
+            log.info(
+                "curl_cffi rescue declined for %s: status=%s body_bytes=%d proxied=%s",
+                task.property_id, status, len(body), used_proxy,
+            )
             return None
 
         emit(
@@ -1651,6 +1714,67 @@ async def _drive_cta_hop(page: Any) -> None:
 def _now_ms() -> int:
     """Current time in milliseconds since epoch."""
     return int(time.time() * 1000)
+
+
+# ── PROBE_PROXY_URL circuit breaker ─────────────────────────────────────────
+# 2026-07-25 RCA: the residential probe proxy answered CONNECT with 502 x134 in
+# a single 5k run. Each attempt burned ~20s of a property's budget for a rung
+# that was structurally dead, and nothing gave up. Once N consecutive tunnel
+# failures are seen, stop trying for a cooldown window. Process-local by design:
+# each task discovers the outage independently within N attempts, and no shared
+# state is needed.
+_PROBE_PROXY_FAILS: int = 0
+_PROBE_PROXY_OPEN_UNTIL: float = 0.0
+_PROBE_PROXY_TUNNEL_MARKERS: tuple[str, ...] = (
+    "connect tunnel failed", "502", "tunnel", "proxy", "could not resolve proxy",
+)
+
+
+def _probe_proxy_threshold() -> int:
+    try:
+        return max(1, int(os.environ.get("PROBE_PROXY_CIRCUIT_FAILS", "8")))
+    except (TypeError, ValueError):
+        return 8
+
+
+def _probe_proxy_cooldown_s() -> float:
+    try:
+        return max(0.0, float(os.environ.get("PROBE_PROXY_CIRCUIT_COOLDOWN_S", "600")))
+    except (TypeError, ValueError):
+        return 600.0
+
+
+def _probe_proxy_circuit_open() -> bool:
+    """``True`` while the proxied rescue rung is short-circuited."""
+    return time.monotonic() < _PROBE_PROXY_OPEN_UNTIL
+
+
+def _probe_proxy_note_failure(err: str) -> None:
+    """Record a proxied-rescue failure; trip the breaker on repeated tunnel errors.
+
+    Only tunnel/transport-shaped errors count — a 403 from the target site is
+    the proxy working correctly and must not open the circuit.
+    """
+    global _PROBE_PROXY_FAILS, _PROBE_PROXY_OPEN_UNTIL
+    low = (err or "").lower()
+    if not any(m in low for m in _PROBE_PROXY_TUNNEL_MARKERS):
+        return
+    _PROBE_PROXY_FAILS += 1
+    if _PROBE_PROXY_FAILS >= _probe_proxy_threshold():
+        _PROBE_PROXY_OPEN_UNTIL = time.monotonic() + _probe_proxy_cooldown_s()
+        _PROBE_PROXY_FAILS = 0
+        log.warning(
+            "PROBE_PROXY_URL circuit OPEN for %.0fs after %d consecutive tunnel "
+            "failures — skipping the proxied rescue rung until it closes",
+            _probe_proxy_cooldown_s(), _probe_proxy_threshold(),
+        )
+
+
+def _probe_proxy_reset_circuit() -> None:
+    """Test hook: clear breaker state."""
+    global _PROBE_PROXY_FAILS, _PROBE_PROXY_OPEN_UNTIL
+    _PROBE_PROXY_FAILS = 0
+    _PROBE_PROXY_OPEN_UNTIL = 0.0
 
 
 def _redact_proxy(proxy: str | None) -> str | None:

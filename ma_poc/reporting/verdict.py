@@ -117,6 +117,27 @@ _SUCCESS_VERDICTS: frozenset[str] = frozenset(
 )
 
 
+def _has_any_extracted_units(extract_result: Any) -> bool:
+    """``True`` when the extraction cascade produced at least one record.
+
+    Used to stop a failed ENTRY fetch from vetoing data the cascade actually
+    recovered (salvage checkpoint, link-hop sub-page, plan-text tier). Tolerates
+    both the dataclass shape (``.records``) and the dict shape
+    (``{"records": [...]}`` / ``{"units": [...]}``). Never raises.
+    """
+    if extract_result is None:
+        return False
+    try:
+        records = getattr(extract_result, "records", None)
+        if records is None and isinstance(extract_result, dict):
+            records = extract_result.get("records")
+            if records is None:
+                records = extract_result.get("units")
+        return bool(records)
+    except Exception:  # pragma: no cover — defensive only
+        return False
+
+
 def verdict_is_success(verdict: Verdict | str | None) -> bool:
     """``True`` when *verdict* counts toward success-rate numerator.
 
@@ -221,12 +242,21 @@ def compute(
             "fetch",
         )
 
+    # A non-OK fetch outcome is only DISPOSITIVE when nothing was extracted.
+    # 2026-07-25 RCA: this check used to fire unconditionally and vetoed units
+    # the cascade had already produced — a property whose base fetch failed but
+    # whose salvage/link-hop path still returned priced units was stamped
+    # FAILED_UNREACHABLE and its data thrown away. Measured on the 5k canary:
+    # 10 properties / 68 units / 63 with rent were being discarded this way,
+    # and another 20 were mislabelled "unreachable" despite a cascade that ran.
+    # Extraction succeeding is stronger evidence than the entry fetch failing.
     if fetch_outcome and fetch_outcome not in ("OK", "NOT_MODIFIED"):
-        return VerdictResult(
-            Verdict.FAILED_UNREACHABLE,
-            f"fetch outcome: {fetch_outcome}",
-            "fetch",
-        )
+        if not _has_any_extracted_units(extract_result):
+            return VerdictResult(
+                Verdict.FAILED_UNREACHABLE,
+                f"fetch outcome: {fetch_outcome}",
+                "fetch",
+            )
 
     # Check extract result
     if extract_result is not None:
