@@ -204,3 +204,24 @@ def test_gate_and_parser_agree_end_to_end() -> None:
     rows = parse_entrata_pp_unit_cards(PLAN_PAGE, "https://x.test/plan")
     assert len(rows) == 3
     assert all(r["market_rent_low"] for r in rows), "gate admitted it; rents must parse"
+
+
+def test_gate_does_not_match_jonah_digital_unit_cards() -> None:
+    """`unit-card` as a bare SUBSTRING also matches Jonah Digital's
+    ``jd-fp-unit-card``, which would hand a foreign vendor's page to the
+    Entrata parser for a guaranteed-empty parse.
+
+    Live: livethewatts.com/floorplans/ returns 235KB containing 46
+    ``jd-fp-unit-card`` markers and ZERO real Entrata elements
+    (soup.select('.unit-card') == 0). The property is Jonah Digital, not
+    Entrata.
+    """
+    from ma_poc.pms.adapters.entrata import _pp_plan_page_has_units
+
+    jonah = (
+        '<div data-jd-fp-selector="map-embed-unit-list" class="jd-fp-unit-card-container">'
+        '<div class="jd-fp-unit-card jd-fp-unit-card--preload">…</div></div>'
+    )
+    assert _pp_plan_page_has_units(jonah) is False
+    # …while a genuine Entrata card still admits.
+    assert _pp_plan_page_has_units('<div class="unit-card container-shape">…</div>') is True

@@ -1068,7 +1068,14 @@ def _pp_plan_url_match(url: str) -> tuple[str, str] | None:
 #:   U1  ``.unit-card``   — the card template
 #:   U2  ``.option-row`` inside ``.fp-units-table`` — the Aria/Grand Oaks
 #:       tabular template, handled by ``_parse_pp_option_rows``
-_PP_PLAN_UNIT_MARKERS: tuple[str, ...] = ("unit-card", "fp-units-table", "option-row")
+#: Matched on a CLASS BOUNDARY, not as a bare substring. "unit-card" as a
+#: substring also matches Jonah Digital's ``jd-fp-unit-card`` (live:
+#: livethewatts.com/floorplans/ has 46 of them and ZERO Entrata elements),
+#: which would hand a foreign vendor's page to the Entrata parser for a
+#: guaranteed-empty parse.
+_PP_PLAN_UNIT_MARKERS_RE = re.compile(
+    r"(?<![-\w])(?:unit-card|fp-units-table|option-row)(?![-\w])"
+)
 
 
 def _pp_plan_page_has_units(plan_html: str) -> bool:
@@ -1088,7 +1095,7 @@ def _pp_plan_page_has_units(plan_html: str) -> bool:
     """
     if not plan_html:
         return False
-    return any(marker in plan_html for marker in _PP_PLAN_UNIT_MARKERS)
+    return bool(_PP_PLAN_UNIT_MARKERS_RE.search(plan_html))
 
 
 def _pp_extract_card_uid(card: Any) -> str:
