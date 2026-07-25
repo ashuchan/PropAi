@@ -1236,6 +1236,18 @@ def parse_api_responses(
                 "Number", "number", "customlink", "customLink", "CustomLink",
                 "id",
             )
+            # As-displayed unit label (capture-only). NARROW on purpose: only
+            # unit-scoped display keys. "label"/"name"/"display_name"/"title"
+            # are deliberately EXCLUDED — on SightMap and ResMan those are
+            # PLAN-level names, and mapping them here would write a floor-plan
+            # name into a unit-label column. "label" already appears in the
+            # unit_number chain above and stays there; this is a parallel
+            # capture that changes no existing unit_number resolution.
+            unit_disp = _get(item,
+                "unit_name", "unitName", "unit_label", "unitLabel",
+                "display_unit_number", "displayUnitNumber",
+                "unit_display_name", "unitDisplayName",
+            )
             floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
             building = _get(item, "building", "buildingName", "BuildingName", "building_name")
             plan_type = _get(item, "floorPlanType", "type", "bedBath", "BedBath")
@@ -1281,6 +1293,7 @@ def parse_api_responses(
                 "bathrooms": baths,
                 "sqft": sqft_display,
                 "unit_number": unit_num,
+                "unit_name": unit_disp,
                 "floor": floor_num,
                 "building": building,
                 "rent_range": rent_display,

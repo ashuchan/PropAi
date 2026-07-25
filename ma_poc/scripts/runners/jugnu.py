@@ -2999,6 +2999,15 @@ def _format_v2_unit(
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # As-displayed operator label. Kept in lock-step with
+        # core/schema_v2.py — this fork is the one production actually runs,
+        # and it is where task #36's is_floor_plan_level flag was lost for
+        # 4,024 rows by being added to the OTHER copy only.
+        "unit_name": (
+            str(unit.get("unit_name")).strip() or None
+            if unit.get("unit_name") not in (None, "", "null")
+            else None
+        ),
         # 2026-07-25: #36's placeholder marker was added to
         # ``ma_poc/core/schema_v2.py:_format_v2_unit`` only — but THIS is the
         # formatter the production Jugnu runner uses, so the flag never

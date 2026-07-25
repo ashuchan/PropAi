@@ -306,6 +306,15 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # As-displayed operator label ("HOME 302", "APT PH14", an AppFolio
+        # street address). Capture-only and frequently NULL — see
+        # _parsing.make_unit_dict for why it is never composed. MUST stay in
+        # lock-step with the forked copy in scripts/runners/jugnu.py.
+        "unit_name": (
+            str(unit.get("unit_name")).strip() or None
+            if unit.get("unit_name") not in (None, "", "null")
+            else None
+        ),
         # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.

@@ -269,6 +269,11 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 bathrooms=str(baths) if baths is not None else "",
                 sqft=sqft,
                 unit_number=str(u.get("unit_number") or u.get("label") or ""),
+                # As-displayed label, e.g. "HOME 302" / "APT PH14". Distinct
+                # from unit_number on 221/221 fixture units; the prefix is
+                # operator-specific, which is why it is captured and never
+                # reconstructed. Empty when SightMap omits it.
+                unit_name=str(u.get("display_unit_number") or ""),
                 floor=str(u.get("floor_id") or ""),
                 building=str(u.get("building") or ""),
                 rent_range=f"${price_i:,}" if price_i else str(u.get("display_price") or ""),

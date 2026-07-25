@@ -870,6 +870,7 @@ def make_unit_dict(
     bathrooms: str = "",
     sqft: str = "",
     unit_number: str = "",
+    unit_name: str = "",
     floor: str = "",
     building: str = "",
     rent_range: str = "",
@@ -1036,6 +1037,21 @@ def make_unit_dict(
         "bathrooms": bathrooms,
         "sqft": sqft,
         "unit_number": unit_number,
+        # 2026-07-25: the operator's as-displayed unit label, CAPTURE-ONLY.
+        # SightMap publishes "HOME 302" / "APT PH14", AppFolio the listing
+        # address — always distinct from the clean join key in unit_number
+        # (221/221 fixture units differ). Until now make_unit_dict had no
+        # parameter to hold one, so every adapter discarded it.
+        #
+        # NEVER composed. The prefix is operator-specific (HOME/APT/Unit vary
+        # by site), and for sites that render "Unit 02-208 - Cape Poge" the
+        # combined string does NOT exist in the payload — the browser glues it
+        # from two fields at display time (verified: centennialgardensapts.com
+        # serves "02-208" and "Cape Poge" separately, the literal "Unit 02-208"
+        # zero times). Composing would fabricate a label the operator never
+        # published, so this stays empty when no single display string exists
+        # (~70% of units). Build display strings in the presentation layer.
+        "unit_name": unit_name,
         "floor": floor,
         "building": building,
         "rent_range": rent_range,
