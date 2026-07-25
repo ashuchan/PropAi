@@ -30,7 +30,8 @@ _PLAN_RE = re.compile(
     re.I,
 )
 _SQFT_RE = re.compile(r"(\d{2,4})\s*(?:sq\.?\s?ft\.?|sqft|square\s?f(?:ee)?t|ft\s?[²³⁲-⁹²2])", re.I)
-_RENT_RE = re.compile(r"(?:from|starting\s*at)\s*\$\s?([\d,]{3,})", re.I)
+_RENT_RE = re.compile(r"(?:from|starting\s*at|rent:?)\s*\$\s?([\d,]{3,})", re.I)
+_RANGE_RE = re.compile(r"\$\s?([\d,]{3,})\s*[-–—]\s*\$?\s?[\d,]{3,}", re.I)
 _BARE_RENT_RE = re.compile(r"\$\s?([\d,]{3,})", re.I)
 # lines that carry a $ but are FEES, not rent — never treat as a plan
 _FEE_RE = re.compile(
@@ -143,27 +144,45 @@ def parse_marketing_plan_text(html: str, url: str = "") -> list[dict[str, Any]]:
             rec["rent_range"] = f"${rent:,}"
         plans.append(rec)
 
+    # v1.1 windowed association. A plan "anchor" is a pure plan-name line (form 1:
+    # "Studio") OR a combined bed+sqft line (form 2: "1 Bed | 1 Bath | 623 sqft").
+    # Each anchor owns a WINDOW up to the next anchor (capped), within which we
+    # find its sqft (if not on the anchor) and its rent. This recovers rent
+    # published on SEPARATE lines ("Rent: $815", "Starting at $1420", "$X-$Y")
+    # rather than only the "sqft | from $X" adjacency of v1 — 4/5 measured firings
+    # publish rent that way. Window is bounded (next anchor + cap 6) and
+    # fee-filtered so it can't steal the next plan's rent or a fee amount.
     n = len(lines)
-    for i, ln in enumerate(lines):
-        # a plan-name line → look at the next 1-2 lines for sqft + rent
+
+    def _is_anchor(ln: str) -> bool:
         if _PLAN_RE.match(ln):
-            for j in (i + 1, i + 2):
-                if j >= n:
-                    break
-                nxt = lines[j]
-                sm = _SQFT_RE.search(nxt)
-                if not sm:
-                    continue
-                if _FEE_RE.search(nxt):
-                    continue
-                rm = _RENT_RE.search(nxt) or _BARE_RENT_RE.search(nxt)
-                rent = _to_int(rm.group(1)) if rm else None
-                _emit(ln, _to_int(sm.group(1)), rent)
+            return True
+        return bool(_SQFT_RE.search(ln) and _BED_RE.search(ln) and not _FEE_RE.search(ln))
+
+    anchors = [i for i in range(n) if _is_anchor(lines[i])]
+    for k, i in enumerate(anchors):
+        name = lines[i]
+        end = anchors[k + 1] if k + 1 < len(anchors) else n
+        end = min(end, i + 6)  # cap so a distant rent isn't mis-attributed
+        sqft: int | None = None
+        rent: int | None = None
+        sm0 = _SQFT_RE.search(name)  # form-2 anchor carries sqft on its own line
+        if sm0 and not _FEE_RE.search(name):
+            sqft = _to_int(sm0.group(1))
+        for w in lines[i:end]:
+            if _FEE_RE.search(w):
+                continue
+            if sqft is None:
+                sm = _SQFT_RE.search(w)
+                if sm:
+                    sqft = _to_int(sm.group(1))
+            if rent is None:
+                rm = _RENT_RE.search(w) or _RANGE_RE.search(w) or _BARE_RENT_RE.search(w)
+                if rm:
+                    rent = _to_int(rm.group(1))
+            if sqft and rent:
                 break
-        # a single line carrying plan-name + sqft + rent together
-        elif _SQFT_RE.search(ln) and _BED_RE.search(ln) and not _FEE_RE.search(ln):
-            sm = _SQFT_RE.search(ln)
-            rm = _RENT_RE.search(ln) or _BARE_RENT_RE.search(ln)
-            _emit(ln, _to_int(sm.group(1)), _to_int(rm.group(1)) if rm else None)
+        if sqft is not None:  # require sqft — avoids plan-name-only / prose firings
+            _emit(name, sqft, rent)
 
     return plans

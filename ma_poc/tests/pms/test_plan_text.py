@@ -74,6 +74,30 @@ def test_prose_marketing_is_not_a_plan() -> None:
     assert parse_marketing_plan_text(prose2, "") == []
 
 
+def test_v11_rent_on_separate_line_captured() -> None:
+    # v1.1: rent published on a SEPARATE line (Rent:/Starting at) inside the
+    # plan's window is now attached (measured lift 0/6 → 5/6 firings-with-rent).
+    html = (
+        "<p>1 Bed</p><p>636 sq ft</p><p>Rent: $815</p>"
+        "<p>2 Bed</p><p>844 sq ft</p><p>Starting at $945</p>"
+    )
+    by = {p["_floor_plan"]: p for p in parse_marketing_plan_text(html, "")}
+    assert by["1 Bed"]["area"] == 636 and by["1 Bed"]["market_rent_low"] == 815
+    assert by["2 Bed"]["area"] == 844 and by["2 Bed"]["market_rent_low"] == 945
+
+
+def test_v11_does_not_steal_fee_or_next_plan_rent() -> None:
+    # window bounded at the next anchor + fee-filtered: a fee $ is never taken as
+    # rent, and a plan can't steal the next plan's rent.
+    html = (
+        "<p>1 Bed</p><p>600 sq ft</p><p>Application Fee: $50</p>"
+        "<p>2 Bed</p><p>800 sq ft</p><p>Rent: $1200</p>"
+    )
+    by = {p["_floor_plan"]: p for p in parse_marketing_plan_text(html, "")}
+    assert by["1 Bed"]["area"] == 600 and by["1 Bed"].get("market_rent_low") is None
+    assert by["2 Bed"]["market_rent_low"] == 1200
+
+
 def test_empty_and_garbage_never_raise() -> None:
     assert parse_marketing_plan_text("", "") == []
     assert parse_marketing_plan_text("<html>no plans here, just $5 coffee</html>", "") == []
