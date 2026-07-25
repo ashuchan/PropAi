@@ -2318,7 +2318,83 @@ async def scrape(
 # ---------------------------------------------------------------------------
 
 
-_RENT_SIGNAL_RE = re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", re.IGNORECASE)
+#: 2026-07-25 — this pattern USED TO BE
+#: ``\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?`` which required 3-4
+#: digits immediately after the "$" and therefore matched NONE of the
+#: comma-formatted amounts that most US rents are written in: "$1,950",
+#: "$2,623", "$1,110.00" all failed, while "$950" and "$1950" passed.
+#:
+#: That is not cosmetic. ``rent_signal_count`` is the CARDINAL GUARD in
+#: ``reporting.publish_ceiling``: zero rent tokens + an empty cascade + an
+#: operator signal is graded CONFIRMED_NO_DATA ("the operator publishes
+#: nothing"), which is gold-eligible. A page listing "$1,950/month" on every
+#: plan therefore counted ZERO rent tokens and could be certified as a
+#: publish ceiling — the exact false-gold the guard exists to prevent, and
+#: the failure direction that HIDES extraction bugs instead of surfacing them.
+#:
+#: Now: 1-3 digits with comma groups, or a bare 3-5 digit amount, with an
+#: optional cents suffix. Anchored to a currency symbol and a >=3-digit
+#: magnitude so "$50" fees and bare years do not qualify.
+_RENT_SIGNAL_RE = re.compile(
+    # ``\s{0,2}`` not ``\s?``: WPResidence and several template CMSes render
+    # "starting at: $  760" with padding between the sign and the digits
+    # (princetonmanagement.com, live-probed 2026-07-25). Bounded at 2 so a
+    # bare "$" followed by unrelated markup can't reach a distant number.
+    r"\$\s{0,2}(?:\d{1,3}(?:,\d{3})+|\d{3,5})(?:\.\d{2})?(?:/mo|\s*/\s*month)?",
+    re.IGNORECASE,
+)
+#: Words that mark a "$" amount as a CONCESSION / FEE / DEPOSIT rather than an
+#: asking rent — "$500 OFF", "$220 IN WAIVED LEASING FEES", "$350 deposit".
+_NON_RENT_MONEY_RE = re.compile(
+    r"\b(off|waiv\w*|fee|fees|deposit|special|credit|discount|bonus|"
+    r"gift|rebate|admin|application|amenity|pet|reduced\s+by|save)\b",
+    re.IGNORECASE,
+)
+#: How far either side of a "$" token to look for a concession word.
+_NON_RENT_WINDOW = 60
+
+
+def _count_rent_signals(page_html: str) -> int:
+    """Count "$NNN" tokens that plausibly represent an ASKING RENT.
+
+    2026-07-25: ``rent_signal_count`` gates ``reporting.publish_ceiling`` — a
+    page with rent tokens but zero extracted units is graded EXTRACTION_MISS
+    ("our bug"), while zero tokens can be graded a genuine publish ceiling. A
+    naive "$" count therefore turns a promo banner into an accusation against
+    the extractor: measured on the 182-property EXTRACTION_MISS cohort, 139
+    (76%) sat at only 1-4 tokens, so a single "$500 OFF" was decisive, and
+    hand-checking found real false positives on that basis.
+
+    Discards a token when a concession/fee word appears within
+    ``_NON_RENT_WINDOW`` characters either side. Deliberately conservative: it
+    only ever REMOVES tokens, so it can turn a false EXTRACTION_MISS into a
+    ceiling, never the reverse (which would hide a real extraction bug).
+    """
+    if not page_html:
+        return 0
+    n = 0
+    for m in _RENT_SIGNAL_RE.finditer(page_html):
+        lo = max(0, m.start() - _NON_RENT_WINDOW)
+        hi = min(len(page_html), m.end() + _NON_RENT_WINDOW)
+        # Clamp the window to the token's OWN text node. Without this, dense
+        # markup lets a neighbouring element poison a real rent:
+        # "<p>Studio $1,295/mo</p><p>Save $500 today</p>" put "Save" 16 chars
+        # from "$1,295" and discarded a genuine asking rent.
+        before = page_html[lo:m.start()]
+        after = page_html[m.end():hi]
+        cut = max(before.rfind(">"), before.rfind("<"))
+        if cut != -1:
+            before = before[cut + 1:]
+        cut = min(
+            (i for i in (after.find("<"), after.find(">")) if i != -1),
+            default=-1,
+        )
+        if cut != -1:
+            after = after[:cut]
+        if _NON_RENT_MONEY_RE.search(before + m.group(0) + after):
+            continue
+        n += 1
+    return n
 _FRAMEWORK_HINTS: tuple[tuple[str, str], ...] = (
     ("__NEXT_DATA__", "next"),
     ("__NUXT__", "nuxt"),
@@ -2363,7 +2439,7 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
             break
 
     frameworks = [label for needle, label in _FRAMEWORK_HINTS if needle in page_html]
-    rent_signals = len(_RENT_SIGNAL_RE.findall(page_html))
+    rent_signals = _count_rent_signals(page_html)
 
     # SPA heuristic: lots of script, little text, no JSON-LD, rent signals nil.
     spa_score = 0.0

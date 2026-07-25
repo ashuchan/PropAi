@@ -1796,6 +1796,44 @@ async def _harvest_view_unit_spaces(
 # RentCafe / etc. on the retry.
 _TIER_BASE = "TIER_1_API_ENTRATA"
 _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
+#: 2026-07-25: the page never LOADED — a bot-management interstitial was
+#: served instead of the site. Distinct from _NO_RESPONSE ("page loaded, no
+#: Entrata XHR seen"), which is an extraction signal. Conflating the two cost
+#: a whole diagnosis cycle: 55 of 60 properties in the ENTRATA_NO_RESPONSE
+#: cohort returned HTTP 403 + a Cloudflare challenge on static fetch, so the
+#: roster was never reachable — yet they read as 60 adapter bugs.
+_TIER_FETCH_BLOCKED = f"{_TIER_BASE}_FETCH_BLOCKED"
+
+#: Cloudflare / bot-management interstitial markers. A challenge page is small
+#: and carries none of the site's own content, so size + marker together are a
+#: reliable discriminator against a genuinely thin marketing shell.
+_CHALLENGE_MARKERS: tuple[str, ...] = (
+    "just a moment",
+    "cdn-cgi/challenge-platform",
+    "cf-browser-verification",
+    "_cf_chl_opt",
+    "checking your browser",
+    "enable javascript and cookies to continue",
+)
+_CHALLENGE_MAX_BYTES = 10_000
+
+
+def _looks_like_challenge_page(html: str | None) -> bool:
+    """True when *html* is a bot-management interstitial, not the site.
+
+    Requires BOTH a small body and a known marker: a real marketing shell can
+    mention "just a moment" in copy, and a large page that embeds the phrase is
+    not a challenge. Never raises.
+    """
+    if not html:
+        return False
+    try:
+        if len(html) > _CHALLENGE_MAX_BYTES:
+            return False
+        low = html.lower()
+        return any(m in low for m in _CHALLENGE_MARKERS)
+    except Exception:  # pragma: no cover - defensive
+        return False
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
@@ -1824,16 +1862,33 @@ def _is_entrata_response(body: Any) -> bool:
 
 def _classify_entrata_failure(
     api_responses: list[dict[str, Any]],
+    page_html: str | None = None,
 ) -> tuple[str, str]:
     """Return (tier_code, machine-readable error message) for a 0-unit
     Entrata extraction.
 
     Tier resolution:
+      * Page body is a bot-management interstitial → ``_FETCH_BLOCKED``
       * No API responses captured at all → ``_NO_RESPONSE``
       * Responses captured but none Entrata-shaped → ``_SHAPE_REJECTED``
       * Otherwise (responses matched but parser produced 0 records) →
         ``_EMPTY``
+
+    The ``_FETCH_BLOCKED`` arm exists because the other three all describe
+    EXTRACTION outcomes, and lumping a failed FETCH in with them is actively
+    misleading. Measured 2026-07-25: 55 of the 60 properties sitting at
+    ``ENTRATA_NO_RESPONSE`` returned HTTP 403 with a Cloudflare challenge on
+    static fetch — the roster was never on the wire — yet the tier name says
+    "no Entrata response", which reads as an adapter bug and sent a whole
+    diagnosis cycle looking for parser gaps that did not exist.
     """
+    if _looks_like_challenge_page(page_html):
+        return (
+            _TIER_FETCH_BLOCKED,
+            "ENTRATA_FETCH_BLOCKED: bot-management interstitial served instead "
+            "of the page — nothing was fetched to extract from. Not an adapter "
+            "failure; retry via the render/CF-clearing path.",
+        )
     if not api_responses:
         return (
             _TIER_NO_RESPONSE,
@@ -2401,6 +2456,10 @@ class EntrataAdapter:
         # Live-verified against Lumina (pid 72391, liveatlumina.com).
         # Runs BEFORE the empty-exit label below so a successful
         # LeaseLeads recovery returns SUCCESS instead of TIER_*_EMPTY.
+        # Bound unconditionally: the failure classifier below reads this to
+        # tell a blocked FETCH from a missing XHR, and `page` is None on the
+        # body-only paths (and in tests), which previously left it unassigned.
+        html = ""
         if not result.units and page is not None:
             try:
                 html = await page.content()
@@ -2441,7 +2500,7 @@ class EntrataAdapter:
         # markers but no real Entrata inventory backing; the detector
         # picks Entrata at 0.85 based on the marker, the adapter runs
         # empty, and Path B should re-dispatch to the next candidate.
-        tier_code, err_msg = _classify_entrata_failure(api_responses)
+        tier_code, err_msg = _classify_entrata_failure(api_responses, html)
         result.tier_used = tier_code
         result.confidence = 0.0
         result.errors.append(err_msg)
