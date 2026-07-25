@@ -139,7 +139,33 @@ def _snap_one(
     extracted_name = unit.get("floor_plan_name") or unit.get("_floor_plan") or unit.get("floorplan_name")
     if extracted_name is not None:
         new_unit["floor_plan_name_extracted"] = extracted_name
-    new_unit["floor_plan_name"] = plan.description
+
+    # 2026-07-25 — THE OPERATOR'S MARKETING NAME WINS.
+    #
+    # This line used to be an unconditional `= plan.description`, overwriting
+    # the name the operator publishes with the `description` column of
+    # config/Floorplan-comparisons.csv. Measured on the 2026-07-25 5k run:
+    # 65,169 units (73.3%) shipped a CSV description instead of the site's own
+    # name, and 8,135 of the 10,523 "bad" plan names were this overwrite rather
+    # than a capture gap — including every one of the 5,910 "NBD/NBR-N" labels,
+    # a format nothing in this repo generates.
+    #
+    # It is not merely cosmetic: it MERGES DISTINCT PRODUCTS. Laurel Oaks
+    # publishes "2x2 Upstairs Granite", "2x2 D Brown Cabinets" and "2x2 Down
+    # End White Cabinets" as separate plans; all three snapped onto the single
+    # CSV row "2BD/2BR-2", so plan-level rent comparison silently averaged
+    # non-equivalent inventory. The CSV is also 11.7% unusable (blank, generic,
+    # or NBD/NBR-N rows), so it is a weaker source than the live page.
+    #
+    # The catalog KEYS (floor_plan_id / floorplannumber / apartmentid) are
+    # still adopted — that join is the point of the snap and is unaffected.
+    # Only the human-facing NAME now prefers what the operator published.
+    _extracted_str = str(extracted_name).strip() if extracted_name is not None else ""
+    if _extracted_str:
+        new_unit["floor_plan_name"] = _extracted_str
+        new_unit["floor_plan_name_catalog"] = plan.description
+    else:
+        new_unit["floor_plan_name"] = plan.description
     new_unit["floor_plan_id"] = plan.floor_plan_id
     new_unit["floorplannumber"] = plan.floorplannumber
     new_unit["apartmentid"] = plan.apartmentid

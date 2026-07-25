@@ -29,7 +29,14 @@ def catalog(tmp_path: Path) -> fc.FloorplanCatalog:
     return fc.FloorplanCatalog(csv_path=csv_path, mapping_path=map_path)
 
 
-def test_snap_overwrites_floor_plan_name_with_canonical(catalog) -> None:
+def test_snap_keeps_operator_name_and_records_canonical(catalog) -> None:
+    """2026-07-25 inversion: the name the operator publishes wins.
+
+    The snap still adopts the catalog KEYS (that join is the point of the
+    snap), but the human-facing name is no longer overwritten with the CSV
+    `description` — that overwrite merged distinct products under one label.
+    The canonical name is kept alongside in `floor_plan_name_catalog`.
+    """
     units = [
         {
             "unit_id": "101",
@@ -41,9 +48,19 @@ def test_snap_overwrites_floor_plan_name_with_canonical(catalog) -> None:
     ]
     out = snap_units(units, "P1", catalog)
     assert len(out) == 1
-    assert out[0]["floor_plan_name"] == "Aspen"
+    assert out[0]["floor_plan_name"] == "1BR / 1BA #1"
+    assert out[0]["floor_plan_name_catalog"] == "Aspen"
     assert out[0]["floor_plan_id"] == "P1_1"
     assert out[0]["floor_plan_snap_reason"] == "exact_three_field"
+
+
+def test_snap_falls_back_to_canonical_when_operator_published_no_name(catalog) -> None:
+    """With nothing extracted there is no operator name to prefer, so the
+    catalog description is still the best available label."""
+    units = [{"unit_id": "101", "beds": 1, "baths": 1.0, "sqft": 750}]
+    out = snap_units(units, "P1", catalog)
+    assert out[0]["floor_plan_name"] == "Aspen"
+    assert out[0]["floor_plan_id"] == "P1_1"
 
 
 def test_snap_preserves_extracted_name_in_audit_field(catalog) -> None:
@@ -128,7 +145,9 @@ def test_snap_handles_multi_alias_unit_dict(catalog) -> None:
     ]
     out = snap_units(units, "P1", catalog)
     assert out[0]["floor_plan_id"] == "P1_1"
-    assert out[0]["floor_plan_name"] == "Aspen"
+    # `_floor_plan` is an operator-published alias, so it wins over the catalog.
+    assert out[0]["floor_plan_name"] == "Aspen-ish"
+    assert out[0]["floor_plan_name_catalog"] == "Aspen"
 
 
 def test_snap_passes_through_when_units_empty(catalog) -> None:
