@@ -423,6 +423,31 @@ class RentCafeLayoutTabAdapter:
         p = urlparse(base)
         origin = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else base.rstrip("/")
 
+        # 2026-07-25 — WHOLE-ROSTER SHORT-CIRCUIT. `{origin}/availableunits` is
+        # a standard RentCafe route that server-renders EVERY available
+        # apartment for the property in ONE response (tr.unit-container rows,
+        # each carrying the same applyGAClick handler the per-plan drills use).
+        #
+        # It is strictly better than the /floorplans → N-drill fan-out below:
+        # one request instead of 1+N, and the full roster rather than whatever
+        # subset the plan pages happen to link. It is also invisible to the
+        # anchor-drill discovery — live-probed 2026-07-25, the Oaks of
+        # Northgate homepage exposes NO href to it, so it must be tried by
+        # convention rather than found.
+        #
+        # This is the fix for the RENTCAFE_NO_RESPONSE_PLAN_LEVEL cohort (341
+        # properties in the 2026-07-25 run) which fell back to plan rows while
+        # the complete rent roll sat one well-known URL away.
+        avail_url = origin + "/availableunits"
+        try:
+            ra = probe_get(avail_url, timeout=20)
+            if getattr(ra, "status_code", 0) == 200:
+                roster = parse_rentcafe_lt_applyga(getattr(ra, "text", "") or "", avail_url)
+                if roster:
+                    return self._finish_code_only(ctx, result, roster, avail_url)
+        except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+            result.errors.append(f"rentcafe_lt: /availableunits probe failed: {exc}")
+
         # Always fetch the RAW /floorplans server HTML via curl: the
         # Playwright-rendered fetch_result.body drops the raw root-relative
         # drill hrefs (Tudor: 0 drills from the rendered DOM vs 1 from raw).
@@ -465,6 +490,28 @@ class RentCafeLayoutTabAdapter:
                 )
             collected.extend(rows)
 
+        return self._finish_code_only(
+            ctx, result, collected, origin + "/floorplans",
+            detail=f"{len(drills)} drills",
+        )
+
+    @staticmethod
+    def _finish_code_only(
+        ctx: AdapterContext,
+        result: AdapterResult,
+        collected: list[dict],
+        winning_url: str,
+        *,
+        detail: str = "/availableunits roster",
+    ) -> AdapterResult:
+        """Dedup, post-process and score rows from the code-only path.
+
+        Extracted 2026-07-25 so the ``/availableunits`` whole-roster
+        short-circuit and the ``/floorplans`` drill fan-out finish through
+        IDENTICAL logic — a second copy of the dedup/scoring tail is exactly
+        how this file would drift, and drift between two copies of the same
+        rule is already a recurring defect class in this repo.
+        """
         # RUN-GLOBAL dedup by unit_number (plan-level rows with no unit_number
         # are kept as-is — they're not roster duplicates).
         deduped: list[dict] = []
@@ -480,7 +527,7 @@ class RentCafeLayoutTabAdapter:
         if not deduped:
             result.confidence = 0.0
             result.errors.append(
-                f"rentcafe_lt: {len(drills)} drills yielded zero units (code-only)"
+                f"rentcafe_lt: {detail} yielded zero units (code-only)"
             )
             return result
 
@@ -490,7 +537,7 @@ class RentCafeLayoutTabAdapter:
         if pp.n_admitted > 0:
             result.units = pp.admitted
             result.plan_summaries = pp.plan_summaries
-            result.winning_url = origin + "/floorplans"
+            result.winning_url = winning_url
             result.confidence = min(0.92, 0.7 + 0.02 * pp.n_admitted)
             return result
         result.confidence = 0.0
