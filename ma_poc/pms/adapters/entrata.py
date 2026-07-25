@@ -1217,12 +1217,33 @@ def _parse_pp_option_rows(
         # ``.unit-rent`` / ``.fee-transparency-text`` selectors when
         # present so we never grab a deposit / concession dollar
         # token by accident.
-        rent_el = row.select_one(
-            ".detail.second .unit-rent, "
-            ".detail.second .fee-transparency-text, "
-            ".detail.second"
-        )
-        rent_text = rent_el.get_text(" ", strip=True) if rent_el else ""
+        # 2026-07-25 — MUST be tried in priority order, one select_one per
+        # selector. A single comma-separated selector returns the first match
+        # in DOCUMENT ORDER, not in selector order, and PP renders the
+        # Building cell as a bare ``.detail.second`` BEFORE the rent cell — so
+        # the broad third alternative won, rent_text came back "Building D",
+        # and every unit on the page shipped with a null rent while still
+        # carrying a real unit_number.
+        #
+        # Live-verified on grandoakscommunity.com plan 2X2A: units D103 /
+        # F302 / G202 all extracted correctly but rent-less before this fix;
+        # $1,939 / $2,049 / $1,939 after.
+        rent_text = ""
+        for sel in (
+            ".detail.second .unit-rent",
+            ".detail.second .fee-transparency-text",
+            ".detail.second",
+        ):
+            el = row.select_one(sel)
+            if el is None:
+                continue
+            candidate = el.get_text(" ", strip=True)
+            if _pp_money_low_high(candidate) != (None, None):
+                rent_text = candidate
+                break
+            # Keep the broadest match as a last resort so a template that
+            # renders rent directly in .detail.second still parses.
+            rent_text = rent_text or candidate
         rent_lo, rent_hi = _pp_money_low_high(rent_text)
 
         lease_el = row.select_one(".lease-term-name")
