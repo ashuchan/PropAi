@@ -1249,6 +1249,7 @@ async def _process_property(
     from ma_poc.observability.events import EventKind, emit
     from ma_poc.pms.scraper import scrape_jugnu
     from ma_poc.reporting.verdict import compute as compute_verdict
+    from ma_poc.reporting.verdict import verdict_for_publish_ceiling
     from ma_poc.validation.orchestrator import validate
 
     # task #45: wall-clock anchor for the plan→unit render's elapsed-budget
@@ -1828,6 +1829,12 @@ async def _process_property(
     meta["canonical_id"] = task.property_id
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
+    # Single source of truth for the rest of this function. The publish-ceiling
+    # block below may upgrade it, and every downstream consumer (the emit, the
+    # TIER_1 failure-capture gate) must see the SAME value that lands in
+    # _meta.verdict — reading verdict.verdict.value directly would silently
+    # diverge from the record we ship.
+    verdict_value = verdict.verdict.value
 
     # Agentic router SHADOW observer (Phase 2, flag ENABLE_ROUTE_SHADOW, default
     # off). ADDITIVE + never-fail: logs what the deterministic router WOULD decide
@@ -1891,6 +1898,23 @@ async def _process_property(
                 "reason": _pc.reason,
                 "evidence": _pc.evidence,
             }
+            # 2026-07-25: the grade now REACHES the verdict. Until this line the
+            # assessment was write-only — a property we had PROVEN publishes
+            # nothing still shipped as FAILED_NO_DATA, so doing the right thing
+            # cost us success rate. verdict_for_publish_ceiling is deliberately
+            # narrow: FAILED_NO_DATA only, and only on the two CONFIRMED grades.
+            # EXTRACTION_MISS (rent tokens present + zero units) is OUR bug and
+            # stays a visible failure.
+            _upgraded = verdict_for_publish_ceiling(
+                meta.get("verdict"), _pc.verdict.value
+            )
+            if _upgraded:
+                meta["verdict"] = _upgraded
+                meta["verdict_upgraded_from"] = verdict_value
+                meta["verdict_reason"] = (
+                    f"publish ceiling proven ({_pc.verdict.value}): {_pc.reason}"
+                )
+                verdict_value = _upgraded
             emit(
                 EventKind.PROPERTY_EMITTED,  # publish_ceiling ride-along
                 task.property_id,
@@ -1906,7 +1930,7 @@ async def _process_property(
     emit(
         EventKind.PROPERTY_EMITTED,
         task.property_id,
-        verdict=verdict.verdict.value,
+        verdict=verdict_value,
         units=len(result.get("units", [])),
     )
 
@@ -1974,7 +1998,7 @@ async def _process_property(
     _tier_used = ""
     if extract_result is not None:
         _tier_used = getattr(extract_result, "tier_used", "") or ""
-    if run_dir is not None and verdict.verdict.value == "FAILED_NO_DATA" and _tier_used.startswith("TIER_1_"):
+    if run_dir is not None and verdict_value == "FAILED_NO_DATA" and _tier_used.startswith("TIER_1_"):
         try:
             from ma_poc.services.llm_diagnostics import (
                 adapter_debugger,

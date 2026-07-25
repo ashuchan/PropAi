@@ -252,6 +252,41 @@ def _source_id_anchor(unit: dict[str, Any]) -> str | None:
     return None
 
 
+#: Prefixes minted by this module when a row has no identifying anchor.
+SYNTHETIC_ID_PREFIXES: tuple[str, ...] = ("inferred_", "unkeyable_")
+
+
+def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
+    """True when *unit* carries a genuine per-apartment identity.
+
+    Answers "will this row end up with a real unit_id, or a synthesised one?"
+    using the SAME anchors :func:`assign_fallback_unit_id` resolves against, so
+    callers get a consistent answer at ANY point in the pipeline.
+
+    That last part is the whole reason this exists. ``unit_id`` is not minted
+    until ``_format_v2_unit`` runs, but the verdict layer runs BEFORE the
+    formatter — so a plan-vs-unit test written as
+    ``unit_id.startswith("inferred_")`` silently reads an absent field and
+    concludes "real identity" for every plan-level row. Measured on the
+    2026-07-25 run that mislabelled ~436 plan-level properties as SUCCESS.
+
+    Accepts rows in either shape:
+      * pre-format  — identity lives in ``unit_number`` (or ``source_ids``)
+      * post-format — identity lives in ``unit_id``, possibly ``inferred_*``
+    """
+    uid = str(unit.get("unit_id") or "").strip()
+    if (
+        uid
+        and uid.lower() not in {"null", "none"}
+        and not uid.startswith(SYNTHETIC_ID_PREFIXES)
+    ):
+        return True
+    number = str(unit.get("unit_number") or "").strip()
+    if number and number.lower() not in {"null", "none"}:
+        return True
+    return _source_id_anchor(unit) is not None
+
+
 def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | None:
     """Mutate ``unit['unit_id']`` in place with a stable fallback id.
 
