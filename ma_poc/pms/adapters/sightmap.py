@@ -45,6 +45,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
+    _unwrap_name_blob,
     bed_label_from,
     make_unit_dict,
     money_to_int,
@@ -165,6 +166,24 @@ def _sightmap_deposit(u: dict[str, Any]) -> str:
     return ""
 
 
+def _plan_name_key(raw: Any) -> str:
+    """Normalised comparison key for a SightMap floor-plan name.
+
+    SightMap ``floor_plans[].name`` is frequently a DOUBLE-ENCODED JSON string
+    (``'{"name":"JRA1","provider_id":"4710554"}'``), so a raw string compare
+    would never match the unwrapped name ``make_unit_dict`` writes onto the
+    emitted unit rows. ``_unwrap_name_blob`` is the same helper
+    ``make_unit_dict`` applies, which keeps the plan-row dedupe key aligned
+    with what actually ships.
+
+    Returns a casefolded, whitespace-collapsed key, or ``""`` when no usable
+    name is present (callers must not dedupe on an empty key — an unnamed plan
+    should still emit).
+    """
+    name = _unwrap_name_blob(raw)
+    return " ".join(name.split()).casefold()
+
+
 def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
@@ -280,9 +299,43 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
     # marked UNAVAILABLE / available_units="0" so downstream catalogue diff
     # surfaces the full inventory while the operator's published-rent gate keeps
     # unit-level metrics unaffected.
+    #
+    # 2026-07-25 correction — dedupe by plan NAME, not by floor_plan id.
+    # ``data.floor_plans`` is an id-keyed history, not a deduped catalogue:
+    # SightMap retains superseded plan records with fresh ids and the same
+    # name. Live-verified on Residences at Mazza (embed dqw97d5zvo9, sightmap
+    # 92572): 293 floor_plans carry only 163 distinct names — 89 duplicate-name
+    # groups covering 219 of the 293 records. Emitting one row per unjoined id
+    # therefore (a) duplicated the same plan up to 3× and (b) asserted
+    # UNAVAILABLE/available_units="0" for 43 plans that simultaneously shipped a
+    # real AVAILABLE priced unit under a sibling id — two contradictory rows for
+    # one plan. Run-wide on the 2026-07-25 5k canary that was 200 contradictory
+    # rows across 82 of 505 SightMap properties.
+    #
+    # Both filters are name-scoped and additive: a plan whose name has no real
+    # unit and has not already been emitted still produces exactly one
+    # catalogue row, preserving the 2026-06-27 chip's coverage intent
+    # (3,828 of 4,028 plan rows in that same canary are genuinely-new names).
+    real_plan_names: set[str] = {
+        _plan_name_key(u.get("floor_plan_name")) for u in units_out
+    }
+    real_plan_names.discard("")
+    emitted_plan_names: set[str] = set()
+
     for fp_id, fp in fp_by_id.items():
         if fp_id in seen_fp_ids:
             continue
+        plan_key = _plan_name_key(fp.get("name") or fp.get("filter_label") or "")
+        # Contradiction guard: this plan already shipped a real, priced,
+        # AVAILABLE unit under a different floor_plan id. Claiming it is
+        # UNAVAILABLE is false.
+        if plan_key and plan_key in real_plan_names:
+            continue
+        # Duplicate guard: SightMap kept several ids for one plan name.
+        if plan_key and plan_key in emitted_plan_names:
+            continue
+        if plan_key:
+            emitted_plan_names.add(plan_key)
         beds = fp.get("bedroom_count")
         baths = fp.get("bathroom_count")
         name = fp.get("name") or fp.get("filter_label") or ""

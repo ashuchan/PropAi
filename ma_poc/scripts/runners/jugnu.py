@@ -2133,6 +2133,8 @@ def _provenance_block(
     outcome_val: str | None,
 ) -> dict[str, Any]:
     """Compute _meta.provenance from an already-scraped result. Pure; never raises."""
+    from ma_poc.core.schema_v2 import _is_floor_plan_level
+
     units = result.get("units") or []
     by_family: dict[str, int] = {}
     n_plan = n_synth = n_realid = 0
@@ -2140,7 +2142,16 @@ def _provenance_block(
         tier = str(u.get("extraction_tier") or u.get("_extraction_tier") or "")
         fam = _tier_family(tier)
         by_family[fam] = by_family.get(fam, 0) + 1
-        if u.get("is_floor_plan_level") or tier.upper().endswith("_PLAN_LEVEL"):
+        # 2026-07-25: this ran on the INTERNAL unit dicts, which carry the
+        # adapter's ``data_quality_flag`` (SightMap writes
+        # ``SIGHTMAP_PLAN_PRESENCE``) but never an ``is_floor_plan_level`` key
+        # — that key is only minted later by the v2 formatter. With a
+        # ``TIER_1_API_SIGHTMAP`` tier that also fails the ``_PLAN_LEVEL``
+        # suffix test, both arms missed and ``plan_level_units`` read 0 for
+        # all 505 SightMap properties in the 2026-07-25 5k canary while 4,024
+        # plan rows were in fact shipping. Delegate to the canonical predicate,
+        # which reads the flag as well as the tier suffix.
+        if _is_floor_plan_level(u) or tier.upper().endswith("_PLAN_LEVEL"):
             n_plan += 1
         uid = str(u.get("unit_id") or u.get("unit_number") or "")
         if uid.startswith(("inferred_", "unkeyable_")):
@@ -2772,7 +2783,7 @@ def _format_v2_unit(
     """
     # Delegate the available-now → scrape-date fallback to the canonical
     # resolver (single source of truth; see the available_date field below).
-    from ma_poc.core.schema_v2 import _resolve_available_date
+    from ma_poc.core.schema_v2 import _is_floor_plan_level, _resolve_available_date
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
     # formatting. Emitted as first-class ``<field>_raw`` columns at the
@@ -2988,6 +2999,17 @@ def _format_v2_unit(
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # 2026-07-25: #36's placeholder marker was added to
+        # ``ma_poc/core/schema_v2.py:_format_v2_unit`` only — but THIS is the
+        # formatter the production Jugnu runner uses, so the flag never
+        # reached properties.json. Result on the 2026-07-25 5k canary: 4,024
+        # SightMap plan-presence rows (20.9% of all SightMap unit rows, across
+        # 352 mixed properties) shipped indistinguishable from real units —
+        # every one of them carrying an ``inferred_`` synthetic unit_id and
+        # ``area=-1``, and ``_provenance_block``'s ``plan_level_units`` counter
+        # reading 0 for all 505 SightMap properties. Keep in lock-step with
+        # ``core.schema_v2._is_floor_plan_level``.
+        "is_floor_plan_level": _is_floor_plan_level(unit),
         "rent_low": _format_rent(rent_lo_raw),
         "rent_high": _format_rent(rent_hi_raw),
         "floor": _format_floor(_raw_src["floor"]),
