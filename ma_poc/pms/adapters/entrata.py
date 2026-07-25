@@ -1062,6 +1062,35 @@ def _pp_plan_url_match(url: str) -> tuple[str, str] | None:
     return None
 
 
+#: Markers that mean "this ProspectPortal plan-detail page carries a
+#: per-apartment roster". MUST stay in sync with the templates
+#: ``parse_entrata_pp_unit_cards`` can actually parse:
+#:   U1  ``.unit-card``   — the card template
+#:   U2  ``.option-row`` inside ``.fp-units-table`` — the Aria/Grand Oaks
+#:       tabular template, handled by ``_parse_pp_option_rows``
+_PP_PLAN_UNIT_MARKERS: tuple[str, ...] = ("unit-card", "fp-units-table", "option-row")
+
+
+def _pp_plan_page_has_units(plan_html: str) -> bool:
+    """True when a plan-detail page looks like it carries a unit roster.
+
+    2026-07-25: the per-plan drill used to gate on ``"unit-card" in
+    plan_html`` alone, which is only template U1. Template U2 pages — no
+    ``.unit-card`` anywhere, roster rendered as ``.option-row`` inside
+    ``.fp-units-table`` — were SKIPPED BEFORE the parser ran, even though
+    ``parse_entrata_pp_unit_cards`` already falls back to
+    ``_parse_pp_option_rows`` for exactly that shape.
+
+    So the U2 branch was unreachable from the drill: the parser was correct
+    and simply never handed the page. Live example — grandoakscommunity.com
+    plan 2X2A has unit-card=0, option-row=4, fp-units-table=1 and holds 3
+    real apartments (D103 $1,939 / F302 $2,049 / G202 $1,939).
+    """
+    if not plan_html:
+        return False
+    return any(marker in plan_html for marker in _PP_PLAN_UNIT_MARKERS)
+
+
 def _pp_extract_card_uid(card: Any) -> str:
     """Return the stable PP unit id (``data-unit-id`` / ``data-uid`` /
     ``data-uspid`` / ``unit-item-details-<n>`` class suffix). Empty
@@ -2287,7 +2316,7 @@ class EntrataAdapter:
                         plan_html = await _entrata_static_fetch(plan_url)
                     except Exception:
                         plan_html = ""
-                    if not plan_html or "unit-card" not in plan_html:
+                    if not plan_html or not _pp_plan_page_has_units(plan_html):
                         continue
                     pp_unit_card_rows.extend(
                         parse_entrata_pp_unit_cards(plan_html, plan_url)

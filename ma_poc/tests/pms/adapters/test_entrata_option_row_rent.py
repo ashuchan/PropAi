@@ -151,3 +151,56 @@ def test_template_with_rent_directly_in_detail_second_still_parses() -> None:
     rows = _parse_pp_option_rows(BeautifulSoup(html, "lxml"), "u", "A1", "1")
     assert len(rows) == 1
     assert rows[0]["market_rent_low"] == 1500
+
+
+# ── Reachability: the drill gate must hand this template to the parser ──────
+
+
+def test_drill_gate_admits_the_option_row_template() -> None:
+    """The parser above was correct but UNREACHABLE from the per-plan drill.
+
+    The drill gated on ``"unit-card" in plan_html`` — template U1 only — and
+    ``continue``d past every U2 page. parse_entrata_pp_unit_cards already
+    falls back to _parse_pp_option_rows for exactly this shape, so the branch
+    existed and was simply never given the page.
+
+    Live counts for grandoakscommunity.com plan 2X2A:
+        unit-card      0     <- old gate rejected the page on this alone
+        option-row     4
+        fp-units-table 1
+    """
+    from ma_poc.pms.adapters.entrata import _pp_plan_page_has_units
+
+    assert _pp_plan_page_has_units(PLAN_PAGE) is True
+    assert "unit-card" not in PLAN_PAGE, (
+        "fixture must reproduce the U2 shape — no .unit-card anywhere"
+    )
+
+
+def test_drill_gate_still_admits_the_unit_card_template() -> None:
+    from ma_poc.pms.adapters.entrata import _pp_plan_page_has_units
+
+    assert _pp_plan_page_has_units('<div class="unit-card">…</div>') is True
+
+
+def test_drill_gate_rejects_pages_with_no_roster() -> None:
+    """A plan page with no unit markup must still be skipped — admitting it
+    would spend a parse on every marketing page in the fan-out."""
+    from ma_poc.pms.adapters.entrata import _pp_plan_page_has_units
+
+    assert _pp_plan_page_has_units("") is False
+    assert _pp_plan_page_has_units("<html><h1>Floor Plans</h1></html>") is False
+
+
+def test_gate_and_parser_agree_end_to_end() -> None:
+    """Whatever the gate admits, the drill's own entry point must parse —
+    the two drifting apart is what made the U2 branch dead code."""
+    from ma_poc.pms.adapters.entrata import (
+        _pp_plan_page_has_units,
+        parse_entrata_pp_unit_cards,
+    )
+
+    assert _pp_plan_page_has_units(PLAN_PAGE)
+    rows = parse_entrata_pp_unit_cards(PLAN_PAGE, "https://x.test/plan")
+    assert len(rows) == 3
+    assert all(r["market_rent_low"] for r in rows), "gate admitted it; rents must parse"
