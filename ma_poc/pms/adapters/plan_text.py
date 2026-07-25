@@ -81,12 +81,127 @@ def _text_lines(html: str) -> list[str]:
     return [ln.strip() for ln in txt.split("\n") if ln.strip()]
 
 
+# A marketing page that publishes a per-APARTMENT availability grid — the
+# columns a leasing table always carries, in any order.
+_UNIT_COL_RE = re.compile(r"\b(bldg\s*/\s*unit|unit\s*(?:#|no\.?|number)?|apt\.?)\b", re.I)
+_BED_COL_RE = re.compile(r"\bbed(room)?s?\b", re.I)
+_PRICE_COL_RE = re.compile(r"\b(rents?|price|pricing)\b", re.I)
+# A real apartment designator: 302, PH14, 03-0712, 01E-104, B-12. Deliberately
+# NOT a bare floor-plan code (JRA1, C23B) — those are layouts, not apartments.
+_UNIT_TOKEN_RE = re.compile(r"^(?=.*\d)[A-Za-z0-9]{1,4}(?:[-–][A-Za-z0-9]{1,5})?$")
+_DATE_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2,4}|now|available)\b", re.I)
+
+
+def parse_unit_table(html: str, url: str = "") -> list[dict[str, Any]]:
+    """Extract UNIT-LEVEL rows from a marketing availability grid.
+
+    Many marketing sites publish a per-apartment table — ``Bldg/Unit | Bed |
+    Bath | Rents From | Available Date`` — rendered as a CSS grid of divs rather
+    than a ``<table>``. ``parse_marketing_plan_text`` reads those pages as free
+    text, captures the rents correctly, but has no concept of a unit column, so
+    it emits PLAN-level rows and the apartment numbers are discarded.
+
+    Measured cost (2026-07-25, user-validated against the live site): The
+    Majestic (majesticvernonhills.com) publishes ``03-0712 / 1 Bedroom / 1 Bath
+    / $2,623 / 07/27/2026``. Our rents matched the site exactly, but all 48 rows
+    shipped as SUCCESS_PLAN_LEVEL with ``inferred_*`` ids — a gold-level
+    property demoted to plan-level purely because the unit column was dropped.
+
+    Runs BEFORE the plan-text parser so a page that publishes apartments yields
+    apartments. Returns [] when no unit grid is present (the overwhelmingly
+    common case), so the plan-text path is unaffected. Never raises.
+    """
+    if not html:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return []
+
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    try:
+        # Find a header row that names a unit column AND a price column — both
+        # required, so a plain floor-plan comparison table can't match.
+        for head in soup.find_all(True):
+            cells = [c.get_text(" ", strip=True) for c in head.find_all(True, recursive=False)]
+            if len(cells) < 3:
+                continue
+            joined = " ".join(cells)
+            if not (_UNIT_COL_RE.search(joined) and _PRICE_COL_RE.search(joined)):
+                continue
+            unit_i = next((i for i, c in enumerate(cells) if _UNIT_COL_RE.search(c)), None)
+            price_i = next((i for i, c in enumerate(cells) if _PRICE_COL_RE.search(c)), None)
+            bed_i = next((i for i, c in enumerate(cells) if _BED_COL_RE.search(c)), None)
+            if unit_i is None or price_i is None:
+                continue
+            # Find data rows by SHAPE, not by structure. Real grids nest the
+            # rows arbitrarily (The Majestic wraps them in a `units-body` div,
+            # so they are the header's NIECES, not its siblings). Scan the
+            # container's descendants for anything whose direct-child cells
+            # align with the header arity — that survives markup variation.
+            parent = head.parent
+            if parent is None:
+                continue
+            for row in parent.find_all(True):
+                if row is head or row.find(class_=head.get("class") or []) is not None:
+                    continue
+                vals = [c.get_text(" ", strip=True) for c in row.find_all(True, recursive=False)]
+                if len(vals) <= max(unit_i, price_i):
+                    continue
+                unit = vals[unit_i].strip()
+                if not unit or not _UNIT_TOKEN_RE.match(unit) or unit in seen:
+                    continue
+                rent = _to_int((_BARE_RENT_RE.search(vals[price_i]) or [None, ""])[1]) \
+                    if _BARE_RENT_RE.search(vals[price_i]) else None
+                if not rent:
+                    continue
+                seen.add(unit)
+                beds = _beds(vals[bed_i]) if bed_i is not None and bed_i < len(vals) else None
+                baths = next(
+                    (_baths(v) for v in vals if _baths(v) is not None), None
+                )
+                avail = next((v for v in vals if _DATE_RE.search(v)), "")
+                rec: dict[str, Any] = {
+                    "unit_number": unit,
+                    "unit_id": unit,
+                    "market_rent_low": rent,
+                    "market_rent_high": rent,
+                    "asking_rent": rent,
+                    "rent": rent,
+                    "rent_range": f"${rent:,}",
+                    "availability_status": "AVAILABLE",
+                    "extraction_tier": "TIER_1_DOM_UNIT_TABLE",
+                }
+                if beds is not None:
+                    rec["beds"] = beds
+                    rec["bedrooms"] = beds
+                if baths is not None:
+                    rec["baths"] = baths
+                    rec["bathrooms"] = baths
+                if avail:
+                    rec["availability_date"] = avail
+                    rec["available_date"] = avail
+                out.append(rec)
+            if out:
+                break
+    except Exception:
+        return []
+    # A single stray row is noise; a real grid lists several apartments.
+    return out if len(out) >= 2 else []
+
+
 def parse_marketing_plan_text(html: str, url: str = "") -> list[dict[str, Any]]:
     """Extract plan-level records from a marketing floor-plan text section.
 
     Returns a list of plan dicts (``unit_number=""``, ``_floor_plan``, ``_sqft``,
     ``bedrooms``, ``bathrooms``, ``market_rent_low``, ``rent_range``,
     ``extraction_tier``). Empty list when the pattern isn't present. Never raises.
+
+    NOTE: callers should try :func:`parse_unit_table` FIRST — a page that
+    publishes a per-apartment grid should yield unit-level rows, not plans.
     """
     if not html:
         return []

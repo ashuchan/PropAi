@@ -102,3 +102,78 @@ def test_empty_and_garbage_never_raise() -> None:
     assert parse_marketing_plan_text("", "") == []
     assert parse_marketing_plan_text("<html>no plans here, just $5 coffee</html>", "") == []
     assert parse_marketing_plan_text("<<<not html", "") == []
+
+
+# ── unit-table parser: a per-apartment grid must yield APARTMENTS ───────────
+
+_UNIT_GRID = """
+<html><body>
+<div class="apts-units"><div class="apts-units__container">
+  <div class="units-head">
+    <div>Bldg/Unit</div><div>Bed</div><div>Bath</div>
+    <div>Rents From</div><div>Available Date</div><div></div>
+  </div>
+  <div class="units-body">
+    <div class="row"><div>03-0712</div><div>1 Bedroom</div><div>1 Bath</div>
+        <div>$2,623</div><div>07/27/2026</div><div>Apply Now</div></div>
+    <div class="row"><div>02-0604</div><div>1 Bedroom</div><div>1 Bath</div>
+        <div>$2,622</div><div>08/17/2026</div><div>Apply Now</div></div>
+    <div class="row"><div>02-0414</div><div>2 Bedroom</div><div>2 Bath</div>
+        <div>$2,593</div><div>10/08/2026</div><div>Apply Now</div></div>
+  </div>
+</div></div>
+</body></html>
+"""
+
+
+def test_unit_grid_yields_unit_level_rows() -> None:
+    """Mirrors majesticvernonhills.com (user-validated 2026-07-25).
+
+    The plan-text reader captured this page's RENTS correctly but had no unit
+    column, so every row shipped SUCCESS_PLAN_LEVEL with an inferred_* id — a
+    gold property demoted purely because "03-0712" was discarded.
+    """
+    from ma_poc.pms.adapters.plan_text import parse_unit_table
+
+    rows = parse_unit_table(_UNIT_GRID, "")
+    assert [r["unit_number"] for r in rows] == ["03-0712", "02-0604", "02-0414"]
+    by = {r["unit_number"]: r for r in rows}
+    assert by["03-0712"]["market_rent_low"] == 2623
+    assert by["03-0712"]["beds"] == 1 and by["03-0712"]["baths"] == 1.0
+    assert by["03-0712"]["available_date"] == "07/27/2026"
+    assert by["02-0414"]["beds"] == 2 and by["02-0414"]["market_rent_low"] == 2593
+    # unit-level, NOT plan-level → downstream stamps gold, not SUCCESS_PLAN_LEVEL
+    assert all(r["unit_number"] and r["extraction_tier"] == "TIER_1_DOM_UNIT_TABLE" for r in rows)
+
+
+def test_unit_grid_not_confused_by_a_floor_plan_table() -> None:
+    """A PLAN comparison table has no unit column — must yield nothing here.
+
+    Guards the demotion boundary in the other direction: floor-plan codes like
+    'JRA1' / 'C23B' are layouts, not apartments, and must never be emitted as
+    unit numbers.
+    """
+    from ma_poc.pms.adapters.plan_text import parse_unit_table
+
+    plan_table = """
+    <div><div class="head"><div>Floor Plan</div><div>Beds</div><div>Rent</div></div>
+      <div class="body">
+        <div><div>JRA1</div><div>1 Bed</div><div>$1,951</div></div>
+        <div><div>C23B</div><div>1 Bed</div><div>$3,375</div></div>
+      </div></div>
+    """
+    assert parse_unit_table(plan_table, "") == []
+
+
+def test_unit_grid_requires_more_than_one_row_and_never_raises() -> None:
+    from ma_poc.pms.adapters.plan_text import parse_unit_table
+
+    single = _UNIT_GRID.replace(
+        '<div class="row"><div>02-0604</div><div>1 Bedroom</div><div>1 Bath</div>\n'
+        '        <div>$2,622</div><div>08/17/2026</div><div>Apply Now</div></div>', ''
+    )
+    # a lone stray row is noise, not a roster
+    assert len(parse_unit_table(single, "")) != 1
+    assert parse_unit_table("", "") == []
+    assert parse_unit_table("<<<not html", "") == []
+    assert parse_unit_table("<div>no grid here</div>", "") == []
