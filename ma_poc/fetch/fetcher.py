@@ -599,7 +599,9 @@ class Fetcher:
         # the GCP worker IP isn't on the operator's CF blocklist.
         # Priority chain:
         #   1. Direct (no proxy) — works for ~95% of CF-walled sites
-        #   2. Proxied (PROBE_PROXY_URL) — only useful for Yardi
+        #   2. Hyperbrowser (free on the RealPage account) — residential
+        #      egress + CF clearance; preferred over the paid vendor
+        #   3. Proxied (PROBE_PROXY_URL, BrightData) — only useful for Yardi
         #      SecureCafe tenancy where GCP IPs are explicitly blocked
         r = None
         used_proxy = False
@@ -625,9 +627,35 @@ class Fetcher:
         status = getattr(r, "status_code", 0) if r is not None else 0
         body = getattr(r, "text", "") or "" if r is not None else ""
 
-        # If direct didn't bypass AND a residential proxy is configured,
-        # try the proxied path as a second attempt (handles Yardi/CF
-        # tenancy that blocks GCP IPs).
+        # 2. Hyperbrowser BEFORE the paid BrightData proxy. HB is free on the
+        #    RealPage account and reaches the origin from a residential egress
+        #    with CF clearance — the same capability this rung wanted the
+        #    residential proxy for. Until 2026-07-25 this rung had NO HB branch
+        #    at all, so it was BrightData-only by construction: HB could never
+        #    serve it however the flags were set. Measured on the 2026-07-25 5k
+        #    run: 241 paid proxied attempts, 138 of which died on
+        #    "CONNECT tunnel failed, response 502" — i.e. money spent failing,
+        #    while HB sat available. Mirrors the vendor switch in
+        #    _try_unlocker_fallback so both rescue paths prefer the free vendor.
+        used_hb = False
+        if status != 200 or len(body) < 1024:
+            try:
+                from ma_poc.config.feature_flags import hb_enabled
+
+                if hb_enabled():
+                    from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                    hb_status, hb_body = await hb_raw_get(task.url, task.property_id)
+                    if hb_status == 200 and len(hb_body) >= 1024:
+                        status, body, used_hb = hb_status, hb_body, True
+            except Exception as exc:  # never let the rescue path raise
+                log.warning(
+                    "hyperbrowser rescue failed for %s: %s", task.property_id, exc
+                )
+
+        # 3. If neither direct nor HB bypassed AND a residential proxy is
+        #    configured, try the paid proxied path (handles Yardi/CF tenancy
+        #    that blocks GCP IPs).
         if (
             (status != 200 or len(body) < 1024)
             and os.environ.get("PROBE_PROXY_URL", "").strip()
@@ -659,15 +687,22 @@ class Fetcher:
             # so an in-run salvage yield of 11% against 53% for the identical
             # call run by hand was undiagnosable from the artifacts alone.
             log.info(
-                "curl_cffi rescue declined for %s: status=%s body_bytes=%d proxied=%s",
-                task.property_id, status, len(body), used_proxy,
+                "curl_cffi rescue declined for %s: status=%s body_bytes=%d "
+                "proxied=%s hb=%s",
+                task.property_id, status, len(body), used_proxy, used_hb,
             )
             return None
 
         emit(
             EventKind.FETCH_TIER_ESCALATED,
             task.property_id,
-            tier="CURL_CFFI_CHROME120_PROXIED" if used_proxy else "CURL_CFFI_CHROME120",
+            # Distinguish the three vendors so cost attribution is readable
+            # from the event stream: free-direct vs free-HB vs paid-BrightData.
+            tier=(
+                "CURL_CFFI_CHROME120_PROXIED" if used_proxy
+                else "HYPERBROWSER_RAW_GET" if used_hb
+                else "CURL_CFFI_CHROME120"
+            ),
             reason="render_bot_blocked",
         )
         # Construct an OK FetchResult that the rest of the pipeline

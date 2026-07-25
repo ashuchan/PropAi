@@ -215,3 +215,107 @@ def test_master_flag_still_gates_the_dc_rung(monkeypatch) -> None:
         assert ff.ENABLE_DC_PROXY_TIER is False
     finally:
         _reload_flags(monkeypatch)
+
+
+# ── 6: the curl rescue must prefer FREE Hyperbrowser over PAID BrightData ───
+
+class _Resp:
+    def __init__(self, status: int, text: str) -> None:
+        self.status_code = status
+        self.text = text
+        self.url = "https://x.com/"
+
+
+async def _run_rescue(monkeypatch, *, direct, hb, proxied, hb_on=True, probe_proxy=True):
+    """Drive _try_curl_cffi_fallback with each vendor stubbed; report who was called."""
+    from ma_poc.discovery.contracts import CrawlTask, TaskReason
+    from ma_poc.fetch import fetcher as F
+    from ma_poc.fetch.contracts import RenderMode
+
+    called: list[str] = []
+
+    def _fake_probe_get(url, **kw):
+        # proxies={} forced ⇒ the DIRECT leg; otherwise the paid BrightData leg
+        if kw.get("proxies") == {}:
+            called.append("direct")
+            return direct
+        called.append("brightdata")
+        if proxied is None:
+            raise RuntimeError("CONNECT tunnel failed, response 502")
+        return proxied
+
+    async def _fake_hb_raw_get(url, pid="?", **kw):
+        called.append("hb")
+        return hb
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.hb_raw_get", _fake_hb_raw_get
+    )
+    monkeypatch.setattr("ma_poc.config.feature_flags.hb_enabled", lambda: hb_on)
+    if probe_proxy:
+        monkeypatch.setenv("PROBE_PROXY_URL", "http://paid.example:22225")
+    else:
+        monkeypatch.delenv("PROBE_PROXY_URL", raising=False)
+    F._probe_proxy_reset_circuit()
+
+    task = CrawlTask(
+        url="https://x.com/", property_id="P1", priority=0, budget_ms=35000,
+        reason=TaskReason.SCHEDULED, render_mode=RenderMode.RENDER,
+    )
+    fetcher = F.Fetcher.__new__(F.Fetcher)  # no __init__ — rescue needs no deps
+    res = await fetcher._try_curl_cffi_fallback(task, 0)
+    return res, called
+
+
+async def test_hb_tried_before_paid_brightdata(monkeypatch) -> None:
+    """Direct fails, HB succeeds ⇒ BrightData must never be called.
+
+    Until 2026-07-25 this rung had no HB branch at all: it went straight from
+    the free direct probe to the PAID residential proxy. Measured cost of that
+    on one 5k run: 241 paid attempts, 138 of them dying on CONNECT 502.
+    """
+    res, called = await _run_rescue(
+        monkeypatch,
+        direct=_Resp(403, "blocked"),
+        hb=(200, "y" * 4096),
+        proxied=_Resp(200, "z" * 4096),
+    )
+    assert res is not None and res.outcome.value == "OK"
+    assert "hb" in called, "Hyperbrowser was never attempted"
+    assert "brightdata" not in called, f"paid vendor called despite HB success: {called}"
+
+
+async def test_brightdata_still_used_when_hb_fails(monkeypatch) -> None:
+    """HB is preferred, not exclusive — the paid rung remains the backup."""
+    res, called = await _run_rescue(
+        monkeypatch,
+        direct=_Resp(403, "blocked"),
+        hb=(0, ""),                       # HB failed
+        proxied=_Resp(200, "z" * 4096),
+    )
+    assert res is not None and res.outcome.value == "OK"
+    assert called == ["direct", "hb", "brightdata"], called
+
+
+async def test_direct_success_skips_both_vendors(monkeypatch) -> None:
+    """The free direct probe still short-circuits everything."""
+    res, called = await _run_rescue(
+        monkeypatch,
+        direct=_Resp(200, "a" * 4096),
+        hb=(200, "y" * 4096),
+        proxied=_Resp(200, "z" * 4096),
+    )
+    assert res is not None and res.outcome.value == "OK"
+    assert called == ["direct"], called
+
+
+async def test_hb_disabled_falls_straight_to_paid(monkeypatch) -> None:
+    res, called = await _run_rescue(
+        monkeypatch,
+        direct=_Resp(403, "blocked"),
+        hb=(200, "y" * 4096),
+        proxied=_Resp(200, "z" * 4096),
+        hb_on=False,
+    )
+    assert "hb" not in called and "brightdata" in called, called
