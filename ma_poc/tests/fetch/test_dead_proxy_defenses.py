@@ -163,3 +163,55 @@ def test_units_helper_tolerates_shapes() -> None:
     assert h({"units": [{"a": 1}]}) is True
     assert h({"records": None, "units": None}) is False
     assert h("garbage") is False  # never raises
+
+
+# ── 5: the DC proxy rung must be opt-IN, not opt-out ────────────────────────
+
+def _reload_flags(monkeypatch, **env: str):
+    """Reload the flag module under a given environment (flags read at import)."""
+    import importlib
+
+    from ma_poc.config import feature_flags as ff
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    return importlib.reload(ff)
+
+
+def test_dc_proxy_tier_is_off_by_default(monkeypatch) -> None:
+    """Unset ENABLE_DC_PROXY_TIER must mean OFF.
+
+    It defaulted ON until 2026-07-25, which made PROXY_POOL_URLS opt-OUT: a job
+    that never mentioned the flag still had a DC proxy attached to every fetch,
+    so one silently-dead pool entry produced 0 usable rendered bodies across a
+    whole 5k run. An unused tier pointing at unverified infrastructure must not
+    be something you have to remember to switch off.
+    """
+    monkeypatch.delenv("ENABLE_DC_PROXY_TIER", raising=False)
+    ff = _reload_flags(monkeypatch, ENABLE_TIER_ESCALATION="true")
+    try:
+        assert ff.ENABLE_DC_PROXY_TIER is False
+    finally:
+        _reload_flags(monkeypatch)
+
+
+def test_dc_proxy_tier_can_still_be_opted_in(monkeypatch) -> None:
+    """The rung is kept, not deleted — an explicit opt-in must still work."""
+    ff = _reload_flags(
+        monkeypatch, ENABLE_TIER_ESCALATION="true", ENABLE_DC_PROXY_TIER="true"
+    )
+    try:
+        assert ff.ENABLE_DC_PROXY_TIER is True
+    finally:
+        _reload_flags(monkeypatch)
+
+
+def test_master_flag_still_gates_the_dc_rung(monkeypatch) -> None:
+    """Master off ⇒ rung off, even with an explicit opt-in."""
+    ff = _reload_flags(
+        monkeypatch, ENABLE_TIER_ESCALATION="false", ENABLE_DC_PROXY_TIER="true"
+    )
+    try:
+        assert ff.ENABLE_DC_PROXY_TIER is False
+    finally:
+        _reload_flags(monkeypatch)

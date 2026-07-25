@@ -14,9 +14,31 @@ ENABLE_TIER_ESCALATION: Final[bool] = (
 )
 
 # Provider-tier flags — keyed off the master flag. If master is off, all are off.
+#
+# ENABLE_DC_PROXY_TIER defaults **OFF** as of 2026-07-25. It previously defaulted
+# ON, which made ``PROXY_POOL_URLS`` opt-OUT: any job that did not explicitly
+# disable it had a datacentre proxy attached to every fetch, RENDER included.
+# When the pool's single entry (a rented DC proxy) silently disappeared — every
+# port black-holing, not even refusing — Chromium failed EVERY navigation and a
+# whole 5k run produced 0 usable rendered bodies out of 10,677 fetch attempts,
+# while still reporting 71% "success" off the static-HTML fallback. The run that
+# survived did so only because someone had set the flag false by hand.
+#
+# The rung is also redundant in the current architecture: DIRECT static first,
+# then Hyperbrowser (free on the RealPage account, full browser + CF clearance),
+# then BrightData residential as backup. The DC rung's niche — a cheap non-GCP
+# exit IP for hosts that block GCP but need no rendering — is covered by HB, and
+# this codebase has repeatedly found blocks to be browser-solvable rather than
+# IP-solvable (the RESIDENTIAL tier was previously dropped as 100% wasted; the
+# 2026-07-12 audit found 87% of blocks CF-managed and browser-solvable).
+#
+# The code path is deliberately KEPT, not deleted: zero firings with the flag off
+# is not evidence it was useless when on, and no historical measurement exists
+# either way. Set ENABLE_DC_PROXY_TIER=1 to re-enable if a need is measured —
+# but point PROXY_POOL_URLS at a proxy that is verified live first.
 ENABLE_DC_PROXY_TIER: Final[bool] = (
     ENABLE_TIER_ESCALATION
-    and os.environ.get("ENABLE_DC_PROXY_TIER", "true").lower() == "true"
+    and os.environ.get("ENABLE_DC_PROXY_TIER", "false").lower() == "true"
 )
 ENABLE_RESIDENTIAL_TIER: Final[bool] = (
     ENABLE_TIER_ESCALATION
