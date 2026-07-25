@@ -14,6 +14,7 @@ Jugnu deltas applied:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -73,11 +74,75 @@ _MERGE_LIST_KEYS: tuple[str, ...] = (
 # selectors) discovered while crawling the sub-page were silently
 # dropped on the TIER_MERGED_CROSS_PAGE path — see
 # tests/integration/test_phase9_merge_preserves_learning.py.
+# Floor for a single in-flight link-hop fetch. The hop wall-clock budget caps
+# the loop, but an almost-spent budget must still allow a genuine attempt
+# rather than cancelling the fetch the instant it starts.
+_MIN_HOP_FETCH_S: float = 20.0
+
 _MERGE_DICT_KEYS: tuple[str, ...] = (
     "_llm_analysis_results",
     "_llm_hints",
     "_explored_links",
 )
+
+
+def checkpoint_partial(
+    shared_budget: dict[str, Any] | None,
+    units: list[Any] | None = None,
+    *,
+    tier_used: str | None = None,
+    winning_page_url: str | None = None,
+) -> None:
+    """Checkpoint salvageable progress so a per-property TIMEOUT is not a total loss.
+
+    ``asyncio.wait_for`` cancels the scrape coroutine, destroying every local it
+    owns. ``_external_partial_ref`` is a dict created in the CALLER's scope
+    (``jugnu._process_one``), so anything written into it survives cancellation
+    and is read by the timeout handler.
+
+    RCA 2026-07-25: this checkpoint previously existed ONLY inside the link-hop
+    floor-plan accumulation loop, so just 6.9% of timed-out properties salvaged
+    any data — everything that died on the single-page path, mid-extraction, or
+    before the multi-page crawl was a total loss. Calling this at every point
+    where units (or route knowledge) become known widens that salvage.
+
+    Args:
+        shared_budget: the scrape's shared budget dict (carries the external
+            ref). No-op when None or when no external ref is registered.
+        units: units known so far. Only overwrites a previous checkpoint when
+            it is at least as large, so a later partial view can never shrink
+            an earlier richer one.
+        tier_used: extraction tier that produced ``units`` — without it a
+            salvage ships ``tier_used=None`` and a real Tier-1 recovery is not
+            counted as gold.
+        winning_page_url: the URL that actually produced units. Persisted by the
+            timeout handler onto ``profile.navigation.winning_page_url`` so the
+            NEXT run starts warm instead of re-paying full discovery — the
+            compounding "timed-out properties never learn" trap.
+
+    Never raises: a checkpoint failure must never break a live scrape.
+    """
+    if shared_budget is None:
+        return
+    try:
+        ext_ref = shared_budget.get("_external_partial_ref")
+        if not isinstance(ext_ref, dict):
+            return
+        if units:
+            prior = ext_ref.get("units")
+            if not isinstance(prior, list) or len(units) >= len(prior):
+                ext_ref["units"] = list(units)
+                shared_budget["_partial_units"] = list(units)
+        if tier_used:
+            ext_ref["tier_used"] = tier_used
+        if winning_page_url:
+            hints = ext_ref.get("profile_hints")
+            if not isinstance(hints, dict):
+                hints = {}
+                ext_ref["profile_hints"] = hints
+            hints["winning_page_url"] = winning_page_url
+    except Exception:  # pragma: no cover — defensive only
+        pass
 
 
 def _merge_post_hop_telemetry(
@@ -2034,6 +2099,16 @@ async def scrape(
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
     result["extraction_tier_used"] = adapter_result.tier_used or None
+    # Salvage checkpoint for the SINGLE-PAGE path (RCA 2026-07-25). Everything
+    # after this point — enrichment, null-field recovery, plan snapping — can
+    # still burn the per-property budget; without this, a timeout there threw
+    # away units that were already in hand.
+    checkpoint_partial(
+        shared_budget,
+        adapter_result.units,
+        tier_used=adapter_result.tier_used or None,
+        winning_page_url=adapter_result.winning_url or None,
+    )
     result["errors"].extend(adapter_result.errors)
     result["api_calls_intercepted"] = [r.get("url", "") for r in adapter_result.api_responses]
     # Surface full {url, body} records and the winning URL so downstream
@@ -3041,7 +3116,21 @@ async def _try_link_hop(
     # pool slot instead of wedging it for 10 minutes.
     from ma_poc.config.feature_flags import LINK_HOP_BUDGET_S
 
-    _hop_deadline = time.monotonic() + float(LINK_HOP_BUDGET_S)
+    # The deadline is PER-PROPERTY, not per-call. _try_link_hop is re-entered
+    # (post-hop re-crawl, render-on-empty escalation); computing a fresh
+    # deadline on every entry made the budget unbounded in aggregate — one
+    # property chained 8 hops over ~2,900s against a nominal 150s budget
+    # (RCA 2026-07-25). Stash it in shared_budget so re-entry INHERITS the
+    # original deadline instead of resetting it.
+    _hop_deadline: float
+    if shared_budget is not None and isinstance(
+        shared_budget.get("_hop_deadline"), (int, float)
+    ):
+        _hop_deadline = float(shared_budget["_hop_deadline"])
+    else:
+        _hop_deadline = time.monotonic() + float(LINK_HOP_BUDGET_S)
+        if shared_budget is not None:
+            shared_budget["_hop_deadline"] = _hop_deadline
 
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
@@ -3099,7 +3188,26 @@ async def _try_link_hop(
             parent_task_id=None,
         )
         try:
-            sub_fetch = await jugnu_fetch(sub_task)
+            # Bound the IN-FLIGHT hop to whatever budget remains. The deadline
+            # check above only stops new hops from STARTING; a hop admitted at
+            # t=149s of a 150s budget used to run to completion unbounded (a
+            # tarpitting host held it for 100-560s), so the budget did not cap
+            # anything in the cases that mattered (RCA 2026-07-25). Floor the
+            # allowance so an almost-spent budget still gives a real attempt
+            # rather than an instant cancel.
+            _hop_remaining = max(_MIN_HOP_FETCH_S, _hop_deadline - time.monotonic())
+            sub_fetch = await asyncio.wait_for(
+                jugnu_fetch(sub_task), timeout=_hop_remaining
+            )
+        except TimeoutError:
+            emit(
+                EventKind.LINK_HOP_FETCHED,
+                property_id,
+                url=sub_url,
+                outcome="HOP_FETCH_BUDGET_EXCEEDED",
+                hop_index=idx,
+            )
+            break
         except Exception as exc:
             emit(EventKind.LINK_HOP_FETCHED, property_id, url=sub_url, error=str(exc)[:200], hop_index=idx)
             continue
@@ -3622,6 +3730,13 @@ async def _try_link_hop(
                 seen_ids.add(key_str)
                 deduped.append(u)
         _first_successful_result["units"] = deduped
+        # Post-dedupe checkpoint: this is the authoritative hop-crawl unit set.
+        checkpoint_partial(
+            shared_budget,
+            deduped,
+            tier_used=_first_successful_result.get("extraction_tier_used"),
+            winning_page_url=_best_units_page[0] or None,
+        )
         existing_explored = _first_successful_result.get("_explored_links") or {}
         existing_explored.update(explored)
         _first_successful_result["_explored_links"] = existing_explored
@@ -4155,6 +4270,11 @@ async def scrape_jugnu(
                                 u.pop("_provenance", None)
                             result["units"] = legacy
                             result["extraction_tier_used"] = "TIER_MERGED_CROSS_PAGE"
+                            checkpoint_partial(
+                                _jugnu_budget,
+                                legacy,
+                                tier_used="TIER_MERGED_CROSS_PAGE",
+                            )
                             # Combine telemetry from main + sub-page so the
                             # self-learning loop sees every mapping, blocked
                             # endpoint, CSS selector, and explored link the
@@ -4246,6 +4366,9 @@ async def scrape_jugnu(
 
             snapped = snap_units(extracted_units, property_id)
             result["units"] = snapped
+            checkpoint_partial(
+                _jugnu_budget, snapped, tier_used=result.get("extraction_tier_used")
+            )
             # Telemetry: how many rows snapped, and which reason set fired.
             snap_reasons: dict[str, int] = {}
             for u in snapped:

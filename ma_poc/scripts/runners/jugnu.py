@@ -647,16 +647,41 @@ async def run_jugnu(
             # timed-out run accelerates the next run even if this one yielded
             # no units. Units are still only persisted when present (no blank
             # rows) — this is route/selector knowledge, not fabricated data.
+            #
+            # 2026-07-25 RCA: the block above was DEAD. Nothing ever wrote
+            # ``partial_state["profile"]`` (verified: no writer anywhere outside
+            # tests), so ``_partial_profile`` was always None and 0 "next run
+            # starts warm" lines appeared across 366 timeouts in the 5k canary.
+            # Timed-out properties therefore stayed COLD forever and re-paid
+            # full discovery every run — the vicious cycle the 2026-05-19 note
+            # claimed to have broken was still running.
+            #
+            # The scraper now checkpoints route knowledge into
+            # ``partial_state["profile_hints"]`` via
+            # ``pms.scraper.checkpoint_partial`` as soon as a page yields units.
+            # Load the property's profile here and persist just that knowledge.
+            # Deliberately narrow: only ``winning_page_url`` (the URL that
+            # actually produced units) is written. Success counters, maturity
+            # promotion and tier preference are NOT touched — this run timed
+            # out, so it must not look like a success to the profile updater.
             try:
-                if _partial_profile is not None and hasattr(profile_store, "save"):
-                    profile_store.save(_partial_profile)
-                    log.info(
-                        "Property %s: persisted discovered profile from "
-                        "timed-out run (units=%d) — next run starts warm",
-                        task.property_id, len(_partial_units),
-                    )
+                _hints = _partial_state.get("profile_hints")
+                _winning = (_hints or {}).get("winning_page_url") if isinstance(_hints, dict) else None
+                if _winning and hasattr(profile_store, "save"):
+                    _prof = _partial_profile
+                    if _prof is None and hasattr(profile_store, "get_profile"):
+                        _prof = profile_store.get_profile(task.property_id)
+                    if _prof is not None and getattr(_prof, "navigation", None) is not None:
+                        if _prof.navigation.winning_page_url != _winning:
+                            _prof.navigation.winning_page_url = _winning
+                            profile_store.save(_prof)
+                            log.info(
+                                "Property %s: persisted winning_page_url=%s from "
+                                "timed-out run (units=%d) — next run starts warm",
+                                task.property_id, _winning, len(_partial_units),
+                            )
             except Exception as _ps_exc:
-                log.warning("partial profile_store.save failed: %s", _ps_exc)
+                log.warning("partial profile persist failed: %s", _ps_exc)
             failed = _make_failed_record(
                 task.property_id,
                 task.url,
