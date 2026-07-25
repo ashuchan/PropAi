@@ -119,3 +119,103 @@ def test_min_hop_fetch_floor_keeps_a_real_attempt_possible() -> None:
     # the in-flight allowance is max(floor, remaining) — never zero/negative
     for remaining in (-100.0, 0.0, 3.0, 90.0):
         assert max(_MIN_HOP_FETCH_S, remaining) >= _MIN_HOP_FETCH_S
+
+
+# ── 1. timed-out properties must LEARN their route (end-to-end) ─────────────
+
+class _FakeNav:
+    def __init__(self, winning_page_url: str | None = None) -> None:
+        self.winning_page_url = winning_page_url
+
+
+class _FakeProfile:
+    def __init__(self, winning_page_url: str | None = None) -> None:
+        self.navigation = _FakeNav(winning_page_url)
+
+
+class _FakeStore:
+    """Minimal stand-in for ProfileStore (get_profile / save)."""
+
+    def __init__(self, profile: Any | None = None) -> None:
+        self._profile = profile
+        self.saved: list[Any] = []
+
+    def get_profile(self, _pid: str) -> Any | None:
+        return self._profile
+
+    def save(self, profile: Any) -> None:
+        self.saved.append(profile)
+
+
+def _persist():
+    from ma_poc.scripts.runners.jugnu import persist_timeout_route_hints
+
+    return persist_timeout_route_hints
+
+
+def test_timeout_persists_route_end_to_end() -> None:
+    """scraper checkpoint -> partial_state -> profile write.
+
+    Exercises the REAL chain: checkpoint_partial writes the hint into the
+    caller-scoped dict (the one that survives cancellation), and the timeout
+    handler's helper turns it into a persisted winning_page_url.
+    """
+    budget, ext = _budget_with_ref()
+    # what the scraper does when a page yields units
+    checkpoint_partial(
+        budget,
+        [{"unit_number": "12"}],
+        tier_used="TIER_1_API",
+        winning_page_url="https://x.com/floorplans",
+    )
+
+    store = _FakeStore(_FakeProfile())
+    wrote = _persist()(store, "P1", ext, unit_count=1)
+
+    assert wrote is True
+    assert len(store.saved) == 1
+    assert store.saved[0].navigation.winning_page_url == "https://x.com/floorplans"
+
+
+def test_timeout_persists_route_even_with_zero_units() -> None:
+    """The case that kept properties COLD: discovery worked, extraction didn't."""
+    budget, ext = _budget_with_ref()
+    checkpoint_partial(budget, None, winning_page_url="https://x.com/availability")
+
+    store = _FakeStore(_FakeProfile())
+    assert _persist()(store, "P1", ext, unit_count=0) is True
+    assert store.saved[0].navigation.winning_page_url == "https://x.com/availability"
+
+
+def test_timeout_persist_is_idempotent_and_narrow() -> None:
+    # unchanged URL → no write (no pointless version bump)
+    budget, ext = _budget_with_ref()
+    checkpoint_partial(budget, None, winning_page_url="https://x.com/fp")
+    store = _FakeStore(_FakeProfile("https://x.com/fp"))
+    assert _persist()(store, "P1", ext) is False
+    assert store.saved == []
+
+    # a timeout must NOT look like a success: no success/maturity fields touched
+    budget2, ext2 = _budget_with_ref()
+    checkpoint_partial(budget2, None, winning_page_url="https://x.com/new")
+    prof = _FakeProfile("https://x.com/old")
+    prof.confidence = type("C", (), {"consecutive_successes": 0, "preferred_tier": None})()
+    store2 = _FakeStore(prof)
+    assert _persist()(store2, "P1", ext2) is True
+    assert prof.confidence.consecutive_successes == 0
+    assert prof.confidence.preferred_tier is None
+
+
+def test_timeout_persist_never_raises_on_bad_inputs() -> None:
+    p = _persist()
+    assert p(_FakeStore(_FakeProfile()), "P1", None) is False          # no state
+    assert p(_FakeStore(_FakeProfile()), "P1", {}) is False            # no hints
+    assert p(_FakeStore(_FakeProfile()), "P1", {"profile_hints": {}}) is False  # no url
+    assert p(_FakeStore(None), "P1", {"profile_hints": {"winning_page_url": "u"}}) is False
+    assert p(object(), "P1", {"profile_hints": {"winning_page_url": "u"}}) is False  # no save()
+
+    class _Boom:
+        def get_profile(self, _p): raise RuntimeError("store down")
+        def save(self, _p): ...
+
+    assert p(_Boom(), "P1", {"profile_hints": {"winning_page_url": "u"}}) is False

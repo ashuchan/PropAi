@@ -664,24 +664,14 @@ async def run_jugnu(
             # actually produced units) is written. Success counters, maturity
             # promotion and tier preference are NOT touched — this run timed
             # out, so it must not look like a success to the profile updater.
-            try:
-                _hints = _partial_state.get("profile_hints")
-                _winning = (_hints or {}).get("winning_page_url") if isinstance(_hints, dict) else None
-                if _winning and hasattr(profile_store, "save"):
-                    _prof = _partial_profile
-                    if _prof is None and hasattr(profile_store, "get_profile"):
-                        _prof = profile_store.get_profile(task.property_id)
-                    if _prof is not None and getattr(_prof, "navigation", None) is not None:
-                        if _prof.navigation.winning_page_url != _winning:
-                            _prof.navigation.winning_page_url = _winning
-                            profile_store.save(_prof)
-                            log.info(
-                                "Property %s: persisted winning_page_url=%s from "
-                                "timed-out run (units=%d) — next run starts warm",
-                                task.property_id, _winning, len(_partial_units),
-                            )
-            except Exception as _ps_exc:
-                log.warning("partial profile persist failed: %s", _ps_exc)
+            if persist_timeout_route_hints(
+                profile_store,
+                task.property_id,
+                _partial_state,
+                unit_count=len(_partial_units),
+                profile=_partial_profile,
+            ):
+                pass  # logged inside the helper
             failed = _make_failed_record(
                 task.property_id,
                 task.url,
@@ -3357,6 +3347,75 @@ def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
             _f.write(line + "\n")
     except Exception as exc:
         log.debug("_append_issue_to_run failed: %s", exc)
+
+
+def persist_timeout_route_hints(
+    profile_store: Any,
+    property_id: str,
+    partial_state: dict[str, Any] | None,
+    *,
+    unit_count: int = 0,
+    profile: Any | None = None,
+) -> bool:
+    """Persist route knowledge discovered by a property that TIMED OUT.
+
+    Returns True when a profile was actually written.
+
+    Why this exists (RCA 2026-07-25): the previous implementation read
+    ``partial_state["profile"]``, a key **nothing ever wrote**. The live 5k
+    canary logged zero "next run starts warm" lines across 366 timeouts, so
+    every timed-out property stayed COLD and re-paid full discovery on the next
+    run — a compounding trap that also caps the warm-profile ratio the
+    fast-path levers depend on. ``pms.scraper.checkpoint_partial`` now records
+    the URL that actually produced units under
+    ``partial_state["profile_hints"]["winning_page_url"]``, and this persists it.
+
+    Deliberately NARROW. Only ``navigation.winning_page_url`` is written. A run
+    that timed out must not look like a success to the profile updater, so
+    success counters, maturity promotion and ``preferred_tier`` are untouched —
+    this is route knowledge, not an extraction outcome.
+
+    Args:
+        profile_store: store exposing ``get_profile(id)`` and ``save(profile)``.
+        property_id: canonical property id.
+        partial_state: the caller-scoped dict that survived coroutine
+            cancellation (see ``checkpoint_partial``).
+        unit_count: units salvaged, for the log line only.
+        profile: an already-loaded profile, if the caller has one.
+
+    Never raises — a persistence failure must not mask the timeout itself.
+    """
+    try:
+        if not isinstance(partial_state, dict):
+            return False
+        hints = partial_state.get("profile_hints")
+        if not isinstance(hints, dict):
+            return False
+        winning = hints.get("winning_page_url")
+        if not winning or not hasattr(profile_store, "save"):
+            return False
+
+        prof = profile
+        if prof is None and hasattr(profile_store, "get_profile"):
+            prof = profile_store.get_profile(property_id)
+        nav = getattr(prof, "navigation", None)
+        if prof is None or nav is None:
+            return False
+        # Idempotent: an unchanged URL is not worth a version bump.
+        if getattr(nav, "winning_page_url", None) == winning:
+            return False
+
+        nav.winning_page_url = winning
+        profile_store.save(prof)
+        log.info(
+            "Property %s: persisted winning_page_url=%s from timed-out run "
+            "(units=%d) — next run starts warm",
+            property_id, winning, unit_count,
+        )
+        return True
+    except Exception as exc:
+        log.warning("persist_timeout_route_hints failed for %s: %s", property_id, exc)
+        return False
 
 
 def _salvage_unit_has_numeric_rent(unit: dict[str, Any]) -> bool:
