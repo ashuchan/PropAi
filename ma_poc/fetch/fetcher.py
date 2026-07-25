@@ -558,7 +558,11 @@ class Fetcher:
         used_proxy = False
         try:
             # Force-disable proxy on this call regardless of PROBE_PROXY_URL.
-            r = probe_get(task.url, timeout=20, proxies={}, verify=True)
+            # probe_get is BLOCKING curl_cffi — off-load it, or it freezes the
+            # whole shard's event loop (all pool workers) for up to `timeout`.
+            r = await asyncio.to_thread(
+                probe_get, task.url, timeout=20, proxies={}, verify=True
+            )
         except Exception as exc:
             log.warning(
                 "curl_cffi direct fallback fetch failed for %s: %s",
@@ -575,7 +579,7 @@ class Fetcher:
             "PROBE_PROXY_URL", ""
         ).strip():
             try:
-                r2 = probe_get(task.url, timeout=20)
+                r2 = await asyncio.to_thread(probe_get, task.url, timeout=20)
             except Exception as exc:
                 log.warning(
                     "curl_cffi proxied fallback fetch failed for %s: %s",

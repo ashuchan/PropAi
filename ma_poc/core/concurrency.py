@@ -117,8 +117,21 @@ class SystemResources:
         usable_ram = int(self.available_ram_bytes * ram_budget_fraction)
         ram_limit = max(1, usable_ram // ram_per_worker_bytes)
 
-        # Constraint 2 — CPU (I/O-bound heuristic: 2× cores)
-        cpu_limit = max(1, self.cpu_count * 2)
+        # Constraint 2 — CPU. The 2× heuristic assumes the workers are purely
+        # I/O-bound. Measured 2026-07-25 (5k canary RCA): they are NOT — each
+        # property does synchronous CPU work on the shared event loop (lxml /
+        # BeautifulSoup over 100-250KB bodies, plus any blocking probe that has
+        # not been off-loaded). At 2× cores the loop starves: asyncio.wait_for
+        # overshot its own deadline by a median of 20s (p90 81s, max 261s), and
+        # mean per-property wall time reached ~305s against a 600s cap, so ~10%
+        # of properties were clipped at random. CPU_OVERSUBSCRIBE tunes the
+        # multiplier; 1.0 (one worker per core) is the measured-safe default.
+        try:
+            _oversub = float(os.environ.get("CPU_OVERSUBSCRIBE", "1.0"))
+        except ValueError:
+            _oversub = 1.0
+        _oversub = min(4.0, max(0.5, _oversub))
+        cpu_limit = max(1, int(self.cpu_count * _oversub))
 
         # Constraint 3 — environment override
         env_val = os.environ.get(env_override_key)
@@ -136,7 +149,7 @@ class SystemResources:
             f"Pool size calculation: "
             f"ram_limit={ram_limit} (avail={self.available_ram_bytes / (1024**3):.1f}GB, "
             f"budget={ram_budget_fraction:.0%}, per_worker={ram_per_worker_bytes // (1024**2)}MB), "
-            f"cpu_limit={cpu_limit} (cores={self.cpu_count}), "
+            f"cpu_limit={cpu_limit} (cores={self.cpu_count}, oversub={_oversub:g}), "
             f"env_limit={env_limit} → pool_size={pool_size}"
         )
         return pool_size
