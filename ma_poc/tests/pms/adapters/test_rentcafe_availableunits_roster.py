@@ -202,3 +202,80 @@ async def test_probe_exception_is_never_fatal(monkeypatch: pytest.MonkeyPatch) -
 
     result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
     assert len(result.units) == 3
+
+
+# ── SecureCafe portal fallback (404/403 on the vanity route) ────────────────
+
+_SC_PORTAL_HTML = (
+    # Cut verbatim from a live fetch of
+    # modaatthehill.securecafe.com/onlineleasing/moda-at-the-hill/availableunits.aspx
+    # (HTTP 200, 111KB, 20 AvailUnitRow rows). Trimmed to the first floor-plan
+    # header + its first row, which still parses to exactly 1 unit.
+    "<html><body><table><caption>"
+    'Floor Plan: The Campbell - 2 Bedrooms, 1 Bathroom</caption><thead><tr><th class=\'table-header tcolumn text-left\' data-label=\'Apartment\' scope=\'col\'>Apartment</th><th class=\'table-header tcolumn text-center\' data-label=\'Sq. Ft.\' scope=\'col\'><span>Sq.Ft.</span></th><th class=\'table-header tcolumn text-center\' data-label=\'Rent\' scope=\'col\'>Rent</th><th class=\'table-header tcolumn text-center\' data-label=\'Availability\' scope=\'col\'>Date Available</th><th class=\'table-header tcolumn text-center\' data-label=\'Action\' scope=\'col\'>Action</th></tr></thead><tbody><tr class=\'AvailUnitRow\'  data-selenium-id=\'urow1\' id=\'unitrow_32163017\' scope=\'row\' FloorPlateID=\'0\' ><th class=\'text-left\' data-selenium-id=\'Apt1\' id=\'32163017\' data-label=\'Apartment\'>#311</th><td class=\'text-center\' data-selenium-id=\'SqFt1\' data-label=Sq.Ft.>855</td><td  data-selenium-id=\'Rent1\'  style="" class=\'text-center\' data-label=\'Rent\'>$2,670-$7,055</td><td data-selenium-id=\'AvailDate1\' data-label=\'Date Available\'><span class=\'text-success\'>Available</span></td><td class=\'text-center\' \' data-selenium-id=\'Action1\' data-label=\'Action\'><input type="button" data-selenium-id=\'btnUnitSelect1\' class="UnitSelect btn btn-primary" id="311" value = "Select" aria-describedby="32163017" onclick=SetTermsUrl(\'rentaloptions.aspx?UnitID=32163017&FloorPlanID=4285110&myOlePropertyid=1471013&MoveInDate=7/26/2026\')></td></tr>'
+    "</table></body></html>"
+)
+
+
+@pytest.mark.asyncio
+async def test_securecafe_portal_recovers_a_404_vanity_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When {origin}/availableunits 404s, the same roster is usually mounted at
+    {sub}.securecafe.com/onlineleasing/{slug}/availableunits.aspx.
+
+    Live-measured 2026-07-25 on the plan-level cohort: the vanity route covers
+    70% of the 571 SecureCafe properties; this fallback recovered 8 of the 12
+    sampled failures (Moda at the Hill 20 units, Mihir Taylor 33, Alicante 26,
+    Grove Parkview 17, The Vue 12, Arlington West 11, Marina Key 7, Oak Creek
+    6). Together: 36 of 40 — 90% of the block.
+    """
+    seen: list[str] = []
+    listing = (
+        '<html><body><a href="https://demo.securecafe.com/onlineleasing/demo-props/'
+        'oleapplication.aspx">Apply Now</a></body></html>'
+    )
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(404, "")
+        if url.endswith("/floorplans"):
+            return _Resp(200, listing)
+        if "securecafe.com" in url and url.endswith("availableunits.aspx"):
+            return _Resp(200, _SC_PORTAL_HTML)
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert any("securecafe.com" in u for u in seen), "portal was never tried"
+    assert len(result.units) == 1
+    u = result.units[0]
+    # Real values from the Moda at the Hill portal page.
+    assert u["unit_number"] == "311"
+    assert u["floor_plan_name"] == "The Campbell"
+    assert u["sqft"] == "855"
+    # Internal keys at this layer; the v2 formatter maps them to rent_low/high.
+    assert u["market_rent_low"] == 2670
+    assert u["market_rent_high"] == 7055
+    assert u["extraction_tier"] == "TIER_1_API_RENTCAFE_SECURECAFE"
+    assert result.winning_url.endswith("availableunits.aspx")
+
+
+@pytest.mark.asyncio
+async def test_portal_is_not_tried_when_the_vanity_route_worked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cost guard: the vanity route already covers ~70% of this cohort. Firing
+    the portal anyway would add a wasted request on ~400 properties."""
+    seen: list[str] = []
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(200, AVAILABLEUNITS_HTML)
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert len(result.units) == 3
+    assert not any("securecafe.com" in u for u in seen)

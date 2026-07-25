@@ -439,12 +439,15 @@ class RentCafeLayoutTabAdapter:
         # properties in the 2026-07-25 run) which fell back to plan rows while
         # the complete rent roll sat one well-known URL away.
         avail_url = origin + "/availableunits"
+        roster_units: list[dict] = []
         try:
             ra = probe_get(avail_url, timeout=20)
             if getattr(ra, "status_code", 0) == 200:
-                roster = parse_rentcafe_lt_applyga(getattr(ra, "text", "") or "", avail_url)
-                if roster:
-                    return self._finish_code_only(ctx, result, roster, avail_url)
+                roster_units = parse_rentcafe_lt_applyga(
+                    getattr(ra, "text", "") or "", avail_url
+                )
+                if roster_units:
+                    return self._finish_code_only(ctx, result, roster_units, avail_url)
         except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
             result.errors.append(f"rentcafe_lt: /availableunits probe failed: {exc}")
 
@@ -459,6 +462,47 @@ class RentCafeLayoutTabAdapter:
                 listing = r.text
         except Exception as exc:  # noqa: BLE001 — best-effort
             result.errors.append(f"rentcafe_lt: /floorplans probe failed: {exc}")
+
+        # 2026-07-25 — SECURECAFE PORTAL FALLBACK. When the vanity
+        # ``{origin}/availableunits`` route is absent (404) or blocked (403),
+        # the same roster is usually mounted on the Yardi leasing portal at
+        # ``{sub}.securecafe.com/onlineleasing/{slug}/availableunits.aspx``.
+        #
+        # Measured on the 2026-07-25 plan-level cohort: 571 of 1,126 (51%)
+        # carry a SecureCafe fingerprint — the single largest surface in the
+        # cohort. A live sample of 40 showed the vanity route already recovers
+        # 70% of them; the remaining ~30% are exactly the 404/403 cases this
+        # covers.
+        #
+        # Both halves already existed — _find_all_securecafe_bases discovers
+        # the base and parse_securecafe_availableunits reads the page — but
+        # nothing connected them on this path. Same "parser exists, discovery
+        # missing" shape as the /availableunits lever itself.
+        if not roster_units:
+            try:
+                from ma_poc.pms.adapters.rentcafe import (
+                    _find_all_securecafe_bases,
+                    parse_securecafe_availableunits,
+                )
+
+                for _base in _find_all_securecafe_bases(listing, ctx)[:3]:
+                    _sc_url = _base.rstrip("/") + "/availableunits.aspx"
+                    try:
+                        _sr = probe_get(_sc_url, timeout=20)
+                    except Exception:
+                        continue
+                    if getattr(_sr, "status_code", 0) != 200:
+                        continue
+                    _sc_rows = parse_securecafe_availableunits(
+                        getattr(_sr, "text", "") or "", _sc_url
+                    )
+                    if _sc_rows:
+                        return self._finish_code_only(
+                            ctx, result, _sc_rows, _sc_url,
+                            detail="securecafe availableunits.aspx",
+                        )
+            except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+                result.errors.append(f"rentcafe_lt: securecafe hop failed: {exc}")
 
         collected: list[dict] = []
         # The rendered listing may already carry unit anchors inline — parse
