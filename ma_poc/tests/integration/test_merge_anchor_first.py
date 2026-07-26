@@ -20,8 +20,10 @@ for _name in ("playwright", "playwright.async_api"):
         sys.modules[_name] = _mod
 
 from ma_poc.observability import events as ev_module
+from ma_poc.pms.adapters._merge_fns import (
+    availability_count_aware_merge as _availability_count_aware_merge,
+)
 from ma_poc.pms.adapters.generic import (
-    _availability_count_aware_merge,
     _merge_into_result_units,
 )
 

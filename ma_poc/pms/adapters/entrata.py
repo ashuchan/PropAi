@@ -1062,6 +1062,82 @@ def _pp_plan_url_match(url: str) -> tuple[str, str] | None:
     return None
 
 
+#: Markers that mean "this ProspectPortal plan-detail page carries a
+#: per-apartment roster". MUST stay in sync with the templates
+#: ``parse_entrata_pp_unit_cards`` can actually parse:
+#:   U1  ``.unit-card``   — the card template
+#:   U2  ``.option-row`` inside ``.fp-units-table`` — the Aria/Grand Oaks
+#:       tabular template, handled by ``_parse_pp_option_rows``
+#: Matched on a CLASS BOUNDARY, not as a bare substring. "unit-card" as a
+#: substring also matches Jonah Digital's ``jd-fp-unit-card`` (live:
+#: livethewatts.com/floorplans/ has 46 of them and ZERO Entrata elements),
+#: which would hand a foreign vendor's page to the Entrata parser for a
+#: guaranteed-empty parse.
+_PP_PLAN_UNIT_MARKERS_RE = re.compile(
+    r"(?<![-\w])(?:unit-card|fp-units-table|option-row)(?![-\w])"
+)
+
+
+#: ProspectPortal plan-index href: ``/{city-slug}/{property-slug}/conventional/``.
+#: Absolute or root-relative; the trailing slash is optional in the wild.
+_PP_CONVENTIONAL_RE = re.compile(
+    r"""href=["'']((?:https?://[^"'\s]+)?/[a-z0-9][a-z0-9\-]*/[a-z0-9][a-z0-9\-]*/conventional/?)["'']""",
+    re.IGNORECASE,
+)
+
+
+def _find_pp_conventional_index(html: str, base: str) -> list[str]:
+    """Absolute ``/{city}/{slug}/conventional/`` URLs found in *html*.
+
+    The slug shape cannot be derived from CSV fields — live examples are
+    ``/rockville/fenestra-at-the-square/``,
+    ``/oklahoma-city-oklahoma-city/garden-gate/`` and
+    ``/corvallis-corvallis/grand-oaks-grand-oaks/``, where city and property
+    are each sometimes doubled. So it is read off the page's own anchors.
+
+    Same-host only: a ProspectPortal vanity site can link a sibling property,
+    and drilling someone else's roster would attribute their apartments here.
+    """
+    if not html:
+        return []
+    from urllib.parse import urljoin, urlparse
+
+    base_host = urlparse(base).netloc.lower() if base else ""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _PP_CONVENTIONAL_RE.finditer(html):
+        url = urljoin(base or "", m.group(1))
+        host = urlparse(url).netloc.lower()
+        # Allow the vanity host itself and its prospectportal twin.
+        if base_host and host != base_host and not host.endswith("prospectportal.com"):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
+def _pp_plan_page_has_units(plan_html: str) -> bool:
+    """True when a plan-detail page looks like it carries a unit roster.
+
+    2026-07-25: the per-plan drill used to gate on ``"unit-card" in
+    plan_html`` alone, which is only template U1. Template U2 pages — no
+    ``.unit-card`` anywhere, roster rendered as ``.option-row`` inside
+    ``.fp-units-table`` — were SKIPPED BEFORE the parser ran, even though
+    ``parse_entrata_pp_unit_cards`` already falls back to
+    ``_parse_pp_option_rows`` for exactly that shape.
+
+    So the U2 branch was unreachable from the drill: the parser was correct
+    and simply never handed the page. Live example — grandoakscommunity.com
+    plan 2X2A has unit-card=0, option-row=4, fp-units-table=1 and holds 3
+    real apartments (D103 $1,939 / F302 $2,049 / G202 $1,939).
+    """
+    if not plan_html:
+        return False
+    return bool(_PP_PLAN_UNIT_MARKERS_RE.search(plan_html))
+
+
 def _pp_extract_card_uid(card: Any) -> str:
     """Return the stable PP unit id (``data-unit-id`` / ``data-uid`` /
     ``data-uspid`` / ``unit-item-details-<n>`` class suffix). Empty
@@ -1217,12 +1293,33 @@ def _parse_pp_option_rows(
         # ``.unit-rent`` / ``.fee-transparency-text`` selectors when
         # present so we never grab a deposit / concession dollar
         # token by accident.
-        rent_el = row.select_one(
-            ".detail.second .unit-rent, "
-            ".detail.second .fee-transparency-text, "
-            ".detail.second"
-        )
-        rent_text = rent_el.get_text(" ", strip=True) if rent_el else ""
+        # 2026-07-25 — MUST be tried in priority order, one select_one per
+        # selector. A single comma-separated selector returns the first match
+        # in DOCUMENT ORDER, not in selector order, and PP renders the
+        # Building cell as a bare ``.detail.second`` BEFORE the rent cell — so
+        # the broad third alternative won, rent_text came back "Building D",
+        # and every unit on the page shipped with a null rent while still
+        # carrying a real unit_number.
+        #
+        # Live-verified on grandoakscommunity.com plan 2X2A: units D103 /
+        # F302 / G202 all extracted correctly but rent-less before this fix;
+        # $1,939 / $2,049 / $1,939 after.
+        rent_text = ""
+        for sel in (
+            ".detail.second .unit-rent",
+            ".detail.second .fee-transparency-text",
+            ".detail.second",
+        ):
+            el = row.select_one(sel)
+            if el is None:
+                continue
+            candidate = el.get_text(" ", strip=True)
+            if _pp_money_low_high(candidate) != (None, None):
+                rent_text = candidate
+                break
+            # Keep the broadest match as a last resort so a template that
+            # renders rent directly in .detail.second still parses.
+            rent_text = rent_text or candidate
         rent_lo, rent_hi = _pp_money_low_high(rent_text)
 
         lease_el = row.select_one(".lease-term-name")
@@ -1796,6 +1893,44 @@ async def _harvest_view_unit_spaces(
 # RentCafe / etc. on the retry.
 _TIER_BASE = "TIER_1_API_ENTRATA"
 _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
+#: 2026-07-25: the page never LOADED — a bot-management interstitial was
+#: served instead of the site. Distinct from _NO_RESPONSE ("page loaded, no
+#: Entrata XHR seen"), which is an extraction signal. Conflating the two cost
+#: a whole diagnosis cycle: 55 of 60 properties in the ENTRATA_NO_RESPONSE
+#: cohort returned HTTP 403 + a Cloudflare challenge on static fetch, so the
+#: roster was never reachable — yet they read as 60 adapter bugs.
+_TIER_FETCH_BLOCKED = f"{_TIER_BASE}_FETCH_BLOCKED"
+
+#: Cloudflare / bot-management interstitial markers. A challenge page is small
+#: and carries none of the site's own content, so size + marker together are a
+#: reliable discriminator against a genuinely thin marketing shell.
+_CHALLENGE_MARKERS: tuple[str, ...] = (
+    "just a moment",
+    "cdn-cgi/challenge-platform",
+    "cf-browser-verification",
+    "_cf_chl_opt",
+    "checking your browser",
+    "enable javascript and cookies to continue",
+)
+_CHALLENGE_MAX_BYTES = 10_000
+
+
+def _looks_like_challenge_page(html: str | None) -> bool:
+    """True when *html* is a bot-management interstitial, not the site.
+
+    Requires BOTH a small body and a known marker: a real marketing shell can
+    mention "just a moment" in copy, and a large page that embeds the phrase is
+    not a challenge. Never raises.
+    """
+    if not html:
+        return False
+    try:
+        if len(html) > _CHALLENGE_MAX_BYTES:
+            return False
+        low = html.lower()
+        return any(m in low for m in _CHALLENGE_MARKERS)
+    except Exception:  # pragma: no cover - defensive
+        return False
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
@@ -1824,16 +1959,33 @@ def _is_entrata_response(body: Any) -> bool:
 
 def _classify_entrata_failure(
     api_responses: list[dict[str, Any]],
+    page_html: str | None = None,
 ) -> tuple[str, str]:
     """Return (tier_code, machine-readable error message) for a 0-unit
     Entrata extraction.
 
     Tier resolution:
+      * Page body is a bot-management interstitial → ``_FETCH_BLOCKED``
       * No API responses captured at all → ``_NO_RESPONSE``
       * Responses captured but none Entrata-shaped → ``_SHAPE_REJECTED``
       * Otherwise (responses matched but parser produced 0 records) →
         ``_EMPTY``
+
+    The ``_FETCH_BLOCKED`` arm exists because the other three all describe
+    EXTRACTION outcomes, and lumping a failed FETCH in with them is actively
+    misleading. Measured 2026-07-25: 55 of the 60 properties sitting at
+    ``ENTRATA_NO_RESPONSE`` returned HTTP 403 with a Cloudflare challenge on
+    static fetch — the roster was never on the wire — yet the tier name says
+    "no Entrata response", which reads as an adapter bug and sent a whole
+    diagnosis cycle looking for parser gaps that did not exist.
     """
+    if _looks_like_challenge_page(page_html):
+        return (
+            _TIER_FETCH_BLOCKED,
+            "ENTRATA_FETCH_BLOCKED: bot-management interstitial served instead "
+            "of the page — nothing was fetched to extract from. Not an adapter "
+            "failure; retry via the render/CF-clearing path.",
+        )
     if not api_responses:
         return (
             _TIER_NO_RESPONSE,
@@ -2178,6 +2330,49 @@ class EntrataAdapter:
                 )
                 pp_ssr_index_bodies.append((cand_url, cand_html))
 
+            # 2026-07-26 — HARVEST THE PLAN INDEX FROM THE PAGE.
+            #
+            # ProspectPortal mounts its plan grid at
+            # ``/{city-slug}/{property-slug}/conventional/`` — NOT at
+            # ``/floorplans``, which on many of these hosts 302s to the
+            # homepage. The candidate-path probes above therefore find no
+            # index, the per-plan drill has nothing to walk, and the property
+            # ships plan-level.
+            #
+            # The slug shape is NOT derivable: live examples are
+            # ``/rockville/fenestra-at-the-square/``,
+            # ``/oklahoma-city-oklahoma-city/garden-gate/`` and
+            # ``/corvallis-corvallis/grand-oaks-grand-oaks/`` — city and
+            # property are each sometimes doubled. So it is harvested from
+            # the page's own anchors rather than constructed.
+            #
+            # Measured on the 2026-07-26 canary: 20 of the 53 unconverted
+            # Entrata-surface properties (38%) expose this href on their
+            # landing page. Live-verified on gardengateokc.com — the
+            # conventional index yields 19 plan links whose detail pages
+            # carry real apartments (4032 Renovated $1,863).
+            if not pp_ssr_index_bodies:
+                for _conv_url in _find_pp_conventional_index(
+                    fr_body_check if isinstance(fr_body_check, str) else "", base
+                )[:2]:
+                    try:
+                        _conv_html = await _entrata_static_fetch(_conv_url)
+                    except Exception:
+                        continue
+                    if not _conv_html:
+                        continue
+                    if (
+                        "fp-card" not in _conv_html
+                        and "fp-group-item" not in _conv_html
+                        and "fp-name-link" not in _conv_html
+                    ):
+                        continue
+                    pp_ssr_units.extend(
+                        parse_entrata_prospectportal_html(_conv_html, _conv_url)
+                    )
+                    pp_ssr_index_bodies.append((_conv_url, _conv_html))
+                    break
+
             # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
             # Templates A/B/C above produce plan-level rows with
             # ``unit_number=""``; downstream the runner synthesises
@@ -2211,7 +2406,7 @@ class EntrataAdapter:
                         plan_html = await _entrata_static_fetch(plan_url)
                     except Exception:
                         plan_html = ""
-                    if not plan_html or "unit-card" not in plan_html:
+                    if not plan_html or not _pp_plan_page_has_units(plan_html):
                         continue
                     pp_unit_card_rows.extend(
                         parse_entrata_pp_unit_cards(plan_html, plan_url)
@@ -2401,6 +2596,10 @@ class EntrataAdapter:
         # Live-verified against Lumina (pid 72391, liveatlumina.com).
         # Runs BEFORE the empty-exit label below so a successful
         # LeaseLeads recovery returns SUCCESS instead of TIER_*_EMPTY.
+        # Bound unconditionally: the failure classifier below reads this to
+        # tell a blocked FETCH from a missing XHR, and `page` is None on the
+        # body-only paths (and in tests), which previously left it unassigned.
+        html = ""
         if not result.units and page is not None:
             try:
                 html = await page.content()
@@ -2441,7 +2640,7 @@ class EntrataAdapter:
         # markers but no real Entrata inventory backing; the detector
         # picks Entrata at 0.85 based on the marker, the adapter runs
         # empty, and Path B should re-dispatch to the next candidate.
-        tier_code, err_msg = _classify_entrata_failure(api_responses)
+        tier_code, err_msg = _classify_entrata_failure(api_responses, html)
         result.tier_used = tier_code
         result.confidence = 0.0
         result.errors.append(err_msg)

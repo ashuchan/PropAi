@@ -143,6 +143,20 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
             }
           }
         }
+        # Hyperbrowser API key (task #46). Wired unconditionally so a canary is
+        # a pure config flip (set FETCH_BACKEND=hyperbrowser at execution via
+        # --update-env-vars); the switchable backend only READS this when that
+        # flag is on. The secret always has a placeholder version, so this
+        # mount resolves on the default BrightData path too.
+        env {
+          name = "HYPERBROWSER_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = var.hyperbrowser_secret_id
+              version = "latest"
+            }
+          }
+        }
         # CLOUD_RUN_TASK_INDEX and CLOUD_RUN_TASK_COUNT are injected automatically by Cloud Run
       }
     }
@@ -268,6 +282,17 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
           value_source {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id
+              version = "latest"
+            }
+          }
+        }
+        # Hyperbrowser API key (task #46) — mirror the scrape job so a retry
+        # pass with FETCH_BACKEND=hyperbrowser can reach the CF-walled cohort.
+        env {
+          name = "HYPERBROWSER_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = var.hyperbrowser_secret_id
               version = "latest"
             }
           }
@@ -414,6 +439,16 @@ resource "google_cloud_run_v2_job" "jugnu_adhoc" {
           value_source {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id
+              version = "latest"
+            }
+          }
+        }
+        # Hyperbrowser API key (task #46) — available to adhoc canary runs.
+        env {
+          name = "HYPERBROWSER_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = var.hyperbrowser_secret_id
               version = "latest"
             }
           }

@@ -78,9 +78,19 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
     _residential_on = ENABLE_RESIDENTIAL_TIER and not (
         ENABLE_UNLOCKER_TIER and SKIP_RESIDENTIAL_WHEN_UNLOCKER
     )
+    from ma_poc.config.feature_flags import compliance_mode, hb_enabled
+
+    _solvers_ok = not compliance_mode()  # COMPLIANCE_MODE forces solver rungs off
     all_tiers: list[tuple[FetchTier, bool]] = [
         (FetchTier.DIRECT, True),
         (FetchTier.DC_PROXY, ENABLE_DC_PROXY_TIER),
+        # Hyperbrowser rung (FETCH_BACKEND=hyperbrowser) — PREFERRED over the
+        # paid BrightData rungs (Ankur: HB is free on the RealPage account, use
+        # it first, BrightData only as backup). Positioned before RESIDENTIAL so
+        # a prop that fails the free static tiers hits HB *first*; on HB failure
+        # escalation falls through to the BrightData residential/2a rungs below.
+        # Clean render (solveCaptchas off), so compliant.
+        (FetchTier.HYPERBROWSER, hb_enabled()),
         (FetchTier.RESIDENTIAL, _residential_on),
         # Clean "2a" render tier: a real browser on residential that passes
         # JS challenges by waiting and aborts on interactive captchas. Placed
@@ -89,8 +99,12 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
         (FetchTier.RESIDENTIAL_RENDER, ENABLE_RESIDENTIAL_RENDER_TIER),
         # FlareSolverr sits between RESIDENTIAL and UNLOCKER. It handles CF
         # JS challenges locally (no proxy cost) but can't bypass WAF blocks.
-        (FetchTier.FLARESOLVERR, ENABLE_FLARESOLVERR_TIER),
-        (FetchTier.UNLOCKER, ENABLE_UNLOCKER_TIER),
+        # Solver rungs — FORCED OFF under COMPLIANCE_MODE (RealPage legal
+        # 2026-07-22: Web Unlocker + FlareSolverr are no-fly zones). Belt-and-
+        # suspenders over the per-tier flags: even ENABLE_UNLOCKER_TIER=true
+        # can't re-enable them while compliance is on. Code is kept, just held off.
+        (FetchTier.FLARESOLVERR, ENABLE_FLARESOLVERR_TIER and _solvers_ok),
+        (FetchTier.UNLOCKER, ENABLE_UNLOCKER_TIER and _solvers_ok),
     ]
     # Explicit list order sets the attempt order; the ``t >= floor`` guard
     # only filters by the property's tier floor. RESIDENTIAL_RENDER's high
@@ -99,7 +113,7 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
     return [t for t, enabled in all_tiers if enabled and t >= floor]
 
 
-def _should_probe_lower(profile: "ScrapeProfile") -> FetchTier | None:
+def _should_probe_lower(profile: ScrapeProfile) -> FetchTier | None:
     """Return a lower tier to probe, or None if no probe is needed.
 
     Conditions for a probe:
@@ -137,8 +151,25 @@ def _should_probe_lower(profile: "ScrapeProfile") -> FetchTier | None:
     return probe_tier
 
 
-def _make_provider(tier: FetchTier) -> "FetchProvider":
+def _make_provider(tier: FetchTier) -> FetchProvider:
     """Instantiate the appropriate provider for a given tier."""
+    # Vendor switch (task #46): FETCH_BACKEND=hyperbrowser swaps Hyperbrowser
+    # in BEHIND the rungs named in HYPERBROWSER_TIERS (default UNLOCKER). A
+    # property that succeeds on a cheaper rung never reaches here for those
+    # tiers, so this is "HB for the escalated cohort only". Default off →
+    # branch never taken and the BrightData/httpx providers below are unchanged.
+    from ma_poc.config.feature_flags import hb_enabled, hb_tiers
+
+    if hb_enabled() and tier.name in hb_tiers():
+        from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
+
+        mode = "render" if tier == FetchTier.RESIDENTIAL_RENDER else "unlock"
+        return HyperbrowserProvider(mode=mode)
+    # The dedicated HB rung (preferred over BrightData; see _build_ladder).
+    if tier == FetchTier.HYPERBROWSER:
+        from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
+
+        return HyperbrowserProvider(mode="render")
     if tier == FetchTier.DIRECT:
         from ma_poc.fetch.providers.direct import DirectProvider
         return DirectProvider()
@@ -163,8 +194,8 @@ def _make_provider(tier: FetchTier) -> "FetchProvider":
 
 
 async def fetch_with_escalation(
-    task: "CrawlTask",
-    profile: "ScrapeProfile",
+    task: CrawlTask,
+    profile: ScrapeProfile,
 ) -> FetchResult:
     """Fetch *task* with automatic tier escalation on BOT_BLOCKED.
 

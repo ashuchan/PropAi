@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -135,6 +136,46 @@ def _push_profiles_to_gcs(profiles_dir: Path) -> None:
         )
     except Exception as exc:
         log.warning("profile GCS push failed (learning not persisted): %s", exc)
+
+
+def _profile_push_interval_s() -> float:
+    """Seconds between periodic profile flushes. ``0`` disables (end-of-run only)."""
+    try:
+        return max(0.0, float(os.environ.get("PROFILE_PUSH_INTERVAL_S", "300")))
+    except (TypeError, ValueError):
+        return 300.0
+
+
+async def _periodic_profile_push(profiles_dir: Path, interval_s: float) -> None:
+    """Flush learned profiles to GCS every *interval_s* until cancelled.
+
+    Why this exists (2026-07-25): profile learning was pushed exactly ONCE, after
+    the whole property loop. Profiles are written to the container's local
+    ``/tmp``, which dies with the task — so **task completion was the unit of
+    durability**. When all 24 tasks of the 5k canary were killed at the Cloud Run
+    7200s task timeout, ~4,471 properties' worth of learning was lost and GCS
+    still held only the previous day's 251 profiles. A task killed at 99% lost
+    100% of its learning.
+
+    Flushing periodically makes a killed task cost only the last interval. The
+    upload is watermark-based and shard-safe (see ``_push_profiles_to_gcs``), so
+    repeated calls only re-send what this shard actually modified.
+
+    The upload is BLOCKING network I/O, so it runs via ``asyncio.to_thread`` —
+    calling it inline would freeze every property coroutine sharing this loop
+    (the event-loop starvation this pipeline was just fixed for).
+
+    Never raises: cancellation is expected (the caller cancels at end of run) and
+    any push error is already swallowed by ``_push_profiles_to_gcs``.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_s)
+            await asyncio.to_thread(_push_profiles_to_gcs, profiles_dir)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # pragma: no cover — defensive only
+            log.warning("periodic profile push failed (non-fatal): %s", exc)
 
 
 def _resurface_stale_profiles(profiles_dir: Path, run_dir: Path) -> None:
@@ -647,16 +688,31 @@ async def run_jugnu(
             # timed-out run accelerates the next run even if this one yielded
             # no units. Units are still only persisted when present (no blank
             # rows) — this is route/selector knowledge, not fabricated data.
-            try:
-                if _partial_profile is not None and hasattr(profile_store, "save"):
-                    profile_store.save(_partial_profile)
-                    log.info(
-                        "Property %s: persisted discovered profile from "
-                        "timed-out run (units=%d) — next run starts warm",
-                        task.property_id, len(_partial_units),
-                    )
-            except Exception as _ps_exc:
-                log.warning("partial profile_store.save failed: %s", _ps_exc)
+            #
+            # 2026-07-25 RCA: the block above was DEAD. Nothing ever wrote
+            # ``partial_state["profile"]`` (verified: no writer anywhere outside
+            # tests), so ``_partial_profile`` was always None and 0 "next run
+            # starts warm" lines appeared across 366 timeouts in the 5k canary.
+            # Timed-out properties therefore stayed COLD forever and re-paid
+            # full discovery every run — the vicious cycle the 2026-05-19 note
+            # claimed to have broken was still running.
+            #
+            # The scraper now checkpoints route knowledge into
+            # ``partial_state["profile_hints"]`` via
+            # ``pms.scraper.checkpoint_partial`` as soon as a page yields units.
+            # Load the property's profile here and persist just that knowledge.
+            # Deliberately narrow: only ``winning_page_url`` (the URL that
+            # actually produced units) is written. Success counters, maturity
+            # promotion and tier preference are NOT touched — this run timed
+            # out, so it must not look like a success to the profile updater.
+            if persist_timeout_route_hints(
+                profile_store,
+                task.property_id,
+                _partial_state,
+                unit_count=len(_partial_units),
+                profile=_partial_profile,
+            ):
+                pass  # logged inside the helper
             failed = _make_failed_record(
                 task.property_id,
                 task.url,
@@ -786,7 +842,27 @@ async def run_jugnu(
                 schema_version,
             )
 
-    results = await pool.map(_process_one, [(t,) for t in tasks])
+    # Flush profile learning to GCS DURING the run, not only at the end. A task
+    # killed mid-run (Cloud Run task timeout, preemption, crash) otherwise loses
+    # every profile it learned — see _periodic_profile_push. Cancelled in the
+    # finally block; the authoritative end-of-run push still runs below.
+    _push_interval = _profile_push_interval_s()
+    _profile_pusher: asyncio.Task[None] | None = None
+    if _push_interval > 0 and _PROFILE_GCS_PREFIX:
+        _profile_pusher = asyncio.create_task(
+            _periodic_profile_push(_profiles_dir, _push_interval)
+        )
+        log.info(
+            "profile persistence: periodic push every %.0fs (task-death insurance)",
+            _push_interval,
+        )
+    try:
+        results = await pool.map(_process_one, [(t,) for t in tasks])
+    finally:
+        if _profile_pusher is not None:
+            _profile_pusher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await _profile_pusher
 
     # End-of-run transient retry pass (opt-in via ENABLE_END_OF_RUN_RETRY).
     # Re-drives ONLY the transient-class fetch failures through the SAME
@@ -1088,6 +1164,48 @@ async def _encore_plan_render_units(
         return all_units
 
 
+def _emit_route_shadow(
+    fetch_result: Any,
+    result: dict[str, Any],
+    task: Any,
+    run_dir: Any,
+    profile: Any,
+    actual_tier: Any,
+    actual_verdict: str,
+) -> None:
+    """Append one route-shadow record (agentic router Phase 2, observe-only).
+
+    Computes what the deterministic router WOULD decide from the fetch signals and
+    writes it next to what the pipeline actually did, to ``{run_dir}/route_shadow.jsonl``.
+    Never acts, never raises. The divergence between ``router_action`` and
+    ``actual_tier``/``actual_verdict`` on the failed cohort is the signal that tells
+    us whether wiring the agent to act (Phase 3) is worth it.
+    """
+    try:
+        import dataclasses as _dc
+        import json as _json
+
+        from ma_poc.services.route_policy import compute_signals, route
+
+        units = result.get("units") or []
+        sig = compute_signals(fetch_result, None, profile, units_extracted=len(units))
+        dec = route(sig, profile)
+        rec = {
+            "property_id": getattr(task, "property_id", "?"),
+            "signals": _dc.asdict(sig),
+            "router_action": dec.action,
+            "router_target": dec.target_field_group,
+            "router_rationale": dec.rationale,
+            "actual_tier": str(actual_tier) if actual_tier else None,
+            "actual_verdict": actual_verdict,
+            "actual_units": len(units),
+        }
+        with open(run_dir / "route_shadow.jsonl", "a", encoding="utf-8") as f:
+            f.write(_json.dumps(rec) + "\n")
+    except Exception:  # observe-only — must never affect a property record
+        pass
+
+
 async def _process_property(
     task: Any,
     cost_ledger: Any,
@@ -1131,6 +1249,7 @@ async def _process_property(
     from ma_poc.observability.events import EventKind, emit
     from ma_poc.pms.scraper import scrape_jugnu
     from ma_poc.reporting.verdict import compute as compute_verdict
+    from ma_poc.reporting.verdict import verdict_for_publish_ceiling
     from ma_poc.validation.orchestrator import validate
 
     # task #45: wall-clock anchor for the plan→unit render's elapsed-budget
@@ -1178,6 +1297,107 @@ async def _process_property(
             )
             fetch_result = None
             rc_direct_property_id = None
+
+    # Knock direct-GET shortcut (task #21, warm=fast). Knock's doorway-api is a
+    # PUBLIC GET, so a WARM Knock profile can skip the ~10-45s render and GET its
+    # stored /units endpoint directly (<1s). try_knock_direct parses the roster
+    # with the CANONICAL parse_knock_units (real unit numbers, not synthetic
+    # ids) and returns a COMPLETE result dict — used verbatim below in place of
+    # scrape_jugnu (routing the raw JSON through scrape_jugnu would misroute to
+    # the generic cascade → inferred_* ids). Trigger = the stored endpoint, NOT
+    # api_provider (Knock profiles carry api_provider='unknown'). Self-gates on
+    # ENABLE_KNOCK_DIRECT_GET (default off) + WARM/HOT + endpoint + non-empty
+    # roster; None → fall through to the normal render fetch below. Never-fail.
+    # Shared holder for a warm direct-GET shortcut's pre-extracted result
+    # (Knock / RentCafe / … — all fit the same shape: WARM profile → stored
+    # endpoint → canonical parser → complete result dict used verbatim in place
+    # of scrape_jugnu). None → fall through to the normal render + scrape_jugnu.
+    _direct_shortcut_result: dict[str, Any] | None = None
+    if fetch_result is None:
+        try:
+            from ma_poc.pms.knock_direct import try_knock_direct
+
+            _kd = await try_knock_direct(task, profile_for_dispatch, csv_row)
+            if _kd is not None:
+                fetch_result = _kd["fetch_result"]
+                _direct_shortcut_result = _kd["result"]
+        except Exception as exc:
+            log.warning(
+                "knock_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
+
+    # RentCafe/SecureCafe direct raw-GET (task #21, warm=fast). The unit-level
+    # gold is on securecafe availableunits.aspx; a WARM profile stores it in
+    # winning_page_url, so we fetch it via HB in-page fetch (residential proxy
+    # clears CF, returns RAW HTML the canonical parser needs — no BrightData) and
+    # skip the marketing-page render + link-hop. Self-gates on
+    # ENABLE_RENTCAFE_DIRECT_GET (default off) + WARM/HOT + a stored securecafe
+    # availableunits URL + a non-empty roster; None → fall through. Never-fail.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.securecafe_direct import try_rentcafe_direct
+
+            _rc = await try_rentcafe_direct(task, profile_for_dispatch, csv_row)
+            if _rc is not None:
+                fetch_result = _rc["fetch_result"]
+                _direct_shortcut_result = _rc["result"]
+        except Exception as exc:
+            log.warning(
+                "rentcafe_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
+
+    # SightMap direct raw-GET (task #21, warm=fast). WARM profile with a stored
+    # sightmap /sightmaps/ API URL → hb_raw_get (HB in-page fetch → raw JSON, CF
+    # cleared, no BrightData) → parse_sightmap_payload. Content-guarded (≥1
+    # rent-bearing unit) so Entrata-hint props fall through to render. Self-gates
+    # on ENABLE_SIGHTMAP_DIRECT_GET (default off); None → fall through. Never-fail.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.sightmap_direct import try_sightmap_direct
+
+            _sm = await try_sightmap_direct(task, profile_for_dispatch, csv_row)
+            if _sm is not None:
+                fetch_result = _sm["fetch_result"]
+                _direct_shortcut_result = _sm["result"]
+        except Exception as exc:
+            log.warning(
+                "sightmap_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
+
+    # RealPage CWS direct raw-GET (task #21, warm=fast). WARM CWS profile (stored
+    # api.ws.realpage.com endpoint; OLL excluded) → hb_raw_get the property page
+    # (HB clears CF, no BrightData) → generic._probe_realpage_cws harvests the
+    # public apiKey + GETs /units (no proxy — Akamai auth-gated, not CF-IP-
+    # blocked). Skips the render; the probe today only runs post-render. Self-
+    # gates on ENABLE_REALPAGE_DIRECT_GET (default off); None → fall through.
+    if fetch_result is None and _direct_shortcut_result is None:
+        try:
+            from ma_poc.pms.realpage_direct import try_realpage_direct
+
+            _rp = await try_realpage_direct(task, profile_for_dispatch, csv_row)
+            if _rp is not None:
+                fetch_result = _rp["fetch_result"]
+                _direct_shortcut_result = _rp["result"]
+        except Exception as exc:
+            log.warning(
+                "realpage_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            _direct_shortcut_result = None
 
     # H4 — unconditional vanity-domain fallback. Runs whenever the
     # direct path didn't produce a usable result (any failure tier or
@@ -1289,14 +1509,21 @@ async def _process_property(
         except Exception as _ws_exc:  # defensive — never block the scrape
             log.debug("cluster warm-start skipped for %s: %s", task.property_id, _ws_exc)
 
-    result = await scrape_jugnu(
-        task=task,
-        fetch_result=fetch_result,
-        page=None,  # Would be provided in full RENDER mode
-        profile=profile,
-        csv_row=csv_row,
-        partial_state=partial_state,
-    )
+    if _direct_shortcut_result is not None:
+        # A warm direct-GET shortcut (Knock / RentCafe) already produced a
+        # complete, canonically-parsed result (real unit numbers) — use it
+        # verbatim; skipping scrape_jugnu is the whole point (no render, no
+        # generic-cascade misroute).
+        result = _direct_shortcut_result
+    else:
+        result = await scrape_jugnu(
+            task=task,
+            fetch_result=fetch_result,
+            page=None,  # Would be provided in full RENDER mode
+            profile=profile,
+            csv_row=csv_row,
+            partial_state=partial_state,
+        )
 
     # ── L3: render-on-empty escalation (2026-07-16, flag-gated, default off) ──
     # When a routed adapter extracts 0 units from a fetch that SUCCEEDED (a 200
@@ -1310,6 +1537,7 @@ async def _process_property(
         ENABLE_PLAN_UNIT_RENDER,
         ENABLE_RENDER_ON_EMPTY,
         PLAN_RENDER_BUDGET_GUARD_S,
+        hb_enabled,
     )
     from ma_poc.fetch.contracts import RenderMode
 
@@ -1373,6 +1601,49 @@ async def _process_property(
                 "render-on-empty escalation failed for %s: %s",
                 task.property_id,
                 _roe_exc,
+            )
+
+    # ── HB-on-shell recovery (task #46, 2026-07-24 canary finding) ──
+    # The CF-walled cohort (SecureCafe / SightMap / Knock) returns an
+    # OK-CLASSIFIED shell: the static fetch (and the patchright render-on-empty
+    # above) reach the page but the unit XHR never fires, so we still have ZERO
+    # units — and because nothing was BOT_BLOCKED, the escalator's HB rung never
+    # triggered (it only fires on BOT_BLOCKED). The 2026-07-24 250-prop canary
+    # showed HB firing only ~10x for this exact reason. Give HB an explicit shot
+    # here: it renders through a fresh cloud IP + basic stealth (clears CF by
+    # WAITING — no solve, compliant) and CAPTURES the XHR into network_log, which
+    # scrape_jugnu promotes to the Tier-1 API surface. Only when
+    # FETCH_BACKEND=hyperbrowser (default off → BrightData runs untouched); the
+    # budget guard bounds spend, and a single HB fetch is internally timeout-
+    # bounded (~40-60s), so this cannot itself cause a 600s hang.
+    if (
+        hb_enabled()
+        and not (result.get("units") or [])
+        and fetch_result.ok()
+        and (_time.monotonic() - _pp_t0) < PLAN_RENDER_BUDGET_GUARD_S
+    ):
+        try:
+            from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
+
+            hb_task = _dc_replace(task, render_mode=RenderMode.RENDER)
+            hb_fetch = await HyperbrowserProvider(mode="render").fetch(
+                hb_task, profile_for_dispatch
+            )
+            if hb_fetch.ok():
+                hb_result = await scrape_jugnu(
+                    task=hb_task,
+                    fetch_result=hb_fetch,
+                    page=None,
+                    profile=profile,
+                    csv_row=csv_row,
+                    partial_state=partial_state,
+                )
+                if len(hb_result.get("units") or []) > 0:
+                    result = hb_result
+                    fetch_result = hb_fetch
+        except Exception as _hb_exc:  # never let recovery crash a property
+            log.debug(
+                "hb-shell recovery failed for %s: %s", task.property_id, _hb_exc
             )
 
     # ── Track 2b (task #37): encore per-plan render fan-out ──
@@ -1558,6 +1829,27 @@ async def _process_property(
     meta["canonical_id"] = task.property_id
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
+    # Single source of truth for the rest of this function. The publish-ceiling
+    # block below may upgrade it, and every downstream consumer (the emit, the
+    # TIER_1 failure-capture gate) must see the SAME value that lands in
+    # _meta.verdict — reading verdict.verdict.value directly would silently
+    # diverge from the record we ship.
+    verdict_value = verdict.verdict.value
+
+    # Agentic router SHADOW observer (Phase 2, flag ENABLE_ROUTE_SHADOW, default
+    # off). ADDITIVE + never-fail: logs what the deterministic router WOULD decide
+    # from the fetch signals next to what the pipeline actually did — observe-only,
+    # never acted on. Same additive-block contract as _provenance below.
+    try:
+        from ma_poc.config.feature_flags import ENABLE_ROUTE_SHADOW
+
+        if ENABLE_ROUTE_SHADOW and run_dir is not None:
+            _emit_route_shadow(
+                fetch_result, result, task, run_dir, profile,
+                getattr(extract_result, "tier_used", None), verdict.verdict.value,
+            )
+    except Exception:
+        pass
 
     # Property-level provenance — surface the diagnostics we already captured
     # (confidence, adapter/PMS, tiers attempted, fetch method/latency, and a
@@ -1606,6 +1898,23 @@ async def _process_property(
                 "reason": _pc.reason,
                 "evidence": _pc.evidence,
             }
+            # 2026-07-25: the grade now REACHES the verdict. Until this line the
+            # assessment was write-only — a property we had PROVEN publishes
+            # nothing still shipped as FAILED_NO_DATA, so doing the right thing
+            # cost us success rate. verdict_for_publish_ceiling is deliberately
+            # narrow: FAILED_NO_DATA only, and only on the two CONFIRMED grades.
+            # EXTRACTION_MISS (rent tokens present + zero units) is OUR bug and
+            # stays a visible failure.
+            _upgraded = verdict_for_publish_ceiling(
+                meta.get("verdict"), _pc.verdict.value
+            )
+            if _upgraded:
+                meta["verdict"] = _upgraded
+                meta["verdict_upgraded_from"] = verdict_value
+                meta["verdict_reason"] = (
+                    f"publish ceiling proven ({_pc.verdict.value}): {_pc.reason}"
+                )
+                verdict_value = _upgraded
             emit(
                 EventKind.PROPERTY_EMITTED,  # publish_ceiling ride-along
                 task.property_id,
@@ -1621,7 +1930,7 @@ async def _process_property(
     emit(
         EventKind.PROPERTY_EMITTED,
         task.property_id,
-        verdict=verdict.verdict.value,
+        verdict=verdict_value,
         units=len(result.get("units", [])),
     )
 
@@ -1689,7 +1998,7 @@ async def _process_property(
     _tier_used = ""
     if extract_result is not None:
         _tier_used = getattr(extract_result, "tier_used", "") or ""
-    if run_dir is not None and verdict.verdict.value == "FAILED_NO_DATA" and _tier_used.startswith("TIER_1_"):
+    if run_dir is not None and verdict_value == "FAILED_NO_DATA" and _tier_used.startswith("TIER_1_"):
         try:
             from ma_poc.services.llm_diagnostics import (
                 adapter_debugger,
@@ -1848,6 +2157,8 @@ def _provenance_block(
     outcome_val: str | None,
 ) -> dict[str, Any]:
     """Compute _meta.provenance from an already-scraped result. Pure; never raises."""
+    from ma_poc.core.schema_v2 import _is_floor_plan_level
+
     units = result.get("units") or []
     by_family: dict[str, int] = {}
     n_plan = n_synth = n_realid = 0
@@ -1855,7 +2166,16 @@ def _provenance_block(
         tier = str(u.get("extraction_tier") or u.get("_extraction_tier") or "")
         fam = _tier_family(tier)
         by_family[fam] = by_family.get(fam, 0) + 1
-        if u.get("is_floor_plan_level") or tier.upper().endswith("_PLAN_LEVEL"):
+        # 2026-07-25: this ran on the INTERNAL unit dicts, which carry the
+        # adapter's ``data_quality_flag`` (SightMap writes
+        # ``SIGHTMAP_PLAN_PRESENCE``) but never an ``is_floor_plan_level`` key
+        # — that key is only minted later by the v2 formatter. With a
+        # ``TIER_1_API_SIGHTMAP`` tier that also fails the ``_PLAN_LEVEL``
+        # suffix test, both arms missed and ``plan_level_units`` read 0 for
+        # all 505 SightMap properties in the 2026-07-25 5k canary while 4,024
+        # plan rows were in fact shipping. Delegate to the canonical predicate,
+        # which reads the flag as well as the tier suffix.
+        if _is_floor_plan_level(u) or tier.upper().endswith("_PLAN_LEVEL"):
             n_plan += 1
         uid = str(u.get("unit_id") or u.get("unit_number") or "")
         if uid.startswith(("inferred_", "unkeyable_")):
@@ -1878,6 +2198,14 @@ def _provenance_block(
             "render_mode": getattr(rm, "value", rm),
             "proxied": bool(getattr(fetch_result, "proxy_label", None)),
             "page_load_ms": getattr(fetch_result, "elapsed_ms", None),
+            # 2026-07-25 RCA: "fetch outcome: TRANSIENT" was undecomposable from
+            # the run artifacts — diagnosing a 336-property regression required
+            # reconstructing error classes from Cloud Logging. Persist the
+            # signature, HTTP status and body size so the SAME question is
+            # answerable offline from properties.json next time.
+            "error_signature": getattr(fetch_result, "error_signature", None),
+            "status_code": getattr(fetch_result, "status_code", None),
+            "body_bytes": len(getattr(fetch_result, "body", None) or ""),
         },
         "data_quality": {
             "by_tier_family": by_family,
@@ -2479,7 +2807,7 @@ def _format_v2_unit(
     """
     # Delegate the available-now → scrape-date fallback to the canonical
     # resolver (single source of truth; see the available_date field below).
-    from ma_poc.core.schema_v2 import _resolve_available_date
+    from ma_poc.core.schema_v2 import _is_floor_plan_level, _resolve_available_date
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
     # formatting. Emitted as first-class ``<field>_raw`` columns at the
@@ -2695,6 +3023,26 @@ def _format_v2_unit(
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # As-displayed operator label. Kept in lock-step with
+        # core/schema_v2.py — this fork is the one production actually runs,
+        # and it is where task #36's is_floor_plan_level flag was lost for
+        # 4,024 rows by being added to the OTHER copy only.
+        "unit_name": (
+            str(unit.get("unit_name")).strip() or None
+            if unit.get("unit_name") not in (None, "", "null")
+            else None
+        ),
+        # 2026-07-25: #36's placeholder marker was added to
+        # ``ma_poc/core/schema_v2.py:_format_v2_unit`` only — but THIS is the
+        # formatter the production Jugnu runner uses, so the flag never
+        # reached properties.json. Result on the 2026-07-25 5k canary: 4,024
+        # SightMap plan-presence rows (20.9% of all SightMap unit rows, across
+        # 352 mixed properties) shipped indistinguishable from real units —
+        # every one of them carrying an ``inferred_`` synthetic unit_id and
+        # ``area=-1``, and ``_provenance_block``'s ``plan_level_units`` counter
+        # reading 0 for all 505 SightMap properties. Keep in lock-step with
+        # ``core.schema_v2._is_floor_plan_level``.
+        "is_floor_plan_level": _is_floor_plan_level(unit),
         "rent_low": _format_rent(rent_lo_raw),
         "rent_high": _format_rent(rent_hi_raw),
         "floor": _format_floor(_raw_src["floor"]),
@@ -3123,6 +3471,75 @@ def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
             _f.write(line + "\n")
     except Exception as exc:
         log.debug("_append_issue_to_run failed: %s", exc)
+
+
+def persist_timeout_route_hints(
+    profile_store: Any,
+    property_id: str,
+    partial_state: dict[str, Any] | None,
+    *,
+    unit_count: int = 0,
+    profile: Any | None = None,
+) -> bool:
+    """Persist route knowledge discovered by a property that TIMED OUT.
+
+    Returns True when a profile was actually written.
+
+    Why this exists (RCA 2026-07-25): the previous implementation read
+    ``partial_state["profile"]``, a key **nothing ever wrote**. The live 5k
+    canary logged zero "next run starts warm" lines across 366 timeouts, so
+    every timed-out property stayed COLD and re-paid full discovery on the next
+    run — a compounding trap that also caps the warm-profile ratio the
+    fast-path levers depend on. ``pms.scraper.checkpoint_partial`` now records
+    the URL that actually produced units under
+    ``partial_state["profile_hints"]["winning_page_url"]``, and this persists it.
+
+    Deliberately NARROW. Only ``navigation.winning_page_url`` is written. A run
+    that timed out must not look like a success to the profile updater, so
+    success counters, maturity promotion and ``preferred_tier`` are untouched —
+    this is route knowledge, not an extraction outcome.
+
+    Args:
+        profile_store: store exposing ``get_profile(id)`` and ``save(profile)``.
+        property_id: canonical property id.
+        partial_state: the caller-scoped dict that survived coroutine
+            cancellation (see ``checkpoint_partial``).
+        unit_count: units salvaged, for the log line only.
+        profile: an already-loaded profile, if the caller has one.
+
+    Never raises — a persistence failure must not mask the timeout itself.
+    """
+    try:
+        if not isinstance(partial_state, dict):
+            return False
+        hints = partial_state.get("profile_hints")
+        if not isinstance(hints, dict):
+            return False
+        winning = hints.get("winning_page_url")
+        if not winning or not hasattr(profile_store, "save"):
+            return False
+
+        prof = profile
+        if prof is None and hasattr(profile_store, "get_profile"):
+            prof = profile_store.get_profile(property_id)
+        nav = getattr(prof, "navigation", None)
+        if prof is None or nav is None:
+            return False
+        # Idempotent: an unchanged URL is not worth a version bump.
+        if getattr(nav, "winning_page_url", None) == winning:
+            return False
+
+        nav.winning_page_url = winning
+        profile_store.save(prof)
+        log.info(
+            "Property %s: persisted winning_page_url=%s from timed-out run "
+            "(units=%d) — next run starts warm",
+            property_id, winning, unit_count,
+        )
+        return True
+    except Exception as exc:
+        log.warning("persist_timeout_route_hints failed for %s: %s", property_id, exc)
+        return False
 
 
 def _salvage_unit_has_numeric_rent(unit: dict[str, Any]) -> bool:

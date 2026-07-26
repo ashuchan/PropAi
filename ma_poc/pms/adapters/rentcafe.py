@@ -33,6 +33,7 @@ Key findings:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import TYPE_CHECKING, Any
@@ -1259,7 +1260,8 @@ async def _try_rentcafe_anchor_walk(
     # Cap to 6 to bound the request burst (matches entrata_deep_probe).
     for cand in candidates[:6]:
         try:
-            r = probe_get(cand, timeout=20)
+            # blocking curl_cffi → thread, so the shared event loop stays free
+            r = await asyncio.to_thread(probe_get, cand, timeout=20)
         except Exception as exc:
             result.errors.append(
                 f"rentcafe-anchor-walk-fetch-error[{cand}]: "
@@ -1415,7 +1417,7 @@ async def _try_rentcafe_securecafe_probe(
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
-                _hr = probe_get(origin, timeout=20)
+                _hr = await asyncio.to_thread(probe_get, origin, timeout=20)
                 if _hr.status_code == 200 and _hr.text:
                     bases = _find_all_securecafe_bases(_hr.text, ctx)
             except Exception as _hp_exc:
@@ -1455,7 +1457,9 @@ async def _try_rentcafe_securecafe_probe(
         body_text = ""
         # Attempt 1: DIRECT (no proxy).
         try:
-            r = probe_get(candidate_au, timeout=25, proxies={}, verify=True)
+            r = await asyncio.to_thread(
+                probe_get, candidate_au, timeout=25, proxies={}, verify=True
+            )
             if r.status_code == 200:
                 body_text = r.text or ""
         except Exception as exc:
@@ -1469,7 +1473,7 @@ async def _try_rentcafe_securecafe_probe(
         # path for those.
         if "AvailUnitRow" not in body_text and proxy_available:
             try:
-                r = probe_get(candidate_au, timeout=25)
+                r = await asyncio.to_thread(probe_get, candidate_au, timeout=25)
                 if r.status_code == 200:
                     body_text = r.text or ""
             except Exception as exc:

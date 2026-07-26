@@ -23,6 +23,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from ma_poc.core.identity import unit_has_real_anchor
+
 log = logging.getLogger(__name__)
 
 
@@ -65,10 +67,18 @@ def _units_are_unit_level(units: list[dict[str, Any]] | None) -> bool:
         return False
     from ma_poc.validation.schema_gate import property_has_rent_signal
 
+    # 2026-07-25: was ``not str(u.get("unit_id", "")).startswith("inferred_")``,
+    # which had two failure modes, both proven against the 2026-07-25 run:
+    #   1. ORDERING — unit_id is minted later, in _format_v2_unit. At verdict
+    #      time the key is absent, "" never starts with "inferred_", and every
+    #      plan-level row read as real identity.
+    #   2. ``str(None)`` — an explicit ``unit_id: None`` stringifies to "None",
+    #      which also does not start with "inferred_", so the emptiest possible
+    #      row counted as the strongest identity.
+    # unit_has_real_anchor resolves the same anchors identity itself uses, and
+    # works on pre- and post-format rows alike.
     has_identity = any(
-        (not str(u.get("unit_id", "")).startswith("inferred_"))
-        or _has_per_unit_source_id(u)
-        for u in units
+        unit_has_real_anchor(u) or _has_per_unit_source_id(u) for u in units
     )
     return has_identity and property_has_rent_signal(units)
 
@@ -92,6 +102,26 @@ class Verdict(StrEnum):
     #: but is intentionally distinct from SUCCESS so dashboards can split
     #: "zero-inventory operators" from "with-inventory extractions".
     SUCCESS_NO_AVAILABILITY = "SUCCESS_NO_AVAILABILITY"
+    #: 2026-07-25: the operator publishes ONLY floor plans — no per-apartment
+    #: data exists to extract. Distinct from SUCCESS_PLAN_LEVEL (where we DID
+    #: extract plan rows): this is the PROVEN ceiling, graded
+    #: ``PublishCeiling.CONFIRMED_PLAN_ONLY`` by ``reporting.publish_ceiling``
+    #: with its rent-token / unit-vocab / embed guards satisfied. A success:
+    #: we correctly determined the limit of what the operator discloses.
+    SUCCESS_PLAN_ONLY_PUBLISHED = "SUCCESS_PLAN_ONLY_PUBLISHED"
+    #: 2026-07-25: the operator publishes NO rent or unit data at all, proven
+    #: (``PublishCeiling.CONFIRMED_NO_DATA``: cascade ran empty, zero rent
+    #: tokens, zero unit vocabulary, plus a positive operator signal such as an
+    #: empty-inventory or pre-leasing page). "No data available" is the correct
+    #: answer for this property, not a scrape failure — so it counts toward the
+    #: success numerator while staying its own visible bucket.
+    #:
+    #: The bar is deliberately high: ANY rent token in the HTML alongside zero
+    #: extracted units is graded EXTRACTION_MISS (our bug) and stays
+    #: FAILED_NO_DATA. That guard exists because a real page (rentcafe pid
+    #: 18158) carried "No apartments available" AND listed 2 units at $1,795 —
+    #: a no-data claim must never rest on a marker string.
+    SUCCESS_NO_DATA_PUBLISHED = "SUCCESS_NO_DATA_PUBLISHED"
     FAILED_UNREACHABLE = "FAILED_UNREACHABLE"
     FAILED_NO_DATA = "FAILED_NO_DATA"
     CARRY_FORWARD = "CARRY_FORWARD"
@@ -113,8 +143,66 @@ _SUCCESS_VERDICTS: frozenset[str] = frozenset(
         Verdict.SUCCESS.value,
         Verdict.SUCCESS_PLAN_LEVEL.value,
         Verdict.SUCCESS_NO_AVAILABILITY.value,
+        # 2026-07-25: proven publish ceilings. We correctly determined the
+        # limit of what the operator discloses — that is a successful scrape,
+        # not a failure. Kept as DISTINCT values (not folded into SUCCESS) so a
+        # plain verdict count shows each bucket instead of hiding zero-data
+        # properties inside the headline.
+        Verdict.SUCCESS_PLAN_ONLY_PUBLISHED.value,
+        Verdict.SUCCESS_NO_DATA_PUBLISHED.value,
     }
 )
+
+#: publish-ceiling grade -> the verdict it justifies. Only these two grades are
+#: gold-eligible; EXTRACTION_MISS / NEEDS_RENDER / UNCERTAIN stay FAILED_NO_DATA
+#: because they mean "we could not prove it", which is our problem, not the
+#: operator's.
+CEILING_VERDICTS: dict[str, str] = {
+    "CONFIRMED_PLAN_ONLY": Verdict.SUCCESS_PLAN_ONLY_PUBLISHED.value,
+    "CONFIRMED_NO_DATA": Verdict.SUCCESS_NO_DATA_PUBLISHED.value,
+}
+
+
+def verdict_for_publish_ceiling(
+    current_verdict: str | None, ceiling_grade: str | None
+) -> str | None:
+    """Return the upgraded verdict a proven publish ceiling justifies, else None.
+
+    ``reporting.publish_ceiling`` grades every zero-unit result but is ADDITIVE
+    — it stamps ``_meta.publish_ceiling`` and historically never touched the
+    verdict, so a property we had PROVEN publishes nothing still shipped as
+    FAILED_NO_DATA and dragged the success rate down for doing the right thing.
+
+    Deliberately narrow: only upgrades FAILED_NO_DATA, and only on the two
+    CONFIRMED grades. Never downgrades anything, and never upgrades a property
+    whose grade is EXTRACTION_MISS (rent tokens present + zero units extracted
+    = our bug, and the largest such cohort was 182 properties in the 2026-07-25
+    run — those must stay visible as failures).
+    """
+    if current_verdict != Verdict.FAILED_NO_DATA.value:
+        return None
+    return CEILING_VERDICTS.get(str(ceiling_grade or ""))
+
+
+def _has_any_extracted_units(extract_result: Any) -> bool:
+    """``True`` when the extraction cascade produced at least one record.
+
+    Used to stop a failed ENTRY fetch from vetoing data the cascade actually
+    recovered (salvage checkpoint, link-hop sub-page, plan-text tier). Tolerates
+    both the dataclass shape (``.records``) and the dict shape
+    (``{"records": [...]}`` / ``{"units": [...]}``). Never raises.
+    """
+    if extract_result is None:
+        return False
+    try:
+        records = getattr(extract_result, "records", None)
+        if records is None and isinstance(extract_result, dict):
+            records = extract_result.get("records")
+            if records is None:
+                records = extract_result.get("units")
+        return bool(records)
+    except Exception:  # pragma: no cover — defensive only
+        return False
 
 
 def verdict_is_success(verdict: Verdict | str | None) -> bool:
@@ -221,12 +309,21 @@ def compute(
             "fetch",
         )
 
+    # A non-OK fetch outcome is only DISPOSITIVE when nothing was extracted.
+    # 2026-07-25 RCA: this check used to fire unconditionally and vetoed units
+    # the cascade had already produced — a property whose base fetch failed but
+    # whose salvage/link-hop path still returned priced units was stamped
+    # FAILED_UNREACHABLE and its data thrown away. Measured on the 5k canary:
+    # 10 properties / 68 units / 63 with rent were being discarded this way,
+    # and another 20 were mislabelled "unreachable" despite a cascade that ran.
+    # Extraction succeeding is stronger evidence than the entry fetch failing.
     if fetch_outcome and fetch_outcome not in ("OK", "NOT_MODIFIED"):
-        return VerdictResult(
-            Verdict.FAILED_UNREACHABLE,
-            f"fetch outcome: {fetch_outcome}",
-            "fetch",
-        )
+        if not _has_any_extracted_units(extract_result):
+            return VerdictResult(
+                Verdict.FAILED_UNREACHABLE,
+                f"fetch outcome: {fetch_outcome}",
+                "fetch",
+            )
 
     # Check extract result
     if extract_result is not None:
@@ -321,9 +418,12 @@ def compute(
         # backend per-unit id (sightmap_unit_id / entrata_uid / …) is
         # unit-level even without a natural unit_number, so it is not
         # "inferred" for the plan-vs-unit decision.
+        # 2026-07-25: see _units_are_unit_level — this predicate had the same
+        # two defects (unit_id not yet minted at verdict time; str(None) ==
+        # "None"). Either one made a single row defeat `all`, so a wholly
+        # plan-level property shipped as SUCCESS.
         all_inferred = all(
-            str(u.get("unit_id", "")).startswith("inferred_")
-            and not _has_per_unit_source_id(u)
+            not unit_has_real_anchor(u) and not _has_per_unit_source_id(u)
             for u in units
         )
         if all_inferred:

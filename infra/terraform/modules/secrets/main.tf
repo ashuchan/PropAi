@@ -58,6 +58,36 @@ resource "google_secret_manager_secret" "proxy_credentials" {
   }
 }
 
+# Hyperbrowser cloud-browser API key (task #46). Consumed by the switchable
+# fetch backend (ma_poc/fetch/hyperbrowser_backend.py) ONLY when the job is
+# run with FETCH_BACKEND=hyperbrowser; the key env is wired unconditionally, so
+# the placeholder below is required or every execution (incl. the default
+# BrightData path) would fail to resolve ``latest``. Operator overwrites with
+# the real token out-of-band:
+#   echo -n "$HB_KEY" | gcloud secrets versions add hyperbrowser-api-key-${var.env} --data-file=-
+resource "google_secret_manager_secret" "hyperbrowser_api_key" {
+  secret_id = "hyperbrowser-api-key-${var.env}"
+  replication {
+    auto {}
+  }
+}
+
+resource "null_resource" "hyperbrowser_api_key_placeholder" {
+  triggers = {
+    secret_name = google_secret_manager_secret.hyperbrowser_api_key.name
+  }
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      printf 'PLACEHOLDER_REPLACE_VIA_GCLOUD' | \
+        gcloud secrets versions add ${google_secret_manager_secret.hyperbrowser_api_key.secret_id} \
+          --project=${google_secret_manager_secret.hyperbrowser_api_key.project} \
+          --data-file=-
+    EOT
+  }
+}
+
 # Grant worker SA access to all secrets
 resource "google_secret_manager_secret_iam_member" "worker_openrouter" {
   secret_id = google_secret_manager_secret.openrouter_api_key.id
@@ -73,6 +103,12 @@ resource "google_secret_manager_secret_iam_member" "worker_anthropic" {
 
 resource "google_secret_manager_secret_iam_member" "worker_proxy_credentials" {
   secret_id = google_secret_manager_secret.proxy_credentials.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.worker_sa_email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "worker_hyperbrowser" {
+  secret_id = google_secret_manager_secret.hyperbrowser_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${var.worker_sa_email}"
 }

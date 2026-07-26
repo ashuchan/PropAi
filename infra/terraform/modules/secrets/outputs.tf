@@ -15,3 +15,10 @@ output "anthropic_secret_id" {
 output "proxy_credentials_secret_id" {
   value = google_secret_manager_secret.proxy_credentials.secret_id
 }
+
+output "hyperbrowser_secret_id" {
+  value = google_secret_manager_secret.hyperbrowser_api_key.secret_id
+  # Same ordering guard as anthropic: wait for the placeholder version so the
+  # cloud_run_jobs secret_key_ref{version="latest"} mount resolves on first apply.
+  depends_on = [null_resource.hyperbrowser_api_key_placeholder]
+}

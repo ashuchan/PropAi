@@ -14,9 +14,31 @@ ENABLE_TIER_ESCALATION: Final[bool] = (
 )
 
 # Provider-tier flags — keyed off the master flag. If master is off, all are off.
+#
+# ENABLE_DC_PROXY_TIER defaults **OFF** as of 2026-07-25. It previously defaulted
+# ON, which made ``PROXY_POOL_URLS`` opt-OUT: any job that did not explicitly
+# disable it had a datacentre proxy attached to every fetch, RENDER included.
+# When the pool's single entry (a rented DC proxy) silently disappeared — every
+# port black-holing, not even refusing — Chromium failed EVERY navigation and a
+# whole 5k run produced 0 usable rendered bodies out of 10,677 fetch attempts,
+# while still reporting 71% "success" off the static-HTML fallback. The run that
+# survived did so only because someone had set the flag false by hand.
+#
+# The rung is also redundant in the current architecture: DIRECT static first,
+# then Hyperbrowser (free on the RealPage account, full browser + CF clearance),
+# then BrightData residential as backup. The DC rung's niche — a cheap non-GCP
+# exit IP for hosts that block GCP but need no rendering — is covered by HB, and
+# this codebase has repeatedly found blocks to be browser-solvable rather than
+# IP-solvable (the RESIDENTIAL tier was previously dropped as 100% wasted; the
+# 2026-07-12 audit found 87% of blocks CF-managed and browser-solvable).
+#
+# The code path is deliberately KEPT, not deleted: zero firings with the flag off
+# is not evidence it was useless when on, and no historical measurement exists
+# either way. Set ENABLE_DC_PROXY_TIER=1 to re-enable if a need is measured —
+# but point PROXY_POOL_URLS at a proxy that is verified live first.
 ENABLE_DC_PROXY_TIER: Final[bool] = (
     ENABLE_TIER_ESCALATION
-    and os.environ.get("ENABLE_DC_PROXY_TIER", "true").lower() == "true"
+    and os.environ.get("ENABLE_DC_PROXY_TIER", "false").lower() == "true"
 )
 ENABLE_RESIDENTIAL_TIER: Final[bool] = (
     ENABLE_TIER_ESCALATION
@@ -174,6 +196,85 @@ PLAN_RENDER_REARM_DAYS: Final[int] = _int_env("PLAN_RENDER_REARM_DAYS", 7)
 # Elapsed-budget guard (seconds): the generic plan→unit trigger only fires
 # when the property has consumed less than this much of its 600s budget.
 PLAN_RENDER_BUDGET_GUARD_S: Final[int] = _int_env("PLAN_RENDER_BUDGET_GUARD_S", 300)
+
+# Knock direct-GET shortcut (task #21, warm=fast). Knock's doorway-api /units
+# endpoint is a PUBLIC GET (no auth/CF/cookies) — proven 2026-07-24, 6/6 warm
+# props returned the full gold roster (unit+rent) via plain GET. A WARM Knock
+# profile stores that endpoint in known_endpoints, so subsequent runs can skip
+# the ~10-45s render and GET it directly (<1s), feeding the JSON to the existing
+# TIER_1_KNOCK_API parser via network_log. Default OFF — flag-on canary measures
+# the render-skip rate + confirms unit parity vs the render path. Never-fail:
+# any GET failure falls through to the normal render.
+ENABLE_KNOCK_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_KNOCK_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# RentCafe/SecureCafe direct raw-GET shortcut (task #21, warm=fast). The
+# unit-level gold lives on the securecafe availableunits.aspx page — CF-fronted +
+# the parser needs RAW HTML (a render mutates the DOM → parser returns 0). A WARM
+# profile stores that URL in navigation.winning_page_url, so subsequent runs can
+# skip the marketing-page render + link-hop and fetch it via hb_raw_get (HB
+# in-page same-origin fetch — residential proxy clears CF, returns raw HTML, no
+# BrightData). Proven 2026-07-24: grantparkvillage → 25 gold units via HB.
+# Default OFF — flag-on canary measures the render-skip rate + unit parity.
+ENABLE_RENTCAFE_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_RENTCAFE_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# SightMap direct raw-GET shortcut (task #21, warm=fast). The SightMap unit API
+# (sightmap.com/app/api/v1/{key}/sightmaps/{id}) is CF-fronted + content-
+# negotiates (browser nav → HTML embed, not JSON), so a WARM profile's stored API
+# URL is fetched via hb_raw_get (HB in-page same-origin fetch → raw JSON, CF
+# cleared by residential proxy, no BrightData), then parse_sightmap_payload +
+# json.loads. Content-guarded (≥1 rent-bearing unit) so Entrata-hint props fall
+# through to render. Default OFF — flag-on canary measures render-skip + parity.
+ENABLE_SIGHTMAP_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_SIGHTMAP_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# RealPage CWS/LeaseStar direct raw-GET shortcut (task #21, warm=fast). The
+# api.ws.realpage.com floorplans+units API is render-free — auth-gated by
+# x-ws-authkey, a PUBLIC per-property key in the property page's static HTML
+# (RPFP_config). For a WARM CWS profile: fetch the property page via hb_raw_get
+# (HB clears any CF, no BrightData) → reuse generic._probe_realpage_cws (regex
+# key + GET /units via httpx; the API is Akamai auth-gated, not CF-IP-blocked, so
+# no proxy). EXCLUDES OLL (leasing.realpage.com — render-required). Default OFF.
+ENABLE_REALPAGE_DIRECT_GET: Final[bool] = os.environ.get(
+    "ENABLE_REALPAGE_DIRECT_GET", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# Agentic router SHADOW mode (Phase 2). When on, _process_property computes what
+# the deterministic router (services/route_policy.py) WOULD decide from the fetch
+# signals and logs it to a per-run route_shadow.jsonl next to what the pipeline
+# actually did (tier/verdict/units) — OBSERVE-ONLY, the decision is never acted
+# on, zero behavior change. The divergence measures whether wiring the agent
+# (Phase 3) to act is worth it. Default OFF (pure measurement instrument).
+ENABLE_ROUTE_SHADOW: Final[bool] = os.environ.get(
+    "ENABLE_ROUTE_SHADOW", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# Marketing-page floor-plan TEXT parser (task #21 plan-level recovery). Many
+# small/independent sites publish floor plans as free text ("Unit Layouts:
+# Studio | 288 sq ft | from $1125") that the CSS-selector dom_scan misses → they
+# mis-verdict FAILED_NO_DATA despite publishing PLAN-LEVEL data. This runs
+# parse_marketing_plan_text as the last deterministic tier before the LLM, when
+# the cascade extracted 0 units. Emits plan-level records (unit_number="") →
+# SUCCESS_PLAN_LEVEL (coverage, not gold). Default OFF — flag-on canary measures
+# the FAILED_NO_DATA → SUCCESS_PLAN_LEVEL flip rate. Proven: cottagesatsanford → 4 plans.
+ENABLE_PLAN_TEXT: Final[bool] = os.environ.get(
+    "ENABLE_PLAN_TEXT", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# Link-hop wall-clock budget (seconds). _try_link_hop does up to ~14 sequential
+# RENDER sub-fetches (max_hops + dynamic appends), each ~35s+ — historically the
+# DOMINANT driver of the 600s per-property timeouts, because the hop loop was
+# bounded only by a page COUNT (max_hops), never by elapsed time. When a host
+# tarpits (slow-walls under load, e.g. throttle-off), every hop render stretches
+# and the property blows the whole budget. This cap stops STARTING new hops once
+# the budget is spent, so a slow property fails-fast and frees its pool slot
+# instead of monopolising it for 10 minutes. 150s ≈ 3-4 healthy hops and leaves
+# room under the 600s ceiling for the escalation ladder that ran before it.
+LINK_HOP_BUDGET_S: Final[int] = _int_env("LINK_HOP_BUDGET_S", 150)
 
 # Encore per-plan render fan-out (2026-07-19, task #37 Track 2b). The
 # encoreskyline (Jonah Digital) unit roster lives on N per-plan
@@ -409,3 +510,74 @@ def enable_degraded_dom_persist() -> bool:
     a process restart.
     """
     return os.environ.get("ENABLE_DEGRADED_DOM_PERSIST", "true").lower() == "true"
+
+
+# ── Hyperbrowser fetch-backend switch (2026-07-20) ──────────────────────────
+# A vendor switch that swaps the Hyperbrowser cloud browser in BEHIND the
+# existing RESIDENTIAL_RENDER / UNLOCKER rungs — NOT a new cost tier. Default
+# ``brightdata`` so the code path is never constructed unless explicitly opted
+# in. Function-form (read env each call) so an ops flip needs no restart, and
+# because the seams (_make_provider / _try_unlocker_fallback) are hot.
+# "HB for the CF-walled cohort only" recipe:
+#   FETCH_BACKEND=hyperbrowser ENABLE_TIER_ESCALATION=true ENABLE_UNLOCKER_TIER=true
+# — HB then bites ONLY on rungs a blocked property escalates into; a property
+# that succeeds cheap (DIRECT/DC/residential/patchright-render) never reaches it.
+
+
+def fetch_backend() -> str:
+    """``FETCH_BACKEND`` = ``brightdata`` (default) | ``hyperbrowser``.
+
+    Master vendor switch. Read each call so a flip needs no process restart.
+    """
+    return os.environ.get("FETCH_BACKEND", "brightdata").strip().lower()
+
+
+def hb_enabled() -> bool:
+    """True when the Hyperbrowser backend is selected (``FETCH_BACKEND=hyperbrowser``)."""
+    return fetch_backend() == "hyperbrowser"
+
+
+def hb_tiers() -> frozenset[str]:
+    """Which ladder rungs HB replaces (``HYPERBROWSER_TIERS``, default ``UNLOCKER``).
+
+    Comma list of ``FetchTier`` names. Default ``UNLOCKER`` — HB replaces only
+    the solver rung; DIRECT/DC/residential/patchright-render stay on the cheap
+    BrightData/httpx path. Add ``RESIDENTIAL_RENDER`` only when the compliance-
+    posture change (2a is non-solver by design) is intended.
+    """
+    raw = os.environ.get("HYPERBROWSER_TIERS", "UNLOCKER").strip().upper()
+    return frozenset(t.strip() for t in raw.split(",") if t.strip())
+
+
+def compliance_mode() -> bool:
+    """``COMPLIANCE_MODE=1`` forces OFF every challenge-solver / bot-detection-
+    defeating path — Web Unlocker, FlareSolverr, CAPTCHA-solving — regardless of
+    their individual flags.
+
+    RealPage legal (2026-07-22) ruled these a "no-go / no-fly zone" for this
+    scrape (see feedback_realpage_scraping_legal_constraints memory). The code
+    is KEPT, not deleted — this switch just holds it OFF, so it stays available
+    for any separately-authorized context. **Set COMPLIANCE_MODE=1 on every
+    RealPage run.** Read each call so an ops flip needs no restart.
+    """
+    return os.environ.get("COMPLIANCE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def web_unlocker_allowed() -> bool:
+    """False under compliance mode — the Web Unlocker (BrightData) is a no-fly zone."""
+    return not compliance_mode()
+
+
+def flaresolverr_allowed() -> bool:
+    """False under compliance mode — FlareSolverr is a CF-challenge solver (no-go)."""
+    return not compliance_mode()
+
+
+def hb_covers_render_primary() -> bool:
+    """Aggressive mode: HB as the PRIMARY renderer for every RENDER task
+    (``RENDER_BACKEND=hyperbrowser``), not just the blocked-render fallback.
+
+    Default off — much bigger spend (HB renders every RENDER task, not only
+    the walled cohort a blocked render escalates into).
+    """
+    return os.environ.get("RENDER_BACKEND", "").strip().lower() == "hyperbrowser"

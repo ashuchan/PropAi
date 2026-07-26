@@ -730,6 +730,12 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
             bathrooms=str(baths) if baths is not None else "",
             sqft=sqft,
             unit_number=unit_number_display,
+            # AppFolio's listing address IS the operator's as-displayed label
+            # for a scattered-site unit ("1420 Oak St Apt 3"). It is currently
+            # also written into floor_plan_name above for want of anywhere
+            # better; capture it in its own field so consumers stop having to
+            # read an address out of a plan-name column.
+            unit_name=address or "",
             rent_range=format_rent_range(rent_val, rent_val),
             availability_status="AVAILABLE",
             availability_date=avail_raw or "",

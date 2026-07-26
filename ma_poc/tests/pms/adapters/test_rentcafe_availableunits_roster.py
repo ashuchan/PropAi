@@ -1,0 +1,281 @@
+"""RentCafe ``{origin}/availableunits`` whole-roster short-circuit (2026-07-25).
+
+Markup below is cut verbatim from a live fetch of
+``https://www.oaksofnorthgatesanantonio.com/availableunits`` (200, 205KB,
+16 ``tr.unit-container`` rows) on 2026-07-25.
+
+WHY THIS PATH EXISTS. The 2026-07-25 run left 341 properties on
+``TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL`` — floor-plan rows only, no
+apartments. A 42-property live probe of that cohort found 39 recoverable and
+ZERO true ceilings, and the dominant navigation step was this single URL:
+``/availableunits`` server-renders the property's ENTIRE available roster in
+one response.
+
+Two properties make it worth a dedicated path rather than more drill anchors:
+
+1. It is NOT DISCOVERABLE. The Oaks homepage exposes no ``href`` to it — the
+   existing anchor-drill regex finds only ``/floorplans``. It has to be tried
+   by convention.
+2. It is CHEAPER AND MORE COMPLETE than the ``/floorplans`` → N-drill fan-out:
+   one request instead of 1+N, and the whole roster instead of whatever subset
+   the plan pages link.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from ma_poc.pms.adapters.base import AdapterContext
+from ma_poc.pms.adapters.rentcafe_layout_tab import (
+    RentCafeLayoutTabAdapter,
+    parse_rentcafe_lt_applyga,
+)
+from ma_poc.pms.detector import detect_pms
+
+
+def _row(unit: str, plan: str, beds: str, sqft: str, rent: str, avail: str, uid: str) -> str:
+    """One ``tr.unit-container`` exactly as the live page emits it."""
+    return f"""
+<tr data-selenium-id="urow1" class="unit-container" id="unit-container-{uid}">
+  <td class="td-card-name" data-selenium-id="Apt1">
+    <p class="d-block d-lg-none td-label">Apartment:</p> #{unit}
+  </td>
+  <td class="td-card-sqft" data-selenium-id="Sqft1"><p class="d-block d-lg-none td-label">Sq. Ft.:</p> {sqft}</td>
+  <td class="td-card-rent" data-selenium-id="Rent1">
+    <p class="d-block d-lg-none td-label">Rent:</p>${rent}<span></span>
+  </td>
+  <td class="td-card-available" data-selenium-id="AvailDate1">
+    <p class="d-block d-lg-none td-label">Date:</p>{avail}
+  </td>
+  <td class="td-card-footer" data-selenium-id="Action1">
+    <a data-selenium-id="Select_1" type="button" class="btn btn-primary" id="{unit}"
+       onclick="applyGAClick('{plan}', '{beds}', '{sqft}', '{rent}', '{rent}', '{unit}')"
+       href=' https://oaksofnorthgatesanantonio.securecafe.com/onlineleasing/oaks-of-northgate/oleapplication.aspx?stepname=RentalOptions&amp;UnitID={uid}'>
+      Apply Now <span class="sr-only">&nbsp;for apartment #{unit}</span>
+    </a>
+  </td>
+</tr>"""
+
+
+AVAILABLEUNITS_HTML = (
+    "<html><body><table><tbody>"
+    + _row("01012", "A1", "1 Bed(s)", "660", "749.00", "11/6/2026", "18028262")
+    + _row("18062", "A2- VL/LI", "1 Bed(s)", "710", "764.00", "Available", "18028523")
+    + _row("16021", "B1", "2 Bed(s)", "838", "1,009.00", "Available", "18028481")
+    + "</tbody></table></body></html>"
+)
+
+
+# ── The parser reads the live roster shape ──────────────────────────────────
+
+
+def test_parses_the_live_availableunits_roster() -> None:
+    units = parse_rentcafe_lt_applyga(AVAILABLEUNITS_HTML, "https://x.test/availableunits")
+    assert len(units) == 3
+    by_num = {u["unit_number"]: u for u in units}
+    assert set(by_num) == {"01012", "18062", "16021"}
+
+    a1 = by_num["01012"]
+    assert a1["floor_plan_name"] == "A1"
+    assert a1["bedrooms"] == "1"
+    assert a1["sqft"] == "660"
+    # Rent lives on the INTERNAL keys at this layer; the v2 formatter maps
+    # market_rent_low/high -> rent_low/high downstream.
+    assert a1["market_rent_low"] == 749
+    assert a1["market_rent_high"] == 749
+
+
+def test_comma_formatted_rent_survives() -> None:
+    """`1,009.00` must not truncate to 1 — the roster's larger units all use
+    thousands separators."""
+    units = parse_rentcafe_lt_applyga(AVAILABLEUNITS_HTML, "https://x.test/availableunits")
+    b1 = next(u for u in units if u["unit_number"] == "16021")
+    assert b1["market_rent_low"] == 1009
+    assert b1["bedrooms"] == "2"
+
+
+def test_every_row_is_unit_level_not_plan_level() -> None:
+    """The whole point: real apartment numbers, not plan names. A plan-level
+    row would have an empty unit_number and would keep the property in the
+    RENTCAFE_NO_RESPONSE_PLAN_LEVEL bucket."""
+    units = parse_rentcafe_lt_applyga(AVAILABLEUNITS_HTML, "https://x.test/availableunits")
+    assert all(str(u.get("unit_number") or "").strip() for u in units)
+
+
+def test_non_roster_page_yields_nothing() -> None:
+    """A plain marketing page must not produce phantom rows — otherwise the
+    short-circuit would swallow properties whose /availableunits 200s with a
+    soft-404 body."""
+    assert parse_rentcafe_lt_applyga("<html><body><h1>Floor Plans</h1></body></html>", "u") == []
+
+
+# ── The adapter tries the URL, and prefers it over the drill fan-out ─────────
+
+
+class _FakePage:
+    """The jugnu fetch-only stub page.
+
+    Deliberately has NO ``evaluate`` — that absence is exactly what routes
+    ``extract()`` into ``_extract_code_only``, which is the path under test.
+    Giving it an ``evaluate`` sends the adapter down the DOM-JS drill-walker
+    instead and the roster probe never runs.
+    """
+
+    url = "https://www.oaksofnorthgatesanantonio.com/"
+
+
+def _ctx() -> AdapterContext:
+    return AdapterContext(
+        base_url="https://www.oaksofnorthgatesanantonio.com/",
+        detected=detect_pms("https://www.oaksofnorthgatesanantonio.com/"),
+        profile=None,
+        expected_total_units=None,
+        property_id="P_OAKS",
+    )
+
+
+class _Resp:
+    def __init__(self, status: int, text: str) -> None:
+        self.status_code = status
+        self.text = text
+
+
+@pytest.mark.asyncio
+async def test_availableunits_short_circuits_the_drill_fanout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One request, whole roster, and NO per-plan drills afterwards.
+
+    Guards the cost property as well as the data property: if this regressed
+    into "fetch the roster AND still fan out", it would multiply request volume
+    across 341 properties without adding a single unit.
+    """
+    seen: list[str] = []
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(200, AVAILABLEUNITS_HTML)
+        raise AssertionError(f"drill fan-out should not have run; fetched {url}")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    adapter = RentCafeLayoutTabAdapter()
+    result = await adapter.extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert seen == ["https://www.oaksofnorthgatesanantonio.com/availableunits"]
+    assert len(result.units) == 3
+    assert result.confidence > 0.7
+    assert result.winning_url.endswith("/availableunits")
+
+
+@pytest.mark.asyncio
+async def test_falls_through_to_drills_when_roster_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 404 (or an empty body) must not strand the property — the existing
+    /floorplans drill walk still has to run."""
+    seen: list[str] = []
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(404, "")
+        if url.endswith("/floorplans"):
+            return _Resp(200, AVAILABLEUNITS_HTML)  # roster inline on the listing
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert seen[0].endswith("/availableunits"), "roster must be tried FIRST"
+    assert any(u.endswith("/floorplans") for u in seen), "must still fall through"
+    assert len(result.units) == 3
+
+
+@pytest.mark.asyncio
+async def test_probe_exception_is_never_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Network failure on the roster probe degrades to the drill path."""
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        if url.endswith("/availableunits"):
+            raise OSError("connection reset")
+        return _Resp(200, AVAILABLEUNITS_HTML)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+    assert len(result.units) == 3
+
+
+# ── SecureCafe portal fallback (404/403 on the vanity route) ────────────────
+
+_SC_PORTAL_HTML = (
+    # Cut verbatim from a live fetch of
+    # modaatthehill.securecafe.com/onlineleasing/moda-at-the-hill/availableunits.aspx
+    # (HTTP 200, 111KB, 20 AvailUnitRow rows). Trimmed to the first floor-plan
+    # header + its first row, which still parses to exactly 1 unit.
+    "<html><body><table><caption>"
+    'Floor Plan: The Campbell - 2 Bedrooms, 1 Bathroom</caption><thead><tr><th class=\'table-header tcolumn text-left\' data-label=\'Apartment\' scope=\'col\'>Apartment</th><th class=\'table-header tcolumn text-center\' data-label=\'Sq. Ft.\' scope=\'col\'><span>Sq.Ft.</span></th><th class=\'table-header tcolumn text-center\' data-label=\'Rent\' scope=\'col\'>Rent</th><th class=\'table-header tcolumn text-center\' data-label=\'Availability\' scope=\'col\'>Date Available</th><th class=\'table-header tcolumn text-center\' data-label=\'Action\' scope=\'col\'>Action</th></tr></thead><tbody><tr class=\'AvailUnitRow\'  data-selenium-id=\'urow1\' id=\'unitrow_32163017\' scope=\'row\' FloorPlateID=\'0\' ><th class=\'text-left\' data-selenium-id=\'Apt1\' id=\'32163017\' data-label=\'Apartment\'>#311</th><td class=\'text-center\' data-selenium-id=\'SqFt1\' data-label=Sq.Ft.>855</td><td  data-selenium-id=\'Rent1\'  style="" class=\'text-center\' data-label=\'Rent\'>$2,670-$7,055</td><td data-selenium-id=\'AvailDate1\' data-label=\'Date Available\'><span class=\'text-success\'>Available</span></td><td class=\'text-center\' \' data-selenium-id=\'Action1\' data-label=\'Action\'><input type="button" data-selenium-id=\'btnUnitSelect1\' class="UnitSelect btn btn-primary" id="311" value = "Select" aria-describedby="32163017" onclick=SetTermsUrl(\'rentaloptions.aspx?UnitID=32163017&FloorPlanID=4285110&myOlePropertyid=1471013&MoveInDate=7/26/2026\')></td></tr>'
+    "</table></body></html>"
+)
+
+
+@pytest.mark.asyncio
+async def test_securecafe_portal_recovers_a_404_vanity_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When {origin}/availableunits 404s, the same roster is usually mounted at
+    {sub}.securecafe.com/onlineleasing/{slug}/availableunits.aspx.
+
+    Live-measured 2026-07-25 on the plan-level cohort: the vanity route covers
+    70% of the 571 SecureCafe properties; this fallback recovered 8 of the 12
+    sampled failures (Moda at the Hill 20 units, Mihir Taylor 33, Alicante 26,
+    Grove Parkview 17, The Vue 12, Arlington West 11, Marina Key 7, Oak Creek
+    6). Together: 36 of 40 — 90% of the block.
+    """
+    seen: list[str] = []
+    listing = (
+        '<html><body><a href="https://demo.securecafe.com/onlineleasing/demo-props/'
+        'oleapplication.aspx">Apply Now</a></body></html>'
+    )
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(404, "")
+        if url.endswith("/floorplans"):
+            return _Resp(200, listing)
+        if "securecafe.com" in url and url.endswith("availableunits.aspx"):
+            return _Resp(200, _SC_PORTAL_HTML)
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert any("securecafe.com" in u for u in seen), "portal was never tried"
+    assert len(result.units) == 1
+    u = result.units[0]
+    # Real values from the Moda at the Hill portal page.
+    assert u["unit_number"] == "311"
+    assert u["floor_plan_name"] == "The Campbell"
+    assert u["sqft"] == "855"
+    # Internal keys at this layer; the v2 formatter maps them to rent_low/high.
+    assert u["market_rent_low"] == 2670
+    assert u["market_rent_high"] == 7055
+    assert u["extraction_tier"] == "TIER_1_API_RENTCAFE_SECURECAFE"
+    assert result.winning_url.endswith("availableunits.aspx")
+
+
+@pytest.mark.asyncio
+async def test_portal_is_not_tried_when_the_vanity_route_worked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cost guard: the vanity route already covers ~70% of this cohort. Firing
+    the portal anyway would add a wasted request on ~400 properties."""
+    seen: list[str] = []
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        seen.append(url)
+        if url.endswith("/availableunits"):
+            return _Resp(200, AVAILABLEUNITS_HTML)
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert len(result.units) == 3
+    assert not any("securecafe.com" in u for u in seen)

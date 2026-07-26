@@ -51,15 +51,6 @@ from ma_poc.pms.adapters._amli import (
 from ma_poc.pms.adapters._amli import (
     parse_amli_trpc_blob as _parse_amli,
 )
-from ma_poc.pms.adapters._camden import (
-    detect_camden_next_data as _detect_camden,
-)
-from ma_poc.pms.adapters._camden import (
-    is_camden_host as _is_camden_host,
-)
-from ma_poc.pms.adapters._camden import (
-    parse_camden_next_data as _parse_camden,
-)
 from ma_poc.pms.adapters._apts247 import (
     build_floorplans_url as _apts247_build_url,
 )
@@ -71,6 +62,15 @@ from ma_poc.pms.adapters._apts247 import (
 )
 from ma_poc.pms.adapters._apts247 import (
     parse_apts247_floorplans as _parse_apts247,
+)
+from ma_poc.pms.adapters._camden import (
+    detect_camden_next_data as _detect_camden,
+)
+from ma_poc.pms.adapters._camden import (
+    is_camden_host as _is_camden_host,
+)
+from ma_poc.pms.adapters._camden import (
+    parse_camden_next_data as _parse_camden,
 )
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
@@ -89,6 +89,18 @@ from ma_poc.pms.adapters._funnel import (
 )
 from ma_poc.pms.adapters._funnel import (
     parse_funnel_api_response as _parse_funnel,
+)
+from ma_poc.pms.adapters._harbor_group import (
+    detect_harbor_group as _detect_harbor_group,
+)
+from ma_poc.pms.adapters._harbor_group import (
+    harbor_prop_base as _hgm_prop_base,
+)
+from ma_poc.pms.adapters._harbor_group import (
+    parse_harbor_floor_plans as _parse_hgm_floor_plans,
+)
+from ma_poc.pms.adapters._harbor_group import (
+    parse_harbor_units_page as _parse_hgm_units,
 )
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
@@ -116,15 +128,6 @@ from ma_poc.pms.adapters._mark_taylor import (
 from ma_poc.pms.adapters._merge_fns import (
     aggregate_quality as _aggregate_quality,
 )
-from ma_poc.pms.adapters._udr import (
-    parse_udr_jsonld as _parse_udr,
-)
-from ma_poc.pms.adapters._harbor_group import (
-    detect_harbor_group as _detect_harbor_group,
-    harbor_prop_base as _hgm_prop_base,
-    parse_harbor_floor_plans as _parse_hgm_floor_plans,
-    parse_harbor_units_page as _parse_hgm_units,
-)
 from ma_poc.pms.adapters._merge_fns import (
     find_unit_list as _find_unit_list,
 )
@@ -149,6 +152,9 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
     rent_in_sanity_range,
+)
+from ma_poc.pms.adapters._udr import (
+    parse_udr_jsonld as _parse_udr,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.g5 import (
@@ -2945,6 +2951,66 @@ class GenericAdapter:
                         reason=str(_exc)[:80],
                         duration_ms=int((_time.monotonic() - _t0) * 1000),
                     )
+
+        # Sub-tier 5.95: marketing-page floor-plan TEXT (task #21) ---------
+        # Last $0 deterministic attempt before the LLM: many small/independent
+        # sites publish their floor plans as free TEXT ("Unit Layouts: Studio |
+        # 288 sq ft | from $1125") that the CSS-selector dom_scan can't see, so
+        # they mis-verdict FAILED_NO_DATA despite publishing PLAN-LEVEL data.
+        # Recover those as plan-level records (unit_number="" → SUCCESS_PLAN_LEVEL,
+        # not gold). Flag-gated (ENABLE_PLAN_TEXT, default off); never-fail.
+        from ma_poc.config.feature_flags import ENABLE_PLAN_TEXT
+
+        if ENABLE_PLAN_TEXT and not result.units:
+            _t0 = _time.monotonic()
+            try:
+                from ma_poc.pms.adapters.plan_text import (
+                    parse_marketing_plan_text,
+                    parse_unit_table,
+                )
+
+                _html = await _get_page_html(page, ctx)
+                # UNIT-level grid first: a page that publishes a per-apartment
+                # availability table must yield apartments, not plans. 2026-07-25
+                # (user-validated on majesticvernonhills.com): the plan-text
+                # reader captured that page's rents exactly right but had no unit
+                # column, so 48 rows shipped SUCCESS_PLAN_LEVEL with inferred_*
+                # ids — a gold property demoted purely by losing "03-0712".
+                _unit_rows = parse_unit_table(_html or "", ctx.base_url)
+                if _unit_rows:
+                    result.units = _unit_rows
+                    result.tier_used = "TIER_1_DOM_UNIT_TABLE"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.8
+                    _log_attempt(
+                        "generic:unit_table", "ran_units",
+                        units=len(_unit_rows),
+                        duration_ms=int((_time.monotonic() - _t0) * 1000),
+                    )
+                    return result
+
+                _plan_units = parse_marketing_plan_text(_html or "", ctx.base_url)
+                if _plan_units:
+                    result.units = _plan_units
+                    result.tier_used = "TIER_3_PLAN_TEXT"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.7
+                    _log_attempt(
+                        "generic:plan_text", "ran_units",
+                        units=len(_plan_units),
+                        duration_ms=int((_time.monotonic() - _t0) * 1000),
+                    )
+                    return result
+                _log_attempt(
+                    "generic:plan_text", "ran_empty",
+                    duration_ms=int((_time.monotonic() - _t0) * 1000),
+                )
+            except Exception as _exc:
+                _log_attempt(
+                    "generic:plan_text", "error",
+                    reason=str(_exc)[:80],
+                    duration_ms=int((_time.monotonic() - _t0) * 1000),
+                )
 
         # Sub-tier 6: LLM extraction --------------------------------------
         # Originally gated ON only for ``pms=unknown``. Option C relaxes

@@ -516,6 +516,7 @@ async def test_link_hop_dedups_profile_against_pms_prior_for_same_url() -> None:
     """
     from unittest.mock import patch
 
+    from ma_poc.pms import scraper as pms_scraper
     from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
     from ma_poc.pms.scraper import _try_link_hop
 
@@ -567,6 +568,8 @@ async def test_link_hop_dedups_profile_against_pms_prior_for_same_url() -> None:
     with (
         patch("ma_poc.fetch.fetch", _fake_fetch, create=True),
         patch.object(obs_events, "emit", _spy_emit),
+        # Cheap-GET gate off — it probe_get()s the live network per hop.
+        patch.object(pms_scraper, "_crawl_get_gate_should_skip", lambda url: False),
     ):
         await _try_link_hop(
             entry_url="https://example.com/",
@@ -601,9 +604,19 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
     for known dead ends just because the template says so.
 
     Documents the dead-end skip-list contract for the new prior layer.
+
+    Asserts on the emitted ``LINK_HOP_FETCHED`` events — the honest
+    per-hop signal — rather than on the fetch mock alone: the cheap-GET
+    gate (``ENABLE_CRAWL_GET_GATE``) can retire a hop as
+    ``DEAD_URL_GATED`` before the sub-fetch is reached, so an empty
+    ``fetch_calls`` does not by itself mean a candidate was skipped.
+    The gate is stubbed off here so the hop is exercised end-to-end
+    (and so the test does not depend on live network responses for
+    ``example.com`` subpaths).
     """
     from unittest.mock import patch
 
+    from ma_poc.pms import scraper as pms_scraper
     from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
     from ma_poc.pms.scraper import _try_link_hop
 
@@ -615,6 +628,7 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
     )
 
     fetch_calls: list[str] = []
+    hop_fetched: list[str] = []
 
     async def _fake_fetch(task: Any) -> Any:
         fetch_calls.append(getattr(task, "url", ""))
@@ -640,9 +654,28 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
 
         return _R()
 
+    # Every attempted hop emits LINK_HOP_FETCHED (success, error, or
+    # gated) — that is the signal the skip-list contract lives on.
+    from ma_poc.observability import events as obs_events
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> Any:
+        kind_value = getattr(kind, "value", str(kind))
+        if "link_hop_fetched" in kind_value.lower():
+            hop_fetched.append(str(payload.get("url", "")))
+        return original_emit(kind, property_id, **payload)
+
     # Profile says /floorplans was explored and had no data (skip it).
     # RentCafe prior would otherwise inject /floorplans as candidate #1.
-    with patch("ma_poc.fetch.fetch", _fake_fetch, create=True):
+    with (
+        patch("ma_poc.fetch.fetch", _fake_fetch, create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+        # Cheap-GET gate off: it would otherwise probe_get() the live
+        # network and retire every prior as DEAD_URL_GATED before the
+        # sub-fetch, masking whichever candidates were really attempted.
+        patch.object(pms_scraper, "_crawl_get_gate_should_skip", lambda url: False),
+    ):
         await _try_link_hop(
             entry_url="https://example.com/",
             entry_page_html="<html></html>",
@@ -654,15 +687,27 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
             max_hops=3,
         )
 
-    assert "https://example.com/floorplans" not in fetch_calls, (
+    # Guard the mock itself: an empty fetch_calls means the patch target
+    # stopped intercepting the hop sub-fetch, not that priors were skipped.
+    assert fetch_calls, (
+        "No sub-fetch was intercepted — the ma_poc.fetch.fetch patch target "
+        "no longer covers _try_link_hop's sub-fetch, so the assertions below "
+        "would pass vacuously."
+    )
+    assert hop_fetched, "No LINK_HOP_FETCHED event emitted"
+
+    assert "https://example.com/floorplans" not in hop_fetched, (
         f"Prior URL was in profile.explored_links but still got fetched: "
-        f"{fetch_calls}. The skip-list must apply to priors the same way "
+        f"{hop_fetched}. The skip-list must apply to priors the same way "
         f"it applies to keyword candidates."
     )
+    assert "https://example.com/floorplans" not in fetch_calls, (
+        f"Skip-listed prior reached the sub-fetch: {fetch_calls}"
+    )
     # The OTHER priors (/availability, /apartments) should still fire.
-    assert any("availability" in u or "apartments" in u for u in fetch_calls), (
+    assert any("availability" in u or "apartments" in u for u in hop_fetched), (
         f"Skipping /floorplans should not suppress the rest of the "
-        f"RentCafe priors; got fetch_calls={fetch_calls}"
+        f"RentCafe priors; got hop_fetched={hop_fetched}"
     )
 
 
@@ -812,4 +857,150 @@ def test_rank_internal_links_discovers_form_action_url() -> None:
     # Cross-site prospectportal.com link should also be discovered (portal host)
     assert any("prospectportal.com" in u for u in urls), (
         f"prospectportal.com URL not in candidates (should score as portal host); got {urls}"
+    )
+
+
+# ── link-hop wall-clock budget (600s-timeout guard) ─────────────────────────
+
+
+def _fake_ok_fetch_recorder(fetch_calls: list[str]) -> Any:
+    """Build an async fetch stub that records every URL and returns an OK
+    HTML body (empty → no units, so the hop loop keeps trying candidates)."""
+
+    async def _fake_fetch(task: Any) -> Any:
+        fetch_calls.append(getattr(task, "url", ""))
+
+        class _O:
+            value = "OK"
+
+        class _R:
+            outcome = _O()
+            status = 200
+            body = b"<html></html>"
+            final_url = task.url
+            elapsed_ms = 0
+            content_type = "text/html"
+            captcha_detected = False
+            error_signature = None
+            identity_ua_hash = "test"
+            render_mode = type("M", (), {"value": "RENDER"})()
+            headers: dict = {}
+
+            def to_dict(self) -> dict:
+                return {"outcome": "OK"}
+
+        return _R()
+
+    return _fake_fetch
+
+
+@pytest.mark.asyncio
+async def test_link_hop_stops_at_wall_clock_budget(monkeypatch: Any) -> None:
+    """Budget spent → no NEW hop starts.
+
+    link-hop was bounded only by ``max_hops`` (a page COUNT), never elapsed
+    time — so when a host tarpitted, up to ~14 sequential RENDER sub-fetches
+    blew the 600s per-property timeout. With LINK_HOP_BUDGET_S=0 the deadline
+    is already past on entry, so the loop must break on the first iteration
+    (zero fetches) and emit HOP_BUDGET_EXCEEDED — never firing the full
+    max_hops fan-out.
+    """
+    from unittest.mock import patch
+
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _try_link_hop
+
+    # from-import inside _try_link_hop re-reads the module attr at call time,
+    # so patching the module attribute controls the budget without a reload.
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_BUDGET_S", 0)
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+    )
+    fetch_calls: list[str] = []
+    budget_hits: list[str] = []
+
+    from ma_poc.observability import events as obs_events
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> Any:
+        if payload.get("outcome") == "HOP_BUDGET_EXCEEDED":
+            budget_hits.append(payload.get("url", ""))
+        return original_emit(kind, property_id, **payload)
+
+    with (
+        patch("ma_poc.fetch.fetch", _fake_ok_fetch_recorder(fetch_calls), create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+    ):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html="<html></html>",
+            detected=detected,
+            profile=_profile_with_winning_url("https://example.com/floorplans"),
+            expected_total_units=None,
+            property_id="BUDGET-ZERO",
+            csv_row=None,
+            max_hops=7,
+        )
+
+    assert fetch_calls == [], f"budget=0 must fire ZERO hops; got {fetch_calls}"
+    assert budget_hits, "HOP_BUDGET_EXCEEDED must be emitted when the budget is spent"
+
+
+@pytest.mark.asyncio
+async def test_link_hop_generous_budget_no_premature_cutoff(monkeypatch: Any) -> None:
+    """Contrast case: with a generous budget the guard must NOT fire — no
+    HOP_BUDGET_EXCEEDED is emitted. Proves the cutoff in the budget=0 test is
+    the deadline itself, not the guard tripping on every run.
+
+    (Asserted on the emitted event rather than fetch_calls: the legacy
+    ``ma_poc.fetch.fetch`` patch target no longer intercepts the hop fetch, so
+    fetch-call counting is unreliable here — the event is the honest signal.)
+    """
+    from unittest.mock import patch
+
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _try_link_hop
+
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_BUDGET_S", 100_000)
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+    )
+    fetch_calls: list[str] = []
+    budget_hits: list[str] = []
+
+    from ma_poc.observability import events as obs_events
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> Any:
+        if payload.get("outcome") == "HOP_BUDGET_EXCEEDED":
+            budget_hits.append(payload.get("url", ""))
+        return original_emit(kind, property_id, **payload)
+
+    with (
+        patch("ma_poc.fetch.fetch", _fake_ok_fetch_recorder(fetch_calls), create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+    ):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html="<html></html>",
+            detected=detected,
+            profile=_profile_with_winning_url("https://example.com/floorplans"),
+            expected_total_units=None,
+            property_id="BUDGET-BIG",
+            csv_row=None,
+            max_hops=7,
+        )
+
+    assert budget_hits == [], (
+        f"generous budget must NOT trip the hop-budget guard; got {budget_hits}"
     )

@@ -42,13 +42,19 @@ def test_subflag_blocked_when_master_off(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_subflag_default_when_master_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Master on + no sub-flag env vars → DC_PROXY True, RESIDENTIAL False, UNLOCKER False."""
+    """Master on + no sub-flag env vars → every provider rung stays OFF.
+
+    DC_PROXY defaulted True until 2026-07-25. That made PROXY_POOL_URLS
+    opt-OUT: a job that never mentioned the flag still attached a datacentre
+    proxy to every fetch, so one silently-dead pool entry produced 0 usable
+    rendered bodies across a 5k run. All provider rungs are now opt-in.
+    """
     monkeypatch.setenv("ENABLE_TIER_ESCALATION", "true")
     monkeypatch.delenv("ENABLE_DC_PROXY_TIER", raising=False)
     monkeypatch.delenv("ENABLE_RESIDENTIAL_TIER", raising=False)
     monkeypatch.delenv("ENABLE_UNLOCKER_TIER", raising=False)
     mod = _reload_flags()
     assert mod.ENABLE_TIER_ESCALATION is True  # type: ignore[attr-defined]
-    assert mod.ENABLE_DC_PROXY_TIER is True  # type: ignore[attr-defined]
+    assert mod.ENABLE_DC_PROXY_TIER is False  # type: ignore[attr-defined]
     assert mod.ENABLE_RESIDENTIAL_TIER is False  # type: ignore[attr-defined]
     assert mod.ENABLE_UNLOCKER_TIER is False  # type: ignore[attr-defined]

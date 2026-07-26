@@ -108,6 +108,66 @@ async def test_body_resolver_no_signal_is_failed_not_wrong_hop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_confident_known_pms_not_downgraded_by_samehost_hop() -> None:
+    """Regression (2026-07-19): a confident BODY-detected RentCafe on a *vanity*
+    URL must keep its adapter even when a same-host /floorplans CTA exists.
+
+    Before the downgrade guard, the vanity URL failed Step-1's url-fingerprint
+    gate, fell to Pass-3b, hopped to the same-host /floorplans anchor, re-detected
+    it as generic, and demoted a RentCafe UNIT-level gold to TIER_3_DOM_GENERIC
+    plan-level (8/44 test100c gold→plan demotions)."""
+    # A confident known-PMS detection (as html_detection would produce from a
+    # body carrying a rentcafe marker).
+    rentcafe = detect_pms("https://www.rentcafe.com/apartments/mi/ann-arbor/foo/")
+    assert rentcafe.pms == "rentcafe" and rentcafe.confidence >= 0.7
+    body = (
+        "<html><body>"
+        "<a href='/floorplans'>Floor Plans</a>"  # same-host CTA-path anchor
+        "<a href='/availability'>Availability</a>"
+        "</body></html>"
+    )
+    res = await resolve_target_from_body(
+        body, "https://parkplacejville.com/", "https://parkplacejville.com/", rentcafe
+    )
+    # Guard fires: no downgrade to generic, adapter stays rentcafe, no spurious hop.
+    assert res.final_detection.pms == "rentcafe"
+    assert res.method == "no_hop_known_pms"
+    assert res.resolved_url == "https://parkplacejville.com/"
+
+
+@pytest.mark.asyncio
+async def test_cross_known_pms_hop_still_allowed() -> None:
+    """The guard only blocks DOWNGRADES to generic — a confident detection that
+    hops to a *different known adapter* (a real portal) must still resolve."""
+    rentcafe = detect_pms("https://www.rentcafe.com/apartments/mi/ann-arbor/foo/")
+    body = (
+        "<html><body><iframe src='https://tour.sightmap.com/embed/X'></iframe>"
+        "</body></html>"
+    )
+    res = await resolve_target_from_body(
+        body, "https://vanity.example/", "https://vanity.example/", rentcafe
+    )
+    # sightmap is a known adapter (not generic) → hop preserved.
+    assert res.final_detection.pms == "sightmap"
+    assert res.method == "iframe"
+
+
+@pytest.mark.asyncio
+async def test_unknown_initial_still_hops_to_generic_subpage() -> None:
+    """The guard must NOT block the legit recovery case: an UNKNOWN vanity that
+    genuinely needs the same-host /floorplans hop still resolves (no known PMS
+    to protect, so the hop is the best available signal)."""
+    unknown = detect_pms("https://vanity.example/")
+    assert unknown.pms in ("unknown", "generic_plan_text")
+    body = "<html><body><a href='/floor-plans-and-pricing'>Floor Plans</a></body></html>"
+    res = await resolve_target_from_body(
+        body, "https://vanity.example/", "https://vanity.example/", unknown
+    )
+    # Not blocked by the guard (initial is generic/unknown) — hop attempted.
+    assert res.method in ("cta_link", "failed")
+
+
+@pytest.mark.asyncio
 async def test_body_resolver_none_body_is_fetch_only() -> None:
     detection = detect_pms("https://vanity.example/")
     res = await resolve_target_from_body(
