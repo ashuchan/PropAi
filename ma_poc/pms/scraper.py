@@ -234,6 +234,24 @@ def _is_unreachable_error(error: Exception | str) -> bool:
     return any(pat in msg for pat in _UNREACHABLE_PATTERNS)
 
 
+def rows_are_plan_level(units: list[dict[str, Any]] | None) -> bool:
+    """True when NOT ONE row carries a real per-apartment identity.
+
+    Resolves through ``core.identity.unit_has_real_anchor`` — the same
+    predicate identity uses to decide whether to mint a synthetic id — so
+    "plan-level" means one thing across the identity, verdict, retry and
+    recovery layers.
+
+    2026-07-26: promoted from a closure inside the Path-B retry block so the
+    universal-recovery gate can share it. Two copies of this rule would drift,
+    and drift between copies of the same rule is already a recurring defect
+    class in this repo.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    return bool(units) and not any(unit_has_real_anchor(u) for u in units)
+
+
 def _detection_to_dict(det: DetectedPMS) -> dict[str, Any]:
     return {
         "pms": det.pms,
@@ -1270,16 +1288,6 @@ async def scrape(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
 
-        def _rows_are_plan_level(units: list[dict[str, Any]]) -> bool:
-            """True when NOT ONE row carries a real per-apartment identity.
-
-            Uses the same anchor predicate identity itself resolves against,
-            so "plan-level" means exactly what it means everywhere else.
-            """
-            from ma_poc.core.identity import unit_has_real_anchor
-
-            return bool(units) and not any(unit_has_real_anchor(u) for u in units)
-
         def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
             / ``"no_area"`` / ``"plan_level_only"`` / None. None means the
@@ -1312,7 +1320,7 @@ async def scrape(
                 # because the detector usually DID see another candidate — 21
                 # onesite-detected properties in that run were ultimately
                 # served by SightMap.
-                if _rows_are_plan_level(res.units):
+                if rows_are_plan_level(res.units):
                     return "plan_level_only"
             return None
 
@@ -1337,7 +1345,7 @@ async def scrape(
             if not _retry_win_condition(res):
                 return False
             if trigger == "plan_level_only":
-                return not _rows_are_plan_level(res.units)
+                return not rows_are_plan_level(res.units)
             return True
 
         # Preserve the baseline (initial-adapter) result so plan-level
@@ -2092,7 +2100,27 @@ async def scrape(
             _ur_page_none_ok = bool(ENABLE_BODY_RESOLVER and page_html)
         except Exception:
             _ur_page_none_ok = False
-    if not adapter_result.units and (page is not None or _ur_page_none_ok):
+    # 2026-07-26 — PLAN-LEVEL IS NOT "RECOVERED". This gate used to be
+    # ``not adapter_result.units``, so universal recovery only ran when the
+    # extraction came back completely EMPTY. A plan-level result HAS units
+    # (floor-plan rows), so it never ran — and universal recovery is what
+    # contains the PMS portal hop.
+    #
+    # Measured on the 2026-07-26-plancohort canary: of 835 properties that
+    # failed to reach unit level, 368 (44%) carry a SecureCafe fingerprint on
+    # their own page. The properties that DID reach the portal converted
+    # 117/117 — a 100% rate — so those 368 are proven-recoverable and were
+    # simply never offered the route. They died on tiers like
+    # RENTCAFE_NO_RESPONSE_PLAN_LEVEL (144), TIER_3_DOM_GENERIC (72) and
+    # GENERIC_PLAN_TEXT (53), all of which return plan rows and so slipped
+    # past this gate.
+    #
+    # Same defect shape as the Path-B retry trigger (d33cd42): "has units"
+    # was being treated as "done", when plan rows are not done.
+    _ur_plan_level_only = rows_are_plan_level(adapter_result.units)
+    if (not adapter_result.units or _ur_plan_level_only) and (
+        page is not None or _ur_page_none_ok
+    ):
         try:
             from ma_poc.pms.adapters._universal_recovery import (
                 already_attempted as _ur_attempted,
@@ -2114,7 +2142,20 @@ async def scrape(
                     _ur_post = _ur_pp(
                         _ur_units, property_id=getattr(ctx, "property_id", None)
                     )
-                    if _ur_post.n_admitted > 0:
+                    # 2026-07-26 — DO NOT DESTROY A GOOD BASELINE. Now that
+                    # this path also fires on plan-level results (not just
+                    # empty ones), the assignment below would OVERWRITE real
+                    # plan rows. Swapping plan-level for plan-level gains
+                    # nothing and can lose the better of the two, so when we
+                    # entered on a plan-level baseline the recovery must come
+                    # back genuinely unit-level to be accepted. Entering on an
+                    # EMPTY baseline keeps the original rule — anything beats
+                    # nothing.
+                    _ur_accept = _ur_post.n_admitted > 0 and (
+                        not _ur_plan_level_only
+                        or not rows_are_plan_level(_ur_post.admitted)
+                    )
+                    if _ur_accept:
                         adapter_result.units = _ur_post.admitted
                         adapter_result.plan_summaries = _ur_post.plan_summaries
                         adapter_result.tier_used = _ur_tier
@@ -2122,6 +2163,12 @@ async def scrape(
                             0.92, 0.65 + 0.04 * _ur_post.n_admitted
                         )
                         fallback_chain.append(f"universal_recovery:{_ur_winner}")
+                    elif _ur_post.n_admitted > 0 and _ur_plan_level_only:
+                        # Visible in triage: the route ran and returned rows,
+                        # but they were no better than what we already had.
+                        fallback_chain.append(
+                            f"universal_recovery_plan_level_declined:{_ur_winner}"
+                        )
 
             # Bot-block telemetry: when a recovery sub-fetch hit a wall
             # (401/403/429/503), record it on the fallback chain so DLQ/
