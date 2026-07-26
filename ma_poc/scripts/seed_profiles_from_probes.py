@@ -55,6 +55,7 @@ import argparse
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -214,7 +215,17 @@ def main(argv: list[str] | None = None) -> int:
     data = json.loads(args.probes.read_text(encoding="utf-8"))
     probes = data if isinstance(data, list) else data.get("per_property") or []
 
-    from ma_poc.services.profile_store import ProfileStore
+    # ``services.profile_store`` imports its models with a BARE
+    # ``from models.scrape_profile import ...``, so it only resolves when
+    # ``ma_poc/`` itself is on sys.path — it cannot be imported as
+    # ``ma_poc.services.profile_store`` from the repo root. (Same root cause
+    # as the long-standing tests/services/test_phase_a_correctness.py
+    # ``no_bare_imports`` failure.) Put the package dir on the path so this
+    # script runs from either location rather than making the caller care.
+    _pkg_root = Path(__file__).resolve().parent.parent
+    if str(_pkg_root) not in sys.path:
+        sys.path.insert(0, str(_pkg_root))
+    from services.profile_store import ProfileStore  # noqa: PLC0415
 
     summary = run(probes, ProfileStore(args.profiles_dir), commit=args.commit)
 
