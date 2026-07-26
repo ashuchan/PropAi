@@ -1078,6 +1078,46 @@ _PP_PLAN_UNIT_MARKERS_RE = re.compile(
 )
 
 
+#: ProspectPortal plan-index href: ``/{city-slug}/{property-slug}/conventional/``.
+#: Absolute or root-relative; the trailing slash is optional in the wild.
+_PP_CONVENTIONAL_RE = re.compile(
+    r"""href=["'']((?:https?://[^"'\s]+)?/[a-z0-9][a-z0-9\-]*/[a-z0-9][a-z0-9\-]*/conventional/?)["'']""",
+    re.IGNORECASE,
+)
+
+
+def _find_pp_conventional_index(html: str, base: str) -> list[str]:
+    """Absolute ``/{city}/{slug}/conventional/`` URLs found in *html*.
+
+    The slug shape cannot be derived from CSV fields — live examples are
+    ``/rockville/fenestra-at-the-square/``,
+    ``/oklahoma-city-oklahoma-city/garden-gate/`` and
+    ``/corvallis-corvallis/grand-oaks-grand-oaks/``, where city and property
+    are each sometimes doubled. So it is read off the page's own anchors.
+
+    Same-host only: a ProspectPortal vanity site can link a sibling property,
+    and drilling someone else's roster would attribute their apartments here.
+    """
+    if not html:
+        return []
+    from urllib.parse import urljoin, urlparse
+
+    base_host = urlparse(base).netloc.lower() if base else ""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _PP_CONVENTIONAL_RE.finditer(html):
+        url = urljoin(base or "", m.group(1))
+        host = urlparse(url).netloc.lower()
+        # Allow the vanity host itself and its prospectportal twin.
+        if base_host and host != base_host and not host.endswith("prospectportal.com"):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
 def _pp_plan_page_has_units(plan_html: str) -> bool:
     """True when a plan-detail page looks like it carries a unit roster.
 
@@ -2289,6 +2329,49 @@ class EntrataAdapter:
                     parse_entrata_prospectportal_html(cand_html, cand_url)
                 )
                 pp_ssr_index_bodies.append((cand_url, cand_html))
+
+            # 2026-07-26 — HARVEST THE PLAN INDEX FROM THE PAGE.
+            #
+            # ProspectPortal mounts its plan grid at
+            # ``/{city-slug}/{property-slug}/conventional/`` — NOT at
+            # ``/floorplans``, which on many of these hosts 302s to the
+            # homepage. The candidate-path probes above therefore find no
+            # index, the per-plan drill has nothing to walk, and the property
+            # ships plan-level.
+            #
+            # The slug shape is NOT derivable: live examples are
+            # ``/rockville/fenestra-at-the-square/``,
+            # ``/oklahoma-city-oklahoma-city/garden-gate/`` and
+            # ``/corvallis-corvallis/grand-oaks-grand-oaks/`` — city and
+            # property are each sometimes doubled. So it is harvested from
+            # the page's own anchors rather than constructed.
+            #
+            # Measured on the 2026-07-26 canary: 20 of the 53 unconverted
+            # Entrata-surface properties (38%) expose this href on their
+            # landing page. Live-verified on gardengateokc.com — the
+            # conventional index yields 19 plan links whose detail pages
+            # carry real apartments (4032 Renovated $1,863).
+            if not pp_ssr_index_bodies:
+                for _conv_url in _find_pp_conventional_index(
+                    fr_body_check if isinstance(fr_body_check, str) else "", base
+                )[:2]:
+                    try:
+                        _conv_html = await _entrata_static_fetch(_conv_url)
+                    except Exception:
+                        continue
+                    if not _conv_html:
+                        continue
+                    if (
+                        "fp-card" not in _conv_html
+                        and "fp-group-item" not in _conv_html
+                        and "fp-name-link" not in _conv_html
+                    ):
+                        continue
+                    pp_ssr_units.extend(
+                        parse_entrata_prospectportal_html(_conv_html, _conv_url)
+                    )
+                    pp_ssr_index_bodies.append((_conv_url, _conv_html))
+                    break
 
             # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
             # Templates A/B/C above produce plan-level rows with
