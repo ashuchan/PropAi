@@ -157,6 +157,12 @@ class EventKind(StrEnum):
     FETCH_TIER_PROBE_SUCCESS = "fetch.tier_probe_success"
     FETCH_TIER_PROBE_FAILED = "fetch.tier_probe_failed"
     FETCH_LADDER_BUDGET_EXHAUSTED = "fetch.ladder_budget_exhausted"
+    # Run-level alarm (2026-07-27): a fetch tier returned nothing but transport
+    # failures for N consecutive attempts and has been latched off for the rest
+    # of the run. Emitted ONCE per tier. This is the signal whose absence let a
+    # dead DC proxy silently degrade all 4,982 properties of the 2026-07-22
+    # hb250 run for eight days. See fetch/tier_health.py.
+    FETCH_TIER_DISABLED = "fetch.tier_disabled"
 
     # Cross-source + self-learning events (CLAUDE_XSOURCE_AND_LEARNING)
     # Phase 6 / 7 / 8

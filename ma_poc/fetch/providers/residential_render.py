@@ -70,6 +70,7 @@ from typing import TYPE_CHECKING
 
 from ma_poc.fetch.captcha_detect import ChallengeKind, classify_challenge
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+from ma_poc.fetch.response_classifier import exception_signature
 from ma_poc.fetch.stealth import IdentityPool
 from ma_poc.models.fetch_tier import FetchTier
 
@@ -298,7 +299,11 @@ class ResidentialRenderProvider:
                     final_url=task.url,
                     attempts=1,
                     elapsed_ms=_now_ms() - start_ms,
-                    error_signature=f"render:{type(exc).__name__}",
+                    # 2026-07-27: see response_classifier.exception_signature —
+                    # bare type names collapse every Playwright navigation
+                    # failure to "render:Error" and hide the net::ERR_* code
+                    # that identifies a dead proxy.
+                    error_signature=exception_signature(exc, prefix="render"),
                 ),
                 attempts=[int(_TIER)],
             )

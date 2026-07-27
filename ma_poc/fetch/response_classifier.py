@@ -205,6 +205,75 @@ except Exception:  # pragma: no cover
     _PlaywrightTimeoutError = None  # type: ignore[assignment,misc]
 
 
+# ── Exception signatures ─────────────────────────────────────────────────────
+# 2026-07-27 RCA: the 267 fetches that a dead datacentre proxy failed all
+# recorded the bare signature ``"Error"``. That is not a placeholder — Playwright's
+# *base exception class is literally named* ``Error``
+# (``playwright._impl._errors.Error``), so ``type(exc).__name__`` renders every
+# Chromium navigation failure as the single least informative string possible,
+# while the message — which carried ``net::ERR_TUNNEL_CONNECTION_FAILED``, the
+# exact fingerprint of a black-holing proxy — was discarded. Eight days of
+# opaque telemetry followed. Preserve the message, but as a *bounded token*:
+# ``error_signature`` is group-by'd in analyze_cloud_run.py and stored in a
+# String(512) column, so raw messages (URLs, IPs, ports) would explode
+# cardinality and make the aggregates useless in the other direction.
+
+#: Transport error codes worth preserving verbatim — Chromium ``net::ERR_*``,
+#: bare ``ERR_*``, curl ``CURLE_*``, and OpenSSL-style ``SSL_ERROR_*``.
+_ERROR_CODE_RE = re.compile(
+    r"\b(net::ERR_[A-Z0-9_]+|ERR_[A-Z0-9_]+|CURLE_[A-Z0-9_]+|SSL_ERROR_[A-Z0-9_]+)"
+)
+#: Noise that would blow up cardinality: URLs, host:port pairs, bare IPs.
+_NOISE_RE = re.compile(
+    r"https?://\S+|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b|\b[\w.-]+\.[a-z]{2,}(?::\d+)?\b",
+    re.IGNORECASE,
+)
+_MAX_TOKEN_CHARS = 48
+
+
+def exception_signature(exception: BaseException, prefix: str | None = None) -> str:
+    """Build a bounded, greppable signature preserving exception type *and* cause.
+
+    Mirrors ``hyperbrowser_backend``'s ``f"hb:{type(exc).__name__}"`` convention
+    but keeps the message, because the type alone is useless for the exception
+    classes that matter most here (Playwright's is named ``Error``).
+
+    Args:
+        exception: The exception raised during the request.
+        prefix: Optional namespace prepended to the type, e.g. ``"hb"`` or
+            ``"render"``. The type name is always kept — a namespace alone
+            would reintroduce exactly the ambiguity this function removes.
+
+    Returns:
+        ``"[<prefix>:]<type>[:<token>]"`` — e.g.
+        ``"Error:net::ERR_TUNNEL_CONNECTION_FAILED"`` or
+        ``"hb:Error:net::ERR_PROXY_CONNECTION_FAILED"``. Falls back to the bare
+        type name when the exception carries no usable message.
+    """
+    head = type(exception).__name__
+    if prefix:
+        head = f"{prefix}:{head}"
+    try:
+        message = str(exception).strip()
+    except Exception:  # pragma: no cover - pathological __str__
+        message = ""
+    if not message:
+        return head
+
+    # 1. A recognised transport code is the most useful token — keep it verbatim.
+    code = _ERROR_CODE_RE.search(message)
+    if code:
+        return f"{head}:{code.group(1)}"
+
+    # 2. Otherwise normalise the first line to a low-cardinality slug.
+    first_line = message.splitlines()[0]
+    scrubbed = _NOISE_RE.sub(" ", first_line)
+    slug = re.sub(r"[^a-z0-9]+", "_", scrubbed.lower()).strip("_")
+    if not slug:
+        return head
+    return f"{head}:{slug[:_MAX_TOKEN_CHARS].rstrip('_')}"
+
+
 def classify(
     status: int | None,
     headers: dict[str, str],
@@ -255,10 +324,10 @@ def classify(
         if _PlaywrightTimeoutError is not None and isinstance(exception, _PlaywrightTimeoutError):
             return FetchOutcome.TRANSIENT, "timeout"
         if isinstance(exception, ConnectionError):
-            return FetchOutcome.TRANSIENT, f"connection_{type(exception).__name__}"
+            return FetchOutcome.TRANSIENT, exception_signature(exception)
         # Unknown exception with no status
         if status is None:
-            return FetchOutcome.TRANSIENT, type(exception).__name__
+            return FetchOutcome.TRANSIENT, exception_signature(exception)
 
     # Status-based classification
     if status is None:

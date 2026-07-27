@@ -42,6 +42,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+from ma_poc.fetch.response_classifier import exception_signature
 from ma_poc.models.fetch_tier import FetchTier
 
 if TYPE_CHECKING:
@@ -409,7 +410,10 @@ def _error_result(task: CrawlTask, outcome: FetchOutcome, exc: Exception, start_
         final_url=task.url,
         attempts=1,
         elapsed_ms=_now_ms() - start_ms,
-        error_signature=f"hb:{type(exc).__name__}",
+        # 2026-07-27: type name alone renders every Playwright failure as
+        # "hb:Error" (its base class is literally named ``Error``) — the same
+        # blind spot that made the dead-proxy outage opaque. Keep the message.
+        error_signature=exception_signature(exc, prefix="hb"),
     )
 
 

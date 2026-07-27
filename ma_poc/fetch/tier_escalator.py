@@ -28,6 +28,7 @@ from ma_poc.config.feature_flags import (
     ENABLE_UNLOCKER_TIER,
     SKIP_RESIDENTIAL_WHEN_UNLOCKER,
 )
+from ma_poc.fetch import tier_health
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult
 from ma_poc.models.fetch_tier import FetchTier
 from ma_poc.observability.events import EventKind, emit
@@ -223,12 +224,22 @@ async def fetch_with_escalation(
     # Before the normal ladder, check if we should probe a lower tier.
     # If the probe succeeds, the profile updater will demote the floor.
     probe_tier = _should_probe_lower(profile)
+    # A tier the breaker has killed is dead for probes too — dialling it here
+    # would reintroduce the exact waste the guard exists to stop.
+    if probe_tier is not None and tier_health.is_tier_disabled(probe_tier.name):
+        probe_tier = None
     if probe_tier is not None:
         try:
             profile.fetch.last_demotion_probe_at = datetime.now(UTC)
             probe_provider = _make_provider(probe_tier)
             probe_result = await probe_provider.fetch(task, profile)
             all_attempts.extend(probe_result.fetch_tier_attempts or [int(probe_tier)])
+            tier_health.note_result(
+                probe_tier.name,
+                probe_result.outcome,
+                property_id=task.property_id,
+                error_signature=probe_result.error_signature,
+            )
 
             if probe_result.outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED):
                 emit(EventKind.FETCH_TIER_PROBE_SUCCESS, task.property_id,
@@ -249,12 +260,26 @@ async def fetch_with_escalation(
 
     escalations = 0
     last_result: FetchResult | None = None
+    attempted_any = False
 
     for tier in ladder:
         if escalations > MAX_ESCALATIONS_PER_RUN:
             emit(EventKind.FETCH_LADDER_BUDGET_EXHAUSTED, task.property_id,
                  escalations=escalations, max=MAX_ESCALATIONS_PER_RUN)
             break
+
+        # Run-level circuit breaker (2026-07-27 RCA). The escalator's providers
+        # build their proxy from BrightDataProvider.get_config(), never from
+        # ProxyPool — so ProxyPool's health/quarantine logic has never applied
+        # to this path. Without this check a dead proxy behind DC_PROXY or
+        # RESIDENTIAL is retried for every property of a 5k run, forever.
+        # DIRECT is never guarded (see tier_health.UNGUARDED_TIERS).
+        if tier_health.is_tier_disabled(tier.name):
+            log.debug(
+                "Skipping tier %s for %s — disabled for this run by the health guard",
+                tier.name, task.property_id,
+            )
+            continue
 
         emit(EventKind.FETCH_TIER_ESCALATED, task.property_id,
              tier=tier.name, escalations=escalations)
@@ -279,8 +304,17 @@ async def fetch_with_escalation(
 
         all_attempts.extend(result.fetch_tier_attempts or [int(tier)])
         last_result = result
+        attempted_any = True
 
         outcome = result.outcome
+        # Feed the run-level breaker. Only TRANSIENT/PROXY_ERROR count as tier
+        # faults — a BOT_BLOCKED or a 404 proves the tier reached the origin.
+        tier_health.note_result(
+            tier.name,
+            outcome,
+            property_id=task.property_id,
+            error_signature=result.error_signature,
+        )
         if outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED):
             emit(EventKind.FETCH_TIER_PROBE_SUCCESS, task.property_id,
                  tier=tier.name, escalations=escalations)
@@ -308,6 +342,20 @@ async def fetch_with_escalation(
 
         # TRANSIENT / RATE_LIMITED / PROXY_ERROR — escalate
         escalations += 1
+
+    # Every tier in the ladder was disabled by the health guard and nothing was
+    # tried. Fall back to DIRECT rather than synthesising a failure: DIRECT is
+    # free, unproxied, and never guarded, so it is always a safe floor. Without
+    # this a run whose tier_floor sits above DIRECT would return LADDER_EMPTY
+    # for every remaining property once the breaker tripped — trading a silent
+    # outage for a loud one, which is not the trade we want.
+    if not attempted_any and ladder:
+        from ma_poc.fetch.providers.direct import DirectProvider
+        log.warning(
+            "All tiers in the ladder are disabled for this run; falling back to "
+            "DIRECT for %s", task.property_id,
+        )
+        return await DirectProvider().fetch(task, profile)
 
     # ── Ladder exhausted → DLQ_PARK signal ───────────────────────────────────
     if last_result is not None:
