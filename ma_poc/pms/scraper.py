@@ -3343,7 +3343,17 @@ async def _try_link_hop(
         # and walled/non-404 pages all fall through to the normal RENDER fetch.
         from ma_poc.config.feature_flags import ENABLE_CRAWL_GET_GATE
 
-        if ENABLE_CRAWL_GET_GATE and _crawl_get_gate_should_skip(sub_url):
+        # The gate's probe_get is a BLOCKING curl_cffi call (up to its 10s
+        # timeout). Called inline it froze this whole event loop — every
+        # co-resident property scrape — for the probe's duration, which is
+        # the same starvation that made per-property wall time approach the
+        # 600s cap (RCA 2026-07-25). 920d050 off-loaded the sync probes in
+        # fetcher.py/rentcafe.py but did not reach this call site; scraper.py
+        # had no to_thread at all. Off-load it so the gate keeps its
+        # timeout protection without blocking the loop.
+        if ENABLE_CRAWL_GET_GATE and await asyncio.to_thread(
+            _crawl_get_gate_should_skip, sub_url
+        ):
             emit(
                 EventKind.LINK_HOP_FETCHED,
                 property_id,

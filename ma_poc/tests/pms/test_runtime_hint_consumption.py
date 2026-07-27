@@ -137,8 +137,16 @@ async def test_llm_nav_hint_consumption_resets_monolithic_budget_before_subscrap
         budget_observed_by_subscrape.append(dict(sb))
         return {"units": [], "extraction_tier_used": None, "errors": []}
 
+    # Cheap-GET gate off — it probe_get()s the LIVE network once per hop
+    # candidate and retires the hop as DEAD_URL_GATED before the stubbed
+    # fetch is reached. What is under test here is hint ranking + budget
+    # reset, not the gate; stubbing it keeps the test hermetic.
+    from ma_poc.pms import scraper as pms_scraper
+
     with patch("ma_poc.fetch.fetch", new=_stub_fetch), patch(
         "ma_poc.pms.scraper.scrape", new=_capture_inner_scrape
+    ), patch.object(
+        pms_scraper, "_crawl_get_gate_should_skip", lambda url: False
     ):
         await _try_link_hop(
             entry_url="https://x.com/",
@@ -195,8 +203,16 @@ async def test_keyword_ranked_hop_does_not_reset_monolithic_budget() -> None:
         budget_observed_by_subscrape.append(dict(sb))
         return {"units": [], "extraction_tier_used": None, "errors": []}
 
+    # Cheap-GET gate off — it probe_get()s the LIVE network once per hop
+    # candidate and retires the hop as DEAD_URL_GATED before the stubbed
+    # fetch is reached. What is under test here is hint ranking + budget
+    # reset, not the gate; stubbing it keeps the test hermetic.
+    from ma_poc.pms import scraper as pms_scraper
+
     with patch("ma_poc.fetch.fetch", new=_stub_fetch), patch(
         "ma_poc.pms.scraper.scrape", new=_capture_inner_scrape
+    ), patch.object(
+        pms_scraper, "_crawl_get_gate_should_skip", lambda url: False
     ):
         await _try_link_hop(
             entry_url="https://x.com/",
@@ -418,8 +434,16 @@ async def test_full_runtime_loop_api_hint_probed_and_nav_hint_resets_budget() ->
         budget_at_subscrape.append(dict(sb))
         return {"units": [], "extraction_tier_used": None, "errors": []}
 
+    # Cheap-GET gate off — it probe_get()s the LIVE network once per hop
+    # candidate and retires the hop as DEAD_URL_GATED before the stubbed
+    # fetch is reached. What is under test here is hint ranking + budget
+    # reset, not the gate; stubbing it keeps the test hermetic.
+    from ma_poc.pms import scraper as pms_scraper
+
     with patch("ma_poc.fetch.fetch", new=_stub_fetch), patch(
         "ma_poc.pms.scraper.scrape", new=_capture_inner_scrape
+    ), patch.object(
+        pms_scraper, "_crawl_get_gate_should_skip", lambda url: False
     ):
         await _try_link_hop(
             entry_url="https://example.com/",

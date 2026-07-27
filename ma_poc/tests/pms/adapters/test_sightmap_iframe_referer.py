@@ -8,11 +8,12 @@ and that units parsed from the embed API JSON are returned.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 
-import httpx
 import pytest
 
+from ma_poc.pms.adapters import _probe as _probe_mod
 from ma_poc.pms.adapters import sightmap as _sm
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import detect_pms
@@ -89,35 +90,56 @@ def _make_ctx() -> AdapterContext:
     )
 
 
-def _install_mock_httpx(monkeypatch: pytest.MonkeyPatch, recorded: list[httpx.Request]):
-    """Replace httpx.AsyncClient with one backed by a MockTransport that
-    records every outbound Request and serves canned responses."""
+@dataclass
+class _RecordedRequest:
+    """One outbound probe call — mirrors the ``httpx.Request`` surface these
+    assertions used before the seam moved (``.url`` / ``.headers``)."""
 
-    def _handler(request: httpx.Request) -> httpx.Response:
-        recorded.append(request)
-        url = str(request.url)
+    url: str
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class _StubProbeResponse:
+    """Minimal ``probe_get`` return shape: ``.status_code`` + ``.text``."""
+
+    status_code: int
+    text: str
+
+
+def _install_mock_probe(
+    monkeypatch: pytest.MonkeyPatch, recorded: list[_RecordedRequest]
+):
+    """Replace ``_probe.probe_get`` with a recorder serving canned responses.
+
+    ``probe_get`` — NOT ``httpx.AsyncClient`` — is the seam the iframe
+    fallback fetches through as of 1d8fb89 ("route the page=None fallback API
+    fetch through probe_get"), which moved it onto the residential/Web-Unlocker
+    path because sightmap.com's CDN CF-blocks the bare GCP runner IP. Stubbing
+    ``httpx`` here recorded nothing and let the call escape to the LIVE
+    internet, so these assertions silently graded real sightmap.com traffic.
+
+    The adapter imports ``probe_get`` *inside* the function, so patching the
+    module attribute is what takes effect.
+    """
+
+    def _probe_get(url: str, headers: dict[str, str] | None = None, **_kwargs):  # type: ignore[no-untyped-def]
+        recorded.append(_RecordedRequest(url=url, headers=dict(headers or {})))
         if url.endswith("/embed/abc123xy"):
-            return httpx.Response(200, text=_EMBED_HTML)
+            return _StubProbeResponse(200, _EMBED_HTML)
         if url == _API_URL:
-            return httpx.Response(200, json=_API_PAYLOAD)
-        return httpx.Response(404, text="not found")
+            return _StubProbeResponse(200, json.dumps(_API_PAYLOAD))
+        return _StubProbeResponse(404, "not found")
 
-    transport = httpx.MockTransport(_handler)
-    real_async_client = httpx.AsyncClient
-
-    def _patched_async_client(*args, **kwargs):  # type: ignore[no-untyped-def]
-        kwargs["transport"] = transport
-        return real_async_client(*args, **kwargs)
-
-    monkeypatch.setattr(httpx, "AsyncClient", _patched_async_client)
+    monkeypatch.setattr(_probe_mod, "probe_get", _probe_get)
 
 
 @pytest.mark.asyncio
 async def test_iframe_fallback_sends_referer_and_chrome120_ua(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    recorded: list[httpx.Request] = []
-    _install_mock_httpx(monkeypatch, recorded)
+    recorded: list[_RecordedRequest] = []
+    _install_mock_probe(monkeypatch, recorded)
 
     ctx = _make_ctx()
     result = AdapterResult()
@@ -156,8 +178,8 @@ async def test_iframe_fallback_skips_referer_when_operator_is_sightmap_host(
     """If the property is hosted on *.sightmap.com itself (synthetic
     test pages, not real customer embeds), we must NOT spoof a same-host
     Referer — fall back to no Referer rather than a misleading one."""
-    recorded: list[httpx.Request] = []
-    _install_mock_httpx(monkeypatch, recorded)
+    recorded: list[_RecordedRequest] = []
+    _install_mock_probe(monkeypatch, recorded)
 
     ctx = AdapterContext(
         base_url="https://tour.sightmap.com/embed/abc123xy",
@@ -178,8 +200,8 @@ async def test_iframe_fallback_skips_referer_when_operator_is_sightmap_host(
 async def test_iframe_fallback_empty_when_no_iframe_in_html(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    recorded: list[httpx.Request] = []
-    _install_mock_httpx(monkeypatch, recorded)
+    recorded: list[_RecordedRequest] = []
+    _install_mock_probe(monkeypatch, recorded)
 
     ctx = AdapterContext(
         base_url=_OPERATOR_HOST + "/",
