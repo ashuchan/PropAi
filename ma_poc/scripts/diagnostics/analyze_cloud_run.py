@@ -147,6 +147,15 @@ class RunStats:
     field_patch_hits: int = 0
     field_patch_drift: int = 0
     llm_gate_relaxed: int = 0
+    # 2026-07-26 — Path-B/C retry funnel. outcome → count, from the single
+    # terminal ``extract.retry_episode`` event. This is the tool the
+    # 2026-07-26 plan-cohort post-mortem was actually run with, and it could
+    # not answer "did the plan_level_only trigger fire?" because the three
+    # older retry events were read by NOTHING in this repo. Full arithmetic
+    # (A/B/D invariants, dangling-dispatch check) lives in
+    # ``scripts/reports/retry_funnel.py``; this is the at-a-glance split.
+    retry_episode_outcomes: Counter = field(default_factory=Counter)
+    retry_episode_triggers: Counter = field(default_factory=Counter)
     # Optional: populated when --check-db is passed and DB is reachable.
     # Maps query name → list of result rows. None when DB check skipped.
     db_persistence_health: dict[str, list[dict[str, Any]]] | None = None
@@ -234,6 +243,8 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         "field_patch_hits": 0,
         "field_patch_drift": 0,
         "llm_gate_relaxed": 0,
+        "retry_episode_outcomes": Counter(),  # outcome → count
+        "retry_episode_triggers": Counter(),  # trigger_reason → count
     }
 
     def get(pid: str) -> PropertyOutcome:
@@ -264,6 +275,16 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
             persistence_health["field_patch_drift"] += 1
         elif kind == "extract.llm_gate_relaxed":
             persistence_health["llm_gate_relaxed"] += 1
+        elif kind == "extract.retry_episode":
+            # Counted BEFORE the property-id gate below on purpose: the
+            # episode is the unit of the funnel, and dropping the ones with a
+            # blank pid would silently reopen it.
+            persistence_health["retry_episode_outcomes"][
+                str(ev.get("outcome") or "unknown")
+            ] += 1
+            persistence_health["retry_episode_triggers"][
+                str(ev.get("trigger_reason") or "(none)")
+            ] += 1
 
         pid = str(ev.get("property_id") or "")
         if not pid:
@@ -351,6 +372,10 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
         stats.field_patch_hits += persistence_health["field_patch_hits"]
         stats.field_patch_drift += persistence_health["field_patch_drift"]
         stats.llm_gate_relaxed += persistence_health["llm_gate_relaxed"]
+        for outcome, n in persistence_health["retry_episode_outcomes"].items():
+            stats.retry_episode_outcomes[outcome] += n
+        for trig, n in persistence_health["retry_episode_triggers"].items():
+            stats.retry_episode_triggers[trig] += n
         if report:
             totals = report.get("totals") or {}
             stats.properties_total += int(totals.get("properties") or 0)
@@ -530,6 +555,49 @@ def render_persistence_health_md(stats: RunStats) -> list[str]:
         for reason, n in stats.mapping_save_dropped.most_common():
             lines.append(f"| `{reason}` | {n} |")
         lines.append("")
+
+    # Path-B/C retry funnel (2026-07-26). Always rendered: |E| == 0 is the
+    # diagnostic — it can only mean the hook did not run, which is exactly
+    # what the 2026-07-26 post-mortem could not establish.
+    total_eps = sum(stats.retry_episode_outcomes.values())
+    lines += [
+        "### Path-B/C retry funnel",
+        "",
+        f"`{total_eps}` episodes (one per `scrape()` call that reached the "
+        "retry decision point). Full arithmetic + invariant gates: "
+        "`python -m ma_poc.scripts.reports.retry_funnel <run_dir>`.",
+        "",
+    ]
+    if total_eps:
+        not_triggered = stats.retry_episode_outcomes.get("not_triggered", 0)
+        setup_error = stats.retry_episode_outcomes.get("setup_error", 0)
+        triggered = total_eps - not_triggered - setup_error
+        lines += [
+            "| Outcome | Count |",
+            "|---|---|",
+        ]
+        for outcome, n in stats.retry_episode_outcomes.most_common():
+            flag = " ⚠️" if outcome in {"setup_error", "aborted_error"} else ""
+            lines.append(f"| `{outcome}`{flag} | {n} |")
+        lines += [
+            "",
+            f"triggered = {triggered} / {total_eps} "
+            f"({triggered / total_eps:.1%}); "
+            f"won = {stats.retry_episode_outcomes.get('won', 0)}",
+            "",
+        ]
+        if stats.retry_episode_triggers:
+            lines += ["| Trigger | Episodes |", "|---|---|"]
+            for trig, n in stats.retry_episode_triggers.most_common():
+                lines.append(f"| `{trig}` | {n} |")
+            lines.append("")
+    else:
+        lines += [
+            "**No `extract.retry_episode` events in this run.** The hook did "
+            "not execute — this is a distinguishable state, not an ambiguous "
+            "one.",
+            "",
+        ]
 
     # DB section (only when --check-db was passed and the query succeeded)
     if stats.db_persistence_health:
@@ -1063,6 +1131,8 @@ def write_outputs(
             "field_patch_drift": stats.field_patch_drift,
             "llm_gate_relaxed": stats.llm_gate_relaxed,
             "db": stats.db_persistence_health,
+            "retry_episode_outcomes": dict(stats.retry_episode_outcomes),
+            "retry_episode_triggers": dict(stats.retry_episode_triggers),
         },
     }
     (out_dir / "summary.json").write_text(

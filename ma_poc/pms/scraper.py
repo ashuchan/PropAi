@@ -19,6 +19,7 @@ import logging
 import re
 import time
 import urllib.parse
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -250,6 +251,93 @@ def rows_are_plan_level(units: list[dict[str, Any]] | None) -> bool:
     from ma_poc.core.identity import unit_has_real_anchor
 
     return bool(units) and not any(unit_has_real_anchor(u) for u in units)
+
+
+# 2026-07-26 — the closed outcome vocabulary for ``EventKind.RETRY_EPISODE``.
+#
+# THIS IS THE SINGLE SOURCE OF TRUTH. Aggregators import it; they must never
+# re-type the literals. Every terminal state of the Path-B/C retry block maps
+# to exactly one member, so ``count(RETRY_EPISODE)`` partitions cleanly by
+# ``outcome`` and every funnel number is derivable:
+#
+#   triggered  = |E| − not_triggered − setup_error − trigger_error(attempts=0)
+#   dispatched = |{e : e.attempts >= 1}|
+#   dispatched = won + lost_* + (torn-down with attempts >= 1)   ← the headline
+#
+# ONE EVENT PER *EPISODE*, NOT PER PROPERTY. An episode is one execution of
+# this block, i.e. one ``scrape()`` call. ``scrape()`` recurses for link-hop
+# sub-pages with the SAME ``property_id`` — on the real 2026-07-16 ledger the
+# mean was 3.73 calls per property, the max 31, and 43% of properties had more
+# than one — so anything phrased "for how many PROPERTIES did X fire?" needs
+# the per-property rollup in ``scripts/reports/retry_funnel.py``, not a raw
+# episode count.
+#
+# Adding a terminal state means adding a member HERE (plus the assignment that
+# produces it). It deliberately does not mean adding an EventKind: an unknown
+# ``kind`` string is silently dropped by every literal-string consumer in this
+# repo, whereas an unknown ``outcome`` still lands in the RETRY_EPISODE count
+# and trips the vocabulary invariant. Same information, opposite failure mode.
+RETRY_EPISODE_OUTCOMES: frozenset[str] = frozenset(
+    {
+        # --- loop never entered (attempts == 0) -----------------------------
+        "not_triggered",  # adapter was fine; no trigger fired
+        "no_budget",  # trigger fired but PATH_B_MAX_RETRIES <= 0
+        "no_candidate",  # no second candidate on the FIRST iteration
+        "telemetry_only",  # PATH_B_RETRY_ENABLED=0 — would-dispatch, then stop
+        # --- dispatched at least once (attempts >= 1) -----------------------
+        "won",  # win condition passed, retry result promoted
+        "lost_candidates_exhausted",  # pool emptied after >=1 dispatch
+        "lost_adapter_error",  # retry adapter's extract() raised
+        "lost_dead_end",  # rolled forward, stopped triggering, never won
+        "lost_max_retries",  # hit the attempt cap, still triggering
+        # --- torn down ------------------------------------------------------
+        "aborted_error",  # an Exception escaped the loop region
+        "aborted_cancelled",  # a BaseException (CancelledError) tore it down
+        "trigger_error",  # the trigger PREDICATE raised (malformed unit rows
+        #                          from the adapter) — per-property, NOT run-wide.
+        #                          attempts==0 → the initial evaluation crashed;
+        #                          attempts>=1 → a roll-forward evaluation did.
+        "setup_error",  # imports / int(PATH_B_MAX_RETRIES) raised —
+        #                          retry is DEAD RUN-WIDE, page immediately
+    }
+)
+
+
+def _emit_retry_episode(property_id: str, payload: dict[str, Any]) -> None:
+    """Emit the single terminal ``RETRY_EPISODE`` event for one episode.
+
+    An *episode* is one execution of the Path-B/C retry block, i.e. one
+    ``scrape()`` call. Link-hop sub-pages recurse into ``scrape()`` with the
+    same ``property_id``, so consumers must join on ``payload["episode_id"]``,
+    never on ``property_id`` alone.
+
+    Args:
+        property_id: canonical property id; "" makes the event invisible to
+            the run aggregators, so callers resolve a non-empty fallback.
+        payload: the 21 episode fields. Must NOT contain ``kind`` or
+            ``property_id`` (TypeError — duplicate argument) nor ``ts`` /
+            ``run_id`` / ``task_id`` / ``event_id`` (they would silently
+            override the envelope in ``Event.to_jsonl``).
+
+    Returns:
+        None.
+
+    Raises:
+        Nothing. Telemetry must never be able to break a scrape, and this
+        helper is reachable from an exception handler where half the block's
+        locals may be unbound.
+    """
+    try:
+        # LAZY IMPORT — deliberate, do not hoist to module scope. Both the
+        # unit-test ``captured`` fixture and tests/integration/fakes/event_spy
+        # monkeypatch ``ma_poc.observability.events.emit``; a module-level
+        # ``from … import emit`` binds the original function object at import
+        # time and would silently blind every spy while the tests kept passing.
+        from ma_poc.observability.events import EventKind, emit
+
+        emit(EventKind.RETRY_EPISODE, property_id=property_id, **payload)
+    except Exception:  # pragma: no cover — telemetry must never raise
+        pass
 
 
 def _detection_to_dict(det: DetectedPMS) -> dict[str, Any]:
@@ -1262,6 +1350,39 @@ async def scrape(
     # okay but just should be flagged".
     #
     # Feature flag: ``PATH_B_RETRY_ENABLED=0`` falls back to telemetry-only.
+    #
+    # --- CLOSED-FUNNEL TELEMETRY (2026-07-26) ---------------------------------
+    # Everything below prefixed ``_ep_`` / ``_retry_episode_`` exists ONLY to
+    # emit exactly one terminal ``RETRY_EPISODE`` event per execution of this
+    # block. It must not influence control flow. These are snapshotted OUTSIDE
+    # the outer try so the ``setup_error`` handler — which fires when the
+    # imports or ``int(PATH_B_MAX_RETRIES)`` raise, silently disabling retry
+    # for the WHOLE RUN — still has real values to report.
+    _retry_episode_id = uuid.uuid4().hex[:16]
+    _retry_episode_emitted = False
+    # One shared id for the episode and its dispatch events. The three existing
+    # emits used ``getattr(ctx, "property_id", "") or ""``; an empty id makes an
+    # event invisible to both run aggregators, so fall back to the result dict.
+    _retry_property_id = (
+        getattr(ctx, "property_id", "") or result.get("_property_id") or "unknown"
+    )
+    _ep_baseline_pms = adapter_name
+    # Snapshot the tier NOW: the plan-level fallback below mutates
+    # ``adapter_result.tier_used`` in place (appending ``_PLAN_LEVEL``), and
+    # ``_baseline_result`` is the SAME object, so a later read would see the
+    # stamped value rather than what the baseline adapter actually returned.
+    _ep_baseline_tier = adapter_result.tier_used or ""
+    _ep_baseline_unit_count = len(adapter_result.units or [])
+    _ep_baseline_error_count = len(adapter_result.errors or [])
+    try:
+        _ep_baseline_plan_level = rows_are_plan_level(adapter_result.units)
+    except Exception:  # pragma: no cover — predicate must never break telemetry
+        _ep_baseline_plan_level = False
+    # Config echoes. Defaulted here so the setup_error payload is never
+    # reporting an unbound local; overwritten with the real values below.
+    _ep_retry_enabled = False
+    _ep_max_retries = 0
+
     try:
         import os as _retry_os
 
@@ -1287,6 +1408,8 @@ async def scrape(
         _PATH_B_MAX_RETRIES = int(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
+        _ep_retry_enabled = _PATH_B_RETRY_ENABLED
+        _ep_max_retries = _PATH_B_MAX_RETRIES
 
         def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
@@ -1359,121 +1482,330 @@ async def scrape(
         _retry_tried_pms: set[str] = {adapter_name}
         _retry_attempt = 0
         _retry_won = False
-        _trigger_reason = _retry_trigger_reason(adapter_result)
-        _initial_trigger_reason = _trigger_reason
+        # 2026-07-26 — the trigger evaluation MOVED INSIDE the inner ``try``.
+        #
+        # ``_retry_trigger_reason`` walks every extracted unit dict through
+        # ``property_has_rent_signal`` / ``property_has_area_signal`` /
+        # ``rows_are_plan_level``, all of which do ``unit.get(...)``. One
+        # non-dict row from a baseline adapter (measured: a bare ``str``
+        # among the units) raises ``AttributeError`` right here. While this
+        # call sat between the outer and inner ``try`` its only handler was
+        # the outer one, which reports ``setup_error`` — whose documented
+        # meaning is "retry is DEAD RUN-WIDE, page immediately" and which
+        # ``retry_funnel.py`` pages on. A single malformed property raised a
+        # false run-wide outage alarm, and the ``setup_error`` payload
+        # hard-codes ``trigger_reason=""``, so the property was recorded as
+        # never having evaluated a trigger when in fact it crashed doing so.
+        # Now it classifies as ``trigger_error``: per-property, not run-wide.
+        #
+        # Pre-bound so the classifier and the ``finally`` emit below never
+        # read an unbound local when the predicate raises on the first call.
+        _trigger_reason: str | None = None
+        _initial_trigger_reason: str | None = None
+        # True only while a ``_retry_trigger_reason`` call is in flight; read
+        # ONLY by the exception classifier, never by control flow.
+        _ep_in_trigger_eval = False
         # The "current" result we evaluate triggers against. Starts as
         # the baseline; rolls forward to the latest attempt. Does NOT
         # mutate the public ``adapter_result`` until a win is confirmed.
         _current_result = adapter_result
-        while (
-            _trigger_reason is not None
-            and _retry_attempt < _PATH_B_MAX_RETRIES
-        ):
-            _next_candidates = detect_pms_candidates(
-                url=getattr(ctx, "base_url", "") or "",
-                csv_row=None,
-                page_html=page_html,
-                exclude=_retry_tried_pms,
-                max_candidates=_PATH_B_MAX_RETRIES,
-            )
-            if not _next_candidates:
-                break
-            _next_cand = _next_candidates[0]
-            _previous_tier = _current_result.tier_used or ""
-            _previous_pms = (
-                adapter_name if _retry_attempt == 0 else _baseline_adapter_name
-            )
+        # --- episode state (telemetry only — never read by control flow) -----
+        _ep_outcome = ""  # resolved after the loop; "" means "not yet decided"
+        _ep_error_type = ""
+        _ep_final_trigger_reason = ""
+        _ep_candidates_offered = -1  # -1 == "never looked" (loop not entered)
+        _ep_tried_pms: list[str] = []  # ordered DETECTOR candidate names
+        _ep_tried_adapters: list[str] = []  # ordered REGISTRY-RESOLVED names
+        _ep_won_pms = ""
+        _ep_won_tier = ""
+        _ep_won_unit_count = -1
+        _ep_baseline_restored = False
+        # Payload-only. Replaces the provably-constant ternary that used to
+        # compute ``_previous_pms``: ``adapter_name if _retry_attempt == 0 else
+        # _baseline_adapter_name`` has identical arms on every iteration
+        # (``_baseline_adapter_name = adapter_name`` above, and ``adapter_name``
+        # is only reassigned on a win, immediately before the break). So
+        # attempt-2 events paired the BASELINE pms with the attempt-1 tier,
+        # because ``_previous_tier`` does roll forward. This rolls both.
+        # ``_previous_pms`` is read by the three emits and nothing else.
+        _prev_adapter_for_event = _baseline_adapter_name
+        try:
+            _ep_in_trigger_eval = True
+            _trigger_reason = _retry_trigger_reason(adapter_result)
+            _initial_trigger_reason = _trigger_reason
+            _ep_final_trigger_reason = _trigger_reason or ""
+            _ep_in_trigger_eval = False
+            while (
+                _trigger_reason is not None
+                and _retry_attempt < _PATH_B_MAX_RETRIES
+            ):
+                _next_candidates = detect_pms_candidates(
+                    url=getattr(ctx, "base_url", "") or "",
+                    csv_row=None,
+                    page_html=page_html,
+                    exclude=_retry_tried_pms,
+                    max_candidates=_PATH_B_MAX_RETRIES,
+                )
+                if _ep_candidates_offered < 0:
+                    _ep_candidates_offered = len(_next_candidates)
+                if not _next_candidates:
+                    # THE ~37% BLIND SPOT. This break used to emit nothing at
+                    # all, which is why a 1,127-property canary could not tell
+                    # "the trigger never fired" from "it fired every time and
+                    # always dead-ended right here".
+                    _ep_outcome = (
+                        "no_candidate"
+                        if _retry_attempt == 0
+                        else "lost_candidates_exhausted"
+                    )
+                    break
+                _next_cand = _next_candidates[0]
+                _previous_tier = _current_result.tier_used or ""
+                _previous_pms = _prev_adapter_for_event
 
-            # Telemetry-only mode — emit and stop (no re-dispatch).
-            if not _PATH_B_RETRY_ENABLED:
+                # Telemetry-only mode — emit and stop (no re-dispatch).
+                if not _PATH_B_RETRY_ENABLED:
+                    _ep_outcome = "telemetry_only"
+                    _retry_emit(
+                        _RetryEventKind.RETRY_WOULD_DISPATCH,
+                        property_id=_retry_property_id,
+                        episode_id=_retry_episode_id,
+                        previous_pms=_previous_pms,
+                        previous_tier=_previous_tier,
+                        empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                        trigger_reason=_trigger_reason,
+                        next_pms=_next_cand.pms,
+                        next_confidence=_next_cand.confidence,
+                        remaining_candidates=len(_next_candidates),
+                    )
+                    break
+
+                _retry_attempt += 1
                 _retry_emit(
-                    _RetryEventKind.RETRY_WOULD_DISPATCH,
-                    property_id=getattr(ctx, "property_id", "") or "",
+                    _RetryEventKind.RETRY_DISPATCHED,
+                    property_id=_retry_property_id,
+                    episode_id=_retry_episode_id,
+                    attempt=_retry_attempt,
                     previous_pms=_previous_pms,
                     previous_tier=_previous_tier,
                     empty_exit_reason=empty_exit_reason(_previous_tier) or "",
                     trigger_reason=_trigger_reason,
+                    # The win condition keys off the INITIAL trigger, but this
+                    # event reports the rolled-forward one. Carry both so
+                    # win-rate-by-trigger is attributable.
+                    initial_trigger_reason=_initial_trigger_reason or "",
                     next_pms=_next_cand.pms,
                     next_confidence=_next_cand.confidence,
-                    remaining_candidates=len(_next_candidates),
                 )
-                break
 
-            _retry_attempt += 1
-            _retry_emit(
-                _RetryEventKind.RETRY_DISPATCHED,
-                property_id=getattr(ctx, "property_id", "") or "",
-                attempt=_retry_attempt,
-                previous_pms=_previous_pms,
-                previous_tier=_previous_tier,
-                empty_exit_reason=empty_exit_reason(_previous_tier) or "",
-                trigger_reason=_trigger_reason,
-                next_pms=_next_cand.pms,
-                next_confidence=_next_cand.confidence,
+                _retry_tried_pms.add(_next_cand.pms)
+                _ep_tried_pms.append(_next_cand.pms)
+                _new_adapter = _retry_get_adapter(_next_cand.pms)
+                _new_adapter_name = getattr(_new_adapter, "pms_name", _next_cand.pms)
+                # get_adapter falls back to ``generic`` for unknown PMSs, so the
+                # candidate name and the adapter actually dispatched can differ.
+                _ep_tried_adapters.append(_new_adapter_name)
+                # Update ctx so the new adapter sees the right detection.
+                ctx.detected = _next_cand
+                try:
+                    _new_result = await _new_adapter.extract(page, ctx)  # type: ignore[arg-type]
+                except Exception as _retry_exc:
+                    _ep_outcome = "lost_adapter_error"
+                    _ep_error_type = type(_retry_exc).__name__
+                    fallback_chain.append(
+                        f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
+                    )
+                    break
+
+                fallback_chain.append(f"retry:{_new_adapter_name}")
+                # Trigger-aware: a plan_level_only retry must come back genuinely
+                # unit-level to be promoted, otherwise we would swap one
+                # plan-level result for another and discard a baseline that may
+                # be the better of the two.
+                if _retry_win_condition_for(_new_result, _initial_trigger_reason):
+                    # WIN — promote
+                    _ep_outcome = "won"
+                    _ep_won_pms = _new_adapter_name
+                    _ep_won_tier = _new_result.tier_used or ""
+                    _ep_won_unit_count = len(_new_result.units)
+                    _retry_emit(
+                        _RetryEventKind.RETRY_SUCCESS,
+                        property_id=_retry_property_id,
+                        episode_id=_retry_episode_id,
+                        attempt=_retry_attempt,
+                        previous_pms=_previous_pms,
+                        previous_tier=_previous_tier,
+                        trigger_reason=_trigger_reason,
+                        initial_trigger_reason=_initial_trigger_reason or "",
+                        won_pms=_new_adapter_name,
+                        won_tier=_new_result.tier_used or "",
+                        unit_count=len(_new_result.units),
+                    )
+                    adapter_result = _new_result
+                    adapter = _new_adapter
+                    adapter_name = _new_adapter_name
+                    result["_adapter_used"] = _new_adapter_name
+                    result["_detected_pms"] = _detection_to_dict(_next_cand)
+                    _retry_won = True
+                    break
+                # Retry didn't recover real units — roll forward and try next.
+                _current_result = _new_result
+                _prev_adapter_for_event = _new_adapter_name
+                # Same predicate, same crash surface as the initial call — the
+                # rows now come from the RETRY adapter. Flagged so a crash here
+                # also classifies as ``trigger_error`` rather than as
+                # ``aborted_error`` ("a bug inside the loop").
+                _ep_in_trigger_eval = True
+                _trigger_reason = _retry_trigger_reason(_current_result)
+                _ep_in_trigger_eval = False
+
+            # --- terminal-outcome resolution for the non-break exits ---------
+            # Two of the thirteen exits are loop-CONDITION falsifications, not
+            # breaks, so they have no statement to hang an assignment on.
+            # Order matters: no_budget must be tested before lost_max_retries,
+            # or ``0 >= 0`` misreports a misconfigured run as an exhausted one.
+            _ep_final_trigger_reason = _trigger_reason or ""
+            if not _ep_outcome:
+                if _initial_trigger_reason is None:
+                    _ep_outcome = "not_triggered"
+                elif _PATH_B_MAX_RETRIES <= 0:
+                    _ep_outcome = "no_budget"
+                elif _retry_attempt >= _PATH_B_MAX_RETRIES:
+                    _ep_outcome = "lost_max_retries"
+                else:
+                    _ep_outcome = "lost_dead_end"
+
+            # Plan-level fallback: all retries failed AND we had baseline
+            # plan-level rows. Per the project_jsonld_recovery memo:
+            # "getting floor plan level data is okay but just should be
+            # flagged and one another path should be retried ... if unit
+            # then pick that ... else floor plan".
+            if (
+                not _retry_won
+                and _baseline_result is not None
+                and _baseline_result.units
+                and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+            ):
+                adapter_result = _baseline_result
+                # Stamp the tier with a _PLAN_LEVEL suffix and surface the
+                # honest verdict on the property result dict.
+                _baseline_tier = _baseline_result.tier_used or ""
+                if _baseline_tier and "_PLAN_LEVEL" not in _baseline_tier:
+                    adapter_result.tier_used = f"{_baseline_tier}_PLAN_LEVEL"
+                result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+                result["_plan_level_reason"] = _initial_trigger_reason
+                _ep_baseline_restored = True
+        except BaseException as _ep_exc:
+            # CLASSIFY, DO NOT CATCH. The bare ``raise`` below preserves the
+            # existing semantics exactly: an Exception still lands in the outer
+            # handler (skipping the plan-level fallback, as today), and a
+            # CancelledError still escapes both handlers and kills the
+            # coroutine. Swallowing here would be a behavior change.
+            #
+            # CancelledError is a BaseException in 3.12 and is the EXPECTED
+            # shape under jugnu's 600s asyncio.wait_for. Folding it into
+            # aborted_error would make the "is the loop buggy?" gate
+            # permanently red and therefore useless.
+            #
+            # ``trigger_error`` is split off for the mirror-image reason: a
+            # predicate crash on one property's malformed rows is neither a
+            # bug in the loop machinery (D2) nor a run-wide setup failure
+            # (D1), and conflating it with either makes that gate useless too.
+            if not isinstance(_ep_exc, Exception):
+                _ep_outcome = "aborted_cancelled"
+            elif _ep_in_trigger_eval:
+                _ep_outcome = "trigger_error"
+            else:
+                _ep_outcome = "aborted_error"
+            _ep_error_type = type(_ep_exc).__name__
+            _ep_final_trigger_reason = _trigger_reason or ""
+            raise
+        finally:
+            # THE closed-funnel event. ``finally`` is the only construct that
+            # covers all thirteen exits: two are loop-condition falsifications
+            # and one (aborted_cancelled) unwinds through no handler at all,
+            # so an emit placed "after the loop" would miss them — which is
+            # exactly the class of silence being fixed here.
+            #
+            # That claim is not self-evident from reading the code, so it is
+            # pinned against the REAL ``scrape()`` (not the test mirror) by
+            # ``tests/pms/test_retry_episode_setup_failure.py``, which drives
+            # every declared outcome — including both aborts — through
+            # production and asserts exactly one episode each.
+            _emit_retry_episode(
+                _retry_property_id,
+                {
+                    "episode_id": _retry_episode_id,
+                    "scrape_url": getattr(ctx, "base_url", "") or "",
+                    "outcome": _ep_outcome,
+                    "trigger_reason": _initial_trigger_reason or "",
+                    "final_trigger_reason": _ep_final_trigger_reason,
+                    "attempts": _retry_attempt,
+                    "candidates_offered": _ep_candidates_offered,
+                    "baseline_pms": _ep_baseline_pms,
+                    "baseline_tier": _ep_baseline_tier,
+                    "baseline_unit_count": _ep_baseline_unit_count,
+                    "baseline_error_count": _ep_baseline_error_count,
+                    "baseline_plan_level": _ep_baseline_plan_level,
+                    "tried_pms": list(_ep_tried_pms),
+                    "tried_adapters": list(_ep_tried_adapters),
+                    "won_pms": _ep_won_pms,
+                    "won_tier": _ep_won_tier,
+                    "won_unit_count": _ep_won_unit_count,
+                    "baseline_restored": _ep_baseline_restored,
+                    "error_type": _ep_error_type,
+                    "retry_enabled": _ep_retry_enabled,
+                    "max_retries": _ep_max_retries,
+                },
             )
-
-            _retry_tried_pms.add(_next_cand.pms)
-            _new_adapter = _retry_get_adapter(_next_cand.pms)
-            _new_adapter_name = getattr(_new_adapter, "pms_name", _next_cand.pms)
-            # Update ctx so the new adapter sees the right detection.
-            ctx.detected = _next_cand
-            try:
-                _new_result = await _new_adapter.extract(page, ctx)  # type: ignore[arg-type]
-            except Exception as _retry_exc:
-                fallback_chain.append(
-                    f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
-                )
-                break
-
-            fallback_chain.append(f"retry:{_new_adapter_name}")
-            # Trigger-aware: a plan_level_only retry must come back genuinely
-            # unit-level to be promoted, otherwise we would swap one
-            # plan-level result for another and discard a baseline that may
-            # be the better of the two.
-            if _retry_win_condition_for(_new_result, _initial_trigger_reason):
-                # WIN — promote
-                _retry_emit(
-                    _RetryEventKind.RETRY_SUCCESS,
-                    property_id=getattr(ctx, "property_id", "") or "",
-                    attempt=_retry_attempt,
-                    previous_pms=_previous_pms,
-                    previous_tier=_previous_tier,
-                    trigger_reason=_trigger_reason,
-                    won_pms=_new_adapter_name,
-                    won_tier=_new_result.tier_used or "",
-                    unit_count=len(_new_result.units),
-                )
-                adapter_result = _new_result
-                adapter = _new_adapter
-                adapter_name = _new_adapter_name
-                result["_adapter_used"] = _new_adapter_name
-                result["_detected_pms"] = _detection_to_dict(_next_cand)
-                _retry_won = True
-                break
-            # Retry didn't recover real units — roll forward and try next.
-            _current_result = _new_result
-            _trigger_reason = _retry_trigger_reason(_current_result)
-
-        # Plan-level fallback: all retries failed AND we had baseline
-        # plan-level rows. Per the project_jsonld_recovery memo:
-        # "getting floor plan level data is okay but just should be
-        # flagged and one another path should be retried ... if unit
-        # then pick that ... else floor plan".
-        if (
-            not _retry_won
-            and _baseline_result is not None
-            and _baseline_result.units
-            and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
-        ):
-            adapter_result = _baseline_result
-            # Stamp the tier with a _PLAN_LEVEL suffix and surface the
-            # honest verdict on the property result dict.
-            _baseline_tier = _baseline_result.tier_used or ""
-            if _baseline_tier and "_PLAN_LEVEL" not in _baseline_tier:
-                adapter_result.tier_used = f"{_baseline_tier}_PLAN_LEVEL"
-            result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
-            result["_plan_level_reason"] = _initial_trigger_reason
-    except Exception:  # pragma: no cover — Path B/C must never block scrape
+            _retry_episode_emitted = True
+    except Exception as _pathb_exc:  # pragma: no cover — Path B/C must never block scrape
+        # Reached when the block's own imports or ``int(PATH_B_MAX_RETRIES)``
+        # raised — retry is then DEAD FOR THE ENTIRE RUN, and the run looks
+        # exactly like "nothing ever triggered". That is the MAPPING_SAVE_DROPPED
+        # failure shape (a writer that runs but never writes); this block had no
+        # equivalent guard until now.
+        #
+        # SCOPE: imports + ``int(PATH_B_MAX_RETRIES)`` ONLY. Everything that
+        # touches THIS property's data — the trigger predicates, the loop —
+        # lives inside the inner try and classifies as ``trigger_error`` /
+        # ``aborted_*``. That split matters because ``setup_error`` PAGES: one
+        # property with a malformed unit row must not raise a run-wide outage
+        # alarm. If you add a statement between the two ``try``s, ask first
+        # whether it can raise on per-property data; if it can, it belongs
+        # inside the inner one.
+        #
+        # Only locals bound BEFORE the outer try may be referenced here —
+        # everything inside the block may be unbound. The guard prevents a
+        # double emit when the inner finally already fired and the exception
+        # then propagated out.
+        if not _retry_episode_emitted:
+            _emit_retry_episode(
+                _retry_property_id,
+                {
+                    "episode_id": _retry_episode_id,
+                    "scrape_url": getattr(ctx, "base_url", "") or "",
+                    "outcome": "setup_error",
+                    "trigger_reason": "",
+                    "final_trigger_reason": "",
+                    "attempts": 0,
+                    "candidates_offered": -1,
+                    "baseline_pms": _ep_baseline_pms,
+                    "baseline_tier": _ep_baseline_tier,
+                    "baseline_unit_count": _ep_baseline_unit_count,
+                    "baseline_error_count": _ep_baseline_error_count,
+                    "baseline_plan_level": _ep_baseline_plan_level,
+                    "tried_pms": [],
+                    "tried_adapters": [],
+                    "won_pms": "",
+                    "won_tier": "",
+                    "won_unit_count": -1,
+                    "baseline_restored": False,
+                    "error_type": type(_pathb_exc).__name__,
+                    "retry_enabled": _ep_retry_enabled,
+                    "max_retries": _ep_max_retries,
+                },
+            )
         pass
 
     # --- #41: empty-exit → marketing-subpage plan-text fallback (2026-07-18) --

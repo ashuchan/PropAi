@@ -192,7 +192,7 @@ Event tracking, cost accounting, SLO monitoring.
 
 | Module | Purpose |
 |---|---|
-| `events.py` | 28 event types, `emit()` function, buffered ledger backend |
+| `events.py` | 81 event types, `emit()` function, buffered ledger backend |
 | `event_ledger.py` | Append-only JSONL with crash-safe reads |
 | `cost_ledger.py` | SQLite-backed LLM/vision/proxy cost tracking |
 | `slo_watcher.py` | Reads `_meta.verdict` + `_extract_result.tier_used`. Success rate >=95%, LLM cost <$1, vision fallback <=5% |
