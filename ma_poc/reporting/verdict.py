@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from ma_poc.core.identity import unit_has_real_anchor
+from ma_poc.core.source_ids import PER_UNIT_EVIDENCE_KEYS
 
 log = logging.getLogger(__name__)
 
@@ -38,21 +39,49 @@ _EMIT_KIND = "output.property_emitted"
 # unit-level identity even when a row has no natural unit_number, so the
 # plan-vs-unit downgrade must NOT treat such a row as plan-level. PER-UNIT
 # ids ONLY — never *_floor_plan_id / *_fpid / *_slug (those are plan-scoped).
-PER_UNIT_SOURCE_ID_KEYS = frozenset(
-    {
-        "sightmap_unit_id", "entrata_uid", "apts247_unit_id", "camden_unit_id",
-        "udr_unitid", "edifice_unit_id", "spherexx_unit_id", "appfolio_listing_id",
-        "appfolio_listable_uid", "appfolio_id", "thinkreside_unit", "securecafe_id",
-    }
-)
+#
+# 2026-07-27: the local 12-key ``PER_UNIT_SOURCE_ID_KEYS`` frozenset that used
+# to live here is DELETED, not aliased — an alias is how the drift against
+# ``core.identity``'s parallel list started. Membership now comes from the
+# shared registry. Four entries were removed outright in that move:
+#   camden_unit_id  — PLAN-scoped (366 rows / 129 distinct; 30% of (property,
+#                     plan) pairs rotated value over six days). 745 units.
+#   edifice_unit_id — a verbatim copy of unit_no, i.e. of unit_number. 164 units.
+#   thinkreside_unit— a verbatim copy of unit_number AND not unique
+#                     ('312' x3 in property 271195). 87 units.
+#   securecafe_id   — DEAD: no adapter has ever written it. 0 units.
+# All 996 touched units already carry a natural non-``inferred_`` unit_id, so
+# the measured verdict-outcome delta of the removal is ZERO — it removes a
+# latent bug, it does not change behaviour.
+#
+# Symmetrically, the SIX keys this move ADDS change no verdict either: this
+# predicate runs on PRE-format adapter rows (``jugnu.py:1820`` passes
+# ``result["units"]``), where ``unit_has_real_anchor`` already returns True via
+# ``unit_number`` — junk filtering happens later, in ``_format_v2_unit``. So
+# the ``or`` at :97 / :442 short-circuits before this function is consulted.
+# Property-level verdict flips measured across all three run-artifact sets:
+# ZERO. The one row with a real delta is property 35256's, which LOSES
+# ``camden_unit_id`` as evidence (it is genuinely plan-scoped) — 1 row in
+# 2026-07-12, 1 in the canary, 0 in plancohort, no property-level change.
+# Do not describe this consolidation as a gold-recovery lever; it is a
+# correctness cleanup. See ``ma_poc/core/source_ids.py`` MEASURED PRODUCTION
+# IMPACT.
+#
+# ``reporting -> core`` is an established edge (this module already imports
+# ``ma_poc.core.identity`` below).
 
 
 def _has_per_unit_source_id(unit: dict[str, Any]) -> bool:
-    """True when *unit* carries a real per-unit backend id in ``source_ids``."""
+    """True when *unit* carries a real per-unit backend id in ``source_ids``.
+
+    Uses ``PER_UNIT_EVIDENCE_KEYS`` — the classify-only view, which needs
+    uniqueness-within-property but NOT the cross-run stability that identity's
+    minting view demands.
+    """
     sids = unit.get("source_ids") or {}
     if not isinstance(sids, dict):
         return False
-    return any(sids.get(k) for k in PER_UNIT_SOURCE_ID_KEYS)
+    return any(sids.get(k) for k in PER_UNIT_EVIDENCE_KEYS)
 
 
 def _units_are_unit_level(units: list[dict[str, Any]] | None) -> bool:

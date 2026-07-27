@@ -26,6 +26,7 @@ Key findings:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import logging
@@ -504,7 +505,9 @@ async def _probe_onesite_workflowstartup(
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
-                r = probe_get(sub_host, timeout=15)
+                # Off-loaded for the same reason as the web_unlocker_get leg
+                # below — blocking urlopen inside an `async def` parks the loop.
+                r = await asyncio.to_thread(probe_get, sub_host, timeout=15)
                 if r.status_code == 200 and r.text:
                     site_ids = _extract_onesite_site_ids(r.text, sub_host)
             except Exception:
@@ -517,7 +520,7 @@ async def _probe_onesite_workflowstartup(
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
-                r = probe_get(g5_match.group(1), timeout=15)
+                r = await asyncio.to_thread(probe_get, g5_match.group(1), timeout=15)
                 if r.status_code == 200 and r.text:
                     pm = _ONESITE_G5_PARTNER_RE.search(r.text)
                     if pm:
@@ -629,7 +632,14 @@ async def _probe_onesite_workflowstartup(
         # WEB_UNLOCKER_MAX_CALLS_PER_JOB.
         if not body_text:
             try:
-                _wu = web_unlocker_get(url, timeout=30)
+                # 2026-07-27: OFF-LOADED to a thread — identical fix to
+                # rentcafe.py's SecureCafe Attempt-3 leg. ``web_unlocker_get``
+                # is a blocking ``urllib.request.urlopen`` (``_probe.py:313``)
+                # and this is an ``async def`` (``_probe_onesite_workflowstartup``
+                # at :455), so the bare call parked the whole event loop for up
+                # to 30s per site id, 3 site ids per property — the 2026-07-25
+                # event-loop-starvation RCA's exact shape.
+                _wu = await asyncio.to_thread(web_unlocker_get, url, timeout=30)
                 if _wu.status_code == 200 and _wu.text:
                     body_text = _wu.text
                     log.info(

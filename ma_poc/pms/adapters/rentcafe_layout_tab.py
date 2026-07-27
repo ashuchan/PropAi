@@ -32,6 +32,7 @@ listed but Waitlist).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import TYPE_CHECKING
@@ -438,10 +439,18 @@ class RentCafeLayoutTabAdapter:
         # This is the fix for the RENTCAFE_NO_RESPONSE_PLAN_LEVEL cohort (341
         # properties in the 2026-07-25 run) which fell back to plan rows while
         # the complete rent roll sat one well-known URL away.
+        # 2026-07-27 — every ``probe_get`` in this coroutine is OFF-LOADED to a
+        # thread. ``_probe.probe_get`` is a blocking ``urllib.request.urlopen``
+        # and this is an ``async def``, so a bare call parks the whole event
+        # loop for the duration — up to 4 sequential fetches here, plus one per
+        # drill page in the fan-out below. That is the 2026-07-25 timeout RCA's
+        # exact failure mode (sync probe on the loop → mean property 305s
+        # against a 600s cap → victims rotate), on the cohort the RCA was
+        # about. Guarded structurally by ``test_no_blocking_probe_in_async_def``.
         avail_url = origin + "/availableunits"
         roster_units: list[dict] = []
         try:
-            ra = probe_get(avail_url, timeout=20)
+            ra = await asyncio.to_thread(probe_get, avail_url, timeout=20)
             if getattr(ra, "status_code", 0) == 200:
                 roster_units = parse_rentcafe_lt_applyga(
                     getattr(ra, "text", "") or "", avail_url
@@ -457,7 +466,7 @@ class RentCafeLayoutTabAdapter:
         # Prefer the raw curl listing; fall back to the rendered body only if
         # the curl fails.
         try:
-            r = probe_get(origin + "/floorplans", timeout=20)
+            r = await asyncio.to_thread(probe_get, origin + "/floorplans", timeout=20)
             if getattr(r, "status_code", 0) == 200 and getattr(r, "text", ""):
                 listing = r.text
         except Exception as exc:  # noqa: BLE001 — best-effort
@@ -478,6 +487,30 @@ class RentCafeLayoutTabAdapter:
         # the base and parse_securecafe_availableunits reads the page — but
         # nothing connected them on this path. Same "parser exists, discovery
         # missing" shape as the /availableunits lever itself.
+        # How many per-plan drill pages the roster walk below WOULD visit.
+        # Computed here, before the securecafe hop, because it is the only
+        # no-network measure of what an early return would preempt: it is a
+        # regex over a string already in memory.
+        drills = sorted({m for m in _DRILL_ANCHOR_RE.findall(listing)})
+
+        # 2026-07-27 — ACCEPTANCE FLOOR on the securecafe early return.
+        # This hop returns straight out of the coroutine, BEFORE the roster
+        # work below (the inline applyGAClick parse plus the per-plan
+        # ``_DRILL_ANCHOR_RE`` fan-out). ``availableunits.aspx`` is an
+        # AVAILABILITY LIST, so a portal exposing only the currently-available
+        # apartments would short-circuit the full multi-drill roster walk and
+        # take whatever it got — the same replace-vs-merge hazard as
+        # ``rentcafe.py``'s plan-level drill, on the same cohort (this file's
+        # own comment sizes it: 571 of 1,126 properties carry a SecureCafe
+        # fingerprint). It had no flag, no count check and an ``except`` that
+        # appends only on failure, never on shrink.
+        #
+        # The floor: the portal may preempt the walk only when it returns at
+        # least one apartment per floor plan the walk would have visited. When
+        # it does not, its rows are KEPT (never discarded) and merged into the
+        # walk's output below, so the hop can only ever add data.
+        _sc_carry: list[dict] = []
+        _sc_src = ""
         if not roster_units:
             try:
                 from ma_poc.pms.adapters.rentcafe import (
@@ -488,7 +521,7 @@ class RentCafeLayoutTabAdapter:
                 for _base in _find_all_securecafe_bases(listing, ctx)[:3]:
                     _sc_url = _base.rstrip("/") + "/availableunits.aspx"
                     try:
-                        _sr = probe_get(_sc_url, timeout=20)
+                        _sr = await asyncio.to_thread(probe_get, _sc_url, timeout=20)
                     except Exception:
                         continue
                     if getattr(_sr, "status_code", 0) != 200:
@@ -496,11 +529,22 @@ class RentCafeLayoutTabAdapter:
                     _sc_rows = parse_securecafe_availableunits(
                         getattr(_sr, "text", "") or "", _sc_url
                     )
-                    if _sc_rows:
+                    if not _sc_rows:
+                        continue
+                    if len(_sc_rows) >= len(drills):
                         return self._finish_code_only(
                             ctx, result, _sc_rows, _sc_url,
                             detail="securecafe availableunits.aspx",
                         )
+                    # Short of the drill count: do NOT preempt the walk. Carry
+                    # the rows forward and say so.
+                    _sc_carry, _sc_src = _sc_rows, _sc_url
+                    result.errors.append(
+                        f"rentcafe_lt: securecafe portal returned {len(_sc_rows)} "
+                        f"rows for {len(drills)} floor plans — merging with the "
+                        f"drill walk instead of short-circuiting to it"
+                    )
+                    break
             except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
                 result.errors.append(f"rentcafe_lt: securecafe hop failed: {exc}")
 
@@ -508,8 +552,9 @@ class RentCafeLayoutTabAdapter:
         # The rendered listing may already carry unit anchors inline — parse
         # them too (harmless; global dedup below removes any overlap).
         collected.extend(parse_rentcafe_lt_applyga(listing, origin + "/floorplans"))
-
-        drills = sorted({m for m in _DRILL_ANCHOR_RE.findall(listing)})
+        # Portal rows that did not clear the floor still count — the global
+        # dedup in _finish_code_only removes any overlap with the drill rows.
+        collected.extend(_sc_carry)
         if not drills and not collected:
             result.confidence = 0.0
             result.errors.append("rentcafe_lt: no drill anchors in listing (code-only)")
@@ -517,7 +562,7 @@ class RentCafeLayoutTabAdapter:
 
         for d in drills:
             try:
-                rr = probe_get(origin + d, timeout=20)
+                rr = await asyncio.to_thread(probe_get, origin + d, timeout=20)
             except Exception:
                 continue
             if getattr(rr, "status_code", 0) != 200:
@@ -535,8 +580,12 @@ class RentCafeLayoutTabAdapter:
             collected.extend(rows)
 
         return self._finish_code_only(
-            ctx, result, collected, origin + "/floorplans",
-            detail=f"{len(drills)} drills",
+            ctx, result, collected, _sc_src or (origin + "/floorplans"),
+            detail=(
+                f"{len(drills)} drills + {len(_sc_carry)} securecafe rows"
+                if _sc_carry
+                else f"{len(drills)} drills"
+            ),
         )
 
     @staticmethod

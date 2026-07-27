@@ -581,3 +581,86 @@ def hb_covers_render_primary() -> bool:
     the walled cohort a blocked render escalates into).
     """
     return os.environ.get("RENDER_BACKEND", "").strip().lower() == "hyperbrowser"
+
+
+def enable_rentcafe_plan_securecafe_drill() -> bool:
+    """RentCafe plan-only → SecureCafe drill-down, at the LINE-467 entry only.
+
+    Guards ``pms/adapters/rentcafe.py``'s ``if not _has_unit_level:`` branch —
+    the one that fires when the in-page ``getFloorplans`` XHR DID return a
+    valid plan catalogue and the adapter then goes looking for a unit-level
+    portal to prefer over it.
+
+    Why it needs a flag now. Before PR #110 the adapter copied a RentCafe
+    ``floorplanId`` into ``unit_number``, which made ``_has_unit_level`` true
+    for EVERY plan payload — so this branch was effectively dead code. #110
+    correctly stopped writing plan ids into ``unit_number``, which re-armed it:
+    it now fires on every RentCafe property whose XHR yields only plan rows.
+    All 5 captured fixtures under ``tests/pms/adapters/fixtures/rentcafe_direct/``
+    flip from skip→probe, and so does the one real captured production payload
+    in the repo (``fixtures/rentcafe/35593.json``, Brookfield / The Continental
+    Dallas — 10 plans, 15 available units, ``_has_unit_level=False``).
+
+    Two independent hazards:
+
+      1. It REPLACED, it did not merge — FIXED 2026-07-27, this flag is no
+         longer what protects against it. It used to overwrite both
+         ``result.units`` and ``result.plan_summaries`` with the portal rows and
+         return. ``parse_securecafe_availableunits`` hardcodes
+         ``availability_status="AVAILABLE"`` — the portal is an AVAILABILITY
+         LIST, while ``getFloorplans`` is the FULL CATALOGUE including plans
+         with ``availableUnitsCount=0``. Swapping catalogue for availability
+         list is a category error whenever any plan is fully leased: measured
+         on an 8-plan property with 3 fully leased, flag-on turned 8 units /
+         8 plan_summaries / {AVAILABLE, UNAVAILABLE} into 2 units / 0
+         plan_summaries / {AVAILABLE}, with ``result.errors == []`` and the
+         tier string as the only trace. ``rentcafe._securecafe_swap_verdict``
+         now rejects such a swap (recording BOTH counts in ``result.errors``)
+         and ``_merge_portal_over_catalogue`` unions rather than overwrites,
+         so a fully-leased plan is retained even on the accept path.
+      2. Wall clock. The drill does a curl_cffi homepage re-fetch plus up to 3
+         candidate bases x (direct 25s → proxied 25s → Web Unlocker). The
+         often-quoted "~95s" is the FLOOR — valid only when neither
+         ``PROBE_PROXY_URL`` nor ``WEB_UNLOCKER_KEY`` is set, because
+         ``_probe.probe_get`` escalates internally to the Web Unlocker at
+         ``timeout + 95`` (``_probe.py:392-425``), making one nominal
+         ``timeout=25`` call worst-case 170s. With the production SecureCafe
+         config — which NEEDS ``PROBE_PROXY_URL`` because CF blocks GCP — worst
+         case is ~1,365-1,535s per property against jugnu's 600s
+         ``asyncio.wait_for`` (``pms/scraper.py:99``), and per the 2026-07-25
+         event-loop RCA that cancellation destroys every local the coroutine
+         owns.
+
+    Default OFF, which restores the pre-#110 blast radius for this branch
+    EXACTLY: fall straight through to ``result.units = pp.admitted`` /
+    ``_TIER_BASE``. With hazard 1 now guarded, this flag governs hazard 2 —
+    WALL CLOCK — and nothing else. Flipping it on is a latency decision, to be
+    made against the 2026-07-25 event-loop RCA, not a data-safety one.
+
+    OTHER SecureCafe call sites — full inventory, because an earlier draft of
+    this docstring said "the OTHER call site" in the definite singular and
+    that was wrong. ``availableunits.aspx`` is fetched-and-returned in at
+    least five production modules; this flag guards exactly ONE of them:
+
+      * ``rentcafe.py:~490`` — THIS branch. Flagged.
+      * ``rentcafe.py:~600`` — the SHAPE_REJECTED path. Unflagged and must stay
+        so: proven (1,344/4,982 on 2026-07-12; 117/1,127 on
+        2026-07-26-plancohort) and ``all_units`` is empty there, so there is
+        nothing to replace.
+      * ``rentcafe_layout_tab.py:~510`` — ``_extract_code_only``'s securecafe
+        hop. Unflagged, and NOT harmless: it returned before the per-plan
+        ``_DRILL_ANCHOR_RE`` roster walk, so a portal listing only the
+        currently-available apartments short-circuited the multi-drill walk.
+        Same hazard class, same cohort — that file's own comment sizes it at
+        571 of 1,126 (51%) properties carrying a SecureCafe fingerprint. Now
+        carries a no-network acceptance floor (portal rows >= drill count) and
+        merges its rows into the walk instead of discarding them.
+      * ``securecafe_direct.py:~91`` and ``knock.py:~350`` — warm-profile /
+        SSR reads, no catalogue to displace.
+
+    Read each call so an env flip needs no process restart.
+    """
+    return (
+        os.environ.get("ENABLE_RENTCAFE_PLAN_SECURECAFE_DRILL", "false").lower()
+        == "true"
+    )

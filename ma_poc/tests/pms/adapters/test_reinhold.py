@@ -113,8 +113,8 @@ def test_known_unit_449_0203_full_extraction() -> None:
     assert u["availability_status"] == "AVAILABLE"
     assert u["extraction_tier"] == REINHOLD_TIER
     assert u["source_api_url"] == "https://cw.test/availability/"
-    # Apply link supplies BOTH apartment_id + floor_plan_id
-    assert u["source_ids"]["apartment_id"] == "4172232"
+    # Apply link supplies BOTH securecafe_apartment_id + floor_plan_id
+    assert u["source_ids"]["securecafe_apartment_id"] == "4172232"
     assert u["source_ids"]["floor_plan_id"] == "1360590"
 
 
