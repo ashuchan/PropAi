@@ -84,7 +84,7 @@ jugnu_runner.py              # Integrated runner wiring all 5 layers
     |   +-- orchestrator.py   # Runs gate → fallback → sanity, sets next_tier_requested
     |
     L5 Observability          # Event tracking + cost accounting + SLO
-    |   +-- events.py         # 28 event types, emit() with buffered ledger backend
+    |   +-- events.py         # 81 event types, emit() with buffered ledger backend
     |   +-- event_ledger.py   # Append-only JSONL, crash-safe reads
     |   +-- cost_ledger.py    # SQLite LLM/vision/proxy cost tracking
     |   +-- slo_watcher.py    # Success >=95%, LLM cost <$1, vision <=5%
@@ -637,7 +637,7 @@ All inter-layer data flows through frozen dataclasses defined in each layer's `c
 | `CrawlTask` | `ma_poc.discovery.contracts` | `property_id`, `url`, `reason` (SCHEDULED/CARRY_FORWARD_CHECK/RETRY/SITEMAP_DISCOVERED/DLQ_REVIVE/MANUAL), `render_mode`, `priority` |
 | `ExtractResult` | `ma_poc.pms.contracts` | `records` (list of dicts), `tier_used`, `llm_cost_usd`, `vision_cost_usd`, `llm_calls`, `vision_calls`, `errors` |
 | `ValidatedRecords` | `ma_poc.validation.contracts` | `accepted` (list), `rejected` (list with reasons), `flagged` (list with flags), `next_tier_requested` (bool) |
-| `Event` | `ma_poc.observability.events` | `kind` (28 types), `property_id`, `run_id`, `ts`, `payload` dict |
+| `Event` | `ma_poc.observability.events` | `kind` (81 types), `property_id`, `run_id`, `ts`, `payload` dict |
 
 ### Layer invariants
 

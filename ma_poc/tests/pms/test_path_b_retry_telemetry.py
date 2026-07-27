@@ -20,6 +20,7 @@ for drift via the source-grep contract test.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from dataclasses import field as _dc_field
 from typing import Any
@@ -342,21 +343,33 @@ def test_does_not_emit_on_llm_tier_failure(captured: _CapturedEvents) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Section 3 — keep the test helper in sync with the scraper hook.
-# This is a *cheap* check that catches drift: if the hook in
-# scraper.py changes but the test helper doesn't, this fails and forces
-# the test author to look.
+# Section 3 — a REMINDER that the helper mirrors the scraper hook.
+#
+# NOT a drift contract. This is a substring grep over scraper.py source; it
+# is blind to behaviour and it has a proven miss. When the 2026-07-25
+# ``plan_level_only`` trigger was added to production and not to the mirror,
+# the grep stayed green because the symbol still appeared elsewhere in the
+# file — and the trigger the 2026-07-26 post-mortem was trying to measure
+# went untested in the mirror. Two later mutations (rewriting production's
+# ``lost_*`` assignments; deleting the abort classifier) were likewise pure
+# production/mirror divergences that this grep did not notice.
+#
+# The load-bearing check is
+# ``tests/pms/test_retry_episode_setup_failure.py::
+# test_mirror_matches_production_payload`` — same input to both
+# implementations, same RETRY_EPISODE payload out, divergence is a failure.
+# Keep this one as a cheap "go look" nudge when a symbol disappears
+# entirely; do not rely on it to catch drift.
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_scraper_hook_kept_in_sync_with_test_helper() -> None:
-    """Reads the actual scraper.py source and asserts the hook still
-    uses the four primitives this test helper uses. Doesn't compare
-    line-by-line — just that the hook still calls each of:
-      - is_empty_exit
-      - detect_pms_candidates
-      - emit(RETRY_WOULD_DISPATCH, ...)
-      - empty_exit_reason
+def test_scraper_hook_still_mentions_the_primitives_this_helper_uses() -> None:
+    """Greps scraper.py for the symbols the mirror is built on.
+
+    A REMINDER, not a contract: presence of a symbol anywhere in the file —
+    including inside a comment or the outcome frozenset — satisfies it. It
+    catches wholesale removal and nothing subtler. Behavioural parity is
+    asserted in tests/pms/test_retry_episode_setup_failure.py.
     """
     from pathlib import Path
 
@@ -386,12 +399,67 @@ def test_scraper_hook_kept_in_sync_with_test_helper() -> None:
         "_PLAN_LEVEL",
         "SUCCESS_PLAN_LEVEL",
         "_plan_level_reason",
+        # 2026-07-25 plan-level trigger. It was NOT pinned here, so the test
+        # helper silently lost it — this grep missed a real drift in exactly
+        # the trigger the 2026-07-26 post-mortem was trying to measure.
+        '"plan_level_only"',
+        "rows_are_plan_level",
+        "_retry_win_condition_for",
+        # 2026-07-26 closed-funnel telemetry.
+        "RETRY_EPISODE",
+        "RETRY_EPISODE_OUTCOMES",
+        "episode_id",
+        "initial_trigger_reason",
+        "baseline_restored",
+        "candidates_offered",
+        # 2026-07-26 — the trigger predicate's own crash is its OWN outcome,
+        # split out of setup_error (which pages run-wide).
+        '"trigger_error"',
+        "_ep_in_trigger_eval",
     ):
         assert symbol in scraper_src, (
             f"Path B retry hook in scraper.py no longer references "
             f"{symbol!r} — test helper and hook are now out of sync; "
             f"update one or the other."
         )
+
+
+def test_retry_episode_outcome_vocabulary_is_declared_once() -> None:
+    """``RETRY_EPISODE_OUTCOMES`` is the single source of truth for the
+    terminal-outcome vocabulary, and it may not silently grow or shrink.
+
+    Aggregators partition on this set, so an unrecognised value must be a
+    loud failure rather than a silent drop.
+
+    This test used to ALSO assert that each member appears as a quoted
+    literal in scraper.py, with a message claiming it caught outcomes that
+    nothing assigns. It could not: the frozenset it iterates declares those
+    very literals in that same file, so the grep was satisfied by its own
+    source. Verified — under a mutation where four ``lost_*`` outcomes were
+    assigned from nowhere, that half still passed. Reachability is now
+    proven by driving the REAL ``scrape()``, in
+    ``tests/pms/test_retry_episode_setup_failure.py::
+    test_every_declared_outcome_is_reachable_from_production``.
+    """
+    from ma_poc.pms.scraper import RETRY_EPISODE_OUTCOMES
+
+    expected = {
+        "not_triggered",
+        "no_budget",
+        "no_candidate",
+        "telemetry_only",
+        "won",
+        "lost_candidates_exhausted",
+        "lost_adapter_error",
+        "lost_dead_end",
+        "lost_max_retries",
+        "aborted_error",
+        "aborted_cancelled",
+        "trigger_error",
+        "setup_error",
+    }
+    assert len(RETRY_EPISODE_OUTCOMES) == 13
+    assert set(RETRY_EPISODE_OUTCOMES) == expected
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -453,11 +521,23 @@ async def _run_retry_loop_under_test(
     The 4th return slot ``result_dict`` mirrors the scraper's ``result``
     dict — exposes ``_verdict_quality`` / ``_plan_level_reason`` keys
     so tests can assert the SUCCESS_PLAN_LEVEL fallback fires correctly.
+
+    2026-07-26 — mirrors the CLOSED-FUNNEL telemetry too: exactly one
+    ``RETRY_EPISODE`` per call, emitted from a ``finally`` so it covers
+    the loop-condition falsifications and the cancellation path as well
+    as the breaks. ``episode_id`` + ``initial_trigger_reason`` were added
+    to the three pre-existing emits at the same time.
     """
     from ma_poc.observability import events as _events_mod
     from ma_poc.observability.events import EventKind
     from ma_poc.pms.detector import detect_pms_candidates
     from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+
+    # Imported, never redefined: tests/pms/test_universal_recovery_plan_level_
+    # gate.py pins that exactly ONE definition of this predicate exists, and a
+    # second copy of the plan-level rule is precisely the drift this repo keeps
+    # paying for.
+    from ma_poc.pms.scraper import rows_are_plan_level
     from ma_poc.validation.schema_gate import (
         property_has_area_signal,
         property_has_rent_signal,
@@ -474,6 +554,11 @@ async def _run_retry_loop_under_test(
                 return "no_rent"
             if not property_has_area_signal(res.units):
                 return "no_area"
+            # 2026-07-25 trigger — was MISSING from this mirror, and the
+            # drift-contract grep did not pin it, so the very trigger the
+            # 2026-07-26 post-mortem asked about was untested here.
+            if rows_are_plan_level(res.units):
+                return "plan_level_only"
         return None
 
     def _win(res: _StubAdapterResult) -> bool:
@@ -482,6 +567,15 @@ async def _run_retry_loop_under_test(
             and property_passes_quality_gate(res.units)
             and property_has_rent_signal(res.units)
         )
+
+    def _win_for(res: _StubAdapterResult, trigger: str | None) -> bool:
+        """Mirror of ``_retry_win_condition_for``: swapping one plan-level
+        result for another is not a win."""
+        if not _win(res):
+            return False
+        if trigger == "plan_level_only":
+            return not rows_are_plan_level(res.units)
+        return True
 
     result_dict: dict[str, Any] = {}
     adapter_result = initial_result
@@ -492,93 +586,207 @@ async def _run_retry_loop_under_test(
     fallback_chain: list[str] = []
     attempt = 0
     retry_won = False
-    trigger_reason = _trigger(adapter_result)
-    initial_trigger_reason = trigger_reason
+    # Mirrors scraper.py: the trigger evaluation lives INSIDE the try, because
+    # the predicates it calls do ``unit.get(...)`` and raise on a non-dict row.
+    # Outside the try it produced no terminal event at all here, and in
+    # production it was misreported as ``setup_error`` — the outcome that
+    # means "retry is dead RUN-WIDE" and pages.
+    trigger_reason: str | None = None
+    initial_trigger_reason: str | None = None
+    in_trigger_eval = False
     current_result = adapter_result
 
-    while trigger_reason is not None and attempt < max_retries:
-        candidates = detect_pms_candidates(
-            url=ctx.base_url,
-            csv_row=None,
-            page_html=page_html,
-            exclude=tried,
-            max_candidates=max_retries,
-        )
-        if not candidates:
-            break
-        nc = candidates[0]
-        previous_tier = current_result.tier_used or ""
-        previous_pms = (
-            adapter_name if attempt == 0 else baseline_adapter_name
-        )
+    # --- episode state (mirrors the ``_ep_*`` locals in scraper.py) ------
+    episode_id = uuid.uuid4().hex[:16]
+    ep_baseline_pms = initial_adapter_name
+    ep_baseline_tier = initial_result.tier_used or ""
+    ep_baseline_unit_count = len(initial_result.units or [])
+    ep_baseline_error_count = 0  # _StubAdapterResult carries no errors list
+    ep_baseline_plan_level = rows_are_plan_level(initial_result.units)
+    ep_outcome = ""
+    ep_error_type = ""
+    ep_final_trigger_reason = ""
+    ep_candidates_offered = -1
+    ep_tried_pms: list[str] = []
+    ep_tried_adapters: list[str] = []
+    ep_won_pms = ""
+    ep_won_tier = ""
+    ep_won_unit_count = -1
+    ep_baseline_restored = False
+    prev_adapter_for_event = baseline_adapter_name
 
-        if not enabled:
+    try:
+        in_trigger_eval = True
+        trigger_reason = _trigger(adapter_result)
+        initial_trigger_reason = trigger_reason
+        ep_final_trigger_reason = trigger_reason or ""
+        in_trigger_eval = False
+        while trigger_reason is not None and attempt < max_retries:
+            candidates = detect_pms_candidates(
+                url=ctx.base_url,
+                csv_row=None,
+                page_html=page_html,
+                exclude=tried,
+                max_candidates=max_retries,
+            )
+            if ep_candidates_offered < 0:
+                ep_candidates_offered = len(candidates)
+            if not candidates:
+                ep_outcome = (
+                    "no_candidate" if attempt == 0 else "lost_candidates_exhausted"
+                )
+                break
+            nc = candidates[0]
+            previous_tier = current_result.tier_used or ""
+            previous_pms = prev_adapter_for_event
+
+            if not enabled:
+                ep_outcome = "telemetry_only"
+                _events_mod.emit(
+                    EventKind.RETRY_WOULD_DISPATCH,
+                    property_id=ctx.property_id,
+                    episode_id=episode_id,
+                    previous_pms=previous_pms,
+                    previous_tier=previous_tier,
+                    empty_exit_reason=empty_exit_reason(previous_tier) or "",
+                    trigger_reason=trigger_reason,
+                    next_pms=nc.pms,
+                    next_confidence=nc.confidence,
+                    remaining_candidates=len(candidates),
+                )
+                break
+
+            attempt += 1
             _events_mod.emit(
-                EventKind.RETRY_WOULD_DISPATCH,
+                EventKind.RETRY_DISPATCHED,
                 property_id=ctx.property_id,
+                episode_id=episode_id,
+                attempt=attempt,
                 previous_pms=previous_pms,
                 previous_tier=previous_tier,
                 empty_exit_reason=empty_exit_reason(previous_tier) or "",
                 trigger_reason=trigger_reason,
+                initial_trigger_reason=initial_trigger_reason or "",
                 next_pms=nc.pms,
                 next_confidence=nc.confidence,
-                remaining_candidates=len(candidates),
             )
-            break
 
-        attempt += 1
+            tried.add(nc.pms)
+            ep_tried_pms.append(nc.pms)
+            new_adapter = adapter_table.get(nc.pms)
+            # Mirrors production's ``getattr(_new_adapter, "pms_name",
+            # _next_cand.pms)`` — the registry can hand back a different
+            # adapter than the candidate name suggests.
+            ep_tried_adapters.append(getattr(new_adapter, "pms_name", nc.pms))
+            if new_adapter is None:
+                # Helper-only exit: production calls ``get_adapter``, which
+                # falls back to ``generic`` rather than returning None, and
+                # reaches this outcome via a KeyError instead.
+                ep_outcome = "lost_adapter_error"
+                ep_error_type = "NoAdapter"
+                fallback_chain.append(f"retry_failed:{nc.pms}:NoAdapter")
+                break
+            try:
+                new_result = await new_adapter.extract(None, ctx)
+            except Exception as exc:
+                ep_outcome = "lost_adapter_error"
+                ep_error_type = type(exc).__name__
+                fallback_chain.append(f"retry_failed:{nc.pms}:{type(exc).__name__}")
+                break
+            fallback_chain.append(f"retry:{nc.pms}")
+            if _win_for(new_result, initial_trigger_reason):
+                ep_outcome = "won"
+                ep_won_pms = nc.pms
+                ep_won_tier = new_result.tier_used or ""
+                ep_won_unit_count = len(new_result.units)
+                _events_mod.emit(
+                    EventKind.RETRY_SUCCESS,
+                    property_id=ctx.property_id,
+                    episode_id=episode_id,
+                    attempt=attempt,
+                    previous_pms=previous_pms,
+                    previous_tier=previous_tier,
+                    trigger_reason=trigger_reason,
+                    initial_trigger_reason=initial_trigger_reason or "",
+                    won_pms=nc.pms,
+                    won_tier=new_result.tier_used or "",
+                    unit_count=len(new_result.units),
+                )
+                adapter_result = new_result
+                adapter_name = nc.pms
+                retry_won = True
+                break
+            current_result = new_result
+            prev_adapter_for_event = nc.pms
+            in_trigger_eval = True
+            trigger_reason = _trigger(current_result)
+            in_trigger_eval = False
+
+        ep_final_trigger_reason = trigger_reason or ""
+        if not ep_outcome:
+            if initial_trigger_reason is None:
+                ep_outcome = "not_triggered"
+            elif max_retries <= 0:
+                ep_outcome = "no_budget"
+            elif attempt >= max_retries:
+                ep_outcome = "lost_max_retries"
+            else:
+                ep_outcome = "lost_dead_end"
+
+        # Plan-level fallback: all retries failed AND baseline had units AND
+        # the initial trigger was a quality concern (not empty-exit).
+        if (
+            not retry_won
+            and baseline_result is not None
+            and baseline_result.units
+            and initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+        ):
+            adapter_result = baseline_result
+            baseline_tier = baseline_result.tier_used or ""
+            if baseline_tier and "_PLAN_LEVEL" not in baseline_tier:
+                adapter_result.tier_used = f"{baseline_tier}_PLAN_LEVEL"
+            result_dict["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+            result_dict["_plan_level_reason"] = initial_trigger_reason
+            ep_baseline_restored = True
+    except BaseException as exc:  # classify, do not catch
+        if not isinstance(exc, Exception):
+            ep_outcome = "aborted_cancelled"
+        elif in_trigger_eval:
+            # A predicate crash on THIS property's rows — not a bug in the
+            # loop machinery (aborted_error) and not a run-wide setup failure
+            # (setup_error). Mirrors scraper.py's three-way classifier.
+            ep_outcome = "trigger_error"
+        else:
+            ep_outcome = "aborted_error"
+        ep_error_type = type(exc).__name__
+        ep_final_trigger_reason = trigger_reason or ""
+        raise
+    finally:
         _events_mod.emit(
-            EventKind.RETRY_DISPATCHED,
+            EventKind.RETRY_EPISODE,
             property_id=ctx.property_id,
-            attempt=attempt,
-            previous_pms=previous_pms,
-            previous_tier=previous_tier,
-            empty_exit_reason=empty_exit_reason(previous_tier) or "",
-            trigger_reason=trigger_reason,
-            next_pms=nc.pms,
-            next_confidence=nc.confidence,
+            episode_id=episode_id,
+            scrape_url=ctx.base_url,
+            outcome=ep_outcome,
+            trigger_reason=initial_trigger_reason or "",
+            final_trigger_reason=ep_final_trigger_reason,
+            attempts=attempt,
+            candidates_offered=ep_candidates_offered,
+            baseline_pms=ep_baseline_pms,
+            baseline_tier=ep_baseline_tier,
+            baseline_unit_count=ep_baseline_unit_count,
+            baseline_error_count=ep_baseline_error_count,
+            baseline_plan_level=ep_baseline_plan_level,
+            tried_pms=list(ep_tried_pms),
+            tried_adapters=list(ep_tried_adapters),
+            won_pms=ep_won_pms,
+            won_tier=ep_won_tier,
+            won_unit_count=ep_won_unit_count,
+            baseline_restored=ep_baseline_restored,
+            error_type=ep_error_type,
+            retry_enabled=enabled,
+            max_retries=max_retries,
         )
-
-        tried.add(nc.pms)
-        new_adapter = adapter_table.get(nc.pms)
-        if new_adapter is None:
-            fallback_chain.append(f"retry_failed:{nc.pms}:NoAdapter")
-            break
-        new_result = await new_adapter.extract(None, ctx)
-        fallback_chain.append(f"retry:{nc.pms}")
-        if _win(new_result):
-            _events_mod.emit(
-                EventKind.RETRY_SUCCESS,
-                property_id=ctx.property_id,
-                attempt=attempt,
-                previous_pms=previous_pms,
-                previous_tier=previous_tier,
-                trigger_reason=trigger_reason,
-                won_pms=nc.pms,
-                won_tier=new_result.tier_used or "",
-                unit_count=len(new_result.units),
-            )
-            adapter_result = new_result
-            adapter_name = nc.pms
-            retry_won = True
-            break
-        current_result = new_result
-        trigger_reason = _trigger(current_result)
-
-    # Plan-level fallback: all retries failed AND baseline had units AND
-    # the initial trigger was a quality concern (not empty-exit).
-    if (
-        not retry_won
-        and baseline_result is not None
-        and baseline_result.units
-        and initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
-    ):
-        adapter_result = baseline_result
-        baseline_tier = baseline_result.tier_used or ""
-        if baseline_tier and "_PLAN_LEVEL" not in baseline_tier:
-            adapter_result.tier_used = f"{baseline_tier}_PLAN_LEVEL"
-        result_dict["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
-        result_dict["_plan_level_reason"] = initial_trigger_reason
 
     return adapter_name, adapter_result, fallback_chain, result_dict
 
@@ -729,10 +937,19 @@ async def test_retry_caps_at_max_retries(captured: _CapturedEvents) -> None:
 
 
 @pytest.mark.asyncio
-async def test_retry_no_candidate_emits_nothing(captured: _CapturedEvents) -> None:
+async def test_retry_no_candidate_emits_terminal_episode(
+    captured: _CapturedEvents,
+) -> None:
     """Page has only G5 markers — no co-resident PMS, no candidates.
-    detect_pms_candidates(exclude={'g5'}) returns []. Retry loop exits
-    without emitting any event."""
+    detect_pms_candidates(exclude={'g5'}) returns [].
+
+    THE ~37% BLIND SPOT. This test used to assert the silence — it was
+    the bug written down as a guaranteed property of the system, and it
+    is why the 1,127-property plan-cohort canary could not distinguish
+    "the trigger never fired" from "it fired every time and dead-ended
+    right here". The episode must now be COUNTED, with the runtime path
+    still byte-identical (all three original silence assertions kept).
+    """
     html_g5_only = (
         "<html><body>"
         '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
@@ -748,6 +965,20 @@ async def test_retry_no_candidate_emits_nothing(captured: _CapturedEvents) -> No
     )
     assert name == "g5"  # no change
     assert chain == []
+
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    assert len(eps) == 1
+    d = eps[0].data
+    assert d["outcome"] == "no_candidate"
+    assert d["attempts"] == 0
+    assert d["candidates_offered"] == 0
+    assert d["trigger_reason"] == "empty_exit"
+    assert d["baseline_pms"] == "g5"
+    assert d["tried_pms"] == []
+    assert d["won_pms"] == "" and d["won_unit_count"] == -1
+    assert d["baseline_restored"] is False
+
+    # Runtime path unchanged — the original silence assertions still hold.
     assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
     assert captured.of_kind(EventKind.RETRY_WOULD_DISPATCH) == []
     assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
@@ -804,7 +1035,13 @@ async def test_retry_does_not_fire_when_initial_succeeds(
     assert name == "knock"
     assert result.units
     assert chain == []
-    assert captured.events == []
+    # The retry never engaged — but the episode is still counted, because a
+    # self-contained denominator is what makes "zero events" mean "the hook
+    # did not run" instead of "we cannot tell".
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    assert len(eps) == 1 and eps[0].data["outcome"] == "not_triggered"
+    assert eps[0].data["candidates_offered"] == -1  # never looked
+    assert [e for e in captured.events if e.kind is not EventKind.RETRY_EPISODE] == []
 
 
 @pytest.mark.asyncio
@@ -824,7 +1061,9 @@ async def test_retry_does_not_fire_on_success_label_with_no_units(
     )
     assert name == "knock"
     assert chain == []
-    assert captured.events == []
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    assert len(eps) == 1 and eps[0].data["outcome"] == "not_triggered"
+    assert [e for e in captured.events if e.kind is not EventKind.RETRY_EPISODE] == []
 
 
 @pytest.mark.asyncio
@@ -1051,8 +1290,12 @@ async def test_path_c_no_retry_when_initial_passes_quality_gate(
     assert name == "g5"  # original adapter, no promotion
     assert result.units == initial.units
     assert chain == []
-    assert captured.events == [], (
-        f"clean win on first dispatch must not trigger any retry events; "
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    assert len(eps) == 1 and eps[0].data["outcome"] == "not_triggered"
+    assert [
+        e for e in captured.events if e.kind is not EventKind.RETRY_EPISODE
+    ] == [], (
+        f"clean win on first dispatch must not trigger any retry activity; "
         f"got {captured.events!r}"
     )
 
@@ -1325,4 +1568,842 @@ async def test_path_c_partial_rent_signal_does_not_trigger(
     )
     assert name == "rentcafe"
     assert chain == []
-    assert captured.events == []
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    assert len(eps) == 1 and eps[0].data["outcome"] == "not_triggered"
+    assert [e for e in captured.events if e.kind is not EventKind.RETRY_EPISODE] == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Section 9 — CLOSED-FUNNEL episode telemetry (2026-07-26).
+#
+# One terminal RETRY_EPISODE per EPISODE — one execution of the block, i.e.
+# one ``scrape()`` call, NOT one property: scrape() recurses for link-hop
+# sub-pages under the same property_id (mean 3.73 on the real 2026-07-16
+# ledger). Per-property numbers come from the rollup in
+# ``scripts/reports/retry_funnel.py``.
+#
+# Each episode carries a trigger reason and an outcome from a closed 13-value
+# vocabulary, so that:
+#
+#   dispatched == won + lost_* + torn_down(attempts >= 1)
+#
+# closes — and so that a trigger which never dispatched (the ~37% bucket
+# with no second candidate) is COUNTED rather than silent. Before this,
+# zero events was equally consistent with "never fired" and "fired
+# constantly and always dead-ended".
+#
+# Every test here asserts the arithmetic via ``_assert_episode_invariants``
+# in addition to its own outcome-specific claims.
+# ─────────────────────────────────────────────────────────────────────
+
+
+_DISPATCHED_OUTCOMES = {
+    "won",
+    "lost_candidates_exhausted",
+    "lost_adapter_error",
+    "lost_dead_end",
+    "lost_max_retries",
+}
+_ABORTED_OUTCOMES = {"aborted_error", "aborted_cancelled"}
+#: Torn down mid-flight; can land on either side of the dispatch split, so
+#: the arithmetic splits them by ``attempts``. ``trigger_error`` joins the
+#: aborts here because the predicate crash leaves the same partial state.
+_TORN_DOWN_OUTCOMES = _ABORTED_OUTCOMES | {"trigger_error"}
+_NEVER_LOOKED_OUTCOMES = {"not_triggered", "no_budget", "setup_error"}
+
+
+def _assert_episode_invariants(captured: _CapturedEvents) -> list[Event]:
+    """Assert the design's set-A and set-B invariants over one captured
+    event stream, and return the episode events.
+
+    This is the whole point of the exercise: every funnel number must be
+    derivable AND cross-checkable, so the tests assert the arithmetic
+    rather than just the presence of a field.
+    """
+    from ma_poc.pms.scraper import RETRY_EPISODE_OUTCOMES
+
+    eps = captured.of_kind(EventKind.RETRY_EPISODE)
+    dispatched_evs = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    success_evs = captured.of_kind(EventKind.RETRY_SUCCESS)
+    would_evs = captured.of_kind(EventKind.RETRY_WOULD_DISPATCH)
+
+    # A1 — one episode, one id.
+    ids = [e.data["episode_id"] for e in eps]
+    assert len(ids) == len(set(ids)), f"duplicate episode_id in {ids!r}"
+
+    # A2 / D4 — closed vocabulary.
+    for e in eps:
+        assert e.data["outcome"] in RETRY_EPISODE_OUTCOMES, (
+            f"outcome {e.data['outcome']!r} is outside the declared "
+            f"vocabulary — an aggregator would silently mis-partition it"
+        )
+        assert e.data["trigger_reason"] in {
+            "",
+            "empty_exit",
+            "quality_gate",
+            "no_rent",
+            "no_area",
+            "plan_level_only",
+        }
+
+    dispatched = [e for e in eps if e.data["attempts"] >= 1]
+
+    # A5 — THE HEADLINE. dispatched == won + lost_* + aborted(attempts>=1).
+    closed = [
+        e
+        for e in dispatched
+        if e.data["outcome"] in _DISPATCHED_OUTCOMES | _TORN_DOWN_OUTCOMES
+    ]
+    assert len(dispatched) == len(closed), (
+        "the funnel is OPEN: an episode dispatched at least once but its "
+        "outcome is not one of won / lost_* / aborted_*"
+    )
+
+    for e in eps:
+        d = e.data
+        outcome = d["outcome"]
+
+        # A6 — attempts bounded by the configured budget.
+        assert 0 <= d["attempts"] <= d["max_retries"]
+
+        # A7 — the tried lists agree with the attempt count.
+        assert len(d["tried_pms"]) == d["attempts"]
+        if outcome not in _TORN_DOWN_OUTCOMES:
+            assert len(d["tried_adapters"]) == d["attempts"]
+
+        # A8 — no_candidate is exactly "looked on the first pass, found none".
+        assert (outcome == "no_candidate") == (
+            d["attempts"] == 0 and d["candidates_offered"] == 0
+        )
+
+        # A9 — the -1 sentinel means "never looked".
+        #
+        # DEVIATION from the written design, which states this as a strict
+        # biconditional over {not_triggered, no_budget, setup_error}. An abort
+        # raised BY detect_pms_candidates itself also leaves the sentinel at
+        # -1 — truthfully, since the look never completed — so aborted_* is
+        # exempted here exactly as it is in A7.
+        if d["candidates_offered"] == -1 and outcome not in _TORN_DOWN_OUTCOMES:
+            assert outcome in _NEVER_LOOKED_OUTCOMES
+        if outcome in _NEVER_LOOKED_OUTCOMES:
+            assert d["candidates_offered"] == -1
+
+        # A10 — the two exhaustion outcomes are distinguishable by attempts.
+        if outcome == "lost_max_retries":
+            assert d["attempts"] == d["max_retries"]
+        if outcome == "lost_candidates_exhausted":
+            assert 1 <= d["attempts"] < d["max_retries"]
+
+        # A11 / A12 — win fields are populated iff the episode won.
+        assert (outcome == "won") == bool(d["won_pms"])
+        if outcome == "won":
+            assert d["won_unit_count"] >= 1
+            assert d["won_tier"] != ""
+            assert d["won_pms"] == d["tried_adapters"][-1]
+        else:
+            assert d["won_tier"] == ""
+            assert d["won_unit_count"] == -1
+
+        # A13 — the plan-level fallback only fires on a loss with baseline rows.
+        if d["baseline_restored"]:
+            assert outcome != "won"
+            assert d["trigger_reason"] in {"quality_gate", "no_rent", "no_area"}
+            assert d["baseline_unit_count"] > 0
+
+    # B1 — every dispatch pairs with its episode, and the totals agree.
+    assert sum(e.data["attempts"] for e in eps) == len(dispatched_evs), (
+        "dangling dispatches: sum(episode.attempts) != count(RETRY_DISPATCHED)"
+    )
+    for e in eps:
+        mine = [
+            x
+            for x in dispatched_evs
+            if x.data["episode_id"] == e.data["episode_id"]
+        ]
+        assert len(mine) == e.data["attempts"]
+
+    # B2 / B3 — wins and telemetry-only breaks reconcile with the old events.
+    assert len([e for e in eps if e.data["outcome"] == "won"]) == len(success_evs)
+    assert len(
+        [e for e in eps if e.data["outcome"] == "telemetry_only"]
+    ) == len(would_evs)
+
+    return eps
+
+
+def _one_episode(captured: _CapturedEvents) -> dict[str, Any]:
+    """Assert the invariants, assert there is exactly one episode, return
+    its payload."""
+    eps = _assert_episode_invariants(captured)
+    assert len(eps) == 1, f"expected exactly one episode, got {len(eps)}"
+    return eps[0].data
+
+
+_HTML_G5_ONLY = (
+    "<html><body>"
+    '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+    "</body></html>"
+)
+
+# Passes quality_gate + rent-signal + area-signal, but no row carries a
+# per-apartment anchor → rows_are_plan_level() is True → plan_level_only.
+_PLAN_LEVEL_UNITS = [
+    {"floor_plan": "A1", "beds": 1, "baths": 1, "sqft": 750, "asking_rent": 1500},
+    {"floor_plan": "B2", "beds": 2, "baths": 2, "sqft": 1100, "asking_rent": 2100},
+]
+_UNIT_LEVEL_UNITS = [
+    {"unit_number": "101", "beds": 1, "baths": 1, "sqft": 750, "asking_rent": 1500},
+]
+
+
+@pytest.mark.asyncio
+async def test_episode_not_triggered_healthy_property(
+    captured: _CapturedEvents,
+) -> None:
+    """outcome=not_triggered — the DENOMINATOR. Emitted even though the
+    retry never engaged, which is what makes ``count(RETRY_EPISODE) == 0``
+    mean "the hook did not run" instead of "we cannot tell"."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK", units=_UNIT_LEVEL_UNITS
+    )
+    await _run_retry_loop_under_test(
+        initial_adapter_name="knock",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/a", property_id="P-ep-nt"),
+        adapter_table={},
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "not_triggered"
+    assert d["trigger_reason"] == ""
+    assert d["final_trigger_reason"] == ""
+    assert d["attempts"] == 0
+    assert d["candidates_offered"] == -1
+    assert d["baseline_pms"] == "knock"
+    assert d["baseline_tier"] == "TIER_1_API_KNOCK"
+    assert d["baseline_unit_count"] == 1
+    assert d["baseline_plan_level"] is False
+    assert d["scrape_url"] == "https://example.com/a"
+
+
+@pytest.mark.asyncio
+async def test_episode_not_triggered_zero_units_success_label(
+    captured: _CapturedEvents,
+) -> None:
+    """outcome=not_triggered on a SUCCESS label with zero units and zero
+    errors — no data, and no retry either.
+
+    This is the next blind spot of the same shape as the plan-level one,
+    and these fields are what make it a one-line query instead of an
+    invisible population.
+    """
+    initial = _StubAdapterResult(tier_used="TIER_1_API_KNOCK", units=[])
+    await _run_retry_loop_under_test(
+        initial_adapter_name="knock",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-zero"),
+        adapter_table={},
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "not_triggered"
+    assert d["baseline_unit_count"] == 0
+    assert d["baseline_error_count"] == 0
+    assert d["baseline_plan_level"] is False
+
+
+@pytest.mark.asyncio
+async def test_episode_no_budget_when_max_retries_zero(
+    captured: _CapturedEvents,
+) -> None:
+    """outcome=no_budget — the trigger DID fire, but PATH_B_MAX_RETRIES<=0
+    meant the loop was never entered. Split from not_triggered because one
+    is a healthy property and the other is a misconfigured run."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-budget"),
+        adapter_table={},
+        max_retries=0,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "no_budget"
+    assert d["trigger_reason"] == "empty_exit"  # it DID trigger
+    assert d["attempts"] == 0
+    assert d["candidates_offered"] == -1
+    assert d["max_retries"] == 0
+
+
+@pytest.mark.asyncio
+async def test_episode_telemetry_only_mode(captured: _CapturedEvents) -> None:
+    """outcome=telemetry_only — PATH_B_RETRY_ENABLED=0. Reconciles 1:1
+    with RETRY_WOULD_DISPATCH (invariant B3)."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK", units=_UNIT_LEVEL_UNITS
+            ),
+        )
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-telem"),
+        adapter_table=table,
+        enabled=False,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "telemetry_only"
+    assert d["attempts"] == 0
+    assert d["candidates_offered"] == 2
+    assert d["retry_enabled"] is False
+    # B5 — enabled=False must never produce a dispatch.
+    assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
+
+
+@pytest.mark.asyncio
+async def test_episode_won_on_first_attempt(captured: _CapturedEvents) -> None:
+    """outcome=won on attempt 1 — reconciles 1:1 with RETRY_SUCCESS."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK", units=_UNIT_LEVEL_UNITS
+            ),
+        )
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-won1"),
+        adapter_table=table,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "won"
+    assert d["attempts"] == 1
+    assert d["tried_pms"] == ["knock"]
+    assert d["tried_adapters"] == ["knock"]
+    assert d["won_pms"] == "knock"
+    assert d["won_tier"] == "TIER_1_API_KNOCK"
+    assert d["won_unit_count"] == 1
+    assert d["baseline_restored"] is False
+
+
+@pytest.mark.asyncio
+async def test_episode_won_on_second_attempt(captured: _CapturedEvents) -> None:
+    """outcome=won on attempt 2 — ``tried_pms`` records the full ordered
+    path, so a losing first candidate is still attributable."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_RENTCAFE", units=_UNIT_LEVEL_UNITS
+            ),
+        ),
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-won2"),
+        adapter_table=table,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "won"
+    assert d["attempts"] == 2
+    assert d["tried_pms"] == ["knock", "rentcafe"]
+    assert d["won_pms"] == "rentcafe"
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 2
+
+
+@pytest.mark.asyncio
+async def test_episode_lost_max_retries(captured: _CapturedEvents) -> None:
+    """outcome=lost_max_retries — hit the attempt cap while still
+    triggering. Previously indistinguishable from every other loss."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-maxr"),
+        adapter_table=table,
+        max_retries=2,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "lost_max_retries"
+    assert d["attempts"] == 2 == d["max_retries"]
+    assert d["final_trigger_reason"] == "empty_exit"
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_episode_lost_candidates_exhausted(
+    captured: _CapturedEvents,
+) -> None:
+    """outcome=lost_candidates_exhausted — the SAME ``break`` as
+    no_candidate, but on iteration >= 2. Splitting them is what separates
+    "we had nowhere to go" from "we tried everywhere and lost"."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_EMPTY"),
+        ),
+    }
+    # Budget of 3 with only 2 co-resident candidates → the pool empties
+    # before the cap is reached.
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-exh"),
+        adapter_table=table,
+        max_retries=3,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "lost_candidates_exhausted"
+    assert d["attempts"] == 2
+    assert d["max_retries"] == 3
+    assert d["tried_pms"] == ["knock", "rentcafe"]
+    # candidates_offered is the FIRST-iteration pool, not the last.
+    assert d["candidates_offered"] == 2
+
+
+@pytest.mark.asyncio
+async def test_episode_lost_adapter_error(captured: _CapturedEvents) -> None:
+    """outcome=lost_adapter_error — the retry adapter's extract() raised.
+    RETRY_DISPATCHED was already emitted, so without a terminal event this
+    dispatch dangles forever."""
+
+    class _RaisingAdapter:
+        pms_name = "knock"
+
+        async def extract(self, page, ctx):  # noqa: ARG002
+            raise RuntimeError("simulated knock crash")
+
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    _name, _res, chain, _rd = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-adaperr"),
+        adapter_table={"knock": _RaisingAdapter()},
+    )
+    assert chain == ["retry_failed:knock:RuntimeError"]
+    d = _one_episode(captured)
+    assert d["outcome"] == "lost_adapter_error"
+    assert d["error_type"] == "RuntimeError"
+    assert d["attempts"] == 1
+    assert d["tried_pms"] == ["knock"]
+
+
+@pytest.mark.asyncio
+async def test_episode_lost_dead_end(captured: _CapturedEvents) -> None:
+    """outcome=lost_dead_end — the retry neither won nor re-triggered, so
+    the loop CONDITION went false with budget still remaining.
+
+    A loop-condition falsification has no statement to hang an emit on,
+    which is exactly why the terminal event lives in a ``finally``.
+    """
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        # Success label + zero units → _trigger() returns None (no retrigger)
+        # and _win() is False (no units). Neither win nor loop continuation.
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK", units=[])
+        ),
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-dead"),
+        adapter_table=table,
+        max_retries=2,
+    )
+    d = _one_episode(captured)
+    assert d["outcome"] == "lost_dead_end"
+    assert d["attempts"] == 1  # budget remained: 1 < 2
+    assert d["max_retries"] == 2
+    assert d["trigger_reason"] == "empty_exit"
+    assert d["final_trigger_reason"] == ""  # stopped triggering
+
+
+@pytest.mark.asyncio
+async def test_episode_aborted_error_propagates(
+    captured: _CapturedEvents, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """outcome=aborted_error — an Exception escaped the loop region. The
+    episode is still emitted (``finally``) and the exception still
+    propagates unchanged."""
+    import ma_poc.pms.detector as _detector_mod
+
+    def _boom(**kwargs: Any) -> list:
+        raise ValueError("detector exploded")
+
+    monkeypatch.setattr(_detector_mod, "detect_pms_candidates", _boom)
+
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    with pytest.raises(ValueError, match="detector exploded"):
+        await _run_retry_loop_under_test(
+            initial_adapter_name="g5",
+            initial_result=initial,
+            page_html=_HTML_KNOCK_THEN_RENTCAFE,
+            ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-abort"),
+            adapter_table={},
+        )
+    d = _one_episode(captured)
+    assert d["outcome"] == "aborted_error"
+    assert d["error_type"] == "ValueError"
+    assert d["attempts"] == 0  # aborted before any dispatch
+
+
+@pytest.mark.asyncio
+async def test_episode_aborted_cancelled_is_split_from_error(
+    captured: _CapturedEvents,
+) -> None:
+    """outcome=aborted_cancelled — CancelledError is a BaseException in
+    3.12 and is the EXPECTED shape under jugnu's 600s wait_for. It gets
+    its own outcome so the "is the loop buggy?" gate (aborted_error == 0)
+    is not permanently red on any loaded run.
+
+    Also pins that cancellation still propagates: classifying must not
+    become catching, or asyncio cancellation breaks.
+    """
+    import asyncio
+
+    class _CancelledAdapter:
+        pms_name = "knock"
+
+        async def extract(self, page, ctx):  # noqa: ARG002
+            raise asyncio.CancelledError()
+
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    with pytest.raises(asyncio.CancelledError):
+        await _run_retry_loop_under_test(
+            initial_adapter_name="g5",
+            initial_result=initial,
+            page_html=_HTML_KNOCK_THEN_RENTCAFE,
+            ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-cancel"),
+            adapter_table={"knock": _CancelledAdapter()},
+        )
+    d = _one_episode(captured)
+    assert d["outcome"] == "aborted_cancelled"
+    assert d["error_type"] == "CancelledError"
+    # Dispatched before the teardown — the abort term in invariant A5 that
+    # carries attempts >= 1.
+    assert d["attempts"] == 1
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 1
+
+
+@pytest.mark.asyncio
+async def test_episode_id_joins_dispatch_to_terminal(
+    captured: _CapturedEvents,
+) -> None:
+    """``episode_id`` is the join key. property_id CANNOT serve: scrape()
+    recurses for link-hop sub-pages with the SAME property_id, and a real
+    ledger showed one pid carrying 13 dispatches."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_RENTCAFE", units=_UNIT_LEVEL_UNITS
+            ),
+        ),
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-join"),
+        adapter_table=table,
+    )
+    d = _one_episode(captured)
+    eid = d["episode_id"]
+    assert eid and isinstance(eid, str)
+    for ev in captured.of_kind(EventKind.RETRY_DISPATCHED):
+        assert ev.data["episode_id"] == eid
+        # Fixes the mis-attribution: the win condition keys off the INITIAL
+        # trigger, but these events reported the rolled-forward one.
+        assert ev.data["initial_trigger_reason"] == "empty_exit"
+    for ev in captured.of_kind(EventKind.RETRY_SUCCESS):
+        assert ev.data["episode_id"] == eid
+        assert ev.data["initial_trigger_reason"] == "empty_exit"
+
+
+@pytest.mark.asyncio
+async def test_two_episodes_same_property_id_stay_separable(
+    captured: _CapturedEvents,
+) -> None:
+    """The link-hop case that breaks any property_id-keyed reconciliation:
+    two episodes, same pid, different episode_ids, and B1 still closes."""
+    for tier in ("TIER_1_API_G5_EMPTY", "TIER_1_API_G5_EMPTY"):
+        await _run_retry_loop_under_test(
+            initial_adapter_name="g5",
+            initial_result=_StubAdapterResult(tier_used=tier, units=[]),
+            page_html=_HTML_KNOCK_THEN_RENTCAFE,
+            ctx=_Ctx(base_url="https://example.com/x", property_id="P-ep-dup"),
+            adapter_table={
+                "knock": _StubAdapter(
+                    "knock",
+                    _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY"),
+                ),
+                "rentcafe": _StubAdapter(
+                    "rentcafe",
+                    _StubAdapterResult(
+                        tier_used="TIER_1_API_RENTCAFE_EMPTY"
+                    ),
+                ),
+            },
+        )
+    eps = _assert_episode_invariants(captured)
+    assert len(eps) == 2
+    assert eps[0].data["episode_id"] != eps[1].data["episode_id"]
+    assert eps[0].property_id == eps[1].property_id == "P-ep-dup"
+    # 2 episodes x 2 attempts, all paired.
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 4
+
+
+@pytest.mark.asyncio
+async def test_plan_level_only_trigger_emits_episode(
+    captured: _CapturedEvents,
+) -> None:
+    """THE TRIGGER THE POST-MORTEM COULD NOT MEASURE.
+
+    Plan-level baseline rows clear the dimension, rent and area gates, so
+    the first four checks all pass and only ``rows_are_plan_level`` fires.
+    A losing plan_level_only episode gets NO SUCCESS_PLAN_LEVEL stamp,
+    because "plan_level_only" is deliberately absent from the fallback
+    eligibility set — a genuine defect, left alone here because fixing it
+    changes what ships in properties.json. This event makes that gap
+    COUNTABLE in the meantime.
+    """
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5", units=_PLAN_LEVEL_UNITS
+    )
+    # Retry also comes back plan-level → not a win (swapping plan-level for
+    # plan-level is not a recovery).
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK", units=_PLAN_LEVEL_UNITS
+            ),
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_RENTCAFE", units=_PLAN_LEVEL_UNITS
+            ),
+        ),
+    }
+    _n, _r, _c, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-plan"),
+        adapter_table=table,
+    )
+    d = _one_episode(captured)
+    assert d["trigger_reason"] == "plan_level_only"
+    assert d["baseline_plan_level"] is True
+    assert d["outcome"] != "won"
+    assert d["attempts"] >= 1
+    # The countable gap: lost plan_level_only episodes are NOT restored.
+    assert d["baseline_restored"] is False
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_plan_level_only_trigger_wins_on_unit_level_retry(
+    captured: _CapturedEvents,
+) -> None:
+    """The recovery the trigger exists for: a genuinely unit-level retry
+    result IS promoted over a plan-level baseline."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5", units=_PLAN_LEVEL_UNITS
+    )
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK", units=_UNIT_LEVEL_UNITS
+            ),
+        ),
+    }
+    name, _r, _c, _rd = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-planwin"),
+        adapter_table=table,
+    )
+    assert name == "knock"
+    d = _one_episode(captured)
+    assert d["trigger_reason"] == "plan_level_only"
+    assert d["outcome"] == "won"
+    assert d["won_pms"] == "knock"
+
+
+@pytest.mark.asyncio
+async def test_baseline_restored_matches_verdict(
+    captured: _CapturedEvents,
+) -> None:
+    """``baseline_restored`` is true exactly when the SUCCESS_PLAN_LEVEL
+    fallback fired, so C3 can be checked against properties.json."""
+    baseline_units = [
+        {"unit_id": "inferred_1", "beds": 1, "baths": 1, "sqft": 750},
+        {"unit_id": "inferred_2", "beds": 2, "baths": 2, "sqft": 1100},
+    ]
+    initial = _StubAdapterResult(tier_used="TIER_2_JSONLD", units=baseline_units)
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+    _n, result, _c, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-ep-restore"),
+        adapter_table=table,
+    )
+    d = _one_episode(captured)
+    assert d["baseline_restored"] is True
+    assert result_dict["_verdict_quality"] == "SUCCESS_PLAN_LEVEL"
+    assert d["trigger_reason"] == "no_rent"
+    assert d["outcome"] == "lost_max_retries"
+    # baseline_tier is snapshotted BEFORE the fallback stamps _PLAN_LEVEL in
+    # place — otherwise the event would report a tier the adapter never
+    # returned.
+    assert d["baseline_tier"] == "TIER_2_JSONLD"
+    assert result.tier_used == "TIER_2_JSONLD_PLAN_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_episode_arithmetic_closes_across_scenarios(
+    captured: _CapturedEvents,
+) -> None:
+    """A5 + B1 + B2 over a MIXED stream: win, loss, no-candidate and
+    not-triggered episodes in one ledger.
+
+    ``dispatched == won + lost_* + aborted_*`` is the number that proves
+    the funnel closed. On the real 2026-07-16 ledger the equivalent
+    ``dangling`` figure was 106; here it must be 0.
+    """
+    scenarios = [
+        # (initial tier, initial units, adapter table, html)
+        (
+            "TIER_1_API_G5_EMPTY",
+            [],
+            {
+                "knock": _StubAdapter(
+                    "knock",
+                    _StubAdapterResult(
+                        tier_used="TIER_1_API_KNOCK", units=_UNIT_LEVEL_UNITS
+                    ),
+                )
+            },
+            _HTML_KNOCK_THEN_RENTCAFE,
+        ),  # won
+        (
+            "TIER_1_API_G5_EMPTY",
+            [],
+            {
+                "knock": _StubAdapter(
+                    "knock",
+                    _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY"),
+                ),
+                "rentcafe": _StubAdapter(
+                    "rentcafe",
+                    _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_EMPTY"),
+                ),
+            },
+            _HTML_KNOCK_THEN_RENTCAFE,
+        ),  # lost_max_retries
+        ("TIER_1_API_G5_EMPTY", [], {}, _HTML_G5_ONLY),  # no_candidate
+        (
+            "TIER_1_API_KNOCK",
+            _UNIT_LEVEL_UNITS,
+            {},
+            _HTML_KNOCK_THEN_RENTCAFE,
+        ),  # not_triggered
+    ]
+    for i, (tier, units, table, html) in enumerate(scenarios):
+        await _run_retry_loop_under_test(
+            initial_adapter_name="g5" if not units else "knock",
+            initial_result=_StubAdapterResult(tier_used=tier, units=list(units)),
+            page_html=html,
+            ctx=_Ctx(
+                base_url="https://example.com/", property_id=f"P-ep-mix-{i}"
+            ),
+            adapter_table=table,
+        )
+
+    eps = _assert_episode_invariants(captured)
+    assert len(eps) == 4
+    outcomes = sorted(e.data["outcome"] for e in eps)
+    assert outcomes == [
+        "lost_max_retries",
+        "no_candidate",
+        "not_triggered",
+        "won",
+    ]
+
+    # The funnel, restated explicitly.
+    total = len(eps)
+    not_triggered = sum(1 for e in eps if e.data["outcome"] == "not_triggered")
+    setup_error = sum(1 for e in eps if e.data["outcome"] == "setup_error")
+    triggered = total - not_triggered - setup_error
+    dispatched = sum(1 for e in eps if e.data["attempts"] >= 1)
+    won = sum(1 for e in eps if e.data["outcome"] == "won")
+
+    assert triggered == 3
+    assert dispatched == 2
+    assert won == 1
+    # A4 — every triggered episode is accounted for.
+    assert triggered == (
+        sum(
+            1
+            for e in eps
+            if e.data["outcome"]
+            in {"no_budget", "no_candidate", "telemetry_only"}
+        )
+        + dispatched
+    )
+    # B1 — zero dangling dispatches.
+    dangling = len(captured.of_kind(EventKind.RETRY_DISPATCHED)) - sum(
+        e.data["attempts"] for e in eps
+    )
+    assert dangling == 0

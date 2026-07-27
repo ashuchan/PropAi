@@ -89,6 +89,56 @@ class EventKind(StrEnum):
     RETRY_WOULD_DISPATCH = "extract.retry_would_dispatch"
     RETRY_DISPATCHED = "extract.retry_dispatched"
     RETRY_SUCCESS = "extract.retry_success"
+    # 2026-07-26 — CLOSED-FUNNEL RETRY TELEMETRY.
+    #
+    # The three events above form an OPEN funnel: there is no loss event
+    # and no event at all for a trigger that never dispatched. After the
+    # 1,127-property plan-cohort canary we could not answer "did the
+    # plan_level_only retry trigger ever fire?", because zero events is
+    # equally consistent with "never fired" and "fired constantly and
+    # always dead-ended" — ~37% of that cohort had no second candidate,
+    # and the loop's ``if not _next_candidates: break`` emits NOTHING.
+    #
+    # RETRY_EPISODE closes the funnel: exactly ONE terminal event per
+    # EPISODE (= one execution of the Path-B/C block in
+    # ``ma_poc.pms.scraper``, i.e. one ``scrape()`` call — note that
+    # link-hop sub-pages recurse into ``scrape()`` with the SAME
+    # property_id, so property_id alone does NOT identify an episode;
+    # join on the payload's ``episode_id``).
+    #
+    # It is emitted for EVERY episode including the not-triggered ones,
+    # which is what makes ``count(RETRY_EPISODE)`` a self-contained
+    # denominator and makes "zero events" mean "the hook did not run"
+    # instead of "we cannot tell".
+    #
+    # ONE PER EPISODE IS NOT ONE PER PROPERTY. On the real 2026-07-16
+    # ledger a property averaged 3.73 scrape() calls (max 31, 43% above
+    # one), so any per-property question — "for how many PROPERTIES did
+    # plan_level_only fire?" — needs the rollup in
+    # ``ma_poc.scripts.reports.retry_funnel``, not a raw episode count.
+    #
+    # Episodes are also a SUBSET of scrape() calls: a call that returns
+    # FAILED_UNREACHABLE, or whose baseline ``adapter.extract`` is
+    # cancelled by jugnu's 600s wait_for, never reaches the block and
+    # emits nothing. The funnel report prints that gap
+    # (``detector_signals - episodes``) explicitly.
+    #
+    # Payload carries ``trigger_reason`` (the INITIAL trigger, "" when
+    # none) plus an ``outcome`` drawn from a closed 13-value vocabulary:
+    #   not_triggered · no_budget · no_candidate · telemetry_only · won ·
+    #   lost_candidates_exhausted · lost_adapter_error · lost_dead_end ·
+    #   lost_max_retries · aborted_error · aborted_cancelled ·
+    #   trigger_error · setup_error
+    # ``trigger_error`` (the trigger predicate itself raised, on THIS
+    # property's malformed rows) is deliberately not ``setup_error``:
+    # setup_error means retry is dead RUN-WIDE and pages.
+    # The SINGLE SOURCE OF TRUTH for that vocabulary is
+    # ``ma_poc.pms.scraper.RETRY_EPISODE_OUTCOMES`` — import it, never
+    # re-type the literals. New outcomes are added THERE, not here: the
+    # whole point of one kind + an outcome field is that a new terminal
+    # state costs one frozenset entry and cannot silently fall out of a
+    # consumer's if/elif ladder the way a new EventKind would.
+    RETRY_EPISODE = "extract.retry_episode"
     # F1.2 (2026-05-09): rescue gate fired but rescue was skipped — e.g.
     # captcha_detected on the fetch_result. Distinct from FAILED so the
     # run report can separate "tried and got nothing" from "didn't try
