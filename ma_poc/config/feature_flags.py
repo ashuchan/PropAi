@@ -276,6 +276,51 @@ ENABLE_PLAN_TEXT: Final[bool] = os.environ.get(
 # room under the 600s ceiling for the escalation ladder that ran before it.
 LINK_HOP_BUDGET_S: Final[int] = _int_env("LINK_HOP_BUDGET_S", 150)
 
+# Per-FETCH cap inside the link-hop wall clock (seconds). LINK_HOP_BUDGET_S
+# bounds the whole crawl; this bounds ONE hop so hop #1 cannot eat the entire
+# crawl and starve the hop that holds the roster. Before this cap the in-flight
+# allowance was ALL remaining budget, so a single tarpitting fetch consumed the
+# deadline and every later candidate went unfetched.
+#
+# Measured 2026-07-27 (run …-sample100-7fc8b4c, 100 properties, 18 of which
+# ran a link hop). Every number below is from THAT run's events.jsonl:
+#   * 8 hops hit HOP_FETCH_BUDGET_EXCEEDED across 7 properties; 6 of the 8 were
+#     on hop_index=1, so the candidate that might hold the roster was never
+#     fetched. 5 of those 7 properties ended FAILED_NO_DATA, 1 SUCCESS_PLAN_LEVEL,
+#     1 SUCCESS.
+#   * successful hop fetches (outcome=OK, n=30): p50 5.5s; 4 of 30 (13%) exceed
+#     60s; 1 of 30 (3.3%) exceeds 90s; max 94.5s. Quoting a "p90" here is
+#     misleading — nearest-rank gives 60.1s and the next value is 80.5s.
+#   * of the 20 hops that went on to recover units, 1 exceeds 60s (7595 @ 86.6s)
+#     and 0 exceed 90s.
+# 90s is chosen from that distribution: it binds 5 of the 8 starved hops
+# (freeing 189.0s of nominal budget) while truncating exactly ONE successful
+# fetch (5842 @ 94.5s, which recovered 0 units and ended FAILED_NO_DATA either
+# way) and no unit-recovering hop. 60s was rejected: its only extra binding hop
+# frees 0.7s, and it would have cut off 7595's 86.6s hop — the one slow fetch
+# that DID recover units (6).
+#
+# WHAT THIS DOES NOT CLAIM. No post-cap hop was executed in that run, so the
+# rescue rate is 0 measured. Of the 5 hops the cap binds: 278371 was already
+# SUCCESS (10 units) and 30747 already SUCCESS_PLAN_LEVEL, so there is nothing
+# to rescue; 97935's second session went on to fetch BOTH of the candidates the
+# freed budget would have bought and still recovered 0 units. Only 256603 and
+# 48389 are plausibly rescuable, and both are unmeasured. Gate the next canary
+# on the HOP_FETCH_CAP_EXCEEDED outcome plus the outcome of the hop that
+# follows it — that is the first run that can measure this at all.
+#
+# The 90s value is also calibrated on ONE 100-property run whose same-URL
+# variance is large (5842's /availability drew 94.5s then 60.1s; 278371's cand1
+# drew a >117s timeout then 8.6s). Re-measure at production concurrency before
+# treating it as validated.
+#
+# 0 (or negative) DISABLES the cap → pre-2026-07-27 behaviour exactly, so the
+# kill switch is an env var, not a redeploy. Values below _MIN_HOP_FETCH_S are
+# clamped UP to it (see ma_poc.pms.scraper._hop_fetch_allowance) rather than
+# silently swallowed — otherwise =10 and =0 would resolve identically while
+# meaning opposite things to the operator.
+LINK_HOP_PER_FETCH_S: Final[int] = _int_env("LINK_HOP_PER_FETCH_S", 90)
+
 # Encore per-plan render fan-out (2026-07-19, task #37 Track 2b). The
 # encoreskyline (Jonah Digital) unit roster lives on N per-plan
 # /floorplans/{slug}/ pages and appears only after a "Check Availability" JS
