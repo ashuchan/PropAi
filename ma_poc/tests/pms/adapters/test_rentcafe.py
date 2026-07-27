@@ -225,6 +225,57 @@ def test_rentcafe_real_apartment_number_remains_an_identity() -> None:
     assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "shared-plan-71"}
 
 
+def test_nameless_plan_gets_a_stable_id_across_rent_changes() -> None:
+    """A nameless plan must not fall through to the rent-hashing id path.
+
+    Blanking ``unit_number`` is right, but a payload with neither a name nor
+    an apartment number would otherwise fall past ``compute_fallback_unit_id``
+    (which requires a floor plan) into ``synthesize_unkeyable_id``, whose hash
+    covers the whole payload INCLUDING rent. The id would then change on every
+    price move and the daily join would report disappeared+new forever.
+    """
+    from ma_poc.core.identity import assign_fallback_unit_id
+
+    def _id_for(rent: str) -> tuple[str, str | None]:
+        units = parse_rentcafe_floorplans(
+            [
+                {
+                    "floorplanId": "5416700",   # no floorplanName
+                    "beds": 1,
+                    "baths": 1,
+                    "minimumSqft": 700,
+                    "maximumSqft": 700,
+                    "minimumRent": rent,
+                    "maximumRent": rent,
+                }
+            ],
+            "https://example.test/api/floorplans",
+        )
+        u = units[0]
+        return u["floor_plan_name"], assign_fallback_unit_id(dict(u), "P-1")
+
+    name_a, id_a = _id_for("2450")
+    name_b, id_b = _id_for("2600")
+
+    assert name_a == name_b == "Plan 5416700"
+    assert id_a == id_b, "unit id must survive a rent change"
+    assert not str(id_a).startswith("unkeyable_")
+    # The plan is still plan-level: the id is synthetic, not a false anchor.
+    assert str(id_a).startswith("inferred_")
+
+
+def test_named_plan_keeps_its_own_name() -> None:
+    """The nameless fallback must not overwrite a real floor-plan name."""
+    units = parse_rentcafe_floorplans(
+        [{"floorplanName": "A1", "floorplanId": "77", "beds": 1, "baths": 1,
+          "minimumRent": "1200"}],
+        "https://example.test/api/floorplans",
+    )
+    assert units[0]["floor_plan_name"] == "A1"
+    assert units[0]["unit_number"] == ""
+    assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "77"}
+
+
 def test_static_fingerprints_nonempty() -> None:
     assert RentCafeAdapter().static_fingerprints()
 

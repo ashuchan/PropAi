@@ -105,6 +105,27 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         item_lc = _normalise_item(item)
 
         name = str(item_lc.get("floorplanname") or "")
+        if not name.strip():
+            # Nameless plan payloads must still carry a STABLE plan label.
+            #
+            # Blanking ``unit_number`` (below) is correct — a floorplanId is
+            # not an apartment. But with no name either, the row falls past
+            # ``compute_fallback_unit_id`` (which requires a floor plan) into
+            # ``synthesize_unkeyable_id``, whose hash covers the whole payload
+            # INCLUDING rent. The id then changes on every price move, so the
+            # daily join reports disappeared+new forever and rent history for
+            # that plan can never be reconstructed — the exact churn class
+            # already fixed once for collision suffixes (jugnu.py P3).
+            #
+            # Measured exposure at the time of writing: 782 units across 109
+            # property-records in RentCafe-tier properties have an empty
+            # floor_plan_name.
+            #
+            # The plan id is stable across rent changes and is what the
+            # operator itself keys the plan by, so it is the honest label.
+            _fp_id_for_name = str(item_lc.get("floorplanid") or "").strip()
+            if _fp_id_for_name:
+                name = f"Plan {_fp_id_for_name}"
         beds_raw = item_lc.get("beds")
         baths_raw = item_lc.get("baths")
         beds = int(beds_raw) if beds_raw is not None else None
