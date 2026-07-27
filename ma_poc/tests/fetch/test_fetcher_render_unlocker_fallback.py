@@ -14,6 +14,7 @@ for server-rendered pages). These tests pin that behaviour.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,6 +25,45 @@ from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
 from ma_poc.fetch.fetcher import Fetcher
 from ma_poc.fetch.proxy_pool import ProxyPool
 from ma_poc.fetch.stealth import Identity, IdentityPool
+
+
+class _StillBlockedResponse:
+    """curl_cffi-response shim: the host is *still* CF-walled.
+
+    ``Fetcher._try_curl_cffi_fallback`` reads ``.status_code``, ``.text``
+    and ``.url`` only (fetcher.py ~627/674/719).
+    """
+
+    def __init__(self, url: str) -> None:
+        self.status_code = 403
+        self.text = "<html>Just a moment...</html>"
+        self.content = self.text.encode()
+        self.headers: dict[str, str] = {}
+        self.url = url
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the free curl_cffi rung off the live internet.
+
+    ``_do_request`` tries the zero-cost ``probe_get`` bypass *before* the
+    paid Unlocker (fetcher.py:848 → :588), so every BOT_BLOCKED case here
+    would otherwise fetch ``www.example.com`` for real. These tests pin the
+    rung *below* it, so the faithful stub is a host that curl_cffi cannot
+    bypass either: a 403 CF shell. ``_try_curl_cffi_fallback`` then declines
+    (status != 200) and the ladder proceeds to the Unlocker — exactly the
+    scenario each test asserts on.
+
+    Function-scoped so it overrides ``ma_poc/conftest.py``'s network guard
+    (same scope, but conftest autouse fixtures are set up first).
+    """
+    from ma_poc.pms.adapters import _probe
+
+    def _blocked_probe_get(url: str, **_kw: Any) -> _StillBlockedResponse:
+        return _StillBlockedResponse(url)
+
+    monkeypatch.setattr(_probe, "probe_get", _blocked_probe_get)
+
 
 _IDENTITY = Identity(
     user_agent="Mozilla/5.0 (Test)",

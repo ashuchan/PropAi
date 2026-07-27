@@ -32,6 +32,43 @@ from ma_poc.pms.detector import DetectedPMS
 from ma_poc.pms.scraper import _try_link_hop
 
 
+class _FakeProbeResponse:
+    """curl_cffi-response stand-in for the ``_probe`` seam.
+
+    ``_try_link_hop`` runs every candidate URL through the cheap-GET gate
+    (``scraper._crawl_get_gate_should_skip`` → ``probe_get``) before the
+    RENDER sub-fetch. A 200 with a body carrying no unit/PMS signal is the
+    neutral answer: the gate only retires ``404``/``410`` + <10 KB bodies,
+    so every candidate still reaches the mocked fetcher and the visit
+    ordering these tests assert on is unchanged.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = "<html><body></body></html>"
+        self.content = self.text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the link-hop cheap-GET gate off the live network.
+
+    Overrides the repo-level guard in ``ma_poc/conftest.py`` for this module
+    only. These are ranking/ordering tests — they care about WHICH URLs get
+    tried, not about page content — so one neutral response for every URL is
+    enough.
+    """
+
+    def _fake_probe_get(url: str, *args: Any, **kwargs: Any) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+
+
 def _entry_html_with_links() -> str:
     """Entry-page HTML with anchor-text candidates the keyword ranker
     will pick up. Used as the substrate that profile-driven candidates

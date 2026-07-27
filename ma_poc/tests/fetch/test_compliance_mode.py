@@ -24,6 +24,7 @@ def test_flag_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ff.web_unlocker_allowed() is False and ff.flaresolverr_allowed() is False
 
 
+@pytest.mark.probe_seam  # asserts the compliance gate short-circuits BEFORE any network
 def test_web_unlocker_get_blocked_even_with_key(monkeypatch: pytest.MonkeyPatch) -> None:
     from ma_poc.pms.adapters._probe import web_unlocker_get
 

@@ -40,6 +40,41 @@ from ma_poc.pms.scraper import _try_link_hop
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 
+class _FakeProbeResponse:
+    """curl_cffi-response stand-in for the ``_probe`` seam.
+
+    Reached from two places here: the link-hop cheap-GET gate
+    (``scraper._crawl_get_gate_should_skip``) and the detection rescue inside
+    the recursive ``scrape()``. A 200 with an empty document is neutral for
+    both — the gate only retires ``404``/``410`` + <10 KB bodies, and a body
+    with no PMS fingerprint leaves ``detect_pms`` where it was — so the visit
+    ordering and budget mutations these tests pin stay untouched.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = "<html><body></body></html>"
+        self.content = self.text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every ``probe_get`` in this module off the live network.
+
+    Overrides the repo-level guard in ``ma_poc/conftest.py`` for this module
+    only.
+    """
+
+    def _fake_probe_get(url: str, *args: Any, **kwargs: Any) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+
+
 def _passing_html() -> str:
     """≥1024 bytes + rent tokens so the LLM gate would admit this body
     if it ever ran on it. Used to satisfy adapter-side body checks."""

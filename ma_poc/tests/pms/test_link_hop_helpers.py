@@ -28,6 +28,44 @@ from ma_poc.pms.scraper import (
     _refresh_monolithic_budget_for_llm_hint,
 )
 
+
+class _FakeProbeResponse:
+    """curl_cffi-response stand-in for the ``_probe`` seam.
+
+    Two production paths in this file's call graph reach ``probe_get``:
+    the link-hop cheap-GET gate (``_crawl_get_gate_should_skip``) and the
+    detection rescue inside the recursive ``scrape()`` (``scraper.py`` step
+    4b, which curl-refetches ``/``, ``/floorplans/``, … to re-run
+    ``detect_pms``). A 200 carrying an empty document is neutral for both:
+    the gate only retires ``404``/``410`` + <10 KB, and a body with no PMS
+    fingerprint leaves the detection unchanged.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = "<html><body></body></html>"
+        self.content = self.text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every ``probe_get`` in this module off the live network.
+
+    Overrides the repo-level guard in ``ma_poc/conftest.py`` for this module
+    only. These tests assert on candidate ordering / dedup / budget events,
+    never on fetched page content, so one neutral response per URL suffices.
+    """
+
+    def _fake_probe_get(url: str, *args: Any, **kwargs: Any) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+
+
 # ── _augment_ranked_with_hints ───────────────────────────────────────────────
 
 

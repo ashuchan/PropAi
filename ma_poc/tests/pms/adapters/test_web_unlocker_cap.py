@@ -14,6 +14,10 @@ import pytest
 
 from ma_poc.pms.adapters import _probe
 
+# Every test here calls web_unlocker_get on purpose with BrightData's urlopen
+# stubbed by _stub_brightdata — the transport is mocked, no packets leave.
+pytestmark = pytest.mark.probe_seam
+
 
 @pytest.fixture(autouse=True)
 def _reset_counter():

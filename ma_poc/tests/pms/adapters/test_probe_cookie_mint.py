@@ -22,6 +22,10 @@ from ma_poc.pms.adapters._probe import (
     set_clearance_cookies,
 )
 
+# These tests exercise the real probe_get with curl_cffi mocked out from under
+# it — that is the point of the file, so they opt out of the network guard.
+pytestmark = pytest.mark.probe_seam
+
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -35,6 +35,42 @@ def _load(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    ``_fetch_availability_html`` tries ``{base}/availability/`` through
+    ``probe_get`` before it will look at ``ctx.fetch_result.body``. The
+    adapter test below is specifically about the body-only path ("no
+    Playwright… mirrors the L1-only call path used in prod"), so the
+    probe must come back empty-handed. A 404 does that deterministically
+    — the live chocolateworks-living.com request the test used to make
+    was never the subject, and the fixture it asserts against
+    (``ma_poc/tests/fixtures/reinhold/chocolateworks_availability.html``)
+    is already loaded into ``ctx.fetch_result.body``.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 # ── Parser tests (10) ──────────────────────────────────────────────────────
 
 

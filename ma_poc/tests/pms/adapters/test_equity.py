@@ -27,6 +27,45 @@ from ma_poc.pms.adapters.equity import (
 )
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim consumed by ``_html_for``.
+
+    ``equity._html_for`` reads ``.status_code`` and ``.text``; the extra
+    ``.content`` / ``.headers`` / ``.url`` attributes keep the shape
+    honest for any sibling call site.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` network seam for every test in this module.
+
+    ``EquityAdapter.extract`` → ``_html_for`` re-fetches ``ctx.base_url``
+    through ``probe_get`` whenever the captured body has no priced
+    ``ledgerId:`` block — which is exactly the case these tests
+    construct. Returning a 404 makes the refetch a deterministic no-op
+    so the adapter falls back to ``ctx.fetch_result.body``: the HTML the
+    test actually authored. That is the same branch the suite has always
+    taken offline, minus the live request to equityapartments.com.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 def _make_ctx(html: bytes | str | None) -> AdapterContext:
     """Minimal AdapterContext for the Equity adapter.
 

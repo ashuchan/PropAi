@@ -3,10 +3,70 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 
 from ma_poc.pms.scraper import scrape_jugnu
+
+# ---------------------------------------------------------------------------
+# Network seam — see ma_poc/conftest.py
+# ---------------------------------------------------------------------------
+# The tests that do NOT short-circuit run the full scrape() body, whose Step-4b
+# detection rescue re-fetches ``/``, ``/floorplans/`` … through the sync
+# ``_probe.probe_get`` curl_cffi seam whenever detection is unknown. That was a
+# live hit on example.com. These tests only assert which short-circuit branch
+# scrape_jugnu took, so the seam returns an inert 200 page with no PMS marker —
+# detection stays unknown exactly as it did against the live example.com body.
+
+_INERT_HTML = (
+    "<html><head><title>Test page</title></head>"
+    "<body><p>No PMS markers, no floor plans, no rents.</p></body></html>"
+)
+
+
+class _InertProbeResponse:
+    """Minimal curl_cffi-response stand-in (``.status_code/.text/.content``)."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = _INERT_HTML
+        self.content = _INERT_HTML.encode("utf-8")
+        self.headers = {"Content-Type": "text/html; charset=utf-8"}
+        self.encoding = "utf-8"
+
+    def json(self) -> Any:
+        """Match curl_cffi/requests semantics for a non-JSON body."""
+        raise ValueError("inert probe response is not JSON")
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Serve every ``probe_get`` in this module an inert local page.
+
+    Also covers the TRANSIENT/BOT_BLOCKED salvage at ``scraper.py:4140``, which
+    calls ``curl_cffi`` DIRECTLY rather than through ``probe_get`` — a second,
+    separate network seam. ``test_scrape_jugnu_short_circuits_on_bot_blocked``
+    drives BOT_BLOCKED straight into it and used to fetch example.com for real.
+
+    The inert 200 is behaviour-preserving, not merely quiet: salvage only fires
+    on ``status_code == 200 and len(body) >= 5000``, and the live example.com
+    body is ~1.2 KB, so salvage declined then and declines now. The
+    BOT_BLOCKED short-circuit each test asserts on is reached identically.
+    """
+
+    def _fake_probe_get(url: str, **_kw: Any) -> _InertProbeResponse:
+        return _InertProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get, raising=True
+    )
+    monkeypatch.setattr(
+        "curl_cffi.requests.get",
+        lambda url, **_kw: _InertProbeResponse(url),
+        raising=True,
+    )
 
 
 @dataclass

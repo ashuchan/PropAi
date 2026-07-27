@@ -55,6 +55,50 @@ from ma_poc.pms.adapters.sightmap import (
 from ma_poc.pms.detector import detect_pms
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    When the SightMap filter empties ``result.units``, ``extract``
+    walks its rescue chain — ``_try_subpage_sightmap_with_prices``
+    probes ``{origin}/availability/`` and friends looking for a second
+    embed code. These tests are about the drop filter, not the rescue,
+    and every payload they feed in is inline. A 404 keeps the rescue a
+    deterministic no-op so the tier flips to
+    ``_OPERATOR_RENT_NOT_PUBLISHED`` as asserted.
+
+    ``_sightmap_subpage_recovery`` binds ``probe_get`` at module import
+    (module top level), so patching ``_probe`` alone would never reach
+    its copy. The rescue chain these tests exercise stops short of that
+    module today, but it sits one branch away — patch it too so a future
+    routing change surfaces as a test failure, not a live request.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._sightmap_subpage_recovery.probe_get",
+        _fake_probe_get,
+    )
+
+
 def _u(
     unit_number: str = "U",
     rent_low: int | None = None,

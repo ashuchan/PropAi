@@ -9,6 +9,8 @@ these as malformed and bills nothing, but each failed call burned
 """
 from __future__ import annotations
 
+import pytest
+
 from ma_poc.pms.adapters._probe import _wu_safe_url
 
 
@@ -86,6 +88,7 @@ def test_real_canary_400_urls_become_safe() -> None:
         assert "action=view_unit_spaces" in safe
 
 
+@pytest.mark.probe_seam  # drives web_unlocker_get with urlopen stubbed below
 def test_web_unlocker_get_passes_encoded_url_to_brightdata(monkeypatch) -> None:
     """End-to-end: web_unlocker_get must POST the encoded URL — not the
     raw bracketed one — to BD's API endpoint. Verifies the wiring."""

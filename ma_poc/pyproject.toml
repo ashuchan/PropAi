@@ -16,6 +16,8 @@ markers = [
     "ts: test requires a Node.js toolchain",
     "slow: test takes > 2s wall-clock — excluded from the default CI run",
     "e2e: full pipeline through all 4 layers (extract → propagate → persist → consume)",
+    "live_network: test genuinely hits the real internet — exempt from the _probe network guard (see conftest.py)",
+    "probe_seam: test drives _probe.probe_get/probe_post directly with the transport (curl_cffi) mocked underneath — exempt from the network guard",
 ]
 
 [tool.mypy]
