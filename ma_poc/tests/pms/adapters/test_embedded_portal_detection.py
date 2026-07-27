@@ -384,8 +384,18 @@ async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
     # Patch at the source module so the dynamic import inside
     # ``_try_link_hop`` ("from ma_poc.fetch import fetch as jugnu_fetch")
     # resolves to our stub.
+    #
+    # Cheap-GET gate off: it probe_get()s the LIVE network per hop, and
+    # ``abc123`` is a synthetic embed code that real sightmap.com 404s
+    # with a <10KB body — exactly the DEAD_URL_GATED shape — so the hop
+    # was retired before ``_fake_fetch`` ever saw it. The gate is
+    # behaving correctly there; what this test asserts is the portal-hint
+    # queueing contract, so stub the gate out and keep it hermetic.
     with patch.object(fetch_mod, "fetch", new=_fake_fetch), \
-         patch.object(scraper_mod, "scrape", new=_fake_scrape):
+         patch.object(scraper_mod, "scrape", new=_fake_scrape), \
+         patch.object(
+             scraper_mod, "_crawl_get_gate_should_skip", lambda url: False
+         ):
         hop_result = await scraper_mod._try_link_hop(
             entry_url=entry_url,
             entry_page_html="<html><a href='/floorplans/'>Floor Plans</a></html>",

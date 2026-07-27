@@ -231,9 +231,9 @@ def test_static_fingerprint_marker_still_present() -> None:
 
 
 class _StubAsyncResp:
-    """Minimal stand-in for ``httpx.Response`` used by the iframe-
-    fallback test below. Carries the three accessors the SightMap
-    adapter touches: ``status_code``, ``text``, and ``json()``."""
+    """Minimal stand-in for a ``probe_get`` response used by the iframe-
+    fallback test below. Carries the accessors the SightMap adapter
+    touches: ``status_code``, ``text``, and ``json()``."""
 
     def __init__(self, status_code: int, text: str, body: dict | None = None):
         self.status_code = status_code
@@ -246,25 +246,6 @@ class _StubAsyncResp:
         return self._body
 
 
-class _StubAsyncClient:
-    """Stand-in for ``httpx.AsyncClient`` used as an async context
-    manager. Routes GETs to a handler callable."""
-
-    def __init__(self, handler):
-        self._handler = handler
-        self.calls: list[str] = []
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_exc):
-        return False
-
-    async def get(self, url, headers=None):  # noqa: ANN001
-        self.calls.append(url)
-        return self._handler(url)
-
-
 @pytest.mark.asyncio
 async def test_adapter_iframe_fallback_when_xhr_uncaptured(monkeypatch) -> None:
     """The most likely production failure mode: canary's Playwright
@@ -274,11 +255,17 @@ async def test_adapter_iframe_fallback_when_xhr_uncaptured(monkeypatch) -> None:
     With ``api_responses=[]``, the adapter must:
       1. Find the embed code from the page HTML.
       2. Refetch the embed page to discover the API URL.
-      3. Refetch the API URL to recover the 125 units.
+      3. Refetch the API URL to recover the 125 units (+1 plan-presence
+         row for the floor plan with no available units, added 5ea7772
+         — hence 126 rows total).
       4. Emit ``TIER_1_API_SIGHTMAP_IFRAME``.
 
-    httpx.AsyncClient is monkey-patched to serve the live embed-page
-    and API fixtures so the test is hermetic.
+    ``_probe.probe_get`` is monkey-patched to serve the embed-page and
+    API fixtures so the test is hermetic. It — not ``httpx.AsyncClient``
+    — is the seam the fallback fetches through as of 1d8fb89; stubbing
+    httpx left the call escaping to the LIVE internet, so this test was
+    silently grading real sightmap.com inventory (85 units on 2026-07-26)
+    against a May-2026 fixture count.
     """
     html = _load_html()
     embed_html = _load_embed_html()
@@ -294,12 +281,12 @@ async def test_adapter_iframe_fallback_when_xhr_uncaptured(monkeypatch) -> None:
             return _StubAsyncResp(200, json.dumps(api_body), body=api_body)
         return _StubAsyncResp(404, "")
 
-    import httpx
+    from ma_poc.pms.adapters import _probe as _probe_mod
 
-    def _client_factory(*args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        return _StubAsyncClient(_handler)
+    def _probe_get(url: str, **_kwargs) -> _StubAsyncResp:  # noqa: ANN003
+        return _handler(url)
 
-    monkeypatch.setattr(httpx, "AsyncClient", _client_factory)
+    monkeypatch.setattr(_probe_mod, "probe_get", _probe_get)
 
     adapter = SightMapAdapter()
     # NO captured api_responses — the iframe-fallback must do all the work.
@@ -308,7 +295,8 @@ async def test_adapter_iframe_fallback_when_xhr_uncaptured(monkeypatch) -> None:
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
     assert len(result.units) == 126, (
-        f"Iframe-fallback produced {len(result.units)} units, expected 125. "
+        f"Iframe-fallback produced {len(result.units)} rows, expected 126 "
+        f"(125 fixture units + 1 plan-presence row). "
         f"tier={result.tier_used!r} errors={result.errors[:3]}"
     )
     assert result.tier_used == "TIER_1_API_SIGHTMAP_IFRAME", (
