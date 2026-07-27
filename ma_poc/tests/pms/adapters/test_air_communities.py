@@ -23,7 +23,9 @@ from ma_poc.pms.adapters._air_communities import (
     parse_residences_html,
 )
 
-_FIXTURE_DIR = Path("ma_poc/tests/fixtures/air_communities")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "air_communities"
 
 
 def _load(name: str) -> str:

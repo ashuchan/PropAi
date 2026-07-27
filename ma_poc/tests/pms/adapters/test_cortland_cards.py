@@ -18,8 +18,13 @@ from pathlib import Path
 
 from ma_poc.pms.adapters.cortland import parse_cortland_cards
 
-_FIXTURE = Path(
-    "ma_poc/tests/fixtures/cortland/macarthur_available_apartments.html"
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "cortland"
+    / "macarthur_available_apartments.html"
 )
 
 
