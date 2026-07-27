@@ -50,6 +50,51 @@ class _FallbackPage:
         return None
 
 
+# ── probe-seam stub (2026-07-26) ────────────────────────────────────────────
+# The LeaseLeads sniff sits at the END of EntrataAdapter.extract (entrata.py:2603),
+# behind the whole Prospect-Portal static cascade. That cascade fetches through
+# ``_entrata_static_fetch`` → the *sync* ``ma_poc.pms.adapters._probe.probe_get``
+# curl_cffi seam, which the ``_FallbackPage`` stub and the
+# ``recover_leaseleads_embed`` patch below do not intercept — so both tests were
+# hitting the live internet (liveatlumina.com, example.com).
+#
+# The stub answers "nothing here" so the PP cascade stays empty and control
+# reaches the LeaseLeads sniff — which is what these tests pin. The signal that
+# drives the sniff still comes from the stored fixture HTML served by
+# ``_FallbackPage.content()``, not from the probe.
+
+
+class _NoDataProbeResponse:
+    """curl_cffi-response stand-in carrying no usable body.
+
+    Exposes the full attribute surface adapter call sites read off a probe
+    response: ``status_code`` / ``text`` / ``content`` / ``headers`` / ``url``.
+    """
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the ``_probe`` fetch seam at an offline 404/empty-body stub."""
+
+    def _fake_probe_get(url: str = "", **_kw: object) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    def _fake_probe_post(
+        url: str = "", data: object = None, **_kw: object
+    ) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_post", _fake_probe_post)
+
+
 def _make_ctx(base_url: str, pid: str) -> AdapterContext:
     ctx = AdapterContext(
         base_url=base_url,

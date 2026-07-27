@@ -65,6 +65,42 @@ _SPA_SHELL_HTML = """<!DOCTYPE html>
 """
 
 
+class _FakeProbeResponse:
+    """curl_cffi-response stand-in for the ``_probe`` seam.
+
+    ``_try_link_hop`` gates each prior-derived candidate with a cheap
+    ``probe_get`` (``scraper._crawl_get_gate_should_skip``) before the RENDER
+    sub-fetch, and the recursive ``scrape()`` curl-refetches sub-paths for its
+    detection rescue. A 200 with an empty document is neutral for both: the
+    gate only retires ``404``/``410`` + <10 KB bodies, so the RentCafe priors
+    still reach ``_fake_fetch`` and land in ``fetch_calls`` — a 404-shaped
+    stub would gate them away and defeat what this test pins.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = "<html><body></body></html>"
+        self.content = self.text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every ``probe_get`` in this module off the live network.
+
+    Overrides the repo-level guard in ``ma_poc/conftest.py`` for this module
+    only.
+    """
+
+    def _fake_probe_get(url: str, *args: Any, **kwargs: Any) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+
+
 class _StarvedNavigation:
     """A profile.navigation block in the state Bug-1's collateral left it:
     blocked_endpoints may exist from prior runs, but winning_page_url and

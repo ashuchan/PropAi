@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typing as t
+from typing import Any
 
 import pytest
 
@@ -15,6 +16,62 @@ from ma_poc.pms.adapters.registry import (
     register,
 )
 from ma_poc.pms.detector import DetectedPMS
+
+
+class _EmptyResponse:
+    """Inert curl_cffi-response shim: reachable host, nothing to extract.
+
+    Adapters read ``.status_code`` / ``.text`` (and occasionally
+    ``.content`` / ``.headers`` / ``.url``), so all five are present.
+    """
+
+    def __init__(self, url: str) -> None:
+        self.status_code = 404
+        self.text = ""
+        self.content = b""
+        self.headers: dict[str, str] = {}
+        self.url = url
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Blanket-stub the ``_probe`` network seam for the whole module.
+
+    These tests exercise the registry *contract* (every adapter is
+    structurally a ``PmsAdapter`` and returns a well-formed
+    ``AdapterResult``), never a live site — so an inert empty response is
+    the right stub: adapters walk their full no-data path and still have
+    to hand back an ``AdapterResult``.
+
+    ``probe_get`` is normally imported inside the calling function, so
+    patching ``_probe`` covers it. Three modules bind it at *module* top
+    level and keep their own reference, which a ``_probe``-only patch can
+    never reach — patch those copies too, since this file sweeps adapters
+    broadly (``all_adapters()``) and a future adapter reaching one of them
+    must not silently fetch for real.
+
+    Function-scoped so it overrides ``ma_poc/conftest.py``'s network guard
+    (same scope, but conftest autouse fixtures are set up first).
+    """
+    from ma_poc.pms.adapters import (
+        _probe,
+        _sightmap_subpage_recovery,
+        rentmanager,
+        repli360,
+    )
+
+    def _fake_probe_get(url: str, **_kw: Any) -> _EmptyResponse:
+        return _EmptyResponse(url)
+
+    def _fake_probe_post(url: str, data: Any = None, **_kw: Any) -> _EmptyResponse:
+        return _EmptyResponse(url)
+
+    monkeypatch.setattr(_probe, "probe_get", _fake_probe_get)
+    monkeypatch.setattr(_probe, "probe_post", _fake_probe_post)
+    # Modules holding a top-level copy of the name (see docstring).
+    for module in (_sightmap_subpage_recovery, rentmanager, repli360):
+        monkeypatch.setattr(module, "probe_get", _fake_probe_get, raising=False)
+    monkeypatch.setattr(repli360, "probe_post", _fake_probe_post, raising=False)
 
 # Literals that must resolve to a concrete, non-generic adapter.
 _CONCRETE_PMS_LITERALS = [

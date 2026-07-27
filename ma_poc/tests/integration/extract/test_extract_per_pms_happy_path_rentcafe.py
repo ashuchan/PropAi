@@ -11,10 +11,52 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
 
 from pms.adapters.base import AdapterContext
 from pms.adapters.rentcafe import RentCafeAdapter
 from pms.detector import DetectedPMS
+
+
+# ── probe-seam stub (2026-07-26) ────────────────────────────────────────────
+# ``test_rentcafe_empty_api_returns_no_units`` passes an empty response list, so
+# the adapter runs its recovery fallbacks — including the securecafe homepage
+# re-fetch (rentcafe.py:1420) through the *sync*
+# ``ma_poc.pms.adapters._probe.probe_get`` curl_cffi seam. That fetch was going
+# to the live internet (testprop.rentcafe.com, a domain the fixture invented).
+# The stub answers "nothing here", which is the no-data condition the test
+# describes. Corpus-driven tests in this file return before reaching it.
+
+
+class _NoDataProbeResponse:
+    """curl_cffi-response stand-in carrying no usable body.
+
+    Exposes the full attribute surface adapter call sites read off a probe
+    response: ``status_code`` / ``text`` / ``content`` / ``headers`` / ``url``.
+    """
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the ``_probe`` fetch seam at an offline 404/empty-body stub."""
+
+    def _fake_probe_get(url: str = "", **_kw: object) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    def _fake_probe_post(
+        url: str = "", data: object = None, **_kw: object
+    ) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_post", _fake_probe_post)
 
 
 @dataclass

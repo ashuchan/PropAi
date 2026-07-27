@@ -19,6 +19,41 @@ from ma_poc.pms.adapters.generic_plan_text import (
 )
 from ma_poc.pms.detector import detect_pms
 
+
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam so no subpage probe leaves the box.
+
+    ``GenericPlanTextAdapter.extract`` fires ``probe_get`` on two
+    optional side-quests: the ``/floorplans/`` … ``/apartments/``
+    subpage sweep when the body yields no rows, and
+    ``_enrich_sqft_from_floorplans`` when fewer than half the rows carry
+    sqft. Neither is what these tests assert on — the extraction subject
+    is the live-captured ``_*_BODY`` text below, fed straight to the
+    parser. A 404 makes both side-quests deterministic no-ops.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 # Live-captured body text excerpts (real DOM ).
 _COLONIAL_BODY = (
     "Skip to main content Reach Us: (248) 646-1188 Office Hours: Mon-Fri "

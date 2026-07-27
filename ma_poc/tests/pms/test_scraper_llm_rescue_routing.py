@@ -13,6 +13,56 @@ import pytest
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
 
+# ---------------------------------------------------------------------------
+# Network seam — see ma_poc/conftest.py
+# ---------------------------------------------------------------------------
+# Two spots in scrape() fetch through the sync ``_probe.probe_get`` curl_cffi
+# seam, which no amount of get_adapter / resolve_target / detect_pms patching
+# intercepts:
+#   * Step 4b detection rescue — fires when detection is unknown/custom.
+#   * F1.5 subpage enrichment — fires when the adapter's units are missing rent
+#     OR sqft, which is exactly what ``_hollow_units()`` is (area=-1, no rent),
+#     so it fired in nearly every rescue test here and hit test.com live.
+# Neither path is what these tests assert on: they assert that the LLM rescue
+# gate fires / doesn't fire and that its output is bridged correctly. The
+# enrichment must therefore stay a no-op, as it effectively was against the
+# live junk response. An inert 200 page does that: ``parse_generic_plan_text``
+# finds no plan rows, so the name-map stays empty and no unit is enriched (an
+# enriched unit would change the hollow-units input the rescue gate keys on).
+
+_INERT_HTML = (
+    "<html><head><title>Test page</title></head>"
+    "<body><p>No PMS markers, no floor plans, no rents.</p></body></html>"
+)
+
+
+class _InertProbeResponse:
+    """Minimal curl_cffi-response stand-in (``.status_code/.text/.content``)."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = _INERT_HTML
+        self.content = _INERT_HTML.encode("utf-8")
+        self.headers = {"Content-Type": "text/html; charset=utf-8"}
+        self.encoding = "utf-8"
+
+    def json(self) -> Any:
+        """Match curl_cffi/requests semantics for a non-JSON body."""
+        raise ValueError("inert probe response is not JSON")
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Serve every ``probe_get`` in this module an inert local page."""
+
+    def _fake_probe_get(url: str, **_kw: Any) -> _InertProbeResponse:
+        return _InertProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get, raising=True
+    )
+
 
 def _detected(pms: str = "generic") -> DetectedPMS:
     return DetectedPMS(pms=pms, confidence=0.9, evidence=frozenset())

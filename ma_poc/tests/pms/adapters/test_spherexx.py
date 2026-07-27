@@ -24,6 +24,41 @@ from ma_poc.pms.detector import detect_pms
 FIXTURES = Path(__file__).parent / "fixtures" / "spherexx"
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    When no ``/api/unit`` response is admitted, ``SpherexxAdapter.extract``
+    falls through to the ZRS crawl: ``_zrs_fetch`` GETs
+    ``{origin}/floorplans/`` and then each detail link it finds. Both
+    negative-path tests below want the adapter to reach its
+    ``_NO_RESPONSE`` / ``_SHAPE_REJECTED`` label, which means the ZRS
+    crawl must find nothing. A 404 yields ``""`` from ``_zrs_fetch``, so
+    ``find_zrs_detail_links`` returns no links and the cascade lands on
+    the asserted label — without touching henryonthepark.com.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 def _load_fixture() -> list[dict]:
     return json.loads((FIXTURES / "henryonthepark.json").read_text(encoding="utf-8"))
 

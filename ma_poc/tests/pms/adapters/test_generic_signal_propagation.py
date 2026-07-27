@@ -40,6 +40,39 @@ from ma_poc.pms.adapters.generic import GenericAdapter
 from ma_poc.pms.detector import detect_pms
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    ``_suppress_deterministic_tiers`` forces ``parse_generic_plan_text``
+    to return ``[]``, which sends ``GenericPlanTextAdapter.extract``
+    into its ``/floorplans/`` … ``/apartments/`` subpage sweep against
+    ``example.com`` — reached via ``scrape()`` in the surface-step test.
+    These tests assert on LLM-hint propagation, all of it mocked, so the
+    sweep must find nothing: a 404 makes that deterministic.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 class _DummyPage:
     """Stand-in for Playwright Page. ``screenshot`` is intentionally
     absent so the Tier-5 vision branch's ``hasattr`` check returns

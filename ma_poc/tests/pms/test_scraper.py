@@ -6,6 +6,7 @@ pipeline without requiring Playwright or real network access.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,6 +15,58 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
 from ma_poc.pms.resolver import ResolvedTarget
 from ma_poc.pms.scraper import scrape
+
+# ---------------------------------------------------------------------------
+# Network seam — see ma_poc/conftest.py
+# ---------------------------------------------------------------------------
+# scrape() reaches the internet through ``_probe.probe_get`` (a sync curl_cffi
+# call) in the Step-4b detection rescue: whenever detection is unknown/custom it
+# re-fetches ``/``, ``/floorplans/``, ``/floor-plans/`` … looking for a PMS
+# marker the rendered HTML hid. Patching detect_pms / resolve_target /
+# get_adapter does not stop that fetch, so these tests were silently hitting
+# example.com. Every test here asserts on the *orchestrator* wiring, never on a
+# rescued detection, so the seam is stubbed with an inert 200 page carrying no
+# PMS marker — the same "nothing useful came back" outcome the live fetch of
+# example.com produced, minus the packets.
+
+_INERT_HTML = (
+    "<html><head><title>Test page</title></head>"
+    "<body><p>No PMS markers, no floor plans, no rents.</p></body></html>"
+)
+
+
+class _InertProbeResponse:
+    """Minimal curl_cffi-response stand-in (``.status_code/.text/.content``).
+
+    Mirrors the attribute surface ``ma_poc/pms/scraper.py`` reads off a
+    ``probe_get`` result. Deliberately boring content so no extraction,
+    detection or enrichment path can latch onto it.
+    """
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = _INERT_HTML
+        self.content = _INERT_HTML.encode("utf-8")
+        self.headers = {"Content-Type": "text/html; charset=utf-8"}
+        self.encoding = "utf-8"
+
+    def json(self) -> Any:
+        """Match curl_cffi/requests semantics for a non-JSON body."""
+        raise ValueError("inert probe response is not JSON")
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Serve every ``probe_get`` in this module an inert local page."""
+
+    def _fake_probe_get(url: str, **_kw: Any) -> _InertProbeResponse:
+        return _InertProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get, raising=True
+    )
+
 
 # ---------------------------------------------------------------------------
 # Helpers

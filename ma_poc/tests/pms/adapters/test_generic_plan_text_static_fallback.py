@@ -20,12 +20,47 @@ import dataclasses
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.generic_plan_text import (
     GenericPlanTextAdapter,
     _bodytext_from_fetch_result,
 )
 from ma_poc.pms.detector import DetectedPMS
+
+
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    The subject here is the static-body fallback: bodyText derived from
+    ``ctx.fetch_result.body``. When that body yields no plan rows the
+    adapter probes ``/floorplans/`` … ``/apartments/`` on
+    ``www.example.com`` before giving up. A 404 keeps that sweep a
+    deterministic no-op, so the "found nothing" assertion is about the
+    body under test rather than whatever example.com happens to serve.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
 
 
 def _make_ctx(body: bytes | str | None) -> AdapterContext:

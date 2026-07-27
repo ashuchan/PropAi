@@ -20,6 +20,43 @@ from ma_poc.models.scrape_profile import ScrapeProfile
 from ma_poc.pms.detector import DetectedPMS
 
 
+class _FakeProbeResponse:
+    """curl_cffi-response stand-in for the ``_probe`` seam.
+
+    ``_try_link_hop`` gates every candidate URL with a cheap
+    ``probe_get`` (``scraper._crawl_get_gate_should_skip``) before the RENDER
+    sub-fetch, and the recursive ``scrape()`` curl-refetches sub-paths for its
+    detection rescue. A 200 with an empty document is the neutral answer for
+    both: the gate only retires ``404``/``410`` + <10 KB bodies, so every
+    candidate still reaches the tracking fetcher these tests count — a
+    404-shaped stub would silently gate the hops away and make the
+    ``max_hops`` cap assertion pass vacuously.
+    """
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.status_code = 200
+        self.text = "<html><body></body></html>"
+        self.content = self.text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every ``probe_get`` in this module off the live network.
+
+    Overrides the repo-level guard in ``ma_poc/conftest.py`` for this module
+    only.
+    """
+
+    def _fake_probe_get(url: str, *args: Any, **kwargs: Any) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+
+
 def _stub_playwright() -> None:
     """Install lightweight playwright stubs so scraper.py can be imported."""
     for name in ("playwright", "playwright.async_api"):

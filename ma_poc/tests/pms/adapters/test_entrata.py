@@ -40,6 +40,51 @@ class _DummyPage:
     pass
 
 
+# ── probe-seam stub (2026-07-26) ────────────────────────────────────────────
+# When the captured-API stage yields nothing the Entrata adapter walks its
+# static Prospect-Portal fallbacks (``_entrata_static_fetch`` at entrata.py:1775,
+# reached from :2259/:2297/:2317/:2359/:2406/:2526/:2534). Those fetch through
+# the *sync* ``ma_poc.pms.adapters._probe.probe_get`` curl_cffi seam, which no
+# page/adapter-level stub in this file intercepts — so the no-data tests below
+# were hitting the live internet (hackneyhouseapartments.com, livethearch.com).
+#
+# The stub answers "nothing here": ``_entrata_static_fetch`` maps a non-200 to
+# ``""``, so the PP cascade finds no grid and the adapter reaches the empty-exit
+# classification the tests assert on. Unit data for the fixture-driven tests
+# still comes from the stored JSON fixtures via ``ctx._api_responses``.
+
+
+class _NoDataProbeResponse:
+    """curl_cffi-response stand-in carrying no usable body.
+
+    Exposes the full attribute surface adapter call sites read off a probe
+    response: ``status_code`` / ``text`` / ``content`` / ``headers`` / ``url``.
+    """
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the ``_probe`` fetch seam at an offline 404/empty-body stub."""
+
+    def _fake_probe_get(url: str = "", **_kw: object) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    def _fake_probe_post(
+        url: str = "", data: object = None, **_kw: object
+    ) -> _NoDataProbeResponse:
+        return _NoDataProbeResponse(url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_post", _fake_probe_post)
+
+
 @pytest.mark.asyncio
 async def test_entrata_extract_happy_path() -> None:
     """Real Entrata payload (257356) produces units with rent and floor plan name."""

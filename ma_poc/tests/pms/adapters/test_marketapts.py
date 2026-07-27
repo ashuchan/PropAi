@@ -182,6 +182,42 @@ _PLAN_D_TWO_UNITS = {
 }
 
 
+class _FakeProbeResponse:
+    """Minimal curl_cffi-response shim (``.status_code`` / ``.text``)."""
+
+    __slots__ = ("status_code", "text", "content", "headers", "url")
+
+    def __init__(self, url: str, status_code: int = 404, text: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the ``_probe`` seam for every test in this module.
+
+    The static-body (``page=None``) path hands
+    ``_ma_residential_drill_fetch`` to ``marketapts_static_payload``,
+    which GETs each plan's ``/unit/{slug}`` drill — a real request to
+    the base_url host. The parser-level tests already cover drilled
+    output by injecting a drill callable (see ``_null_drill`` and the
+    ``drill`` closure in ``test_static_payload_template_b_unit_level_via_drill``);
+    the end-to-end test asserts the *plan-level* shape, i.e. drill
+    returns nothing. A 404 gives exactly that: ``status >= 400`` makes
+    ``_ma_residential_drill_fetch`` return ``None``.
+    """
+
+    def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
+        return _FakeProbeResponse(url)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
+    )
+
+
 class _FakePage:
     """Tiny stand-in for a Playwright page. ``extract`` only calls
     ``page.evaluate`` and ``page.url``."""
