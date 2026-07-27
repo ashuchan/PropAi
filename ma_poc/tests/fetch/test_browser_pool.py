@@ -10,6 +10,7 @@ proxy edge).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from ma_poc.fetch.browser_pool import BrowserContextPool
@@ -222,3 +223,107 @@ def test_env_override_rejects_non_positive(monkeypatch) -> None:
     monkeypatch.setenv("PLAYWRIGHT_NAV_TIMEOUT_MS", "0")
     from ma_poc.fetch.browser_pool import _resolve_int_env
     assert _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000) == 45_000
+
+
+# ── permit safety under cancellation (2026-07-27 review) ───────────────────
+#
+# ``acquire()`` takes the semaphore permit and THEN does four more awaits —
+# ``_ensure_browser()`` (may launch Chromium), ``new_context()``,
+# ``new_page()``, ``page.route()`` — before ``return page``. The only releaser
+# is the caller's ``finally: await self._browsers.release(page)``, which needs a
+# page that does not exist yet. A cancellation landing in that window therefore
+# leaked the permit permanently and shrank MAX_CONCURRENT_BROWSERS by one for
+# the process lifetime: the documented shard-wedge mode.
+#
+# ``new_context()``/``new_page()`` are precisely the un-timeouted Playwright IPC
+# calls this module's header warns "can in practice park forever" —
+# ``page.set_default_timeout`` is not applied until after both. The 2026-07-27
+# link-hop per-fetch cap makes such cancellations ~6x more frequent (measured
+# against the real ``_try_link_hop``: 1 in-flight cancellation with the cap off,
+# 6 with it on), which is what turned a latent leak into a live risk.
+
+
+def _pool_with_hanging_new_page() -> tuple[BrowserContextPool, list[str]]:
+    """A pool whose ``new_page()`` never returns, plus a context-close log."""
+    pool = BrowserContextPool(max_contexts=2)
+    closed: list[str] = []
+
+    class _HangingCtx:
+        async def new_page(self) -> None:
+            await asyncio.sleep(30)
+
+        async def close(self) -> None:
+            closed.append("closed")
+
+    class _Browser:
+        async def new_context(self, **_kw: object) -> _HangingCtx:
+            return _HangingCtx()
+
+    async def _ensure() -> _Browser:
+        return _Browser()
+
+    pool._ensure_browser = _ensure  # type: ignore[method-assign,assignment]
+    return pool, closed
+
+
+def test_cancelled_acquire_releases_the_semaphore_permit() -> None:
+    """Cancelling mid-acquire must not consume a pool slot forever."""
+
+    async def _go() -> tuple[int, int, int]:
+        pool, closed = _pool_with_hanging_new_page()
+        for _ in range(2):
+            task = asyncio.create_task(pool.acquire(_IDENTITY, None))
+            await asyncio.sleep(0.05)
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        return pool._semaphore._value, len(pool._active_contexts), len(closed)
+
+    permits, active, closed_n = asyncio.run(_go())
+    assert permits == 2, (
+        f"{permits}/2 permits left after two cancelled acquires — the pool "
+        "shrinks by one per cancellation and eventually wedges"
+    )
+    assert active == 0, (
+        f"{active} half-built contexts still tracked as active; release() can "
+        "never reach them because they have no page"
+    )
+    assert closed_n == 2, "half-built contexts must also be closed in the browser"
+
+
+def test_cancelled_acquire_still_raises_cancelled_error() -> None:
+    """Releasing the permit must not swallow the cancellation."""
+
+    async def _go() -> bool:
+        pool, _ = _pool_with_hanging_new_page()
+        task = asyncio.create_task(pool.acquire(_IDENTITY, None))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            return True
+        return False
+
+    assert asyncio.run(_go()), "acquire() swallowed the cancellation"
+
+
+def test_failed_acquire_releases_the_permit_too() -> None:
+    """A plain exception in new_context() must not strand the permit either."""
+
+    async def _go() -> int:
+        pool = BrowserContextPool(max_contexts=1)
+
+        class _Browser:
+            async def new_context(self, **_kw: object) -> object:
+                raise RuntimeError("chromium died")
+
+        async def _ensure() -> _Browser:
+            return _Browser()
+
+        pool._ensure_browser = _ensure  # type: ignore[method-assign,assignment]
+        with contextlib.suppress(RuntimeError):
+            await pool.acquire(_IDENTITY, None)
+        return pool._semaphore._value
+
+    assert asyncio.run(_go()) == 1, "a failed acquire leaked the permit"

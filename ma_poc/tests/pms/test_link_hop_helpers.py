@@ -1042,3 +1042,748 @@ async def test_link_hop_generous_budget_no_premature_cutoff(monkeypatch: Any) ->
     assert budget_hits == [], (
         f"generous budget must NOT trip the hop-budget guard; got {budget_hits}"
     )
+
+
+# ── per-hop fetch cap (LINK_HOP_PER_FETCH_S, 2026-07-27) ────────────────────
+#
+# The wall-clock budget above stops new hops from STARTING. It did NOT stop
+# hop #1 from consuming the whole budget: the in-flight allowance was
+# ``max(_MIN_HOP_FETCH_S, deadline - now)`` — i.e. ALL remaining budget — so a
+# single tarpitting fetch starved every later candidate. Measured 2026-07-27
+# (run …-sample100-7fc8b4c, 100 properties): 8 properties hit
+# HOP_FETCH_BUDGET_EXCEEDED, 6 of them on hop_index=1; 5 of the 7 affected
+# properties ended FAILED_NO_DATA with every remaining candidate unfetched.
+# 1 of 30 successful hop fetches exceeded 90s (max 94.5s) and 0 of the 20
+# unit-recovering hops did, which is where the 90s default comes from. See the
+# benefit/limits note on LINK_HOP_PER_FETCH_S in config/feature_flags.py — the
+# rescue rate is 0 measured, 2 plausible.
+#
+# These tests drive the REAL ``_try_link_hop`` and assert on EMITTED EVENTS.
+# They deliberately do not re-implement the allowance expression: the two
+# pre-existing guards in test_timeout_salvage.py did exactly that and stayed
+# green through the whole starvation regime.
+
+_HOP_TEST_HTML = (
+    "<html><body>"
+    '<a href="/floorplans">Floor Plans</a>'
+    '<a href="/availability">Availability</a>'
+    '<a href="/apartments">Apartments</a>'
+    '<a href="/pricing">Pricing</a>'
+    '<a href="/units">Units</a>'
+    '<a href="/rates">Rates</a>'
+    '<a href="/rentals">Rentals</a>'
+    "</body></html>"
+)
+
+
+def _hop_cap_env(
+    monkeypatch: Any,
+    *,
+    budget_s: float,
+    per_fetch_s: float,
+    floor_s: float = 0.05,
+) -> None:
+    """Scale the hop clock into milliseconds so the suite stays fast.
+
+    All three are read as MODULE ATTRIBUTES at call time (the ``from ... import``
+    inside ``_try_link_hop`` re-resolves per hop), so setattr controls them
+    without a reload. ``ENABLE_CRAWL_GET_GATE`` defaults TRUE and would fire a
+    live ``probe_get`` per candidate — ``conftest`` turns that into an
+    ``UnstubbedNetworkCall``, so it must be off.
+    """
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_BUDGET_S", budget_s)
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_PER_FETCH_S", per_fetch_s)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", False)
+    monkeypatch.setattr("ma_poc.pms.scraper._MIN_HOP_FETCH_S", floor_s)
+
+
+def _detected_rentcafe() -> Any:
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+
+    return DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+    )
+
+
+def _tarpit_fetch(
+    calls: list[tuple[str, float]],
+    *,
+    fast_after: int | None = None,
+) -> Any:
+    """Fetch stub that hangs forever, recording (url, monotonic-at-entry).
+
+    When *fast_after* is set, calls with index >= it return an OK body
+    immediately — the "the hop that actually holds the roster" case.
+    """
+
+    async def _fetch(task: Any) -> Any:
+        import asyncio as _aio
+        import time as _t
+
+        n = len(calls)
+        calls.append((getattr(task, "url", ""), _t.monotonic()))
+        if fast_after is not None and n >= fast_after:
+
+            class _O:
+                value = "OK"
+
+            class _R:
+                outcome = _O()
+                status = 200
+                body = b"<html></html>"
+                final_url = task.url
+                elapsed_ms = 1
+                content_type = "text/html"
+                captcha_detected = False
+                error_signature = None
+                identity_ua_hash = "test"
+                render_mode = type("M", (), {"value": "RENDER"})()
+                headers: dict = {}
+
+                def to_dict(self) -> dict:
+                    return {"outcome": "OK"}
+
+            return _R()
+        await _aio.sleep(3600)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    return _fetch
+
+
+async def _run_hop_with_spy(
+    fetch_stub: Any,
+    events: list[dict[str, Any]],
+    *,
+    property_id: str,
+    max_hops: int = 7,
+    entry_html: str = _HOP_TEST_HTML,
+) -> float:
+    """Run the real ``_try_link_hop``, capturing every emitted payload.
+
+    Returns the elapsed wall clock so the total-bound test can assert on it.
+    """
+    import time as _t
+    from unittest.mock import patch
+
+    from ma_poc.observability import events as obs_events
+    from ma_poc.pms.scraper import _try_link_hop
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, pid: str, **payload: Any) -> Any:
+        events.append(dict(payload))
+        return original_emit(kind, pid, **payload)
+
+    t0 = _t.monotonic()
+    with (
+        patch("ma_poc.fetch.fetch", fetch_stub, create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+    ):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html=entry_html,
+            detected=_detected_rentcafe(),
+            profile=_profile_with_winning_url("https://example.com/floorplans"),
+            expected_total_units=None,
+            property_id=property_id,
+            csv_row=None,
+            max_hops=max_hops,
+        )
+    return _t.monotonic() - t0
+
+
+@pytest.mark.asyncio
+async def test_hop_fetch_cap_does_not_consume_whole_budget(monkeypatch: Any) -> None:
+    """T1 — a single hop must not be allowed to spend the entire crawl budget.
+
+    Regression target: ``_hop_remaining = max(_MIN_HOP_FETCH_S,
+    _hop_deadline - time.monotonic())``. With a 5s budget and a 0.1s per-hop
+    cap, a tarpitting hop #1 must be cancelled ~0.1s in, not ~5s in. Asserted
+    on the emitted event (fetch entry → timeout emit), NOT on a re-derived
+    expression, so reverting the cap fails this test: the elapsed becomes the
+    full budget.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+    import time as _t
+
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-CAP-T1")
+
+    assert calls, "hop #1 never fetched"
+    caps = [e for e in events if e.get("outcome") == "HOP_FETCH_CAP_EXCEEDED"]
+    assert caps, (
+        "no HOP_FETCH_CAP_EXCEEDED emitted — the per-hop cap did not bind. "
+        f"outcomes seen: {[e.get('outcome') for e in events]}"
+    )
+    first_cap = caps[0]
+    # The allowance the code actually used, straight off the event.
+    assert first_cap["allowance_s"] <= 0.2, (
+        f"hop #1 allowance {first_cap['allowance_s']}s — the cap regressed to "
+        "'all remaining budget'"
+    )
+    # And budget genuinely survived: that is the whole point of the cap.
+    assert first_cap["budget_remaining_s"] > 5.0 / 2, (
+        f"only {first_cap['budget_remaining_s']}s of the 5s budget left after "
+        "hop #1 — the hop ate the crawl"
+    )
+    # Wall-clock cross-check: hop #1 was cancelled early in the budget.
+    hop1_start = calls[0][1]
+    assert _t.monotonic() - hop1_start < 5.0 / 2, "hop #1 ran for half the budget"
+
+
+@pytest.mark.asyncio
+async def test_hop_cap_releases_loop_to_next_candidate(monkeypatch: Any) -> None:
+    """T2 — the cap must not be inert: a capped-out hop CONTINUES the loop.
+
+    This is the load-bearing half of the change. Capping the allowance while
+    the timeout handler still ``break``s frees budget that nothing can spend —
+    measurably so: on all 8 HOP_FETCH_BUDGET_EXCEEDED events in the
+    2026-07-27 run, ZERO further hops were fetched despite 3-7 unvisited
+    candidates in the matching LINK_HOP_STARTED payload.
+
+    Structurally impossible before the ``break`` → ``continue`` edit.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=1), events, property_id="HOP-CAP-T2"
+    )
+
+    outcomes = [(e.get("hop_index"), e.get("outcome")) for e in events if e.get("outcome")]
+    cap_positions = [i for i, (_, o) in enumerate(outcomes) if o == "HOP_FETCH_CAP_EXCEEDED"]
+    assert len(cap_positions) == 1, f"expected exactly one capped hop; got {outcomes}"
+    later_ok = [
+        (h, o)
+        for (h, o) in outcomes[cap_positions[0] + 1 :]
+        if o == "OK"
+    ]
+    assert later_ok, (
+        "a capped-out hop must release the loop to the next candidate; the "
+        f"loop stopped instead. outcomes: {outcomes}"
+    )
+    assert later_ok[0][0] > outcomes[cap_positions[0]][0], (
+        "the recovered hop must be a LATER hop_index than the capped one"
+    )
+    assert len(calls) >= 2, f"only {len(calls)} fetch(es) fired — `continue` did not land"
+
+
+@pytest.mark.asyncio
+async def test_hop_cap_preserves_total_wall_clock_bound(monkeypatch: Any) -> None:
+    """T3 — `continue` must not re-open the hang the deadline was added to close.
+
+    Every candidate tarpits. The bound is unchanged in form:
+    ``LINK_HOP_BUDGET_S + _MIN_HOP_FETCH_S + one extraction`` — the loop-top
+    deadline check still refuses to ADMIT a hop past the deadline, and the
+    capped allowance is pointwise <= the old one. Both halves are asserted:
+    the bound alone would pass with the old ``break``.
+    """
+    budget_s, floor_s = 2.0, 0.05
+    _hop_cap_env(monkeypatch, budget_s=budget_s, per_fetch_s=0.3, floor_s=floor_s)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+    max_hops = 7
+
+    elapsed = await _run_hop_with_spy(
+        _tarpit_fetch(calls), events, property_id="HOP-CAP-T3", max_hops=max_hops
+    )
+
+    # Generous slack: this asserts "bounded", not "precisely 2.05s".
+    assert elapsed <= budget_s + floor_s + 2.0, (
+        f"hop loop ran {elapsed:.2f}s against a {budget_s}s budget — `continue` "
+        "made the wall clock unbounded"
+    )
+    assert len(calls) >= 2, (
+        f"only {len(calls)} fetch(es) — `continue` did not run, so this test is "
+        "not actually exercising the bound it claims to"
+    )
+    # max_hops + max_dynamic_appends (== max_hops) is the structural ceiling.
+    assert len(calls) <= max_hops * 2, (
+        f"{len(calls)} fetches exceeds the max_hops+dynamic-appends ceiling"
+    )
+
+
+@pytest.mark.asyncio
+async def test_deadline_bound_timeout_still_breaks(monkeypatch: Any) -> None:
+    """T4a — when the DEADLINE (not the cap) bound the fetch, fail fast.
+
+    Budget 0.4s, cap 10s → the deadline is the binding constraint, so the
+    allowance is not capped, ``_cap_bound`` is False, and the 2026-07-25
+    fail-fast ``break`` must be preserved verbatim: exactly one fetch, the
+    original HOP_FETCH_BUDGET_EXCEEDED outcome, no continuation.
+    """
+    _hop_cap_env(monkeypatch, budget_s=0.4, per_fetch_s=10.0, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-CAP-T4A")
+
+    outcomes = [e.get("outcome") for e in events if e.get("outcome")]
+    assert "HOP_FETCH_BUDGET_EXCEEDED" in outcomes, (
+        f"deadline-bound timeout must keep the original outcome; got {outcomes}"
+    )
+    assert "HOP_FETCH_CAP_EXCEEDED" not in outcomes, (
+        "the cap must not claim a timeout the deadline caused"
+    )
+    assert len(calls) == 1, (
+        f"deadline-bound timeout must fail fast; {len(calls)} fetches fired"
+    )
+
+
+@pytest.mark.asyncio
+async def test_inert_cap_leaves_deadline_guard_intact(monkeypatch: Any) -> None:
+    """T4b — a cap larger than the budget changes nothing.
+
+    With budget 0 the loop-top guard fires before any fetch, exactly as it did
+    before the cap existed: HOP_BUDGET_EXCEEDED, zero fetches, and no
+    HOP_FETCH_CAP_EXCEEDED anywhere.
+    """
+    _hop_cap_env(monkeypatch, budget_s=0, per_fetch_s=100_000, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-CAP-T4B")
+
+    outcomes = [e.get("outcome") for e in events if e.get("outcome")]
+    assert calls == [], f"budget=0 must fire ZERO hops; got {calls}"
+    assert "HOP_BUDGET_EXCEEDED" in outcomes, (
+        f"the loop-top deadline guard must still fire; got {outcomes}"
+    )
+    assert "HOP_FETCH_CAP_EXCEEDED" not in outcomes
+
+
+@pytest.mark.asyncio
+async def test_cap_disabled_restores_pre_change_behaviour(monkeypatch: Any) -> None:
+    """T4c — LINK_HOP_PER_FETCH_S=0 is a total kill switch, not a partial one.
+
+    The env var is the revert path (no redeploy). With the cap off, a
+    tarpitting hop #1 consumes the whole budget and the loop breaks — the
+    pre-2026-07-27 behaviour this change replaces. Also proves T1/T2 are
+    detecting the cap rather than some unrelated fixture effect.
+    """
+    _hop_cap_env(monkeypatch, budget_s=1.0, per_fetch_s=0, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=1), events, property_id="HOP-CAP-T4C"
+    )
+
+    outcomes = [e.get("outcome") for e in events if e.get("outcome")]
+    assert "HOP_FETCH_CAP_EXCEEDED" not in outcomes, "cap=0 must disable the cap"
+    assert "HOP_FETCH_BUDGET_EXCEEDED" in outcomes
+    assert len(calls) == 1, (
+        f"cap=0 must reproduce the old starvation exactly (one hop, then break); "
+        f"got {len(calls)} fetches"
+    )
+
+
+def test_hop_fetch_allowance_table() -> None:
+    """T5 — the allowance function itself, including the flag edge cases.
+
+    Called against the real ``_hop_fetch_allowance``; there is no mirrored
+    expression here. The ``cap=0 → 140.0`` row is the trap worth naming: if
+    "disabled" fell through the clamp it would resolve to the 20s floor, making
+    the natural "off" value the most aggressive setting in the whole range.
+    """
+    from ma_poc.pms.scraper import _MIN_HOP_FETCH_S, _hop_fetch_allowance
+
+    assert _MIN_HOP_FETCH_S == 20.0, "table below is written against a 20s floor"
+
+    # (remaining, cap) -> expected
+    assert _hop_fetch_allowance(-100.0, 90.0) == 20.0  # deadline blown → floor
+    assert _hop_fetch_allowance(140.0, 90.0) == 90.0  # cap binds
+    assert _hop_fetch_allowance(40.0, 90.0) == 40.0  # deadline binds
+    assert _hop_fetch_allowance(140.0, 0.0) == 140.0  # DISABLED != 20s
+    assert _hop_fetch_allowance(140.0, -5.0) == 140.0  # negative == disabled
+    assert _hop_fetch_allowance(140.0, 200.0) == 140.0  # cap above budget → inert
+    assert _hop_fetch_allowance(10.0, 90.0) == 20.0  # floor still wins
+
+
+def test_hop_fetch_allowance_warns_instead_of_swallowing_a_sub_floor_cap() -> None:
+    """T5b — a cap below the floor is clamped UP and SAID SO.
+
+    Without the warning, ``LINK_HOP_PER_FETCH_S=10`` and ``=0`` both resolve to
+    20.0 while meaning opposite things, and a mis-set flag reads exactly like a
+    working one.
+    """
+    from ma_poc.pms.scraper import _hop_fetch_allowance
+
+    with pytest.warns(UserWarning, match="below the _MIN_HOP_FETCH_S floor"):
+        assert _hop_fetch_allowance(140.0, 10.0) == 20.0
+
+
+def test_shipped_cap_default_is_not_a_no_op() -> None:
+    """T5c — the shipped defaults must actually be able to bind.
+
+    A cap >= the whole budget is inert by construction; a cap below the floor
+    is clamped. Either would ship a change that measures as a no-op.
+    """
+    from ma_poc.config.feature_flags import LINK_HOP_BUDGET_S, LINK_HOP_PER_FETCH_S
+    from ma_poc.pms.scraper import _MIN_HOP_FETCH_S
+
+    assert LINK_HOP_PER_FETCH_S > 0, "shipped default must have the cap ENABLED"
+    assert LINK_HOP_PER_FETCH_S < LINK_HOP_BUDGET_S, (
+        f"LINK_HOP_PER_FETCH_S={LINK_HOP_PER_FETCH_S} >= "
+        f"LINK_HOP_BUDGET_S={LINK_HOP_BUDGET_S} — the cap can never bind"
+    )
+    assert LINK_HOP_PER_FETCH_S >= _MIN_HOP_FETCH_S, (
+        "shipped default would be clamped up, i.e. it is not the value in force"
+    )
+    # A cap must leave room for at least one more real attempt after it binds.
+    assert LINK_HOP_BUDGET_S - LINK_HOP_PER_FETCH_S >= _MIN_HOP_FETCH_S, (
+        "capping hop #1 must leave at least one floor's worth of budget for the "
+        "hop that holds the roster — otherwise `continue` has nothing to spend"
+    )
+
+
+@pytest.mark.asyncio
+async def test_hop_telemetry_makes_the_cap_adjudicable(monkeypatch: Any) -> None:
+    """T7 — the canary must be able to tell a working cap from an inert one.
+
+    Before 2026-07-27 the only signal was ``outcome=HOP_FETCH_BUDGET_EXCEEDED``
+    with no allowance, no remaining budget, no queue wait and no session index —
+    every one of the eight starved allowances in the sample100 run had to be
+    reconstructed from ``fetch.started`` deltas. These four fields are what make
+    "the cap freed budget and a later hop spent it" directly observable.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=1), events, property_id="HOP-CAP-T7"
+    )
+
+    started = [e for e in events if "candidates" in e]
+    assert started, "LINK_HOP_STARTED not emitted"
+    assert started[0]["deadline_source"] == "fresh"
+    assert started[0]["session_index"] == 1
+
+    capped = [e for e in events if e.get("outcome") == "HOP_FETCH_CAP_EXCEEDED"]
+    assert capped, "cap never bound — telemetry assertions below are vacuous"
+    for key in ("allowance_s", "budget_remaining_s", "queue_wait_ms", "session_index"):
+        assert key in capped[0], f"{key} missing from the capped-hop event"
+    assert capped[0]["queue_wait_ms"] >= 0
+
+    ok = [e for e in events if e.get("outcome") == "OK"]
+    assert ok, "the continuation hop never produced an OK event"
+    # Post-cap continuation count — THE metric. Structurally zero before the
+    # break -> continue edit; a canary reading zero here means it did not land.
+    cap_at = events.index(capped[0])
+    assert any(e.get("outcome") == "OK" for e in events[cap_at + 1 :])
+    assert "queue_wait_ms" in ok[0] and "allowance_s" in ok[0]
+
+
+@pytest.mark.asyncio
+async def test_session_index_exposes_the_reentry_hole(monkeypatch: Any) -> None:
+    """T8 — a second scrape_jugnu call is visible as session_index=2.
+
+    ``shared_budget`` is re-created per scrape_jugnu call, so the deadline does
+    NOT survive (a documented, deliberately-unfixed hole — see
+    test_timeout_salvage.py). The counter lives in the caller-owned
+    ``_external_partial_ref``, which DOES survive, so the extra admission window
+    shows up in the event stream instead of only in artifact archaeology.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    external: dict[str, Any] = {}
+    seen: list[int] = []
+
+    for pid in ("SESSION-1", "SESSION-2"):
+        events: list[dict[str, Any]] = []
+        calls: list[tuple[str, float]] = []
+        from unittest.mock import patch
+
+        from ma_poc.observability import events as obs_events
+        from ma_poc.pms.scraper import _try_link_hop
+
+        original_emit = obs_events.emit
+
+        def _spy(kind: Any, p: str, **payload: Any) -> Any:
+            events.append(dict(payload))
+            return original_emit(kind, p, **payload)
+
+        with (
+            patch("ma_poc.fetch.fetch", _tarpit_fetch(calls, fast_after=0), create=True),
+            patch.object(obs_events, "emit", _spy),
+        ):
+            await _try_link_hop(
+                entry_url="https://example.com/",
+                entry_page_html=_HOP_TEST_HTML,
+                detected=_detected_rentcafe(),
+                profile=_profile_with_winning_url("https://example.com/floorplans"),
+                expected_total_units=None,
+                property_id=pid,
+                csv_row=None,
+                max_hops=3,
+                # A FRESH budget dict per call — exactly what scrape_jugnu builds.
+                shared_budget={"_external_partial_ref": external},
+            )
+        started = [e for e in events if "candidates" in e]
+        assert started, f"{pid}: LINK_HOP_STARTED not emitted"
+        seen.append(started[0]["session_index"])
+
+    assert seen == [1, 2], (
+        f"session_index must count admission windows across scrape_jugnu calls; "
+        f"got {seen}"
+    )
+
+
+# ── the crawl gate is charged against the hop deadline (2026-07-27 review) ──
+#
+# ``_crawl_get_gate_should_skip`` runs BETWEEN the loop-top deadline check and
+# the fetch admission, so every second it spends is charged against
+# ``_hop_deadline`` — but until this change nothing bounded it. ``probe_get``'s
+# own ``timeout=10`` covers the HTTP call, not the ``asyncio.to_thread``
+# queueing in front of it on a shared executor.
+#
+# Measured 2026-07-27 (run …-sample100-7fc8b4c): property 27577 spent 256.6s
+# between LINK_HOP_STARTED and its first ``fetch.started`` with no intervening
+# event, was admitted 106.6s PAST its 150s deadline on the _MIN_HOP_FETCH_S
+# floor, and LINK_HOP_PER_FETCH_S was therefore INERT on it. A per-fetch cap
+# cannot hold a budget spent before the fetch begins.
+#
+# These tests patch the gate helper itself (never ``probe_get``) so no network
+# stub can fail open, and they run with ENABLE_CRAWL_GET_GATE **on** — every
+# other hop test in this file disables it, which is exactly why the hole
+# survived.
+
+
+def _slow_gate(seconds: float, *, skip: bool = False) -> Any:
+    """Sync gate stub that burns *seconds*, like a queued ``probe_get``."""
+
+    def _gate(url: str) -> bool:
+        import time as _t
+
+        _t.sleep(seconds)
+        return skip
+
+    return _gate
+
+
+@pytest.mark.asyncio
+async def test_crawl_gate_cannot_outlive_the_hop_deadline(monkeypatch: Any) -> None:
+    """G1 — a tarpitting gate must not blow the crawl budget before the fetch.
+
+    Budget 2.0s, gate 5.0s per call. Unbounded, the loop admitted its first
+    fetch at t+5.0s — 3s past a deadline it was supposed to respect — and the
+    allowance had already collapsed to the floor. Asserted on the fetch's
+    ADMISSION TIME, not on a re-derived expression.
+    """
+    _hop_cap_env(monkeypatch, budget_s=2.0, per_fetch_s=1.0, floor_s=0.5)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", True)
+    monkeypatch.setattr("ma_poc.pms.scraper._CRAWL_GET_GATE_BUDGET_S", 0.25)
+    monkeypatch.setattr("ma_poc.pms.scraper._crawl_get_gate_should_skip", _slow_gate(5.0))
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+    import time as _t
+
+    t0 = _t.monotonic()
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-GATE-G1")
+
+    assert calls, "no fetch was ever admitted"
+    admitted_at = calls[0][1] - t0
+    assert admitted_at < 2.0, (
+        f"first fetch admitted at t+{admitted_at:.2f}s against a 2.0s deadline — "
+        "the cheap-GET gate is spending budget nothing bounds"
+    )
+
+
+@pytest.mark.asyncio
+async def test_crawl_gate_timeout_fails_open(monkeypatch: Any) -> None:
+    """G2 — bounding the gate must not turn a slow probe into a skipped page.
+
+    The helper documents fail-OPEN on every error; a timeout is one more error.
+    A gate that timed out CLOSED would silently drop candidates whenever the
+    executor is busy — a far worse failure than paying for the render.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", True)
+    monkeypatch.setattr("ma_poc.pms.scraper._CRAWL_GET_GATE_BUDGET_S", 0.05)
+    # skip=True: were the timeout not fail-open, this candidate WOULD be gated.
+    monkeypatch.setattr(
+        "ma_poc.pms.scraper._crawl_get_gate_should_skip", _slow_gate(1.0, skip=True)
+    )
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=0), events, property_id="HOP-GATE-G2"
+    )
+
+    outcomes = [e.get("outcome") for e in events if e.get("outcome")]
+    assert "DEAD_URL_GATED" not in outcomes, (
+        f"a timed-out gate skipped the candidate instead of failing open: {outcomes}"
+    )
+    assert calls, "fail-open must still fetch the candidate"
+
+
+@pytest.mark.asyncio
+async def test_gate_elapsed_is_reported_on_a_gated_candidate(monkeypatch: Any) -> None:
+    """G3 — DEAD_URL_GATED carries the gate's own cost.
+
+    Without it a saturated executor is visible only as a GAP between events,
+    which is how 27577's 256.6s went unnoticed for a full run.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=1.0, floor_s=0.05)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", True)
+    monkeypatch.setattr(
+        "ma_poc.pms.scraper._crawl_get_gate_should_skip", _slow_gate(0.05, skip=True)
+    )
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-GATE-G3")
+
+    gated = [e for e in events if e.get("outcome") == "DEAD_URL_GATED"]
+    assert gated, "the gate never fired"
+    assert "gate_elapsed_ms" in gated[0], "gate cost is still invisible"
+    assert gated[0]["gate_elapsed_ms"] >= 40, gated[0]["gate_elapsed_ms"]
+
+
+# ── headroom on the post-cap `continue` (2026-07-27 review) ─────────────────
+
+
+@pytest.mark.asyncio
+async def test_continue_requires_headroom_for_gate_plus_floor(monkeypatch: Any) -> None:
+    """G4 — `continue` with a sliver of budget re-creates the RCA's own bug.
+
+    Admitting the next hop costs a bounded gate before the fetch even starts,
+    so continuing with less than gate+floor left buys a fetch admitted PAST the
+    deadline on the _MIN_HOP_FETCH_S floor — the exact degenerate admission the
+    2026-07-25 RCA was written about. Measured 2026-07-27, three of the five
+    hops the 90s cap binds (97935 2.6s, 278371 26.1s, 30747 30.8s of freed
+    budget) fall below floor+gate=32s and would have bought exactly that.
+    """
+    # 1.0s budget, 0.6s cap, 0.3 floor + 0.3 gate = 0.6s headroom. Hop #1 is
+    # cap-bound and leaves ~0.4s — real budget, but less than an admission costs.
+    _hop_cap_env(monkeypatch, budget_s=1.0, per_fetch_s=0.6, floor_s=0.3)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", True)
+    monkeypatch.setattr("ma_poc.pms.scraper._CRAWL_GET_GATE_BUDGET_S", 0.3)
+    monkeypatch.setattr("ma_poc.pms.scraper._crawl_get_gate_should_skip", _slow_gate(0.0))
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=1), events, property_id="HOP-CAP-G4"
+    )
+
+    capped = [e for e in events if e.get("outcome") == "HOP_FETCH_CAP_EXCEEDED"]
+    assert capped, "the cap did not bind — this test is vacuous"
+    assert capped[0]["budget_remaining_s"] > 0, (
+        "premise: budget genuinely survived the cap"
+    )
+    assert len(calls) == 1, (
+        f"{len(calls)} fetches — the loop continued on budget too thin to fund "
+        "an admission, so the next hop is admitted past the deadline on the floor"
+    )
+
+
+@pytest.mark.asyncio
+async def test_capped_timeout_reports_actual_fetch_elapsed(monkeypatch: Any) -> None:
+    """G5 — the event must show what the fetch ACTUALLY cost, not its allowance.
+
+    ``asyncio.wait_for`` is not a wall-clock bound here: a cancelled RENDER
+    unwinds through Playwright IPC, and the measured overshoot past the
+    allowance in the 2026-07-27 run was 0.9-144.4s (median 13.1s), charged
+    against the very budget the cap frees. ``allowance_s`` alone cannot show
+    that the bound did not hold.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(_tarpit_fetch(calls), events, property_id="HOP-CAP-G5")
+
+    capped = [e for e in events if e.get("outcome") == "HOP_FETCH_CAP_EXCEEDED"]
+    assert capped, "the cap did not bind"
+    assert "fetch_elapsed_s" in capped[0], (
+        "no fetch_elapsed_s — allowance_s alone cannot distinguish a cap that "
+        "held from one that overshot by 144s"
+    )
+    assert capped[0]["fetch_elapsed_s"] >= capped[0]["allowance_s"] - 0.05
+
+
+# ── freed budget must not be spent re-fetching what just tarpitted ──────────
+
+
+def test_hop_url_key_collapses_scheme_www_and_trailing_slash() -> None:
+    """G6 — the normalisation table, against the real ``_hop_url_key``.
+
+    Drawn from the two properties the cap is meant to rescue: 48389's queue was
+    ``https://villagegatenc.com/floor-plans/`` then
+    ``http://www.villagegatenc.com/floor-plans/``; 256603's was
+    ``…/floorplans/`` then ``…/floorplans``. ``visited`` is an exact-string set,
+    so neither pair deduped.
+    """
+    from ma_poc.pms.scraper import _hop_url_key as k
+
+    assert k("https://villagegatenc.com/floor-plans/") == k(
+        "http://www.villagegatenc.com/floor-plans/"
+    )
+    assert k("https://wyldewoodgosling.com/floorplans/") == k(
+        "https://wyldewoodgosling.com/floorplans"
+    )
+    assert k("https://example.com:443/a") == k("http://example.com:80/a")
+    # Query is identity: per-unit application shells are genuinely different.
+    assert k("https://x.com/a?UnitId=3") != k("https://x.com/a?UnitId=4")
+    # Different paths stay different; a hostless string degrades, never raises.
+    assert k("https://x.com/a") != k("https://x.com/b")
+    assert k("not a url") == "not a url"
+
+
+@pytest.mark.asyncio
+async def test_capped_hop_does_not_refetch_a_variant_of_itself(monkeypatch: Any) -> None:
+    """G7 — budget freed by the cap must buy a DIFFERENT page.
+
+    Both properties the cap could plausibly rescue queue a near-duplicate of
+    the URL that just tarpitted directly behind it, on the same origin that
+    just demonstrated >147s latency. Spending the freed budget there is the
+    rescue quietly failing.
+    """
+    _hop_cap_env(monkeypatch, budget_s=5.0, per_fetch_s=0.1, floor_s=0.05)
+
+    calls: list[tuple[str, float]] = []
+    events: list[dict[str, Any]] = []
+
+    await _run_hop_with_spy(
+        _tarpit_fetch(calls, fast_after=1),
+        events,
+        property_id="HOP-CAP-G7",
+        entry_html=(
+            "<html><body>"
+            '<a href="https://example.com/floorplans/">Floor Plans</a>'
+            '<a href="http://www.example.com/floorplans">Floor Plans</a>'
+            '<a href="https://example.com/availability">Availability</a>'
+            "</body></html>"
+        ),
+    )
+
+    fetched = [u for u, _ in calls]
+    assert len(fetched) >= 2, f"the loop never continued: {fetched}"
+    from ma_poc.pms.scraper import _hop_url_key
+
+    keys = [_hop_url_key(u) for u in fetched]
+    assert len(keys) == len(set(keys)), (
+        f"the freed budget was spent re-fetching a variant of the tarpit: {fetched}"
+    )
+    skipped = [e for e in events if e.get("outcome") == "HOP_SKIPPED_TARPIT_VARIANT"]
+    assert skipped, "the variant skip is not observable in the event stream"

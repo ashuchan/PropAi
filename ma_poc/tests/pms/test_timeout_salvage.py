@@ -12,12 +12,24 @@ in the 5k canary:
    one property chained 8 hops over ~2,900s against a nominal 150s budget.
 3. The salvage checkpoint existed ONLY inside the link-hop accumulation loop,
    so only 6.9% of timed-out properties salvaged any data.
+
+2026-07-27 follow-up: (2) was only half-fixed. Bounding the in-flight hop by
+ALL REMAINING budget let hop #1 consume the entire crawl and starve the hop
+holding the roster — 6 of 8 HOP_FETCH_BUDGET_EXCEEDED events in the
+sample100-7fc8b4c run were on hop_index=1, and 5 of the 7 properties they hit
+ended FAILED_NO_DATA with every remaining candidate unfetched.
+The per-hop cap (``LINK_HOP_PER_FETCH_S``) is pinned in
+``test_link_hop_helpers.py``; the two guards below were MIRRORS that
+re-implemented the logic in their own bodies and stayed green throughout, so
+they now drive the real ``_try_link_hop`` / ``_hop_fetch_allowance`` instead.
 """
 
 from __future__ import annotations
 
 import contextlib
 from typing import Any
+
+import pytest
 
 from ma_poc.pms.scraper import checkpoint_partial
 
@@ -86,40 +98,158 @@ def test_checkpoint_route_only_when_no_units_yet() -> None:
 
 # ── 2. hop budget is per-property, not per-call ─────────────────────────────
 
-def test_hop_deadline_is_inherited_across_reentry() -> None:
+def _hop_probe_env(monkeypatch: Any, *, budget_s: float) -> None:
+    """Scale the hop clock down; disable the cheap-GET gate's live probe_get."""
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_BUDGET_S", budget_s)
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_PER_FETCH_S", 0.2)
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", False)
+    monkeypatch.setattr("ma_poc.pms.scraper._MIN_HOP_FETCH_S", 0.05)
+
+
+async def _hop_once(
+    shared_budget: dict[str, Any], calls: list[str], property_id: str
+) -> None:
+    """Drive the REAL ``_try_link_hop`` with a tarpitting fetch stub."""
+    import asyncio
+    from unittest.mock import patch
+
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _try_link_hop
+
+    async def _tarpit(task: Any) -> Any:
+        calls.append(getattr(task, "url", ""))
+        await asyncio.sleep(3600)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    class _Nav:
+        winning_page_url = "https://example.com/floorplans"
+        availability_links: list[str] = []
+        explored_links: list[str] = []
+
+    class _Profile:
+        navigation = _Nav()
+        api_hints = None
+
+    with patch("ma_poc.fetch.fetch", _tarpit, create=True):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html=(
+                '<html><body><a href="/floorplans">Floor Plans</a>'
+                '<a href="/availability">Availability</a>'
+                '<a href="/apartments">Apartments</a></body></html>'
+            ),
+            detected=DetectedPMS(
+                pms="rentcafe",
+                confidence=0.9,
+                evidence=["fp:rentcafe"],
+                recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+            ),
+            profile=_Profile(),
+            expected_total_units=None,
+            property_id=property_id,
+            csv_row=None,
+            max_hops=3,
+            shared_budget=shared_budget,
+        )
+
+
+@pytest.mark.asyncio
+async def test_hop_deadline_is_inherited_across_reentry(monkeypatch: Any) -> None:
     """Re-entering the hop loop must NOT reset the wall-clock budget.
 
-    Mirrors the deadline logic in ``_try_link_hop``: first entry seeds the
-    deadline into shared_budget; every later entry inherits it. Without this,
-    each re-entry granted a fresh LINK_HOP_BUDGET_S (measured: 8 hops /
-    ~2,900s against a 150s budget).
+    Replaces a MIRROR test (pre-2026-07-27) that re-implemented the deadline
+    resolution inside its own body and never called ``_try_link_hop`` — it
+    passed green throughout the entire starvation regime and would have passed
+    green even if production had stopped inheriting the deadline entirely.
+
+    This drives the real function twice with the SAME ``shared_budget`` dict —
+    which is how ``scrape_jugnu`` threads it through the post-hop re-crawl and
+    render-on-empty escalation. Once the first call exhausts the budget, the
+    second must fire ZERO fetches. Without inheritance each re-entry granted a
+    fresh LINK_HOP_BUDGET_S (measured: 8 hops / ~2,900s against a 150s budget).
     """
-    import time
+    _hop_probe_env(monkeypatch, budget_s=0.5)
 
-    LINK_HOP_BUDGET_S = 150.0
     shared: dict[str, Any] = {}
+    first_calls: list[str] = []
+    second_calls: list[str] = []
 
-    def _resolve_deadline() -> float:
-        if isinstance(shared.get("_hop_deadline"), (int, float)):
-            return float(shared["_hop_deadline"])
-        d = time.monotonic() + LINK_HOP_BUDGET_S
-        shared["_hop_deadline"] = d
-        return d
+    await _hop_once(shared, first_calls, "REENTRY-1")
+    seeded = shared.get("_hop_deadline")
+    assert isinstance(seeded, float), "first entry must seed the deadline"
 
-    first = _resolve_deadline()
-    second = _resolve_deadline()  # simulated re-entry
-    third = _resolve_deadline()
-    assert first == second == third, "re-entry reset the hop budget"
+    await _hop_once(shared, second_calls, "REENTRY-2")
+
+    assert shared["_hop_deadline"] == seeded, "re-entry reset the hop budget"
+    assert second_calls == [], (
+        f"re-entry fired {second_calls} against an already-spent budget — the "
+        "deadline was not inherited"
+    )
+
+
+@pytest.mark.asyncio
+async def test_hop_deadline_does_not_survive_scrape_jugnu_reentry_KNOWN_HOLE(
+    monkeypatch: Any,
+) -> None:
+    """KNOWN HOLE, asserted so it stays visible: the 150s bound is per CALL.
+
+    ``_hop_deadline`` lives in ``shared_budget``, which is ``_jugnu_budget`` —
+    a dict literal RE-CREATED on every ``scrape_jugnu`` invocation. The runner
+    (``ma_poc/scripts/runners/jugnu.py``) calls ``scrape_jugnu`` up to three
+    times per property (initial, render-on-empty, HB-shell), so the effective
+    admission window is ~150s x N, N <= 3. Measured 2026-07-27: 3 of 18
+    link-hop properties ran two independent ~150s sessions.
+
+    This is DELIBERATELY NOT FIXED. It is a one-line fix (thread the deadline
+    through ``partial_state``, which is already reachable from ``_try_link_hop``
+    via ``shared_budget["_external_partial_ref"]``) and the artifacts say don't:
+    property 278371's SUCCESS with 10 units came ENTIRELY from its SECOND
+    session's hop 1. Closing the hole would have converted it to FAILED_NO_DATA.
+
+    The precise statement of the hole: the deadline is written to the budget
+    dict but NOT to the caller-owned ``_external_partial_ref``, which is the
+    only thing that survives across ``scrape_jugnu`` calls.
+    """
+    _hop_probe_env(monkeypatch, budget_s=0.5)
+
+    external: dict[str, Any] = {}
+    session_1: dict[str, Any] = {"_external_partial_ref": external}
+    calls_1: list[str] = []
+    await _hop_once(session_1, calls_1, "HOLE-S1")
+    assert calls_1, "session 1 should have fetched at least once"
+    assert isinstance(session_1.get("_hop_deadline"), float)
+    assert "_hop_deadline" not in external, (
+        "if this now passes through _external_partial_ref, the hole is closed — "
+        "re-read the docstring before celebrating: 278371's 10 units came from "
+        "session 2"
+    )
+
+    # A fresh budget dict is exactly what scrape_jugnu builds on re-entry.
+    session_2: dict[str, Any] = {"_external_partial_ref": external}
+    calls_2: list[str] = []
+    await _hop_once(session_2, calls_2, "HOLE-S2")
+
+    assert calls_2, (
+        "session 2 currently gets a FRESH budget — if this is now empty the "
+        "hole was closed; that is a behaviour change, not a bugfix"
+    )
+    assert session_2["_hop_deadline"] != session_1["_hop_deadline"]
 
 
 def test_min_hop_fetch_floor_keeps_a_real_attempt_possible() -> None:
-    """An almost-spent budget still allows a genuine fetch, not an instant cancel."""
-    from ma_poc.pms.scraper import _MIN_HOP_FETCH_S
+    """An almost-spent budget still allows a genuine fetch, not an instant cancel.
+
+    Asserted against the REAL ``_hop_fetch_allowance`` (2026-07-27). The prior
+    version re-implemented ``max(floor, remaining)`` in the test body, so it
+    could not have noticed the per-hop cap being added, removed, or misordered.
+    """
+    from ma_poc.pms.scraper import _MIN_HOP_FETCH_S, _hop_fetch_allowance
 
     assert _MIN_HOP_FETCH_S >= 5.0, "floor too small to complete any real fetch"
-    # the in-flight allowance is max(floor, remaining) — never zero/negative
-    for remaining in (-100.0, 0.0, 3.0, 90.0):
-        assert max(_MIN_HOP_FETCH_S, remaining) >= _MIN_HOP_FETCH_S
+    # The in-flight allowance is never zero/negative — with the cap on or off.
+    for remaining in (-100.0, 0.0, 3.0, 90.0, 140.0):
+        for cap in (0.0, 90.0, 100_000.0):
+            assert _hop_fetch_allowance(remaining, cap) >= _MIN_HOP_FETCH_S
 
 
 # ── 1. timed-out properties must LEARN their route (end-to-end) ─────────────

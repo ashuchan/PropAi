@@ -275,10 +275,51 @@ class BrowserContextPool:
 
         Returns:
             A Playwright Page ready for navigation.
+
+        Raises:
+            Whatever the launch/context/page calls raise, and
+            ``asyncio.CancelledError`` — but never while still holding the
+            semaphore permit (see ``_open_page``).
         """
         await self._semaphore.acquire()
-        browser = await self._ensure_browser()
+        try:
+            browser = await self._ensure_browser()
+            return await self._open_page(browser, identity, proxy)
+        except BaseException:
+            # The permit is taken BEFORE five more awaits — _ensure_browser()
+            # may launch Chromium, and new_context()/new_page() are the
+            # un-timeouted Playwright IPC calls this module's header warns can
+            # park forever. A cancellation landing on any of them (the link-hop
+            # per-fetch cap, the 600s per-property guard) used to leak the
+            # permit permanently: release() is the only releaser and it needs a
+            # `page` that does not exist yet, so MAX_CONCURRENT_BROWSERS shrank
+            # by one for the process lifetime — the documented shard-wedge mode.
+            # BaseException, not Exception, because CancelledError is the case
+            # that matters.
+            self._semaphore.release()
+            raise
 
+    async def _open_page(
+        self,
+        browser: Browser,
+        identity: Identity,
+        proxy: str | ProxyConfig | None,
+    ) -> Page:
+        """Build an isolated context and page on *browser*.
+
+        Args:
+            browser: Live browser to build the context on.
+            identity: Browser identity (UA, viewport, etc.).
+            proxy: Legacy proxy URL string, a ``ProxyConfig``, or None.
+
+        Returns:
+            A Playwright Page ready for navigation.
+
+        Raises:
+            Propagates any failure/cancellation, after discarding a half-built
+            context so it is neither leaked into ``_active_contexts`` nor left
+            open in the browser.
+        """
         from ma_poc.fetch.stealth import REALISTIC_SCREEN
 
         context_opts: dict[str, object] = {
@@ -319,19 +360,35 @@ class BrowserContextPool:
             # Chromium aborts HTTPS navigations with ERR_CERT_AUTHORITY_INVALID.
             context_opts["ignore_https_errors"] = True
 
-        context = await browser.new_context(**context_opts)  # type: ignore[arg-type]
-        self._active_contexts.append(context)
-        page = await context.new_page()
-        if _BLOCKED_RESOURCE_TYPES:
-            try:
-                await page.route("**/*", _resource_block_route)
-            except Exception as exc:
-                # A route-install hiccup must never abort page acquisition —
-                # degrade to an unfiltered (costlier) render, not a failed one.
-                log.warning("resource-block route install failed: %s", exc)
-        page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
-        page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
-        return page
+        context: BrowserContext | None = None
+        try:
+            context = await browser.new_context(**context_opts)  # type: ignore[arg-type]
+            self._active_contexts.append(context)
+            page = await context.new_page()
+            if _BLOCKED_RESOURCE_TYPES:
+                try:
+                    await page.route("**/*", _resource_block_route)
+                except Exception as exc:
+                    # A route-install hiccup must never abort page acquisition —
+                    # degrade to an unfiltered (costlier) render, not a failed one.
+                    log.warning("resource-block route install failed: %s", exc)
+            page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
+            page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
+            return page
+        except BaseException:
+            # A context created here has no page yet, so release() can never
+            # reach it: without this it stays in _active_contexts forever AND
+            # stays open in the browser. Drop the bookkeeping first (cheap, can
+            # not fail) and only then attempt the close, which is an await that
+            # a pending cancellation will abort immediately.
+            if context is not None:
+                if context in self._active_contexts:
+                    self._active_contexts.remove(context)
+                try:
+                    await context.close()
+                except BaseException:  # pragma: no cover — best effort
+                    pass
+            raise
 
     async def release(self, page: Page) -> None:
         """Release a page and close its context.

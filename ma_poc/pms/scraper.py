@@ -80,6 +80,126 @@ _MERGE_LIST_KEYS: tuple[str, ...] = (
 # rather than cancelling the fetch the instant it starts.
 _MIN_HOP_FETCH_S: float = 20.0
 
+# Wall-clock bound for ONE cheap-GET gate probe inside the link-hop loop.
+#
+# The gate (``_crawl_get_gate_should_skip``) runs BETWEEN the loop-top deadline
+# check and the fetch admission, and every second it spends is charged against
+# ``_hop_deadline`` — but nothing bounded it. ``probe_get``'s own ``timeout=10``
+# covers the HTTP call, not the ``asyncio.to_thread`` queueing in front of it,
+# and the default executor is shared with every other sync probe in the process.
+#
+# Measured 2026-07-27 (run …-sample100-7fc8b4c): property 27577 spent **256.6s**
+# between LINK_HOP_STARTED and the first ``fetch.started``, with no intervening
+# event for that property. Its hop was therefore admitted 106.6s PAST a 150s
+# deadline, its allowance was already the ``_MIN_HOP_FETCH_S`` floor, and
+# ``LINK_HOP_PER_FETCH_S`` could not bind anything. A per-fetch cap cannot hold
+# a budget that is spent before the fetch starts.
+#
+# 12s = probe_get's own 10s timeout + 2s of scheduling slack, so this only bites
+# when the executor is backed up — exactly the case it exists for. On timeout
+# the gate fails OPEN (falls through to the RENDER), which is what the helper
+# already does for every other error.
+_CRAWL_GET_GATE_BUDGET_S: float = 12.0
+
+
+def _hop_url_key(url: str) -> str:
+    """Origin-and-path identity for a link-hop candidate.
+
+    Args:
+        url: Absolute candidate URL.
+
+    Returns:
+        A lowercase ``host/path`` key with the scheme, a leading ``www.``, the
+        default port and a trailing slash removed. Query and fragment are kept —
+        ``?UnitId=3`` and ``?UnitId=4`` are genuinely different pages.
+
+    Raises:
+        Nothing. Returns the stripped input unchanged if it will not parse.
+
+    Why: the hop queue routinely holds scheme/www/trailing-slash variants of the
+    SAME page, and ``visited`` is an exact-string set, so they are not deduped.
+    Measured 2026-07-27 — 48389's queue was ``https://villagegatenc.com/
+    floor-plans/`` followed by ``http://www.villagegatenc.com/floor-plans/``;
+    256603's was ``…/floorplans/`` followed by ``…/floorplans``. In both the
+    first entry tarpitted for >147s. This key exists so budget freed by the
+    per-fetch cap is not spent re-fetching the page that just tarpitted; it is
+    deliberately NOT wired into ``visited`` itself, because an http/https
+    fallback is a legitimate recovery when the first variant *fails* rather than
+    hangs.
+    """
+    from urllib.parse import urlsplit
+
+    raw = (url or "").strip()
+    try:
+        parts = urlsplit(raw)
+        host = (parts.hostname or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if not host:
+            return raw.lower()
+        port = parts.port
+        if port and port not in (80, 443):
+            host = f"{host}:{port}"
+        path = (parts.path or "/").rstrip("/") or "/"
+        tail = f"?{parts.query}" if parts.query else ""
+        return f"{host}{path}{tail}".lower()
+    except Exception:  # pragma: no cover — defensive; urlsplit is total
+        return raw.lower()
+
+
+def _hop_fetch_allowance(remaining_s: float, per_fetch_cap_s: float) -> float:
+    """Timeout for ONE in-flight link-hop fetch.
+
+    Args:
+        remaining_s: ``_hop_deadline - time.monotonic()``. May be negative when
+            the deadline has already passed (the loop-top guard admitted the hop
+            before a long blocking step, e.g. the cheap-GET gate, ran).
+        per_fetch_cap_s: ``LINK_HOP_PER_FETCH_S``. ``<= 0`` means "no cap" and
+            restores the pre-2026-07-27 ``max(floor, remaining)`` behaviour
+            byte-for-byte.
+
+    Returns:
+        Seconds to pass to ``asyncio.wait_for``. Never below
+        ``_MIN_HOP_FETCH_S`` — an almost-spent budget must still buy a genuine
+        attempt, not an instant cancel — and, when the cap is active, never
+        above it.
+
+    Raises:
+        Nothing. Warns (``UserWarning``) when *per_fetch_cap_s* is a positive
+        value below the floor and therefore gets clamped up.
+
+    Why the cap exists (measured 2026-07-27, run …-sample100-7fc8b4c): the
+    allowance used to be ALL remaining budget, so hop #1 could consume the
+    entire 150s crawl deadline and starve every later candidate. 6 of the 8
+    HOP_FETCH_BUDGET_EXCEEDED events in that run were on ``hop_index=1``, and
+    5 of the 7 properties they hit ended FAILED_NO_DATA — 256603 and 48389 with
+    every one of their remaining candidates unfetched. What the cap buys those
+    two is UNMEASURED; see the benefit/limits note on ``LINK_HOP_PER_FETCH_S``
+    in ``ma_poc/config/feature_flags.py`` before quoting a rescue count.
+
+    Why the clamp instead of ignoring a too-small cap: without it,
+    ``LINK_HOP_PER_FETCH_S=10`` and ``LINK_HOP_PER_FETCH_S=0`` both resolve to
+    20.0 while meaning opposite things to the operator (a tighter cap vs. no cap
+    at all). The clamp keeps "disabled" reachable only via ``<= 0``.
+    """
+    if per_fetch_cap_s <= 0.0:  # disabled → pre-cap behaviour, exactly
+        return max(_MIN_HOP_FETCH_S, remaining_s)
+    cap = max(_MIN_HOP_FETCH_S, per_fetch_cap_s)  # clamp, don't swallow
+    if cap > per_fetch_cap_s:
+        # Say so. A silently-clamped cap is indistinguishable from a cap that
+        # took effect, which is how a mis-set flag reads as a working one.
+        import warnings
+
+        warnings.warn(
+            f"LINK_HOP_PER_FETCH_S={per_fetch_cap_s:g}s is below the "
+            f"_MIN_HOP_FETCH_S floor ({_MIN_HOP_FETCH_S:g}s) and was clamped up "
+            f"to it. Set it to 0 to DISABLE the per-hop cap instead.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return max(_MIN_HOP_FETCH_S, min(cap, remaining_s))
+
+
 _MERGE_DICT_KEYS: tuple[str, ...] = (
     "_llm_analysis_results",
     "_llm_hints",
@@ -3571,13 +3691,6 @@ async def _try_link_hop(
     from ma_poc.fetch.contracts import RenderMode
     from ma_poc.observability.events import EventKind, emit
 
-    emit(
-        EventKind.LINK_HOP_STARTED,
-        property_id,
-        entry_url=entry_url,
-        candidates=[{"url": u, "score": s, "anchor": a[:60]} for u, s, a in ranked],
-    )
-
     # Phase 4: track which sub-URLs were tried and whether they produced
     # data. profile_updater consumes this dict to persist
     # profile.navigation.explored_links (skip-next-run) and
@@ -3622,21 +3735,75 @@ async def _try_link_hop(
     # pool slot instead of wedging it for 10 minutes.
     from ma_poc.config.feature_flags import LINK_HOP_BUDGET_S
 
-    # The deadline is PER-PROPERTY, not per-call. _try_link_hop is re-entered
-    # (post-hop re-crawl, render-on-empty escalation); computing a fresh
-    # deadline on every entry made the budget unbounded in aggregate — one
-    # property chained 8 hops over ~2,900s against a nominal 150s budget
-    # (RCA 2026-07-25). Stash it in shared_budget so re-entry INHERITS the
-    # original deadline instead of resetting it.
+    # The deadline is per SCRAPE_JUGNU CALL, not per _try_link_hop entry.
+    # _try_link_hop is re-entered within one call (post-hop re-crawl,
+    # render-on-empty escalation); computing a fresh deadline on every entry
+    # made the budget unbounded in aggregate — one property chained 8 hops over
+    # ~2,900s against a nominal 150s budget (RCA 2026-07-25). Stash it in
+    # shared_budget so intra-call re-entry INHERITS the original deadline.
+    #
+    # KNOWN HOLE — do not "fix" without reading the evidence. shared_budget is
+    # _jugnu_budget, a dict literal re-created on every scrape_jugnu call, and
+    # runners/jugnu.py calls scrape_jugnu up to 3x per property (initial,
+    # render-on-empty, HB-shell). So the effective admission window is
+    # ~LINK_HOP_BUDGET_S x N, N <= 3 — measured 2026-07-27: 3 of 18 link-hop
+    # properties ran two independent ~150s sessions. Threading the deadline
+    # through partial_state would close it in one line, and the artifacts say
+    # DON'T: property 278371's SUCCESS with 10 units came entirely from its
+    # SECOND session's hop 1, so closing the hole converts it to
+    # FAILED_NO_DATA. Pinned by
+    # tests/pms/test_timeout_salvage.py::
+    #   test_hop_deadline_does_not_survive_scrape_jugnu_reentry_KNOWN_HOLE.
     _hop_deadline: float
+    _deadline_source: str
     if shared_budget is not None and isinstance(
         shared_budget.get("_hop_deadline"), (int, float)
     ):
         _hop_deadline = float(shared_budget["_hop_deadline"])
+        _deadline_source = "inherited"
     else:
         _hop_deadline = time.monotonic() + float(LINK_HOP_BUDGET_S)
+        _deadline_source = "fresh"
         if shared_budget is not None:
             shared_budget["_hop_deadline"] = _hop_deadline
+
+    # Session counter for the KNOWN HOLE above. It lives in the CALLER-owned
+    # _external_partial_ref because that is the only dict that survives across
+    # scrape_jugnu calls — so ``session_index > 1`` in the event stream is
+    # direct evidence that a property received a SECOND admission window,
+    # instead of requiring artifact archaeology to find it (3 of 18 hop
+    # properties in the 2026-07-27 run).
+    _hop_session_index = 1
+    _ext_ref = (
+        shared_budget.get("_external_partial_ref") if shared_budget is not None else None
+    )
+    if isinstance(_ext_ref, dict):
+        try:
+            if _deadline_source == "fresh":
+                _hop_session_index = int(_ext_ref.get("_hop_session_count", 0)) + 1
+                _ext_ref["_hop_session_count"] = _hop_session_index
+            else:
+                _hop_session_index = max(1, int(_ext_ref.get("_hop_session_count", 1)))
+        except (TypeError, ValueError):
+            _hop_session_index = 1
+
+    emit(
+        EventKind.LINK_HOP_STARTED,
+        property_id,
+        entry_url=entry_url,
+        candidates=[{"url": u, "score": s, "anchor": a[:60]} for u, s, a in ranked],
+        # Telemetry (2026-07-27): without these the next canary cannot tell a
+        # working per-hop cap from an inert one, nor a per-property budget from
+        # N stacked ones.
+        deadline_source=_deadline_source,
+        session_index=_hop_session_index,
+        budget_remaining_s=round(_hop_deadline - time.monotonic(), 1),
+    )
+    _hop_started_at = time.monotonic()
+    # Normalised keys of candidates whose fetch TIMED OUT (see _hop_url_key).
+    # Scoped to this hop loop, not to `visited`, so an ordinary failure still
+    # gets its http/https twin retried.
+    _tarpit_keys: set[str] = set()
 
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
@@ -3664,6 +3831,23 @@ async def _try_link_hop(
             # Phase 9: defensive — should already be filtered above, but
             # double-check to enforce H5 invariant under all code paths.
             continue
+        # Budget freed by the per-fetch cap must not be spent re-fetching the
+        # page that just consumed it. ``visited`` is an exact-string set, and
+        # the queue routinely holds scheme/www/trailing-slash variants of the
+        # same page: 48389's cand2 was the http/www twin of the cand1 that had
+        # just tarpitted >147s, 256603's cand3 the trailing-slash twin
+        # (measured 2026-07-27). Only URLs that TIMED OUT land in this set —
+        # a candidate that merely FAILED still gets its variant retried, which
+        # is a legitimate http/https recovery.
+        if _hop_url_key(sub_url) in _tarpit_keys:
+            emit(
+                EventKind.LINK_HOP_FETCHED,
+                property_id,
+                url=sub_url,
+                outcome="HOP_SKIPPED_TARPIT_VARIANT",
+                hop_index=idx,
+            )
+            continue
         visited.add(sub_url)
         # #timeout part 2: cheap-GET-gate. The RENDER sub-fetch below burns
         # ~155-191s rendering + curl_cffi/Web-Unlocker-falling-back on a GUESSED
@@ -3683,15 +3867,37 @@ async def _try_link_hop(
         # fetcher.py/rentcafe.py but did not reach this call site; scraper.py
         # had no to_thread at all. Off-load it so the gate keeps its
         # timeout protection without blocking the loop.
-        if ENABLE_CRAWL_GET_GATE and await asyncio.to_thread(
-            _crawl_get_gate_should_skip, sub_url
-        ):
+        #
+        # …and BOUND it. The gate sits between the loop-top deadline check and
+        # the fetch admission, so its wall time is charged against
+        # _hop_deadline — but off-loading it protected the loop, not the budget.
+        # probe_get's own timeout=10 covers the HTTP call, not the to_thread
+        # queueing in front of it on a shared, saturated executor. Measured
+        # 2026-07-27: property 27577 spent 256.6s here, was admitted 106.6s PAST
+        # its 150s deadline with the floor allowance, and LINK_HOP_PER_FETCH_S
+        # was therefore inert on the exact property that most needed it. Fail
+        # OPEN on timeout — same as the helper's own except-return-False.
+        _gate_budget_s = _hop_deadline - time.monotonic()
+        _gate_skip = False
+        _gate_started_at = time.monotonic()
+        if ENABLE_CRAWL_GET_GATE and _gate_budget_s > 0.0:
+            try:
+                _gate_skip = await asyncio.wait_for(
+                    asyncio.to_thread(_crawl_get_gate_should_skip, sub_url),
+                    timeout=min(_CRAWL_GET_GATE_BUDGET_S, _gate_budget_s),
+                )
+            except TimeoutError:
+                _gate_skip = False
+        if _gate_skip:
             emit(
                 EventKind.LINK_HOP_FETCHED,
                 property_id,
                 url=sub_url,
                 outcome="DEAD_URL_GATED",
                 hop_index=idx,
+                # The gate's own cost, so the next canary can see a saturated
+                # executor without artifact archaeology on event GAPS.
+                gate_elapsed_ms=int((time.monotonic() - _gate_started_at) * 1000),
             )
             continue
         sub_task = CrawlTask(
@@ -3703,26 +3909,96 @@ async def _try_link_hop(
             render_mode=RenderMode.RENDER,
             parent_task_id=None,
         )
+        # Bound the IN-FLIGHT hop to whatever budget remains. The deadline
+        # check above only stops new hops from STARTING; a hop admitted at
+        # t=149s of a 150s budget used to run to completion unbounded (a
+        # tarpitting host held it for 100-560s), so the budget did not cap
+        # anything in the cases that mattered (RCA 2026-07-25). Floor the
+        # allowance so an almost-spent budget still gives a real attempt
+        # rather than an instant cancel.
+        #
+        # …but "whatever remains" alone let hop #1 eat the ENTIRE crawl.
+        # Measured 2026-07-27 (run …-sample100-7fc8b4c): 8 properties hit
+        # HOP_FETCH_BUDGET_EXCEEDED and 6 of them were on hop_index=1, so
+        # the candidate actually holding the roster was never fetched, and
+        # 5 of the 7 affected properties ended FAILED_NO_DATA.
+        # LINK_HOP_PER_FETCH_S caps ONE hop so the deadline is shared instead
+        # of monopolised. It is pointwise <= the old allowance
+        # (max(F, min(C, r)) <= max(F, r)), so it can only TIGHTEN the fetch
+        # bound, never loosen it; the per-property deadline and its
+        # shared_budget inheritance above are untouched.
+        #
+        # What the cap does NOT do: `asyncio.wait_for` is not a wall-clock
+        # bound here. Measured overshoot past the allowance in that run was
+        # 0.9-144.4s (median 13.1s) — a cancelled RENDER unwinds through
+        # Playwright IPC — and that overshoot is charged against the very
+        # budget the cap frees. See the headroom guard on the `continue` below.
+        from ma_poc.config.feature_flags import LINK_HOP_PER_FETCH_S
+
+        _raw_remaining = _hop_deadline - time.monotonic()
+        _hop_remaining = _hop_fetch_allowance(
+            _raw_remaining, float(LINK_HOP_PER_FETCH_S)
+        )
+        # True only when the PER-FETCH cap bound this hop, i.e. budget
+        # genuinely survives the timeout. False when the DEADLINE bound it
+        # (or the cap is disabled) — then nothing is left to continue with.
+        _cap_bound = _hop_remaining < _raw_remaining
+        # Elapsed from LINK_HOP_STARTED to this fetch's admission. It is charged
+        # against the deadline but was invisible: measured 2026-07-27 p50 3.4s,
+        # MAX 256.6s (property 27577, whose hop-1 allowance was therefore the
+        # 20s floor). Without it, a hop that "timed out at 20s" is
+        # indistinguishable from one that never had budget to begin with.
+        _queue_wait_ms = int((time.monotonic() - _hop_started_at) * 1000)
+        _fetch_admitted_at = time.monotonic()
         try:
-            # Bound the IN-FLIGHT hop to whatever budget remains. The deadline
-            # check above only stops new hops from STARTING; a hop admitted at
-            # t=149s of a 150s budget used to run to completion unbounded (a
-            # tarpitting host held it for 100-560s), so the budget did not cap
-            # anything in the cases that mattered (RCA 2026-07-25). Floor the
-            # allowance so an almost-spent budget still gives a real attempt
-            # rather than an instant cancel.
-            _hop_remaining = max(_MIN_HOP_FETCH_S, _hop_deadline - time.monotonic())
             sub_fetch = await asyncio.wait_for(
                 jugnu_fetch(sub_task), timeout=_hop_remaining
             )
         except TimeoutError:
+            _budget_left_s = _hop_deadline - time.monotonic()
             emit(
                 EventKind.LINK_HOP_FETCHED,
                 property_id,
                 url=sub_url,
-                outcome="HOP_FETCH_BUDGET_EXCEEDED",
+                outcome=(
+                    "HOP_FETCH_CAP_EXCEEDED" if _cap_bound
+                    else "HOP_FETCH_BUDGET_EXCEEDED"
+                ),
                 hop_index=idx,
+                allowance_s=round(_hop_remaining, 1),
+                # ACTUAL wall time the "bounded" fetch consumed. allowance_s
+                # alone cannot show that the bound did not hold; measured
+                # 2026-07-27 the two differ by 0.9-144.4s. The gap is the
+                # cancellation unwind, and it is spent from the same deadline.
+                fetch_elapsed_s=round(time.monotonic() - _fetch_admitted_at, 1),
+                budget_remaining_s=round(_budget_left_s, 1),
+                queue_wait_ms=_queue_wait_ms,
+                session_index=_hop_session_index,
             )
+            # Only the CAP releases the loop to the next candidate. When the
+            # DEADLINE bound the fetch there is nothing left to spend, so we
+            # keep the 2026-07-25 fail-fast `break` verbatim.
+            #
+            # And "some budget left" is not enough. Admitting the next hop costs
+            # a bounded gate (<= _CRAWL_GET_GATE_BUDGET_S) before the fetch even
+            # starts, so continuing with less than gate+floor left produces
+            # exactly the degenerate admission the 2026-07-25 RCA was written
+            # about: a fetch admitted PAST the deadline on the
+            # _MIN_HOP_FETCH_S floor. Measured 2026-07-27, of the 5 hops the
+            # 90s cap binds, three (97935 2.6s, 278371 26.1s, 30747 30.8s of
+            # freed budget) fall below that bar and would have bought a floored
+            # retry, not a real fetch; the two that clear it (256603 42.8s,
+            # 48389 44.0s) are the only measurably-rescuable properties in the
+            # run. Require headroom, so the `continue` only ever buys a
+            # genuine attempt.
+            _continue_min_s = _MIN_HOP_FETCH_S + (
+                _CRAWL_GET_GATE_BUDGET_S if ENABLE_CRAWL_GET_GATE else 0.0
+            )
+            if _cap_bound and _budget_left_s > _continue_min_s:
+                # Do not spend it re-fetching a variant of the URL that just
+                # tarpitted (see _hop_url_key).
+                _tarpit_keys.add(_hop_url_key(sub_url))
+                continue
             break
         except Exception as exc:
             emit(EventKind.LINK_HOP_FETCHED, property_id, url=sub_url, error=str(exc)[:200], hop_index=idx)
@@ -3741,6 +4017,9 @@ async def _try_link_hop(
             hop_index=idx,
             score=score,
             anchor=anchor[:60],
+            allowance_s=round(_hop_remaining, 1),
+            queue_wait_ms=_queue_wait_ms,
+            session_index=_hop_session_index,
         )
 
         # 2026-05-26 soft-404 recovery on link-hop sub-pages.
