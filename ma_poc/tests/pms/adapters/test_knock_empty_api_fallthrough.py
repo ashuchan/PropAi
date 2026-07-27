@@ -29,7 +29,9 @@ from ma_poc.pms.adapters.knock import (
     find_knock_ids,
 )
 
-_FIXTURES = Path("ma_poc/tests/fixtures/knock_empty_api")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "knock_empty_api"
 
 
 def _load(name: str) -> str:

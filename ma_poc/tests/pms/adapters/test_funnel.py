@@ -36,7 +36,9 @@ from ma_poc.pms.adapters._funnel import (
     parse_funnel_api_response,
 )
 
-_FIXTURE = Path("ma_poc/tests/fixtures/funnel")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "funnel"
 
 
 def _load_html(name: str) -> str:

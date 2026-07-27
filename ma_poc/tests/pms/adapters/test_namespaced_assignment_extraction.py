@@ -143,8 +143,20 @@ def test_lhs_requires_statement_boundary() -> None:
 # ─────────────────────────────────────────────────────────────────────
 
 
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "knollcrestsa_floorplans_snippet.html"
+)
+_HTML_EXTRACT_SRC = (
+    Path(__file__).resolve().parents[3] / "pms" / "adapters" / "_html_extract.py"
+)
+
+
 def _fixture_html() -> str:
-    return Path("ma_poc/tests/fixtures/knollcrestsa_floorplans_snippet.html").read_text()
+    return _FIXTURE.read_text()
 
 
 def test_extract_blobs_finds_yardi_namespace_assignment() -> None:
@@ -253,7 +265,7 @@ def test_html_extract_uses_namespaced_strategy() -> None:
     If a refactor drops this, the Yardi/RentCafe SSR cohort silently
     stops extracting and the Tier-4 LLM cost regresses by ~30 properties
     per run."""
-    src = Path("ma_poc/pms/adapters/_html_extract.py").read_text(encoding="utf-8")
+    src = _HTML_EXTRACT_SRC.read_text(encoding="utf-8")
     assert "_NAMESPACED_LHS_RE.finditer" in src, (
         "_html_extract.py no longer iterates namespaced LHS matches — "
         "Phase 6.1 Strategy C wiring removed."

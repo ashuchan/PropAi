@@ -24,8 +24,13 @@ from ma_poc.pms.adapters._jetengine_repeater import (
     parse_jetengine_rows,
 )
 
-_FIXTURE = Path(
-    "ma_poc/tests/fixtures/jetengine_realpage/copperpoint_3br.html"
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "jetengine_realpage"
+    / "copperpoint_3br.html"
 )
 
 

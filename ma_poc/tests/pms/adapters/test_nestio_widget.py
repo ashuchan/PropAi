@@ -27,7 +27,9 @@ from ma_poc.pms.adapters._nestio_widget import (
     parse_widget_dom,
 )
 
-_FIXTURE = Path("ma_poc/tests/fixtures/nestio_widget")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "nestio_widget"
 
 
 def _load(name: str) -> str:

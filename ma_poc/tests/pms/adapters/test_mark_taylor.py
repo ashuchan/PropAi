@@ -27,8 +27,13 @@ from ma_poc.pms.adapters._mark_taylor import (
     parse_mark_taylor_html,
 )
 
-_FIXTURE = Path(
-    "ma_poc/tests/fixtures/mark_taylor/waterside_at_ocotillo.html"
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "mark_taylor"
+    / "waterside_at_ocotillo.html"
 )
 
 

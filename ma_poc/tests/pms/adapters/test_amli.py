@@ -25,7 +25,14 @@ from ma_poc.pms.adapters._amli import (
 )
 from ma_poc.pms.adapters._html_extract import extract_embedded_blobs_from_html
 
-_FIXTURE = Path("ma_poc/tests/fixtures/amli/south_shore_property.html")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "amli"
+    / "south_shore_property.html"
+)
 
 
 def _extract_next_data_blob() -> dict:

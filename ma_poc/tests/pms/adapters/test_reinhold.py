@@ -26,7 +26,9 @@ from ma_poc.pms.adapters.reinhold import (
 )
 from ma_poc.pms.detector import detect_pms
 
-_FIX = Path("ma_poc/tests/fixtures/reinhold")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIX = Path(__file__).resolve().parents[2] / "fixtures" / "reinhold"
 _CHOCO = _FIX / "chocolateworks_availability.html"
 _SHADY = _FIX / "shadyside_availability.html"
 

@@ -29,7 +29,14 @@ from ma_poc.pms.adapters._apts247 import (
     parse_apts247_floorplans,
 )
 
-_FIXTURE = Path("ma_poc/tests/fixtures/apts247/foxrun_floorplans.json")
+# Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
+# ma_poc/ must resolve fixtures the same way a repo-root run does.
+_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "apts247"
+    / "foxrun_floorplans.json"
+)
 
 
 def _read_fixture() -> dict:
