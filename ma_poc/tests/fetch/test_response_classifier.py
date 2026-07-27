@@ -200,3 +200,98 @@ def test_patchright_timeout_import_resolves() -> None:
         "The classifier will fall back to generic 'TimeoutError' signatures, "
         "breaking retry-after behaviour that keys on 'timeout' in the signature."
     )
+
+
+# ── Exception signatures (RCA 2026-07-27) ───────────────────────────────────
+# All 267 fetches that a dead datacentre proxy failed in the 2026-07-22-hb250
+# run recorded the bare signature "Error" — because Playwright's base exception
+# class is literally named ``Error``, so ``type(exc).__name__`` was maximally
+# uninformative while the message carrying net::ERR_TUNNEL_CONNECTION_FAILED
+# was discarded. Eight days of opaque telemetry followed.
+
+
+class Error(Exception):
+    """Stands in for ``playwright._impl._errors.Error``.
+
+    Deliberately a local class rather than a live import: other tests in the
+    suite replace ``playwright`` in ``sys.modules``, so importing it here is
+    order-dependent (it fails with "unknown location" in a full-suite run while
+    passing in isolation). What is under test is the *shape* — an exception
+    class whose ``__name__`` is the useless string ``"Error"`` — not Playwright
+    itself. ``test_playwright_base_error_is_still_named_error`` pins the premise
+    separately.
+    """
+
+
+def _pw_error(msg: str) -> Exception:
+    return Error(msg)
+
+
+def test_playwright_base_error_is_still_named_error() -> None:
+    """Premise check: if Playwright ever renames its base class, this whole
+    section's motivation changes. Skipped when the module is stubbed by another
+    test, so suite ordering can't turn this into a false alarm."""
+    import pytest
+
+    try:
+        from playwright.async_api import Error as PlaywrightError
+    except ImportError:  # pragma: no cover - depends on suite ordering
+        pytest.skip("playwright module is stubbed/unavailable in this process")
+    assert PlaywrightError.__name__ == "Error"
+
+
+def test_playwright_error_keeps_the_net_error_code() -> None:
+    """The regression: 'Error' alone must never be the whole signature."""
+    exc = _pw_error("Page.goto: net::ERR_TUNNEL_CONNECTION_FAILED at https://x.com/u")
+    outcome, sig = classify(None, {}, None, exception=exc)
+
+    assert outcome == FetchOutcome.TRANSIENT
+    assert sig != "Error", "regressed to the uninformative bare type name"
+    assert sig == "Error:net::ERR_TUNNEL_CONNECTION_FAILED"
+
+
+def test_signature_preserves_type_and_cause_for_plain_exceptions() -> None:
+    outcome, sig = classify(
+        None, {}, None, exception=Exception("CONNECT tunnel failed, response 502")
+    )
+    assert outcome == FetchOutcome.TRANSIENT
+    assert sig == "Exception:connect_tunnel_failed_response_502"
+
+
+def test_signature_cardinality_is_bounded() -> None:
+    """error_signature is group-by'd in analyze_cloud_run and stored in a
+    String(512) column — raw messages with URLs/IPs would explode the aggregate.
+
+    Two failures against different hosts must collapse to ONE signature.
+    """
+    a = classify(None, {}, None, exception=_pw_error(
+        "net::ERR_PROXY_CONNECTION_FAILED at https://alpha.example.com:8443/units"))[1]
+    b = classify(None, {}, None, exception=_pw_error(
+        "net::ERR_PROXY_CONNECTION_FAILED at https://beta.other.org:9001/floorplans"))[1]
+    assert a == b == "Error:net::ERR_PROXY_CONNECTION_FAILED"
+
+    # Unrecognised messages are slugified, scrubbed of hosts/IPs, and truncated.
+    long_sig = classify(None, {}, None, exception=Exception("boom " * 200))[1]
+    assert long_sig is not None and len(long_sig) < 120
+
+    hosty = classify(None, {}, None, exception=Exception(
+        "refused by 10.1.2.3:8080 for host cdn.example.com"))[1]
+    assert hosty is not None
+    assert "10.1.2.3" not in hosty and "example" not in hosty
+
+
+def test_signature_falls_back_to_type_name_when_message_is_empty() -> None:
+    assert classify(None, {}, None, exception=Exception(""))[1] == "Exception"
+
+
+def test_connection_error_keeps_its_cause() -> None:
+    outcome, sig = classify(
+        None, {}, None, exception=ConnectionError("Connection reset by peer")
+    )
+    assert outcome == FetchOutcome.TRANSIENT
+    assert sig == "ConnectionError:connection_reset_by_peer"
+
+
+def test_timeout_signature_is_unchanged() -> None:
+    """Retry back-off keys on 'timeout' in the signature — must not drift."""
+    assert classify(None, {}, None, exception=TimeoutError("slow"))[1] == "timeout"
