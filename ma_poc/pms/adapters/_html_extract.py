@@ -31,16 +31,17 @@ import json
 import re
 from datetime import date
 from typing import Any
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from ma_poc.pms.adapters._parsing import SQFT_RE, clean_unit_number
 from ma_poc.pms.adapters._daily_runner_parsers import (
     _jsonld_floor_size,
     _jsonld_item_has_unit_signal,
     _money_to_int,
     _walk_jsonld,
 )
+from ma_poc.pms.adapters._parsing import SQFT_RE, clean_unit_number
 from ma_poc.pms.signal_engine.floor_plan_signals import (
     SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL,
 )
@@ -216,6 +217,34 @@ _OFFER_CONTAINER_TYPES: frozenset[str] = frozenset(
         "ApartmentComplex",
     }
 )
+
+# Marketing pages sometimes publish one Schema.org ``Apartment`` object per
+# physical apartment, but put the apartment number only in a display name such
+# as ``Sedona #7953C``. A bare plan name such as ``A1`` is deliberately not
+# accepted: a hash/unit/apt label plus a digit is the minimum identity anchor.
+_JSONLD_NAMED_UNIT_RE = re.compile(
+    r"(?:\b(?:unit|apt(?:artment)?)\.?\s*|#)\s*([A-Za-z0-9-]*\d[A-Za-z0-9-]*)",
+    re.IGNORECASE,
+)
+
+
+def _jsonld_unit_number(item: dict[str, Any], name: str) -> str:
+    """Return a concrete JSON-LD apartment identifier, never a plan code.
+
+    Explicit Schema.org extension fields take precedence. ``unitCode`` is
+    accepted only when it includes a digit: several marketing platforms use a
+    letters-only value (for example ``FTK``) as a floor-plan code. When a
+    concrete number appears in a labelled display name, recover it instead.
+    """
+    for key in ("unitNumber", "unit_number", "apartmentNumber", "apartment_number"):
+        candidate = clean_unit_number(str(item.get(key) or ""))
+        if candidate:
+            return candidate
+    unit_code = clean_unit_number(str(item.get("unitCode") or item.get("unit_code") or ""))
+    if unit_code and any(char.isdigit() for char in unit_code):
+        return unit_code
+    match = _JSONLD_NAMED_UNIT_RE.search(name)
+    return clean_unit_number(match.group(1)) if match else ""
 
 
 def _money_int_or_none(v: Any) -> int | None:
@@ -785,7 +814,7 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
                     "bedrooms": num_bedrooms,
                     "bathrooms": num_bathrooms,
                     "sqft": _jsonld_floor_size(item),
-                    "unit_number": "",
+                    "unit_number": _jsonld_unit_number(item, name),
                     "floor": "",
                     "building": "",
                     "rent_range": rent_range,
@@ -2301,6 +2330,10 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
     "a[data-js-hook='apartment']",
     ".apartments__card",
+    # AppFolio's public listings iframe uses a descriptive address whose
+    # middle segment is the apartment number (for example `..., 0188BE,
+    # Austin, TX`). It deliberately has no generic `.unit-*` class.
+    "div.js-listing-item",
     # Brook-style apartment card (PID 3483): `<div class="card">` wrapping
     # `<h3>Apartment: <span># NNNNNN</span></h3>` blocks. Scoped to the
     # availability container `#availApts` so we don't pick up unrelated
@@ -2309,6 +2342,12 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # Common PMS / CMS container patterns. Specific-first, generic-last so a
     # site with both `.unit-card` and `.card` prefers the specific one.
     ".unit-card",
+    # Entrata-backed marketing sites can render each concrete apartment as a
+    # plain ``.unit-body`` div with rich data attributes rather than a
+    # conventional ``.unit-card`` class. The attribute pair is the guard: it
+    # establishes a real property unit id and visible unit number before the
+    # generic text parser runs. Verified on The Village Lakes (PID 11342).
+    "[data-unit-id][data-unit-number]",
     ".unit-row",
     ".unit-item",
     ".unitContainer",
@@ -2488,6 +2527,99 @@ def _rent_to_int(s: str) -> int | None:
     if not (_RENT_LO_BOUND <= n <= _RENT_HI_BOUND):
         return None
     return n
+
+
+_SECURECAFE_APPLICANT_UNIT_ARIA_RE = re.compile(
+    r"^View\s+unit\s+([A-Za-z0-9][A-Za-z0-9-]{0,20})\s+details$", re.IGNORECASE
+)
+_SECURECAFE_APPLICANT_RENT_RE = re.compile(
+    r"\bFrom\s+\$([\d,]+(?:\.\d{1,2})?)", re.IGNORECASE
+)
+_SECURECAFE_APPLICANT_BED_RE = re.compile(r"\b(\d+)\s+Bed\b", re.IGNORECASE)
+_SECURECAFE_APPLICANT_BATH_RE = re.compile(r"\b(\d+)\s+Bath\b", re.IGNORECASE)
+_SECURECAFE_APPLICANT_SQFT_RE = re.compile(r"\b([\d,]+)\s+Sqft\b", re.IGNORECASE)
+
+
+def _extract_securecafe_applicant_units(soup: BeautifulSoup, source_url: str) -> list[dict[str, Any]]:
+    """Parse concrete rows rendered by SecureCafe Applicant's public React UI.
+
+    This route exposes a floor-plan card containing one or more short unit
+    rows. The card itself contains a plan price range, while each child row has
+    the real apartment number and its own ``From $...`` price. Use the child
+    button's accessible label as the identity anchor so a floor-plan title is
+    never promoted to a unit. Returns an empty list for all non-Applicant
+    hosts, preserving generic DOM behaviour elsewhere.
+    """
+    try:
+        host = (urlparse(source_url).hostname or "").lower()
+    except ValueError:
+        return []
+    if not host.endswith("securecafeapplicant.com"):
+        return []
+
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for button in soup.select("button[aria-label]"):
+        label = str(button.get("aria-label") or "").strip()
+        unit_match = _SECURECAFE_APPLICANT_UNIT_ARIA_RE.match(label)
+        if unit_match is None:
+            continue
+        unit_number = clean_unit_number(unit_match.group(1))
+        if not unit_number or unit_number in seen:
+            continue
+
+        row = button.parent
+        for _ in range(4):
+            if row is None:
+                break
+            row_text = row.get_text(" ", strip=True)
+            row_buttons = row.select("button[aria-label]")
+            if (
+                _SECURECAFE_APPLICANT_RENT_RE.search(row_text)
+                and sum(
+                    _SECURECAFE_APPLICANT_UNIT_ARIA_RE.match(
+                        str(child.get("aria-label") or "").strip()
+                    )
+                    is not None
+                    for child in row_buttons
+                )
+                == 1
+            ):
+                break
+            row = row.parent
+        if row is None:
+            continue
+        rent_match = _SECURECAFE_APPLICANT_RENT_RE.search(row.get_text(" ", strip=True))
+        # SecureCafe renders cents (for example ``$1,918.00``); the legacy
+        # integer-only DOM helper intentionally rejects that representation.
+        rent = _money_to_int(rent_match.group(1)) if rent_match is not None else None
+        if rent is None:
+            continue
+
+        card = row.find_parent("li")
+        card_text = card.get_text(" ", strip=True) if card is not None else row.get_text(" ", strip=True)
+        plan_heading = card.find(["h1", "h2", "h3", "h4", "h5", "h6"]) if card is not None else None
+        beds_match = _SECURECAFE_APPLICANT_BED_RE.search(card_text)
+        baths_match = _SECURECAFE_APPLICANT_BATH_RE.search(card_text)
+        sqft_match = _SECURECAFE_APPLICANT_SQFT_RE.search(card_text)
+        units.append(
+            {
+                "unit_number": unit_number,
+                "floor_plan_name": plan_heading.get_text(" ", strip=True) if plan_heading else "",
+                "bedrooms": beds_match.group(1) if beds_match else "",
+                "bathrooms": baths_match.group(1) if baths_match else "",
+                "sqft": sqft_match.group(1).replace(",", "") if sqft_match else "",
+                "market_rent_low": rent,
+                "market_rent_high": rent,
+                "rent_range": str(rent),
+                "availability_status": "AVAILABLE",
+                "source_api_url": "dom:securecafe-applicant",
+                "_source_url": source_url,
+                "extraction_tier": "TIER_3_DOM",
+            }
+        )
+        seen.add(unit_number)
+    return units
 
 
 # Context words that precede a sqft match but indicate it's NOT the unit's
@@ -2948,11 +3080,77 @@ def _extract_brook_availapts_card(
     return unit
 
 
+_APPFOLIO_LISTING_ADDRESS_UNIT_RE = re.compile(
+    r",\s*#?([A-Za-z0-9-]*\d[A-Za-z0-9-]*)\s*,\s*[^,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?\b"
+)
+_APPFOLIO_BED_BATH_RE = re.compile(
+    r"\b(Studio|\d+)\s*bd\s*/\s*(\d+(?:\.\d+)?)\s*ba\b", re.IGNORECASE
+)
+
+
+def _extract_appfolio_listing_item(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """Parse one public AppFolio listings iframe card as a real apartment.
+
+    AppFolio's ``.js-listing-item`` cards publish the physical apartment in
+    the address line rather than a field named ``unit``.  Accept it only when
+    the address has a concrete middle segment, a numeric rent, and the card's
+    distinctive AppFolio class.  This keeps marketing descriptions such as
+    "one-bedroom apartment" from becoming synthetic units.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 20:
+        return None
+    address = node.select_one(".js-listing-address")
+    address_text = address.get_text(" ", strip=True) if address is not None else text
+    unit_match = _APPFOLIO_LISTING_ADDRESS_UNIT_RE.search(address_text)
+    if unit_match is None:
+        return None
+    unit_number = clean_unit_number(unit_match.group(1))
+    if not _is_valid_unit_number(unit_number):
+        return None
+    rent_match = _RENT_PATTERN.search(text)
+    rent = _rent_to_int(rent_match.group(1)) if rent_match is not None else None
+    if rent is None:
+        return None
+
+    unit = _empty_unit_with_ctx(page_ctx, source="dom:appfolio-listing-item", source_url=source_url)
+    unit["unit_number"] = unit_number
+    unit["market_rent_low"] = rent
+    unit["market_rent_high"] = rent
+    unit["rent_range"] = str(rent)
+    sqft_match = _SQFT_LABEL_PATTERN.search(text) or _SQFT_PATTERN.search(text)
+    if sqft_match is not None:
+        try:
+            sqft = int(sqft_match.group(1).replace(",", ""))
+            if _SQFT_MIN <= sqft <= 10_000:
+                unit["sqft"] = str(sqft)
+        except (ValueError, TypeError):
+            pass
+    bed_bath = _APPFOLIO_BED_BATH_RE.search(text)
+    if bed_bath is not None:
+        unit["bedrooms"] = "0" if bed_bath.group(1).lower() == "studio" else bed_bath.group(1)
+        unit["bathrooms"] = bed_bath.group(2)
+    if re.search(r"\bavailable\s+(?:now|today)\b", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+    listing_id = str(node.get("id") or "")
+    listing_id_match = re.fullmatch(r"listing_(\d+)", listing_id)
+    if listing_id_match is not None:
+        unit["source_ids"] = {"appfolio_listing_id": listing_id_match.group(1)}
+    return unit
+
+
 # Selectors mapped to specialised extractors. When the DOM container loop
 # matches one of these selectors, the matching extractor is used INSTEAD of
 # `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
 # rejects compact per-unit rows where bed/bath/sqft live in the page header.
 _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
+    # AppFolio public-listings embed (verified on Emerson Apartments).
+    ("div.js-listing-item", _extract_appfolio_listing_item),
     # RentCafe per-plan availability — both `.option-row` and `div.option-row`
     # patterns map to the same extractor.
     ("div.option-row", _extract_rentcafe_option_row),
@@ -3001,6 +3199,10 @@ def extract_units_from_dom(
             soup = BeautifulSoup(html, "html.parser")
         except Exception:
             return [], "none"
+
+    securecafe_applicant_units = _extract_securecafe_applicant_units(soup, source_url)
+    if securecafe_applicant_units:
+        return securecafe_applicant_units, "default"
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
