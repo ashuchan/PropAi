@@ -1014,7 +1014,24 @@ async def scrape(
                 extract_api_concession,
             )
 
-            _captured = getattr(ctx, "_api_responses", []) or []
+            # 2026-07-27 (dead-fallback fix): this read ``ctx._api_responses``,
+            # but ``ctx`` is not constructed until Step 6, ~350 lines below —
+            # Step 3b runs BEFORE detection/adapter dispatch by design (see
+            # cd03c25). Every execution therefore raised ``NameError: ctx``,
+            # which the broad ``except Exception`` below swallowed: the whole
+            # block was dead from the day it landed and has never produced a
+            # concession. At THIS point the pre-captured responses live in
+            # the ``api_responses`` argument (callers/tests that pass captures
+            # in directly) or, on a RENDER-mode fetch, in
+            # ``fetch_result.network_log``. Same precedence Step 6 uses when
+            # it populates ``ctx._api_responses``; no pre-parsing needed
+            # because the body loop below already normalises dict/list/str/
+            # bytes bodies, which is exactly what network_log entries carry.
+            _captured: list[Any]
+            if api_responses is not None:
+                _captured = api_responses
+            else:
+                _captured = getattr(fetch_result, "network_log", None) or []
             _api_conc: str | None = None
             for _resp in _captured:
                 if not isinstance(_resp, dict):
@@ -1045,8 +1062,12 @@ async def scrape(
                     _api_conc = _candidate
             if _api_conc:
                 result["concessions_text"] = _api_conc[:300]
-        except Exception:
-            pass
+                result["concession_source"] = "API_RESPONSE"
+        except Exception as _exc:
+            # Stays non-fatal (concession capture must never fail a scrape),
+            # but no longer silent: a bare ``pass`` here is what let the
+            # ``NameError: ctx`` above hide for two months.
+            log.debug("Step 3b API-concession capture failed: %r", _exc)
 
     # --- Step 3c: rendered-DOM popup/banner concession rescan (2026-05-24) ---
     # Step 3 scans static HTML. Step 3b scans pre-captured API responses.
