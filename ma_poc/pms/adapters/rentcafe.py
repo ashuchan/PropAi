@@ -87,14 +87,16 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         Pre-fix, MAA's per-unit ``sqft=1019`` was silently dropped because
         only the min/max forms were read.
 
-      * **unit_number**: prefer the unit-level identifier (``apartmentname``
-        or ``unitnumber``) when present; fall back to ``floorplanid`` (the
-        legacy floorplan-level surrogate). MAA emits ``apartmentName="217"``
-        — that's the real unit number, not the shared floorplan id.
+      * **unit_number**: accept only a unit-level identifier
+        (``apartmentname`` or ``unitnumber``). ``floorplanId`` is retained in
+        ``source_ids`` as plan provenance, never promoted to ``unit_number``:
+        it is shared by all apartments on that plan and would turn a plan row
+        into a false unit-level success. MAA emits ``apartmentName="217"`` —
+        that is the real unit number, not the shared floorplan id.
 
-    Both changes are additive: the legacy fallbacks keep existing Windsor/
-    Bexley/Pacifica behaviour intact (their payloads don't carry the
-    unit-level fields).
+    The sqft handling remains backward-compatible. Floorplan-only Windsor/
+    Bexley/Pacifica payloads now remain explicitly plan-level so downstream
+    recovery is allowed to pursue their availability/detail route.
     """
     units: list[dict[str, str]] = []
     for item in items:
@@ -165,12 +167,17 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         avail_count = str(item_lc.get("availableunitscount") or item_lc.get("unitscount") or "")
         avail_date = str(item_lc.get("availabledate") or "")
 
-        # F2 (2026-05-12): real unit number wins over floorplan-level id.
+        # A RentCafe ``floorplanId`` identifies the shared plan, not an
+        # apartment.  It must never become ``unit_number``: doing so promotes
+        # plan rows to unit-level success and suppresses recovery.  Preserve
+        # it as provenance so the SecureCafe/detail drill can still match the
+        # right plan without using it as an identity anchor.
+        floorplan_id = str(item_lc.get("floorplanid") or "").strip()
+        source_ids = {"rentcafe_floorplan_id": floorplan_id} if floorplan_id else {}
         unit_number_str = str(
             item_lc.get("apartmentname")
             or item_lc.get("unitnumber")
             or item_lc.get("unit_number")
-            or item_lc.get("floorplanid")
             or ""
         )
 
@@ -188,6 +195,7 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
                 availability_date=avail_date,
                 source_api_url=url,
                 extraction_tier="TIER_1_API_RENTCAFE",
+                source_ids=source_ids,
             )
         )
     return units

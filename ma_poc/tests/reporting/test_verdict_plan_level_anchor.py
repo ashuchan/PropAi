@@ -30,7 +30,7 @@ from datetime import datetime
 
 import pytest
 
-from ma_poc.core.identity import unit_has_real_anchor
+from ma_poc.core.identity import assign_fallback_unit_id, unit_has_real_anchor
 from ma_poc.reporting.verdict import Verdict, compute
 
 _TS = datetime(2026, 7, 25, 3, 0, 0)
@@ -66,8 +66,20 @@ def _plan_rows() -> list[dict]:
     Grant (thevillagesgg.com) from the 2026-07-25 run.
     """
     return [
-        {"floor_plan_name": "Hadleigh Efficiency", "rent_low": 795.0, "rent_high": 795.0, "area": 377, "beds": 1},
-        {"floor_plan_name": "Thornbury Efficiency", "rent_low": 955.0, "rent_high": 955.0, "area": 480, "beds": 1},
+        {
+            "floor_plan_name": "Hadleigh Efficiency",
+            "rent_low": 795.0,
+            "rent_high": 795.0,
+            "area": 377,
+            "beds": 1,
+        },
+        {
+            "floor_plan_name": "Thornbury Efficiency",
+            "rent_low": 955.0,
+            "rent_high": 955.0,
+            "area": 480,
+            "beds": 1,
+        },
     ]
 
 
@@ -109,6 +121,29 @@ def test_explicit_none_unit_id_does_not_read_as_identity() -> None:
     assert unit_has_real_anchor({"unit_id": ""}) is False
     assert unit_has_real_anchor({"unit_id": "None"}) is False
     assert unit_has_real_anchor({"unit_id": "null"}) is False
+
+
+def test_floorplan_surrogate_is_not_a_real_unit_anchor() -> None:
+    """A legacy RentCafe floorplanId copied to unit_number remains plan-level."""
+    plan_row = {
+        "unit_number": "shared-plan-71",
+        "source_ids": {"rentcafe_floorplan_id": "shared-plan-71"},
+    }
+    assert unit_has_real_anchor(plan_row) is False
+    assert unit_has_real_anchor({**plan_row, "unit_id": "shared-plan-71"}) is False
+
+
+def test_floorplan_surrogate_gets_a_synthetic_fallback_id() -> None:
+    """A legacy shared id cannot survive fallback assignment as a real unit."""
+    plan_row = {
+        "unit_number": "shared-plan-71",
+        "floor_plan_name": "A1",
+        "beds": 1,
+        "source_ids": {"rentcafe_floorplan_id": "shared-plan-71"},
+    }
+    unit_id = assign_fallback_unit_id(plan_row, "P-TEST")
+    assert unit_id is not None and unit_id.startswith("inferred_")
+    assert unit_has_real_anchor(plan_row) is False
 
 
 def test_one_none_row_cannot_rescue_an_all_plan_level_property() -> None:

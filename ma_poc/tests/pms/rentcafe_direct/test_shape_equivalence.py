@@ -44,6 +44,29 @@ def _fixture_stems() -> list[str]:
 _FIXTURES = _fixture_stems()
 
 
+@pytest.fixture(autouse=True)
+def _block_securecafe_recovery_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep plan-only fixture parity offline when recovery is attempted.
+
+    RentCafe floorplan payloads intentionally have no synthetic unit number.
+    The adapter therefore attempts a SecureCafe detail recovery before it
+    returns the correctly-classified plan rows. These fixture tests verify
+    parser shape only, so the recovery seam must return no detail inventory
+    rather than attempt a live request.
+    """
+
+    class _NoInventoryResponse:
+        status_code = 404
+        text = ""
+        content = b""
+        headers: dict[str, str] = {}
+
+    def _no_inventory(*_args: object, **_kwargs: object) -> _NoInventoryResponse:
+        return _NoInventoryResponse()
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _no_inventory)
+
+
 def test_f5_shape_eq_fixture_count_at_least_5() -> None:
     """Drift guard — the parametrize must iterate ≥5 fixtures (per §8.2)."""
     assert len(_FIXTURES) >= 5, (

@@ -256,6 +256,31 @@ def _source_id_anchor(unit: dict[str, Any]) -> str | None:
 SYNTHETIC_ID_PREFIXES: tuple[str, ...] = ("inferred_", "unkeyable_")
 
 
+def _is_floorplan_surrogate(unit: dict[str, Any], candidate: str) -> bool:
+    """Return whether an apparent identity duplicates a plan-level source id.
+
+    Some adapters historically copied a ``floorplanId`` into ``unit_number``.
+    Such an id is stable but shared by every apartment on the plan, so it is
+    evidence for plan matching only—not a genuine per-apartment anchor.  The
+    comparison remains narrow: a normal unit number is rejected only when a
+    source-id key explicitly labels the same literal value as a floor-plan id.
+    """
+    source_ids = unit.get("source_ids")
+    if not isinstance(source_ids, dict) or not candidate:
+        return False
+    for key, value in source_ids.items():
+        normalized_key = str(key).lower().replace("-", "_")
+        if not (
+            normalized_key.endswith("floorplan_id")
+            or normalized_key.endswith("floor_plan_id")
+            or normalized_key.endswith("floorplanid")
+        ):
+            continue
+        if str(value or "").strip() == candidate:
+            return True
+    return False
+
+
 def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
     """True when *unit* carries a genuine per-apartment identity.
 
@@ -279,10 +304,15 @@ def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
         uid
         and uid.lower() not in {"null", "none"}
         and not uid.startswith(SYNTHETIC_ID_PREFIXES)
+        and not _is_floorplan_surrogate(unit, uid)
     ):
         return True
     number = str(unit.get("unit_number") or "").strip()
-    if number and number.lower() not in {"null", "none"}:
+    if (
+        number
+        and number.lower() not in {"null", "none"}
+        and not _is_floorplan_surrogate(unit, number)
+    ):
         return True
     return _source_id_anchor(unit) is not None
 
@@ -306,7 +336,11 @@ def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | Non
     existing = str(
         unit.get("unit_id") or unit.get("unit_number") or ""
     ).strip()
-    if existing and existing.lower() not in {"null", "none"}:
+    if (
+        existing
+        and existing.lower() not in {"null", "none"}
+        and not _is_floorplan_surrogate(unit, existing)
+    ):
         unit["unit_id"] = existing
         return existing
 
