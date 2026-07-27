@@ -216,18 +216,28 @@ def parse_reinhold_units(html: str, url: str) -> list[dict[str, Any]]:
             # with a parseable future date OR a present rent is AVAILABLE.
             avail_status = "AVAILABLE"
 
-            # Apply link mines apartmentId / floorPlanId for source_ids
+            # Apply link mines apartmentId / floorPlanId for source_ids.
+            #
+            # 2026-07-27: emitted as ``securecafe_apartment_id``, not the bare
+            # ``apartment_id`` it used to be. The bare name collides with the v2
+            # OUTPUT's PROPERTY-level ``apartment_id`` field (every record in
+            # properties.json is keyed by it), so once a source-id key can
+            # promote a row to a unit-level anchor, a future adapter reusing
+            # that name for a PROPERTY id would silently mint one apartment out
+            # of a whole building. Registered per-unit in core/source_ids.py
+            # (fixtures 7/7 and 18/18 distinct); the bare name is registered
+            # there as permanently non-admissible.
             source_ids: dict[str, Any] = {}
             for a in unit_div.find_all("a"):
                 href = a.get("href") or ""
                 m = _APPLY_IDS_RE.search(href)
                 if m:
-                    source_ids["apartment_id"] = m.group(1)
+                    source_ids["securecafe_apartment_id"] = m.group(1)
                     source_ids["floor_plan_id"] = m.group(2)
                     break
             # Unit-number cell also links to units-api.php — extract the
             # property+apartment ids from there (richer when present).
-            if "apartment_id" not in source_ids:
+            if "securecafe_apartment_id" not in source_ids:
                 inner_a = unit_cell.find("a")
                 if inner_a:
                     href = inner_a.get("href") or ""
@@ -236,7 +246,7 @@ def parse_reinhold_units(html: str, url: str) -> list[dict[str, Any]]:
                     if pm:
                         source_ids["property_id"] = pm.group(1)
                     if am:
-                        source_ids["apartment_id"] = am.group(1)
+                        source_ids["securecafe_apartment_id"] = am.group(1)
 
             # Reinhold doesn't ship a per-unit sqft cell — the sqft range
             # lives only in the toggle aria-label ("420 - 1250 SQ. FT.")

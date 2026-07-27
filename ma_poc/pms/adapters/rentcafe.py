@@ -35,9 +35,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.config.feature_flags import enable_rentcafe_plan_securecafe_drill
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
@@ -46,6 +48,8 @@ from ma_poc.pms.adapters._parsing import (
 )
 from ma_poc.pms.adapters._rentcafe_hosted_table import parse_rentcafe_hosted_table
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+log = logging.getLogger(__name__)
 
 # Note: ``ma_poc.extraction.post_process`` is imported lazily inside ``extract``
 # below to break the import cycle. The full chain would otherwise be:
@@ -325,6 +329,121 @@ def _is_rentcafe_response(body: Any) -> bool:
     return len(_unit_rent_keys & set(first_lc.keys())) >= 2
 
 
+def _securecafe_swap_verdict(
+    catalogue: list[dict[str, Any]], portal: list[dict[str, Any]]
+) -> tuple[bool, str]:
+    """May the SecureCafe portal result replace/merge over the plan catalogue?
+
+    The getFloorplans catalogue and the ``availableunits.aspx`` portal are
+    different KINDS of list: the catalogue includes plans with
+    ``availableUnitsCount == 0``, the portal is an availability list and
+    ``parse_securecafe_availableunits`` hardcodes
+    ``availability_status="AVAILABLE"``. Letting the portal win unconditionally
+    therefore deletes every fully-leased plan.
+
+    Three checks, cheapest first — all pure, no network:
+
+      1. Every portal row must carry a real per-apartment identity. A portal
+         that parsed into anonymous rows is not unit-level gold.
+      2. The portal must return at least as many apartments as the catalogue
+         says are available (``sum(available_units)``), when that sum is
+         known and > 0. A portal short of its own catalogue's count is
+         partially rendered or paginated.
+      3. Distinct (bedrooms, bathrooms) coverage must not shrink. This is the
+         check that catches the real loss shape — the portal listing 2
+         apartments on one plan while the catalogue described eight.
+
+    Returns ``(accepted, reason)``. *reason* always carries BOTH counts so a
+    rejection is diagnosable from ``result.errors`` alone.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    n_portal, n_cat = len(portal), len(catalogue)
+    if not portal:
+        return False, f"portal returned 0 rows (catalogue has {n_cat} plans)"
+
+    anon = [u for u in portal if not unit_has_real_anchor(u)]
+    if anon:
+        return False, (
+            f"{len(anon)}/{n_portal} portal rows have no per-apartment "
+            f"identity (catalogue has {n_cat} plans)"
+        )
+
+    declared = 0
+    for u in catalogue:
+        try:
+            declared += int(str(u.get("available_units") or "0").strip() or 0)
+        except (TypeError, ValueError):
+            continue
+    if declared > 0 and n_portal < declared:
+        return False, (
+            f"portal returned {n_portal} apartments but the catalogue "
+            f"declares {declared} available across {n_cat} plans"
+        )
+
+    def _num(v: Any) -> float | None:
+        """Numeric bed/bath value, or None when absent/unparseable.
+
+        MUST normalise: the catalogue parser emits ``bathrooms='1'`` while
+        ``parse_securecafe_availableunits`` emits ``'1.0'`` for the same
+        bathroom count. A raw string comparison makes every legitimate swap
+        look like total bed/bath loss and rejects it — measured on a full
+        16-apartment roster that covered every catalogue combination.
+        """
+        try:
+            return float(str(v).strip())
+        except (TypeError, ValueError):
+            return None
+
+    def _shape(rows: list[dict[str, Any]]) -> set[tuple[float, float]]:
+        out: set[tuple[float, float]] = set()
+        for u in rows:
+            bed, bath = _num(u.get("bedrooms")), _num(u.get("bathrooms"))
+            if bed is not None and bath is not None:
+                out.add((bed, bath))
+        return out
+
+    lost = _shape(catalogue) - _shape(portal)
+    if lost:
+        return False, (
+            f"portal ({n_portal} rows) drops {len(lost)} bed/bath "
+            f"combination(s) present in the {n_cat}-plan catalogue: "
+            f"{sorted(lost)}"
+        )
+    return True, f"portal {n_portal} rows >= catalogue {n_cat} plans"
+
+
+def _plan_key(unit: dict[str, Any]) -> str:
+    """Normalised floor-plan name, the join key between the two lists."""
+    return re.sub(r"\s+", " ", str(unit.get("floor_plan_name") or "").strip()).lower()
+
+
+def _merge_portal_over_catalogue(
+    catalogue: list[dict[str, Any]], portal: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Union the portal's apartments with the catalogue's uncovered plans.
+
+    NOT ``_merge_fns.merge_into_result_units``. That helper is an anchor-first
+    merge for two views of the SAME unit list; here the two sides are different
+    KINDS of list — 8 plan rows vs a 16-apartment roster — so its rank ladder
+    matches many incoming apartments onto one existing plan row and merges them
+    into each other. Measured: 16 portal apartments collapsed to 8 rows, i.e.
+    the merge lost half the roster while looking like it preserved the
+    catalogue.
+
+    The correct semantics are plan-keyed:
+      * a plan the portal covers is SUPERSEDED — its aggregate row is replaced
+        by the real apartments on it;
+      * a plan the portal does NOT cover is RETAINED — that is precisely the
+        fully-leased plan (``availableUnitsCount == 0``, ``UNAVAILABLE``) an
+        availability list structurally cannot mention, and dropping it is the
+        loss this whole guard exists to prevent.
+    """
+    covered = {_plan_key(u) for u in portal} - {""}
+    retained = [u for u in catalogue if _plan_key(u) not in covered]
+    return list(portal) + retained
+
+
 # 2026-04-20 fix: structured tier codes for failure-mode classification.
 # Pre-fix, every RentCafe failure stamped ``TIER_1_API_RENTCAFE`` regardless of
 # whether the adapter saw zero responses, saw responses that didn't shape-match,
@@ -461,24 +580,88 @@ class RentCafeAdapter:
                 # is plan-level ONLY (no unit_number), attempt the
                 # securecafe drill-down BEFORE returning; prefer unit-level,
                 # fall back to this plan-level result if it fails.
+                #
+                # 2026-07-27 — FLAGGED OFF by default. PR #110 stopped copying
+                # the RentCafe ``floorplanId`` into ``unit_number``, which is
+                # correct, but it also re-armed this branch: ``_has_unit_level``
+                # used to be True for EVERY plan payload (the floorplanId
+                # fallback made unit_number non-empty), so the drill never ran
+                # from here. It now fires on every RentCafe property whose XHR
+                # yields only plan rows — all 5 rentcafe_direct fixtures and the
+                # real captured payload fixtures/rentcafe/35593.json included.
+                #
+                # Two hazards, both specific to THIS entry (the SHAPE_REJECTED
+                # call site below is fine — ``all_units`` is empty there, so
+                # there is nothing to discard):
+                #   * it REPLACED rather than merged, and
+                #     ``parse_securecafe_availableunits`` hardcodes
+                #     availability_status="AVAILABLE" — the portal is an
+                #     AVAILABILITY LIST, getFloorplans is the CATALOGUE. Every
+                #     fully-leased plan was silently lost. FIXED below by the
+                #     acceptance guard + merge (Tranche 2).
+                #   * up to ~1,535s of wall clock per property under the prod
+                #     SecureCafe config, against jugnu's 600s wait_for. This is
+                #     what the flag still exists for.
+                # See config/feature_flags.enable_rentcafe_plan_securecafe_drill
+                # for the full argument.
                 _has_unit_level = any(
                     str(u.get("unit_number") or "").strip() for u in pp.admitted
                 )
-                if not _has_unit_level:
+                if not _has_unit_level and enable_rentcafe_plan_securecafe_drill():
                     sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
                     if sc_units:
                         sc_pp = post_process(
                             sc_units,
                             property_id=getattr(ctx, "property_id", None),
                         )
-                        if sc_pp.n_admitted > 0:
-                            result.units = sc_pp.admitted
-                            result.plan_summaries = sc_pp.plan_summaries
-                            result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                        # ── Tranche-2 ACCEPTANCE GUARD ───────────────────
+                        # The flag alone was a kill switch, not a guard: with
+                        # it ON the portal result replaced the catalogue
+                        # outright, so an 8-plan property whose portal listed
+                        # the 2 currently-available apartments shipped 2 units,
+                        # 0 plan_summaries, 7 unrecoverable plan names, the
+                        # fully-leased plans' UNAVAILABLE rows erased — and
+                        # ``result.errors`` empty. The portal may only WIN when
+                        # it is demonstrably not a downgrade.
+                        _accepted, _reason = _securecafe_swap_verdict(
+                            pp.admitted, sc_pp.admitted
+                        )
+                        if sc_pp.n_admitted > 0 and _accepted:
+                            # MERGE, never overwrite: the catalogue carries the
+                            # fully-leased plans (availableUnitsCount == 0) that
+                            # an availability list structurally cannot.
+                            result.units = _merge_portal_over_catalogue(
+                                pp.admitted, sc_pp.admitted
+                            )
+                            result.plan_summaries = (
+                                sc_pp.plan_summaries or pp.plan_summaries
+                            )
+                            # DISTINCT tier string, non-negotiable: both call
+                            # sites used to stamp ``_SECURECAFE``.
+                            # ``result.errors`` is not persisted and the v2
+                            # ``_extract_result`` block carries only
+                            # ``llm_cost_usd`` + ``tier_used``, so without a
+                            # distinct string this flag is literally
+                            # unevaluable from run artifacts. The other site
+                            # keeps ``_SECURECAFE`` — cross-run tier
+                            # comparisons (1,344/4,982 on 2026-07-12) depend
+                            # on that string not moving.
+                            result.tier_used = f"{_TIER_BASE}_SECURECAFE_FROM_PLAN"
                             result.confidence = min(
                                 0.92, 0.7 + 0.04 * sc_pp.n_admitted
                             )
                             return result
+                        # Rejected: keep the catalogue, keep the base tier, and
+                        # SAY SO with both counts. A silent rejection is how
+                        # the replace-bug stayed invisible for a whole cohort.
+                        log.info(
+                            "rentcafe.securecafe_from_plan.rejected pid=%s %s",
+                            getattr(ctx, "property_id", None),
+                            _reason,
+                        )
+                        result.errors.append(
+                            f"rentcafe: securecafe_from_plan swap rejected — {_reason}"
+                        )
                 # Unit-level already present, or securecafe drill-down
                 # unavailable: return the network getFloorplans result.
                 # Stage 2: surface unit-level AND plan-level lists. The
@@ -1524,7 +1707,22 @@ async def _try_rentcafe_securecafe_probe(
                     web_unlocker_key,
                 )
                 if web_unlocker_key():
-                    wu = web_unlocker_get(candidate_au, timeout=120)
+                    # 2026-07-27: OFF-LOADED to a thread. This was a bare
+                    # synchronous call inside an ``async def`` — no await, no
+                    # to_thread — while the sibling legs at the direct/proxied
+                    # attempts above are correctly ``await asyncio.to_thread``.
+                    # ``web_unlocker_get`` is a blocking
+                    # ``urllib.request.urlopen`` (``_probe.py:313``), so up to
+                    # 3 candidates x 120s = up to 360s of EVENT-LOOP
+                    # STARVATION per property, on a path that fires on ~1,344
+                    # properties via the SHAPE_REJECTED entry. That is exactly
+                    # the failure mode of the 2026-07-25 timeout RCA (sync
+                    # probe_get on the loop → mean property 305s against a
+                    # 600s cap → victims rotate), and it is independent of
+                    # PR #110 and of the flag above.
+                    wu = await asyncio.to_thread(
+                        web_unlocker_get, candidate_au, timeout=120
+                    )
                     if wu.status_code == 200 and "AvailUnitRow" in (wu.text or ""):
                         body_text = wu.text or ""
             except Exception as exc:

@@ -366,15 +366,46 @@ def test_seen_at_iso_strips_surrounding_whitespace() -> None:
 
 # ── #34: prefer a captured per-unit source_id over the phenotype hash ────────
 def test_fallback_prefers_per_unit_source_id() -> None:
-    """A captured appfolio_listing_id becomes the (real, non-synthetic) id
-    instead of an inferred_ phenotype hash."""
+    """A captured STABLE per-unit id becomes the (real, non-synthetic) id
+    instead of an inferred_ phenotype hash.
+
+    2026-07-27: the example key moved from ``appfolio_listing_id`` to
+    ``appfolio_listable_uid``. ``appfolio_listing_id`` was MEASURED to rotate
+    across runs (44 of 303 rows joined 2026-07-12 <-> 2026-07-18 = 14.5%; same
+    apartment, same plan, same rent, different id) and is now UNIT_VOLATILE —
+    see ``test_fallback_rejects_a_rotating_source_id`` directly below.
+    ``appfolio_listable_uid`` rotated 0 of 19.
+    """
+    u = {
+        "floor_plan_name": "A1", "beds": 1, "baths": 1, "sqft": 700, "rent_low": 1500,
+        "source_ids": {"appfolio_listable_uid": "12345"},
+    }
+    res = assign_fallback_unit_id(u, "P1")
+    # 2026-07-27: prefix is the FULL key name, not ``k.split("_")[0]``. The
+    # truncated form collided across namespaces — measured 3 units / 2 props on
+    # 2026-07-12 — and would merge ``realpage_cws_unit_id`` with
+    # ``realpage_oll_unit_id`` outright now that both are admitted.
+    assert res == "appfolio_listable_uid-12345"
+    assert not res.startswith(("inferred_", "unkeyable_"))
+
+
+def test_fallback_rejects_a_rotating_source_id() -> None:
+    """A UNIT_VOLATILE key must NOT become the daily-join id.
+
+    ``appfolio_listing_id`` is unique within a property but rotates its value
+    between runs, so anchoring on it makes the same apartment read as
+    "disappeared + new" at every daily join. It stays valid EVIDENCE that the
+    row is one apartment — asserted here too, because losing that would
+    wrongly demote ~20,874 AppFolio rows to plan-level.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
     u = {
         "floor_plan_name": "A1", "beds": 1, "baths": 1, "sqft": 700, "rent_low": 1500,
         "source_ids": {"appfolio_listing_id": "12345"},
     }
-    res = assign_fallback_unit_id(u, "P1")
-    assert res == "appfolio-12345"
-    assert not res.startswith(("inferred_", "unkeyable_"))
+    assert unit_has_real_anchor(u) is True
+    assert assign_fallback_unit_id(u, "P1").startswith("inferred_")
 
 
 def test_fallback_ignores_plan_level_source_id() -> None:
@@ -392,4 +423,4 @@ def test_fallback_source_id_rent_stable() -> None:
     """Source-id anchor is rent-independent (daily-join stability)."""
     a = assign_fallback_unit_id({"source_ids": {"apts247_unit_id": "77"}, "rent_low": 1500}, "P1")
     b = assign_fallback_unit_id({"source_ids": {"apts247_unit_id": "77"}, "rent_low": 1600}, "P1")
-    assert a == b == "apts247-77"
+    assert a == b == "apts247_unit_id-77"

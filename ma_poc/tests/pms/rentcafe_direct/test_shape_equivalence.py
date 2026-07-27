@@ -45,14 +45,32 @@ _FIXTURES = _fixture_stems()
 
 
 @pytest.fixture(autouse=True)
-def _block_securecafe_recovery_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep plan-only fixture parity offline when recovery is attempted.
+def _securecafe_portal_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin ONE branch: the SecureCafe portal is unreachable.
 
-    RentCafe floorplan payloads intentionally have no synthetic unit number.
-    The adapter therefore attempts a SecureCafe detail recovery before it
-    returns the correctly-classified plan rows. These fixture tests verify
-    parser shape only, so the recovery seam must return no detail inventory
-    rather than attempt a live request.
+    RentCafe floorplan payloads intentionally have no synthetic unit number
+    (PR #110), so when the plan→SecureCafe drill is enabled the adapter tries a
+    detail recovery before returning the correctly-classified plan rows. These
+    fixture tests verify parser shape only, so the recovery seam must not
+    attempt a live request.
+
+    WHAT THIS PINS: ``probe_get`` returns 404 ⇒ ``_find_all_securecafe_bases``
+    finds nothing on an empty body ⇒ ``bases`` stays empty ⇒ the probe returns
+    ``[]`` ⇒ the adapter falls through to the plan rows and stamps
+    ``TIER_1_API_RENTCAFE``. The tier assertion at the bottom of this file is
+    load-bearing on that: a SUCCESSFUL portal would stamp
+    ``TIER_1_API_RENTCAFE_SECURECAFE_FROM_PLAN`` and fail the test.
+
+    WHAT IT DOES **NOT** COVER: any successful portal response — i.e. the
+    replace-instead-of-merge hazard and the acceptance guard. Those live in
+    ``test_securecafe_from_plan.py``; do not read this fixture's green as
+    evidence about them.
+
+    Note this is a NARROWING, not the actual network guard. The repo-level
+    ``_block_live_network`` in ``ma_poc/conftest.py`` (whose
+    ``UnstubbedNetworkCall`` derives from ``BaseException`` so a blanket
+    ``except Exception`` cannot swallow it) is what actually bites; removing
+    this fixture yields 5 failed / 1 passed, all ``UnstubbedNetworkCall``.
     """
 
     class _NoInventoryResponse:
@@ -131,6 +149,25 @@ async def test_f5_unit_shape_matches_rentcafe_adapter(canonical_id: str) -> None
         assert not missing, (
             f"{canonical_id}: unit missing canonical keys {missing}; "
             f"full keys = {sorted(unit.keys())}"
+        )
+
+    # 2026-07-27: the key-PRESENCE check above passed happily through PR #110,
+    # which changed the VALUE of ``unit_number`` on every one of these rows from
+    # a RentCafe floorplanId to "". Nothing in the suite asserted that. Assert
+    # the actual post-#110 shape here so a regression to "plan id in
+    # unit_number" (false gold: a plan id is shared by every apartment on the
+    # plan, so plan rows read as unit-level and recovery skips them) fails a
+    # test rather than shipping.
+    for unit in result.units:
+        assert unit["unit_number"] == "", (
+            f"{canonical_id}: a RentCafe plan row must carry an EMPTY "
+            f"unit_number, got {unit['unit_number']!r}. A floorplanId must "
+            f"never go back into unit_number (PR #110)."
+        )
+        sids = unit.get("source_ids") or {}
+        assert sids.get("rentcafe_floorplan_id"), (
+            f"{canonical_id}: the plan id must still be captured as provenance "
+            f"in source_ids['rentcafe_floorplan_id']; got {sids!r}"
         )
 
     # Tier-used should be the canonical TIER_1_API_RENTCAFE — the direct

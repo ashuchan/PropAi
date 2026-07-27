@@ -35,10 +35,13 @@ Do not skip steps. Do not reorder steps. This workflow applies to every file in 
 - Fixtures go in `tests/fixtures/`. Use realistic HTML — not lorem ipsum.
 
 **STEP 4 — Run tests and fix failures before moving on**
-- Run: `pytest tests/test_{module}.py -v --tb=short`
+- Run from the **repo root** (the dir containing `ma_poc/`), never from inside it:
+  `python -m pytest ma_poc/tests/pms/test_{module}.py -p no:randomly -v --tb=short`
 - ALL tests must pass before moving to the next module.
 - Fix the implementation, not the test (unless the test itself is wrong).
-- Run `pytest tests/ -v` at the end of each weekly gate to confirm no regressions.
+- At each weekly gate run the full suite and **diff the failure SET** against a
+  baseline taken the same way — never compare counts. See **Running tests**
+  below for the four ways this suite reports misleading numbers.
 
 **STEP 5 — Run static analysis after each module**
 - Run: `ruff check {module_file}.py` — fix all E/F (error) level findings immediately.
@@ -54,7 +57,10 @@ Do not skip steps. Do not reorder steps. This workflow applies to every file in 
 **STEP 7 — Bug hunt after ALL modules complete**
 - After all Phase A modules are implemented and all tests pass, execute the Bug Hunt section below.
 - For each of the 15 bug categories: explicitly state `CHECKED — NOT PRESENT` or `CHECKED — FOUND AND FIXED: [description]`.
-- Run the full test suite again after all bug fixes: `pytest . -v --ignore=data --ignore=config`
+- Run the full test suite again after all bug fixes, from the **repo root**:
+  `python -m pytest ma_poc/tests/ -p no:randomly -q --continue-on-collection-errors`
+  Compare the failure **SET** to your pre-change baseline — the suite has known
+  pre-existing failures, so "exits 0" is not the bar; "no NEW failing test ids" is.
 - Run `python scripts/smoke_test.py` one final time — must pass 5/5.
 - Phase A is not complete until smoke_test passes 5/5 and all 15 categories are checked.
 
@@ -652,21 +658,69 @@ Write the test file for each module immediately after implementing it (Workflow 
 
 ### Running tests
 
+> ⚠️ **This suite reports wrong numbers in four ways. Read this before trusting
+> any count.** Each one produces output that looks authoritative and is not.
+
+**Always run from the REPO ROOT** (the directory containing `ma_poc/`), never
+from inside `ma_poc/`, and always echo the tree first:
+
 ```bash
-# Run a single module's tests while developing (fast feedback)
-pytest tests/test_{module}.py -v --tb=long
+cd <repo-root> && echo "root: $(pwd)  branch: $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse --short HEAD)" \
+  && python -m pytest ma_poc/tests/ -p no:randomly --continue-on-collection-errors -q
+```
 
-# Run all tests — do this at every weekly gate
-pytest . -v --tb=short --ignore=data --ignore=config
+| trap | symptom | why the echo/flags fix it |
+|---|---|---|
+| **wrong depth** — run from inside `ma_poc/` | **82** failures vs **5** from the root, same tree, all `FileNotFoundError` | fixture paths are anchored on `__file__` now (guarded by `tests/pms/test_fixture_paths_cwd_independent.py`), but run from the root anyway |
+| **wrong tree** — this machine has ~14 worktrees, each with its own `ma_poc/` | you test a different branch entirely and never know | `-q` suppresses pytest's `rootdir:` line **and** any `pytest_report_header` hook, so the `echo` is the only thing that identifies the tree |
+| **collect error** | `Interrupted: 1 error during collection` — **zero** tests run, exit looks clean | `--continue-on-collection-errors` |
+| **order-dependent tests** | different failure set per invocation order | `-p no:randomly`, and **compare failure SETS, never counts** |
 
-# With coverage
-pytest . -v --ignore=data --ignore=config --cov=. --cov-report=term-missing
+**Never compare counts across runs.** Diff the failing test IDs against a
+baseline captured with the identical command, from the identical directory:
 
-# Stop on first failure (useful during active debugging)
-pytest tests/ -v --tb=long -x
+```bash
+python -m pytest ma_poc/tests/ -p no:randomly -q --continue-on-collection-errors 2>&1 \
+  | grep -E '^(FAILED|ERROR)' | sed 's/ - .*//' | sort -u > /tmp/after.txt
+comm -13 /tmp/baseline.txt /tmp/after.txt    # regressions only
+```
 
-# Run tests matching a keyword
-pytest tests/ -v -k "tier1 or tier2"
+**Tests must not touch the network.** Production fetches through
+`ma_poc.pms.adapters._probe.probe_get` — a sync curl_cffi call — so stubbing
+`httpx` / `get_adapter` / `resolve_target` / `detect_pms` does **not** stop it.
+A stub that no longer stubs *fails open*: the call still succeeds, against the
+real internet, and the test keeps passing until the world changes. `ma_poc/conftest.py`
+now raises `UnstubbedNetworkCall`; stub that seam, or mark the test
+`@pytest.mark.probe_seam` (transport mocked underneath) or
+`@pytest.mark.live_network`. **Heuristic: a test taking seconds where it should
+take milliseconds is doing I/O you did not intend.**
+
+Other invocations (same rules apply — repo root, echo the tree):
+
+```bash
+# One module while developing
+python -m pytest ma_poc/tests/pms/test_scraper.py -p no:randomly -v --tb=long
+
+# Stop on first failure
+python -m pytest ma_poc/tests/ -p no:randomly -x --tb=long --continue-on-collection-errors
+
+# By keyword
+python -m pytest ma_poc/tests/ -p no:randomly -k "tier1 or tier2"
+
+# Coverage
+python -m pytest ma_poc/tests/ -p no:randomly --continue-on-collection-errors \
+  --cov=ma_poc --cov-report=term-missing
+```
+
+**Before landing several branches together, octopus-merge and run the full
+suite.** Branches that are each green alone can break together — `git merge-tree`
+reporting zero conflicts is not sufficient, because the collision can be
+semantic (this happened with #108 + #109):
+
+```bash
+git worktree add --detach /tmp/combined main
+cd /tmp/combined && git merge --no-edit <branch-a> <branch-b> ...
+python -m pytest ma_poc/tests/ -p no:randomly -q --continue-on-collection-errors
 ```
 
 ---
@@ -703,7 +757,7 @@ Document any unmet gate with root cause before proceeding.
 | 3 | Vision Tier 5 fallback live. | Fallback rate ≤ 5% in `validate_outputs.py`. |
 | 3 | Banner capture on 100% of non-SKIPPED properties. | All SUCCESS `ScrapeEvent`s have `banner_capture_attempted=True`. |
 | 3 | 5–10% accuracy sample live. | Vision comparison JSONs appearing in `extraction_output/`. |
-| 3 | All tests passing. Smoke test 5/5. | `pytest . --ignore=data --ignore=config` exits 0. `smoke_test.py` exits 0. |
+| 3 | No NEW test failures vs baseline. Smoke test 5/5. | `python -m pytest ma_poc/tests/ -p no:randomly -q --continue-on-collection-errors` from the repo root shows no failing test id absent from the recorded baseline. `smoke_test.py` exits 0. |
 
 ---
 
@@ -801,7 +855,7 @@ All items must be checked before Phase A is declared done.
 **Tests**
 - [ ] All 7 test files with minimum test counts met
 - [ ] `tests/fixtures/` with realistic HTML files for all 3 PMS platforms
-- [ ] `pytest . -v --ignore=data --ignore=config` exits with zero failures
+- [ ] `python -m pytest ma_poc/tests/ -p no:randomly -q --continue-on-collection-errors` (from the repo root) introduces no failing test id that is not in the recorded baseline
 - [ ] Coverage report generated
 
 **Bug hunt**

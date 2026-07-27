@@ -25,6 +25,14 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
+from ma_poc.core.source_ids import (
+    PER_UNIT_EVIDENCE_KEYS,
+    PER_UNIT_IDENTITY_KEYS,
+    SourceIdScope,
+    normalize_source_id_key,
+    scope_of,
+)
+
 log = logging.getLogger(__name__)
 
 
@@ -219,37 +227,80 @@ def _last_resort_key(unit: dict[str, Any], property_id: str) -> str | None:
 # Per-unit ids some adapters capture into ``source_ids`` but never promote to
 # ``unit_id``. These are STABLE, UNIQUE-PER-UNIT keys — prefer them over the
 # phenotype hash (which is rent-unstable when two same-plan units collide, and
-# reads as synthetic ``inferred_``). Whitelist only the per-UNIT keys; the
-# per-PLAN keys (``sightmap_floor_plan_id``, ``*_floor_plan_id``,
-# ``*_floorplan_id``) are shared across a plan's units and must NOT be used.
-_PER_UNIT_SOURCE_ID_KEYS: tuple[str, ...] = (
-    "appfolio_listing_id",
-    "appfolio_listable_uid",
-    "appfolio_id",
-    "apts247_unit_id",
-    "entrata_unit_id",
-    "knock_unit_id",
-)
+# reads as synthetic ``inferred_``).
+#
+# 2026-07-27: the hand-maintained 6-key tuple that used to live here is gone.
+# It had drifted from ``reporting/verdict.PER_UNIT_SOURCE_ID_KEYS`` in BOTH
+# directions, and two of its six entries (``entrata_unit_id``,
+# ``knock_unit_id``) had no writer anywhere in the repo while ten real per-unit
+# keys were in neither list. Membership now comes from the one registry that
+# every consumer shares — see ``ma_poc/core/source_ids.py`` for the per-key
+# evidence and the "no name-shaped admission rule" argument.
 
 
 def _source_id_anchor(unit: dict[str, Any]) -> str | None:
     """A stable, unique per-unit id captured in ``source_ids``, or None.
 
-    Returns a provenance-prefixed id (e.g. ``appfolio-12345``) so it is
-    unambiguous and never collides with a real ``unit_number`` namespace. Only
-    the per-unit keys in :data:`_PER_UNIT_SOURCE_ID_KEYS` qualify.
+    Returns a provenance-prefixed id (e.g. ``appfolio_listing_id-12345``) so it
+    is unambiguous and never collides with a real ``unit_number`` namespace.
+    Only the keys in :data:`~ma_poc.core.source_ids.PER_UNIT_IDENTITY_KEYS`
+    qualify; the tuple order IS the anchor preference order.
+
+    The prefix is the FULL key name, not ``k.split("_")[0]``. The old truncated
+    form was already minting collisions (measured: 3 units across 2 properties
+    on 2026-07-12 collided under the then-current 6-key list) and becomes
+    structurally broken now that both ``realpage_cws_unit_id`` and
+    ``realpage_oll_unit_id`` are admitted — two unrelated backend id namespaces
+    would both collapse onto ``realpage-<id>`` and silently merge distinct
+    apartments at upsert.
+
+    ⚠ THIS FUNCTION IS UNREACHABLE FROM THE PRODUCTION FORMATTER TODAY.
+    ``jugnu._format_v2_unit`` calls :func:`assign_fallback_unit_id` at
+    ``jugnu.py:3118`` but does not populate ``out["source_ids"]`` until
+    :3134, so the lookup below reads a missing key and returns ``None`` every
+    time. A prefix scan across all 228,708 units in the three run-artifact
+    sets finds 0 occurrences of ``appfolio-`` / ``apts247-`` / ``entrata-`` /
+    ``knock-`` AND 0 of the new full-key form — that is NOT "re-keying churn
+    is nil", it is proof the path is dead; 280 rows carrying an
+    already-admitted key still shipped ``inferred_``. Widening
+    ``PER_UNIT_IDENTITY_KEYS`` therefore changes NOTHING in production until
+    the jugnu ordering is fixed. See the MEASURED PRODUCTION IMPACT section of
+    ``ma_poc/core/source_ids.py`` for the prerequisite and why it needs its own
+    canary. ``test_source_id_anchor_is_inert_in_jugnu`` pins this so the claim
+    cannot silently go stale.
     """
     sids = unit.get("source_ids")
     if not isinstance(sids, dict):
         return None
-    for k in _PER_UNIT_SOURCE_ID_KEYS:
+    for k in PER_UNIT_IDENTITY_KEYS:
         v = sids.get(k)
         if v in (None, "", -1, "-1"):
             continue
         s = str(v).strip()
         if s and s.lower() not in {"null", "none"}:
-            return f"{k.split('_')[0]}-{s}"
+            return f"{k}-{s}"
     return None
+
+
+def _has_per_unit_evidence(unit: dict[str, Any]) -> bool:
+    """True when ``source_ids`` proves *unit* is a single apartment.
+
+    The CLASSIFY view — ``PER_UNIT_EVIDENCE_KEYS`` = UNIT_STABLE u
+    UNIT_VOLATILE. Wider than :func:`_source_id_anchor`'s minting view by
+    exactly the keys that are unique-within-property but rotate across runs.
+    Uniqueness is all a "is this a real apartment?" answer needs; only the
+    daily-join key additionally needs stability.
+    """
+    sids = unit.get("source_ids")
+    if not isinstance(sids, dict):
+        return False
+    for k in PER_UNIT_EVIDENCE_KEYS:
+        v = sids.get(k)
+        if v in (None, "", -1, "-1"):
+            continue
+        if str(v).strip() and str(v).strip().lower() not in {"null", "none"}:
+            return True
+    return False
 
 
 #: Prefixes minted by this module when a row has no identifying anchor.
@@ -264,17 +315,78 @@ def _is_floorplan_surrogate(unit: dict[str, Any], candidate: str) -> bool:
     evidence for plan matching only—not a genuine per-apartment anchor.  The
     comparison remains narrow: a normal unit number is rejected only when a
     source-id key explicitly labels the same literal value as a floor-plan id.
+
+    2026-07-27 — the plan scan now consults the registry (20 plan keys)
+    instead of suffix-matching (10 keys). Measured cost of the widening: ZERO
+    — of 228,708 units across the three run-artifact sets, not one row
+    collides with a plan key the suffix test missed. The suffix test is KEPT
+    as the backstop for an UNREGISTERED key, so a ``foo_floorplan_id`` landing
+    in a hotfix branch before the registry is updated is still caught.
+
+    NO PROVENANCE OVERRIDE HERE — deliberately. An earlier draft opened this
+    function with "if the row carries an admitted per-unit anchor, it is not a
+    surrogate, return False". That reads as obviously right and is actively
+    harmful, because of where this predicate is CONSUMED:
+    :func:`assign_fallback_unit_id` resolves ``unit_id or unit_number`` at step
+    1 and only reaches :func:`_source_id_anchor` at step 2. Suppressing the
+    surrogate verdict therefore makes step 1 WIN — with the floor-plan id —
+    and the real per-unit anchor one line later is never consulted. Three
+    apartments on plan 5391405 carrying distinct ``realpage_cws_unit_id``s all
+    minted the single id ``5391405``: exactly the PR #110 defect, silently
+    re-introduced one layer down. Exposure had it shipped: 35,687 rows / 1,389
+    properties across the three artifact sets carry BOTH an admitted per-unit
+    key and a plan key (sightmap 29,585; entrata 5,540; apts247 435; spherexx
+    72; onsite 43; realpage_cws 12), i.e. their #110 guard would have been
+    unconditionally off. Benefit measured over the same 228,708 rows: the
+    override changed the surrogate verdict on ZERO of them. The intent it was
+    reaching for — "a row with a real backend id is a real apartment" — is
+    already fully served by :func:`unit_has_real_anchor`'s final line, and
+    demoting here is what ROUTES the row to step 2 so it gets
+    ``<key>-<id>`` instead of the plan id. Pinned by
+    ``test_demotion_routes_the_row_to_its_per_unit_anchor``.
+
+    ACCEPTED FALSE POSITIVE, pinned by test so nobody "fixes" it wrongly:
+    property 35256's row ``{"unit_id": "14", "source_ids":
+    {"camden_floor_plan_id": 14, "camden_unit_id": 394}}`` — plan E1, $1,739 —
+    stays demoted, BY DESIGN, and this PR makes that row strictly worse: it is
+    the one row in 228,708 that goes from carrying per-unit evidence to
+    carrying none, because ``camden_unit_id`` was in verdict's old 12-key list
+    and is registered PLAN here. It IS a real apartment whose unit number
+    collides with its plan id by coincidence, but ``camden_unit_id`` is
+    genuinely plan-scoped — ``_camden.py:251`` reads ``plan["realPageUnitId"]``
+    off the PLAN object under the comment "Plan-level fingerprint shared across
+    all units of this plan" and stamps it identically into every emitted row
+    (measured: 366 rows / 129 distinct; value rotates 27.2% of joined rows
+    between 07-12 and 07-18; unit 394 -> 404 for this very apartment) — so it
+    cannot serve as evidence. Using it would collapse unit_ids
+    302/14/201/114/202 onto one anchor to rescue one row.
+
+    Residual blast radius, measured: exactly 1 row in each of 2026-07-12 and
+    the 07-18 canary, 0 in plancohort, and the PROPERTY-level verdict is
+    unchanged in all three (``_units_are_unit_level`` stays True for 35256 —
+    its sibling rows carry their own anchors). The correct fix is
+    property-scoped — a TRUE plan surrogate makes every sibling row on the plan
+    carry the same candidate, and here the siblings carry 302/201/114/202 —
+    which needs sibling context threaded into this row-scoped function. Not
+    worth it for 1 unit; revisit if the count ever exceeds ~50 in a run.
     """
     source_ids = unit.get("source_ids")
     if not isinstance(source_ids, dict) or not candidate:
         return False
+    # Step 3 — registry plan scan, with the legacy suffix test as the
+    # unregistered-key backstop.
     for key, value in source_ids.items():
-        normalized_key = str(key).lower().replace("-", "_")
-        if not (
+        normalized_key = normalize_source_id_key(key)
+        registered = scope_of(normalized_key)
+        if registered is SourceIdScope.PLAN:
+            pass
+        elif registered is None and (
             normalized_key.endswith("floorplan_id")
             or normalized_key.endswith("floor_plan_id")
             or normalized_key.endswith("floorplanid")
         ):
+            pass
+        else:
             continue
         if str(value or "").strip() == candidate:
             return True
@@ -282,15 +394,26 @@ def _is_floorplan_surrogate(unit: dict[str, Any], candidate: str) -> bool:
 
 
 def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
-    """True when *unit* carries a genuine per-apartment identity.
+    """True when *unit* describes ONE REAL APARTMENT rather than a floor plan.
 
-    Answers "will this row end up with a real unit_id, or a synthesised one?"
-    using the SAME anchors :func:`assign_fallback_unit_id` resolves against, so
-    callers get a consistent answer at ANY point in the pipeline.
+    This is a CLASSIFY question, not a minting question, and since 2026-07-27
+    the two have different answers for three keys. Every consumer —
+    ``reporting.verdict`` (unit-level vs SUCCESS_PLAN_LEVEL),
+    ``pms.scraper.rows_are_plan_level`` (the Path-B retry trigger and the
+    universal-recovery gate) — is asking "is this row a real apartment?", for
+    which uniqueness-within-property is sufficient. It therefore resolves
+    against :data:`~ma_poc.core.source_ids.PER_UNIT_EVIDENCE_KEYS`.
 
-    That last part is the whole reason this exists. ``unit_id`` is not minted
-    until ``_format_v2_unit`` runs, but the verdict layer runs BEFORE the
-    formatter — so a plan-vs-unit test written as
+    :func:`assign_fallback_unit_id` asks a STRICTER question — "may this id be
+    the daily-join key?" — which additionally needs cross-run stability, so it
+    resolves against the narrower ``PER_UNIT_IDENTITY_KEYS``. A row carrying
+    only ``appfolio_listing_id`` is consequently classified unit-level here
+    (it IS one apartment) while still minting ``inferred_*`` there (the id
+    rotates on 14.5% of rows, so anchoring on it would churn the daily join).
+    That divergence is deliberate; it is not the two lists drifting again.
+
+    ``unit_id`` is not minted until ``_format_v2_unit`` runs, but the verdict
+    layer runs BEFORE the formatter — so a plan-vs-unit test written as
     ``unit_id.startswith("inferred_")`` silently reads an absent field and
     concludes "real identity" for every plan-level row. Measured on the
     2026-07-25 run that mislabelled ~436 plan-level properties as SUCCESS.
@@ -314,7 +437,7 @@ def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
         and not _is_floorplan_surrogate(unit, number)
     ):
         return True
-    return _source_id_anchor(unit) is not None
+    return _has_per_unit_evidence(unit)
 
 
 def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | None:
