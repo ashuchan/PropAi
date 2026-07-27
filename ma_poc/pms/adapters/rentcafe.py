@@ -87,14 +87,16 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         Pre-fix, MAA's per-unit ``sqft=1019`` was silently dropped because
         only the min/max forms were read.
 
-      * **unit_number**: prefer the unit-level identifier (``apartmentname``
-        or ``unitnumber``) when present; fall back to ``floorplanid`` (the
-        legacy floorplan-level surrogate). MAA emits ``apartmentName="217"``
-        — that's the real unit number, not the shared floorplan id.
+      * **unit_number**: accept only a unit-level identifier
+        (``apartmentname`` or ``unitnumber``). ``floorplanId`` is retained in
+        ``source_ids`` as plan provenance, never promoted to ``unit_number``:
+        it is shared by all apartments on that plan and would turn a plan row
+        into a false unit-level success. MAA emits ``apartmentName="217"`` —
+        that is the real unit number, not the shared floorplan id.
 
-    Both changes are additive: the legacy fallbacks keep existing Windsor/
-    Bexley/Pacifica behaviour intact (their payloads don't carry the
-    unit-level fields).
+    The sqft handling remains backward-compatible. Floorplan-only Windsor/
+    Bexley/Pacifica payloads now remain explicitly plan-level so downstream
+    recovery is allowed to pursue their availability/detail route.
     """
     units: list[dict[str, str]] = []
     for item in items:
@@ -103,6 +105,27 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         item_lc = _normalise_item(item)
 
         name = str(item_lc.get("floorplanname") or "")
+        if not name.strip():
+            # Nameless plan payloads must still carry a STABLE plan label.
+            #
+            # Blanking ``unit_number`` (below) is correct — a floorplanId is
+            # not an apartment. But with no name either, the row falls past
+            # ``compute_fallback_unit_id`` (which requires a floor plan) into
+            # ``synthesize_unkeyable_id``, whose hash covers the whole payload
+            # INCLUDING rent. The id then changes on every price move, so the
+            # daily join reports disappeared+new forever and rent history for
+            # that plan can never be reconstructed — the exact churn class
+            # already fixed once for collision suffixes (jugnu.py P3).
+            #
+            # Measured exposure at the time of writing: 782 units across 109
+            # property-records in RentCafe-tier properties have an empty
+            # floor_plan_name.
+            #
+            # The plan id is stable across rent changes and is what the
+            # operator itself keys the plan by, so it is the honest label.
+            _fp_id_for_name = str(item_lc.get("floorplanid") or "").strip()
+            if _fp_id_for_name:
+                name = f"Plan {_fp_id_for_name}"
         beds_raw = item_lc.get("beds")
         baths_raw = item_lc.get("baths")
         beds = int(beds_raw) if beds_raw is not None else None
@@ -165,12 +188,17 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         avail_count = str(item_lc.get("availableunitscount") or item_lc.get("unitscount") or "")
         avail_date = str(item_lc.get("availabledate") or "")
 
-        # F2 (2026-05-12): real unit number wins over floorplan-level id.
+        # A RentCafe ``floorplanId`` identifies the shared plan, not an
+        # apartment.  It must never become ``unit_number``: doing so promotes
+        # plan rows to unit-level success and suppresses recovery.  Preserve
+        # it as provenance so the SecureCafe/detail drill can still match the
+        # right plan without using it as an identity anchor.
+        floorplan_id = str(item_lc.get("floorplanid") or "").strip()
+        source_ids = {"rentcafe_floorplan_id": floorplan_id} if floorplan_id else {}
         unit_number_str = str(
             item_lc.get("apartmentname")
             or item_lc.get("unitnumber")
             or item_lc.get("unit_number")
-            or item_lc.get("floorplanid")
             or ""
         )
 
@@ -188,6 +216,7 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
                 availability_date=avail_date,
                 source_api_url=url,
                 extraction_tier="TIER_1_API_RENTCAFE",
+                source_ids=source_ids,
             )
         )
     return units

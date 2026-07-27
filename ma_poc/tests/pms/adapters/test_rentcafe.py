@@ -189,6 +189,93 @@ def test_parse_rentcafe_min_max_price() -> None:
     assert units[0]["availability_status"] == "AVAILABLE"
 
 
+def test_floorplan_id_is_provenance_not_a_unit_identity() -> None:
+    """A plan-price payload must stay plan-level when it lacks an apartment number."""
+    units = parse_rentcafe_floorplans(
+        [
+            {
+                "floorplanName": "A1",
+                "floorplanId": "shared-plan-71",
+                "beds": 1,
+                "baths": 1,
+                "minimumRent": "1200",
+                "maximumRent": "1200",
+            }
+        ],
+        "https://example.test/api/floorplans",
+    )
+    assert units[0]["unit_number"] == ""
+    assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "shared-plan-71"}
+
+
+def test_rentcafe_real_apartment_number_remains_an_identity() -> None:
+    """A concrete ApartmentName wins while the plan id remains provenance."""
+    units = parse_rentcafe_floorplans(
+        [
+            {
+                "floorplanName": "A1",
+                "floorplanId": "shared-plan-71",
+                "apartmentName": "B-203",
+                "minimumRent": "1200",
+            }
+        ],
+        "https://example.test/api/floorplans",
+    )
+    assert units[0]["unit_number"] == "B-203"
+    assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "shared-plan-71"}
+
+
+def test_nameless_plan_gets_a_stable_id_across_rent_changes() -> None:
+    """A nameless plan must not fall through to the rent-hashing id path.
+
+    Blanking ``unit_number`` is right, but a payload with neither a name nor
+    an apartment number would otherwise fall past ``compute_fallback_unit_id``
+    (which requires a floor plan) into ``synthesize_unkeyable_id``, whose hash
+    covers the whole payload INCLUDING rent. The id would then change on every
+    price move and the daily join would report disappeared+new forever.
+    """
+    from ma_poc.core.identity import assign_fallback_unit_id
+
+    def _id_for(rent: str) -> tuple[str, str | None]:
+        units = parse_rentcafe_floorplans(
+            [
+                {
+                    "floorplanId": "5416700",   # no floorplanName
+                    "beds": 1,
+                    "baths": 1,
+                    "minimumSqft": 700,
+                    "maximumSqft": 700,
+                    "minimumRent": rent,
+                    "maximumRent": rent,
+                }
+            ],
+            "https://example.test/api/floorplans",
+        )
+        u = units[0]
+        return u["floor_plan_name"], assign_fallback_unit_id(dict(u), "P-1")
+
+    name_a, id_a = _id_for("2450")
+    name_b, id_b = _id_for("2600")
+
+    assert name_a == name_b == "Plan 5416700"
+    assert id_a == id_b, "unit id must survive a rent change"
+    assert not str(id_a).startswith("unkeyable_")
+    # The plan is still plan-level: the id is synthetic, not a false anchor.
+    assert str(id_a).startswith("inferred_")
+
+
+def test_named_plan_keeps_its_own_name() -> None:
+    """The nameless fallback must not overwrite a real floor-plan name."""
+    units = parse_rentcafe_floorplans(
+        [{"floorplanName": "A1", "floorplanId": "77", "beds": 1, "baths": 1,
+          "minimumRent": "1200"}],
+        "https://example.test/api/floorplans",
+    )
+    assert units[0]["floor_plan_name"] == "A1"
+    assert units[0]["unit_number"] == ""
+    assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "77"}
+
+
 def test_static_fingerprints_nonempty() -> None:
     assert RentCafeAdapter().static_fingerprints()
 
@@ -286,7 +373,8 @@ def test_rc_t03_pascalcase_items_parse_to_correct_fields() -> None:
     u = units[0]
     assert u["floor_plan_name"] == "1BR"
     assert u["bedrooms"] == "1"
-    assert u["unit_number"] == "FP1"
+    assert u["unit_number"] == ""
+    assert u["source_ids"] == {"rentcafe_floorplan_id": "FP1"}
     nums = [int(n.replace(",", "")) for n in re.findall(r"\d[\d,]*", u["rent_range"])]
     assert nums and nums[0] > 0
 
@@ -596,10 +684,8 @@ class TestMAAWorthingtonFieldMap:
         units = parse_rentcafe_floorplans(items, "test")
         assert units[0]["unit_number"] == "101"
 
-    def test_legacy_floorplanid_fallback_still_works(self):
-        """Windsor/Bexley payloads (no apartmentName, no plain sqft) keep
-        their existing behaviour: ``floorplanId`` becomes ``unit_number``,
-        and ``minimumSqft``/``maximumSqft`` form the sqft range string."""
+    def test_floorplanid_without_apartment_number_stays_plan_level(self):
+        """A RentCafe floorplan id is provenance, not a shared fake unit id."""
         items = [
             {
                 "FloorplanName": "1BR",
@@ -612,7 +698,8 @@ class TestMAAWorthingtonFieldMap:
             }
         ]
         units = parse_rentcafe_floorplans(items, "test")
-        assert units[0]["unit_number"] == "FP1"
+        assert units[0]["unit_number"] == ""
+        assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "FP1"}
         assert units[0]["sqft"] == "700-750"
 
     @pytest.mark.asyncio
