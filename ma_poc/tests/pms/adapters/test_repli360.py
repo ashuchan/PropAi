@@ -15,6 +15,7 @@ from __future__ import annotations
 import ma_poc.pms.adapters  # noqa: F401  # populate adapter registry
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.adapters.repli360 import (
+    _AREA_FROM_FP_CARD,
     Repli360Adapter,
     _movein_today,
     find_repli360_floorplans,
@@ -484,6 +485,231 @@ def test_end_to_end_plan_meta_lifts_units_to_rent_plus_sqft() -> None:
     assert rent_and_sqft[0]["bedrooms"] == "1"
     assert rent_and_sqft[0]["bathrooms"] == "1"
     assert rent_and_sqft[0]["floor_plan_name"] == "1A"
+
+
+# ─── 2026-07-28 per-unit "Unit SQFT" column (area=-1 recovery) ─────────
+#
+# Reference run 2026-07-27 (run-2026-07-27-full-0d54ca7): 5 repli360
+# properties shipped 37 rows with area=-1 while the SAME payload carried
+# the area on the unit's own row:
+#   14117 Marquis at Great Hills  13 rows (e.g. 0219 @ $1,731)
+#   27950 Marquis Parkside         8 rows (e.g. 0320 @ $1,334)
+#   62953 Marq on Burnet           7 rows (e.g.  142 @ $1,679)
+#   39494 Hamburg Farms            6 rows (e.g. 1207 @ $1,457)
+#   58452 Enclave at Brookside     3 rows (e.g. 1-143 @ $1,485)
+#
+# Cause: sqft came ONLY from the plan card, and the plan card writes a
+# RANGE for multi-size plans — "<span>932 - 1084</span> sq.ft." — which
+# _SQFT_META_RE (a span of pure digits) does not match. Every unit of
+# such a plan got no sqft. The availability table's own "Unit SQFT"
+# column had the exact per-unit answer all along.
+
+# Captured verbatim from mqgreathills.com getUnitListByFloor,
+# floorPlanID 4464995 (plan "1F", whose card reads "932 - 1084 sq.ft.").
+# The two units have DIFFERENT real areas — which is exactly why
+# collapsing the plan range to one number would have been wrong.
+_STR_HTML_UNIT_SQFT = """
+<div class="rrac_listAvailableUnit"><table class="table" id="fp_table1">
+<tr><th>Unit Number</th><th>Unit SQFT</th><th class="rrac_amenties">Unit Amenities</th>
+<th class="bedRename">Starting At</th><th>Availability</th><th>Lease Now</th></tr>
+<tr class="unitlisting 33752741 lease_term_wrap_33752741" data-count="0"
+    data-available_date="2026-08-05">
+  <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+      <b class="unitNumber">0219</b></td>
+  <td><span class="mobile_rrac">Unit SQFT</span><b class="">932 SQFT</b></td>
+  <td class="rrac_amenties"><span class="mobile_rrac">Unit Amenities</span>
+      <a class="entrata_unitwise_amenity_info">See Amenities</a></td>
+  <td class="rrac_unit_price lease-price"><span class="mobile_rrac">Starting At</span>
+      <span class="unit_price_value unit-rrac-price">$1,731</span></td>
+  <td><span class="mobile_rrac">Availability</span>08/05/2026</td>
+  <td><a href="https://mqgreathills.securecafe.com/x">Lease Now</a></td>
+</tr>
+<tr class="unitlisting 33752740 lease_term_wrap_33752740" data-count="7"
+    data-available_date="2026-10-05">
+  <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+      <b class="unitNumber">0218</b></td>
+  <td><span class="mobile_rrac">Unit SQFT</span><b class="">1084 SQFT</b></td>
+  <td class="rrac_amenties"><span class="mobile_rrac">Unit Amenities</span>
+      <a class="entrata_unitwise_amenity_info">See Amenities</a></td>
+  <td class="rrac_unit_price lease-price"><span class="mobile_rrac">Starting At</span>
+      <span class="unit_price_value unit-rrac-price">$2,280</span></td>
+  <td><span class="mobile_rrac">Availability</span>10/05/2026</td>
+  <td><a href="https://mqgreathills.securecafe.com/y">Lease Now</a></td>
+</tr>
+</table></div>
+"""
+
+# Captured verbatim from the Enclave at Brookside (site_id 2538) payload.
+# SAME endpoint, DIFFERENT column order — Amenities/Special/Deposit sit
+# in other positions and the Deposit cell is a bare "$300". A positional
+# read would have grabbed the deposit as an area.
+_STR_HTML_UNIT_SQFT_REORDERED = """
+<div class="rrac_listAvailableUnit"><table class="table" id="fp_table1">
+<tr><th>Unit Number</th><th>Unit SQFT</th><th class="rrac_amenties">Amenities</th>
+<th class="special_th">Special</th><th class="bedRename">Starting At</th>
+<th>Deposit</th><th>Availability</th><th>Lease Now</th></tr>
+<tr class="unitlisting 15164042 lease_term_wrap_15164042" data-count="0"
+    data-available_date="2026-07-03">
+  <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+      <b class="unitNumber">1-143</b></td>
+  <td><span class="mobile_rrac">Unit SQFT</span><b class="">724 SQFT</b></td>
+  <td class="rrac_amenties"><span class="mobile_rrac">Amenities</span>
+      <a class="entrata_unitwise_amenity_info">See Amenities</a></td>
+  <td class="special_td"><span class="mobile_rrac">Special</span>-</td>
+  <td class="rrac_unit_price lease-price"><span class="mobile_rrac">Starting At</span>
+      <span class="unit_price_value unit-rrac-price">$1,485</span></td>
+  <td><span class="mobile_rrac">Deposit</span>$300</td>
+  <td><span class="mobile_rrac">Availability</span>Available Now</td>
+  <td><a href="https://enclavebrooksideapts.securecafe.com/x">Lease Now</a></td>
+</tr>
+</table></div>
+"""
+
+
+def test_unit_sqft_read_from_the_units_own_row() -> None:
+    """THE 37-row regression. Plan 1F's card says "932 - 1084 sq.ft." so
+    the plan-meta path yields nothing; each unit row carries its own
+    exact area. 0219=932 and 0218=1084 on the SAME plan — proof that any
+    single plan-level number would be wrong for one of them."""
+    units = parse_repli360_str(_STR_HTML_UNIT_SQFT, "https://app.repli360.com/x")
+    assert len(units) == 2
+    by_num = {u["unit_number"]: u for u in units}
+    assert by_num["0219"]["sqft"] == "932"
+    assert by_num["0218"]["sqft"] == "1084"
+    # Rent/date/status must be untouched by the sqft read.
+    assert by_num["0219"]["market_rent_low"] == 1731
+    assert by_num["0218"]["market_rent_low"] == 2280
+    assert by_num["0219"]["availability_date"] == "2026-08-05"
+    assert by_num["0218"]["availability_status"] == "AVAILABLE"
+    # Read off the unit's own row ⇒ NOT plan-derived ⇒ no provenance flag.
+    assert not by_num["0219"].get("data_quality_flag")
+
+
+def test_unit_sqft_survives_reordered_columns_and_ignores_deposit() -> None:
+    """Column order is not stable across repli360 templates. The cell is
+    found by its label, so a "$300" Deposit cell sitting where another
+    template puts Availability can never be read as an area."""
+    units = parse_repli360_str(
+        _STR_HTML_UNIT_SQFT_REORDERED, "https://app.repli360.com/x"
+    )
+    assert len(units) == 1
+    u = units[0]
+    assert u["unit_number"] == "1-143"
+    assert u["sqft"] == "724"  # not 300, not 1485
+    assert u["market_rent_low"] == 1485
+
+
+def test_unit_sqft_header_index_fallback_when_cell_labels_absent() -> None:
+    """If a template drops the per-cell ``span.mobile_rrac`` labels, the
+    column is located from that table's own <th> header row — never from
+    an assumed index."""
+    html = """
+    <table class="table">
+    <tr><th>Unit Number</th><th>Deposit</th><th>Unit SQFT</th><th>Starting At</th></tr>
+    <tr class="unitlisting 7" data-available_date="2026-09-01">
+      <td><b class="unitNumber">312</b></td>
+      <td>$500</td>
+      <td>845 SQFT</td>
+      <td><span class="unit_price_value">$1,900</span></td>
+    </tr></table>
+    """
+    units = parse_repli360_str(html, "https://app.repli360.com/x")
+    assert len(units) == 1
+    assert units[0]["sqft"] == "845"  # not 500
+    assert units[0]["market_rent_low"] == 1900
+
+
+def test_unit_sqft_absent_rather_than_guessed() -> None:
+    """Fail closed. A row with no sqft column, or an unparseable cell,
+    leaves sqft empty (area=-1 downstream) instead of picking up money,
+    a placeholder dash, or half of a range."""
+    rows = {
+        "no such column": """
+            <table><tr><th>Unit Number</th><th>Starting At</th></tr>
+            <tr class="unitlisting 1" data-available_date="2026-09-01">
+              <td><b class="unitNumber">100</b></td>
+              <td><span class="mobile_rrac">Starting At</span>
+                  <span class="unit_price_value">$1,485</span></td>
+            </tr></table>""",
+        "placeholder dash": """
+            <table><tr><th>Unit Number</th><th>Unit SQFT</th></tr>
+            <tr class="unitlisting 1" data-available_date="2026-09-01">
+              <td><b class="unitNumber">100</b></td>
+              <td><span class="mobile_rrac">Unit SQFT</span>-</td>
+            </tr></table>""",
+        "range in the unit cell": """
+            <table><tr><th>Unit Number</th><th>Unit SQFT</th></tr>
+            <tr class="unitlisting 1" data-available_date="2026-09-01">
+              <td><b class="unitNumber">100</b></td>
+              <td><span class="mobile_rrac">Unit SQFT</span>932 - 1084 SQFT</td>
+            </tr></table>""",
+        "money in the sqft cell": """
+            <table><tr><th>Unit Number</th><th>Unit SQFT</th></tr>
+            <tr class="unitlisting 1" data-available_date="2026-09-01">
+              <td><b class="unitNumber">100</b></td>
+              <td><span class="mobile_rrac">Unit SQFT</span>$1,485</td>
+            </tr></table>""",
+    }
+    for label, html in rows.items():
+        units = parse_repli360_str(html, "https://app.repli360.com/x")
+        assert len(units) == 1, label
+        assert units[0]["sqft"] == "", (
+            f"{label}: guessed an area instead of leaving it absent"
+        )
+
+
+def test_plan_card_sqft_is_stamped_with_its_provenance() -> None:
+    """When the area comes from the plan card rather than the unit's own
+    row, it is recorded via the EXISTING data_quality_flag machinery. A
+    unit that already carries its own area is neither overwritten nor
+    stamped."""
+    units = [
+        {"unit_number": "4114", "sqft": "", "bedrooms": "", "bathrooms": "",
+         "floor_plan_name": "", "data_quality_flag": ""},
+        {"unit_number": "4115", "sqft": "932", "bedrooms": "", "bathrooms": "",
+         "floor_plan_name": "", "data_quality_flag": ""},
+    ]
+    merge_repli360_plan_meta(
+        units,
+        {"floor_plan_name": "1A", "sqft": "670", "bedrooms": "1", "bathrooms": "1"},
+    )
+    assert units[0]["sqft"] == "670"
+    assert _AREA_FROM_FP_CARD in units[0]["data_quality_flag"]
+    # Unit-level area wins and stays unflagged.
+    assert units[1]["sqft"] == "932"
+    assert _AREA_FROM_FP_CARD not in units[1]["data_quality_flag"]
+    # Plan-genuine fields (beds/baths/name) do not trigger the area flag.
+    assert units[1]["bedrooms"] == "1"
+
+
+def test_area_provenance_flag_cannot_demote_a_real_unit() -> None:
+    """The provenance token must not contain "PLAN".
+
+    ``extraction/post_process.py`` and ``core/schema_v2.py`` read any
+    data_quality_flag containing "PLAN" / "PLAN_LEVEL" as evidence that
+    the row is a floor-plan placeholder. A well-meaning rename to e.g.
+    "AREA_FROM_PLAN_CARD" would silently strip unit-anchored repli360
+    rows of their identity."""
+    upper = _AREA_FROM_FP_CARD.upper()
+    assert "PLAN" not in upper
+    assert "PRESENCE" not in upper
+    assert "UNVERIFIED" not in upper
+
+
+def test_plan_card_range_sqft_is_not_collapsed_to_a_number() -> None:
+    """Documents the underlying cause and pins the honest behaviour: a
+    plan card carrying a RANGE yields no plan-level sqft. We do not pick
+    the min (or max, or mean) and present it as a unit's area — the unit
+    row is the only place a real per-unit area exists."""
+    html = (
+        "<h2>1F</h2><p>One Bedroom | 1 Bath | <span>932 - 1084</span> sq.ft. "
+        "| <span>8</span> Units Available</p>"
+        "<a onclick=\"getUnitListByFloor(this,'4464995',2,1608)\">x</a>"
+    )
+    meta = parse_repli360_plan_meta(html)
+    assert meta["4464995"].get("sqft") is None
+    assert meta["4464995"]["floor_plan_name"] == "1F"
+    assert meta["4464995"]["bedrooms"] == "1"
 
 
 def test_parse_plan_meta_word_to_digit_map_complete() -> None:
