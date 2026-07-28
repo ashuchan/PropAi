@@ -2163,6 +2163,9 @@ def _provenance_block(
     units = result.get("units") or []
     by_family: dict[str, int] = {}
     n_plan = n_synth = n_realid = 0
+    # Same property-level marker the output formatter uses, so this counter and
+    # the shipped ``is_floor_plan_level`` column can never disagree.
+    prop_plan_level = _property_is_plan_level(result)
     for u in units:
         tier = str(u.get("extraction_tier") or u.get("_extraction_tier") or "")
         fam = _tier_family(tier)
@@ -2176,7 +2179,9 @@ def _provenance_block(
         # all 505 SightMap properties in the 2026-07-25 5k canary while 4,024
         # plan rows were in fact shipping. Delegate to the canonical predicate,
         # which reads the flag as well as the tier suffix.
-        if _is_floor_plan_level(u) or tier.upper().endswith("_PLAN_LEVEL"):
+        if _is_floor_plan_level(
+            u, property_plan_level=prop_plan_level
+        ) or tier.upper().endswith("_PLAN_LEVEL"):
             n_plan += 1
         uid = str(u.get("unit_id") or u.get("unit_number") or "")
         if uid.startswith(("inferred_", "unkeyable_")):
@@ -2470,8 +2475,23 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "pmc": _pick(_csv("Management Company") or _csv("pmc"), md.get("management_company")),
         "website_design": website_design,
         "concessions": concessions_text,
+        # ``property_plan_level`` carries the PROPERTY-level plan marker
+        # (``extraction_tier_used`` ending ``_PLAN_LEVEL`` / ``_verdict_quality
+        # == SUCCESS_PLAN_LEVEL``) into the per-row flag. Adapters that record
+        # plan-ness on ``AdapterResult.tier_used`` — Path-C (scraper.py:2151),
+        # the empty-exit plan path (:2308) and every ``*_NO_RESPONSE_PLAN_LEVEL``
+        # / ``*_SHAPE_REJECTED_PLAN_LEVEL`` route — leave the rows carrying the
+        # plain adapter tier, so the row-only predicate never saw the marker.
         "units": _emit_v2_units_for_property(
-            [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units]
+            [
+                _format_v2_unit(
+                    u,
+                    scrape_ts,
+                    _v2_property_id_for_unit(meta, apartment_id),
+                    property_plan_level=_property_is_plan_level(result),
+                )
+                for u in units
+            ]
         ),
         # A floor-plan card is useful public evidence but never an apartment.
         # The dedicated formatter removes any fallback ``inferred_*`` ID.
@@ -2487,6 +2507,26 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "_extract_result": _extract_result_summary(result),
     }
     return prop
+
+
+def _property_is_plan_level(result: dict[str, Any]) -> bool:
+    """Whether this property's own result metadata declares a plan-level roster.
+
+    Thin, never-raising delegate to the canonical predicate in
+    ``core.schema_v2`` so the runner fork cannot drift from it.
+
+    Args:
+        result: Internal per-property result dict.
+
+    Returns:
+        True when the property-level plan marker is present.
+    """
+    try:
+        from ma_poc.core.schema_v2 import property_is_plan_level
+
+        return property_is_plan_level(result)
+    except Exception:  # pragma: no cover — defensive, never block an emit
+        return False
 
 
 def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> str:
@@ -2824,7 +2864,11 @@ def _apply_p0_fp_name_canonicalization(units: list[dict[str, Any]]) -> int:
 
 
 def _format_v2_unit(
-    unit: dict[str, Any], scrape_ts: datetime, property_id: str = ""
+    unit: dict[str, Any],
+    scrape_ts: datetime,
+    property_id: str = "",
+    *,
+    property_plan_level: bool = False,
 ) -> dict[str, Any]:
     """Format a single unit to v2 schema.
 
@@ -2845,7 +2889,10 @@ def _format_v2_unit(
     """
     # Delegate the available-now → scrape-date fallback to the canonical
     # resolver (single source of truth; see the available_date field below).
-    from ma_poc.core.schema_v2 import _is_floor_plan_level, _resolve_available_date
+    from ma_poc.core.schema_v2 import (
+        _is_floor_plan_level,
+        _resolve_available_date,
+    )
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
     # formatting. Emitted as first-class ``<field>_raw`` columns at the
@@ -3080,7 +3127,16 @@ def _format_v2_unit(
         # ``area=-1``, and ``_provenance_block``'s ``plan_level_units`` counter
         # reading 0 for all 505 SightMap properties. Keep in lock-step with
         # ``core.schema_v2._is_floor_plan_level``.
-        "is_floor_plan_level": _is_floor_plan_level(unit),
+        # 2026-07-28: ``property_plan_level`` closes the second half of the gap
+        # — the flag was only ever reachable from a ROW-level marker, which in
+        # the 2026-07-27 4,982-property run meant 99.5% of the 5,427 flagged
+        # rows were SightMap (the one adapter that stamps a row-level
+        # ``data_quality_flag``), while 1,675 plan-shaped rows shipped
+        # unflagged from tiers that declare PLAN_LEVEL/PLAN_TEXT at the
+        # property level.
+        "is_floor_plan_level": _is_floor_plan_level(
+            unit, property_plan_level=property_plan_level
+        ),
         "rent_low": _format_rent(rent_lo_raw),
         "rent_high": _format_rent(rent_hi_raw),
         "floor": _format_floor(_raw_src["floor"]),
