@@ -1198,6 +1198,29 @@ def _sc_applicant_int(v: Any) -> int | None:
     return n if 0 < n < 1_000_000 else None
 
 
+def _sc_applicant_exact_area(floor_plan: dict[str, Any]) -> int | None:
+    """Return an exact SecureCafe floor-plan area, never a published range.
+
+    ``MinimumArea`` / ``MaximumArea`` are plan context.  When both keys are
+    present they form an explicit range, even if one value is zero or blank;
+    use them for a unit only when both endpoints agree.  Some older API
+    variants expose a single ``MinimumArea`` *without* a matching maximum;
+    treat that as the sole published plan value for backwards compatibility.
+
+    This prevents a label such as "up to 800 sq ft" from becoming a fabricated
+    ``sqft=800`` fact on every unit in the floor plan.
+    """
+    min_present = "MinimumArea" in floor_plan
+    max_present = "MaximumArea" in floor_plan
+    min_area = _sc_applicant_int(floor_plan.get("MinimumArea"))
+    max_area = _sc_applicant_int(floor_plan.get("MaximumArea"))
+    if min_present and max_present:
+        if min_area is not None and min_area == max_area:
+            return min_area
+        return None
+    return min_area if min_present else max_area
+
+
 def parse_securecafe_applicant_floorplans(
     payload: Any, source_url: str
 ) -> list[dict[str, Any]]:
@@ -1245,7 +1268,9 @@ def parse_securecafe_applicant_floorplans(
         name = str(fp.get("FloorPlanName") or "")
         beds = fp.get("Beds")
         baths = fp.get("Baths")
-        sqft_v = _sc_applicant_int(fp.get("MinimumArea") or fp.get("MaximumArea"))
+        # A unit can inherit its parent plan's area only when that plan has
+        # one exact published value.  Do not collapse a min/max range.
+        sqft_v = _sc_applicant_exact_area(fp)
         dep_v = _sc_applicant_int(fp.get("MinimumDeposit"))
         deposit = f"${dep_v:,}" if dep_v else ""
         beds_s = "" if beds is None else str(beds)
@@ -2317,19 +2342,29 @@ def parse_vanity_floorplans_for_sqft(html: str) -> list[dict[str, Any]]:
                     continue
                 if baths < 0:
                     continue
-                # MinSqFt collapsed to int; 0 / blank is treated as missing.
-                sqft_raw = (
-                    entry.get("MinSqFt")
-                    or entry.get("minSqFt")
-                    or entry.get("minsqft")
-                    or entry.get("min_sqft")
-                    or 0
-                )
+                # A YSI min/max pair is plan-range context. It only supports
+                # a unit scalar when both endpoints prove the same value.
+                min_keys = ("MinSqFt", "minSqFt", "minsqft", "min_sqft")
+                max_keys = ("MaxSqFt", "maxSqFt", "maxsqft", "max_sqft")
+                min_key = next((key for key in min_keys if key in entry), None)
+                max_key = next((key for key in max_keys if key in entry), None)
+                min_raw = entry.get(min_key) if min_key else None
+                max_raw = entry.get(max_key) if max_key else None
                 try:
-                    sqft = int(float(sqft_raw))
+                    min_sqft = int(float(min_raw)) if min_raw not in (None, "") else None
                 except (TypeError, ValueError):
-                    continue
-                if sqft <= 0:
+                    min_sqft = None
+                try:
+                    max_sqft = int(float(max_raw)) if max_raw not in (None, "") else None
+                except (TypeError, ValueError):
+                    max_sqft = None
+                if min_key and max_key:
+                    if min_sqft is None or max_sqft is None or min_sqft != max_sqft:
+                        continue
+                    sqft = min_sqft
+                else:
+                    sqft = min_sqft if min_key else max_sqft
+                if sqft is None or sqft <= 0:
                     continue
                 rent_lo_raw = entry.get("MinRent") or entry.get("minRent")
                 rent_hi_raw = (
@@ -2481,18 +2516,24 @@ def fetch_vanity_floorplans_html(origin: str, timeout: int = 15) -> str:
     return ""
 
 
+def _normalise_floorplan_join_name(value: Any) -> str:
+    """Normalise a public floor-plan label for an exact, punctuation-safe join."""
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
 def merge_vanity_floorplans_into_securecafe(
     units: list[dict[str, Any]], plans: list[dict[str, Any]]
 ) -> int:
-    """FK-join plan sqft → SecureCafe units missing sqft, keyed on
-    ``(beds, baths)``. When more than one plan shares the (beds, baths)
-    bucket, pick the plan whose rent range is closest to the unit's rent
-    (best-guess FK). When no plan in the bucket carries rent metadata,
-    fall back to the median-sqft plan; when only one plan matches, use
-    it directly.
+    """Fill an absent SecureCafe unit sqft from its property's floor-plan page.
 
-    Per-unit values WIN; the merge only fills units whose sqft is empty
-    or "0". Returns the number of units that gained sqft for diagnostics.
+    A plan area is copied only when it has an unambiguous relationship to the
+    unit: an exact normalised plan-name match, or the sole plan in the unit's
+    ``(beds, baths)`` bucket.  Rent proximity and a median plan area are not
+    identities; using either can attach a sibling plan's area to a real unit.
+
+    Per-unit values WIN; the merge only fills units whose sqft is empty or
+    ``"0"``.  Returns the number of units that gained an exact plan-derived
+    sqft for diagnostics.
     """
     if not units or not plans:
         return 0
@@ -2521,54 +2562,25 @@ def merge_vanity_floorplans_into_securecafe(
         if len(candidates) == 1:
             chosen = candidates[0]
         else:
-            # Multi-plan bucket — pick closest by rent. Unit rent comes
-            # from market_rent_low (preferred) / market_rent_high; plan
-            # rent uses (rent_lo + rent_hi) / 2 when both present, else
-            # whichever is present, else fall back to median sqft (most
-            # likely the canonical plan).
-            unit_rent = u.get("market_rent_low") or u.get("market_rent_high")
-            try:
-                unit_rent_v = float(unit_rent) if unit_rent is not None else None
-            except (TypeError, ValueError):
-                unit_rent_v = None
-
-            def _plan_rent(p: dict[str, Any]) -> float | None:
-                lo, hi = p.get("rent_lo"), p.get("rent_hi")
-                try:
-                    if lo is not None and hi is not None:
-                        return (float(lo) + float(hi)) / 2.0
-                    if lo is not None:
-                        return float(lo)
-                    if hi is not None:
-                        return float(hi)
-                except (TypeError, ValueError):
-                    return None
-                return None
-
-            if unit_rent_v is not None and any(
-                _plan_rent(c) is not None for c in candidates
-            ):
-                # Bind unit_rent_v as a default arg to satisfy B023 — the
-                # closure is consumed synchronously by ``min(...)`` so the
-                # late-binding bug B023 guards against can't fire here, but
-                # the explicit binding keeps the lint clean and intent
-                # obvious to a future reader.
-                def _dist(
-                    p: dict[str, Any], _rent: float = unit_rent_v
-                ) -> float:
-                    pr = _plan_rent(p)
-                    if pr is None:
-                        # Plans without rent are deprioritised but still
-                        # selectable when no other plan has rent metadata.
-                        return float("inf")
-                    return abs(pr - _rent)
-
-                chosen = min(candidates, key=_dist)
-            else:
-                # No rent signal anywhere — pick the median-sqft plan.
-                # Stable: sort by sqft ascending, pick the middle index.
-                ordered = sorted(candidates, key=lambda p: int(p["sqft"]))
-                chosen = ordered[len(ordered) // 2]
+            # Several plans can share bedroom/bath counts.  Use their public
+            # plan labels only when the unit label identifies exactly one of
+            # them; rent is not a foreign key and must not break this tie.
+            unit_plan_name = _normalise_floorplan_join_name(
+                u.get("floor_plan_name")
+            )
+            named_matches = [
+                candidate
+                for candidate in candidates
+                if unit_plan_name
+                and _normalise_floorplan_join_name(candidate.get("name"))
+                == unit_plan_name
+            ]
+            sqft_values = {
+                str(candidate.get("sqft") or "") for candidate in named_matches
+            }
+            if len(named_matches) != 1 or len(sqft_values) != 1:
+                continue
+            chosen = named_matches[0]
         try:
             sqft_val = int(chosen["sqft"])
         except (TypeError, ValueError, KeyError):

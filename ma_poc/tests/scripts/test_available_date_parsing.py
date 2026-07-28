@@ -59,7 +59,12 @@ _TODAY = datetime.now(UTC).strftime("%Y-%m-%d")
         # Unparseable → None (no crash, no garbage)
         (None, None),
         ("", None),
+        # These operator-gated phrases mean a plan may show a price, but the
+        # operator does not publish unit availability.  They must never be
+        # converted to an invented "available now" date (Edgewood pattern).
         ("call for availability", None),
+        ("contact for availability", None),
+        ("inquire for availability", None),
         ("garbage", None),
         # 2026-05-26 (canary 87b837b QC): YYYYMMDD packed numeric
         # — RentManager / older RealPage XMLs use this. 268 cases.

@@ -15,7 +15,6 @@ import pytest
 
 from ma_poc.pms.adapters._html_extract import detect_embedded_portal_urls
 
-
 # ── Unit tests ──────────────────────────────────────────────────────────
 
 
@@ -267,10 +266,7 @@ async def test_portal_hint_survives_full_scrape_chain(monkeypatch) -> None:
     real data — and preempt the cascade before generic + LLM run.
     """
     monkeypatch.setenv("DISABLE_SIGHTMAP_DIRECT_PROBE", "1")
-    from ma_poc.pms.adapters.base import AdapterContext
-    from ma_poc.pms.adapters.generic import GenericAdapter
     from ma_poc.pms.scraper import scrape
-    from ma_poc.pms.detector import detect_pms
 
     # Blobs must be ≥ 200 chars to pass extract_embedded_blobs_from_html's
     # size gate. Use realistic shapes padded to meet the threshold.
@@ -347,10 +343,11 @@ async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
     hop 2 — where the URL host triggers the SightMap fingerprint and
     its adapter takes over.
     """
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
+    from ma_poc import fetch as fetch_mod
     from ma_poc.pms import scraper as scraper_mod
     from ma_poc.pms.detector import detect_pms
-    from ma_poc import fetch as fetch_mod
 
     entry_url = "https://www.skylineatkessler.com/"
     floorplans_url = "https://www.skylineatkessler.com/floorplans/"
@@ -529,8 +526,12 @@ def test_detect_floorplan_subpage_urls_jonah_index() -> None:
 
 
 def test_detect_floorplan_subpage_urls_no_config_returns_empty() -> None:
-    """If no Jonah config blob is present, returns empty — avoids false
-    positives on pages that happen to have sub-paths."""
+    """A bare floor-plan child link is not enough for generic discovery.
+
+    The vendor-neutral path requires visible plan-card evidence, so a nav
+    link cannot create a detail-page crawl merely because it is beneath a
+    ``/floorplans/`` URL.
+    """
     from ma_poc.pms.adapters._html_extract import detect_floorplan_subpage_urls
 
     blobs: list = []  # no blobs → no detection
@@ -539,6 +540,146 @@ def test_detect_floorplan_subpage_urls_no_config_returns_empty() -> None:
         blobs, html, "https://example.com/floorplans/"
     )
     assert result == []
+
+
+def test_detect_floorplan_subpage_urls_from_linked_plan_cards() -> None:
+    """A non-Jonah public index can safely surface linked plan cards.
+
+    This is the Cypress/Loch-Raven class: the index is plan-level, while the
+    card detail page is where the public site exposes its unit rows.  The
+    helper must discover the detail URLs without minting an inferred ID.
+    """
+    from ma_poc.pms.adapters._html_extract import detect_floorplan_subpage_urls
+
+    html = """<html><body>
+    <nav><a href="/floorplans/">Floor Plans</a></nav>
+    <article class="floorplan-card">
+      <a href="/floorplans/a1/">A1 · 1 Bed 1 Bath · 700 Sq Ft · $1,200</a>
+    </article>
+    <article class="floorplan-card">
+      <a href="/floorplans/b2/">B2 · 2 Bed 2 Bath · 950 Sq Ft · $1,800</a>
+    </article>
+    <footer><a href="/floorplans/contact/">Contact</a></footer>
+    </body></html>"""
+
+    hints = detect_floorplan_subpage_urls(
+        [], html, "https://example.com/floorplans/"
+    )
+
+    assert hints == [
+        ("https://example.com/floorplans/a1/", "floorplan_subpage"),
+        ("https://example.com/floorplans/b2/", "floorplan_subpage"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_link_hop_follows_linked_cards_after_plan_only_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Plan summaries must not suppress same-run public detail recovery.
+
+    A plan-only page is intentionally not a unit success.  It must still be
+    allowed to seed the bounded per-plan crawl; the returned result is only
+    unit-level once a detail page supplies a real unit anchor and rent.
+    """
+    from unittest.mock import patch
+
+    from ma_poc import fetch as fetch_mod
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.pms.detector import detect_pms
+
+    entry_url = "https://example.com/"
+    index_url = "https://example.com/floorplans/"
+    a1_url = "https://example.com/floorplans/a1/"
+    b2_url = "https://example.com/floorplans/b2/"
+    index_html = """<html><body>
+    <article class="floorplan-card"><a href="/floorplans/a1/">A1 1 Bed 1 Bath 700 Sq Ft $1,200</a></article>
+    <article class="floorplan-card"><a href="/floorplans/b2/">B2 2 Bed 2 Bath 950 Sq Ft $1,800</a></article>
+    </body></html>"""
+    fetched: list[str] = []
+
+    async def _fake_fetch(task: object) -> object:
+        url = str(getattr(task, "url"))
+        fetched.append(url)
+
+        class _Outcome:
+            value = "OK"
+
+        class _Response:
+            outcome = _Outcome()
+            status = 200
+            final_url = url
+            elapsed_ms = 1
+            content_type = "text/html"
+            captcha_detected = False
+            error_signature = None
+            identity_ua_hash = "test"
+            render_mode = type("M", (), {"value": "RENDER"})()
+            headers: dict[str, str] = {}
+            body = index_html.encode() if url == index_url else b"<html></html>"
+
+            def to_dict(self) -> dict[str, str]:
+                return {"outcome": "OK"}
+
+        return _Response()
+
+    async def _fake_scrape(*, base_url: str, **_: object) -> dict[str, object]:
+        if base_url == index_url:
+            return {
+                "units": [],
+                "plan_summaries": [
+                    {"floor_plan_name": "A1", "market_rent_low": 1200}
+                ],
+                "extraction_tier_used": "TIER_3_DOM_GENERIC_PLAN_LEVEL",
+            }
+        if base_url == a1_url:
+            return {
+                "units": [
+                    {
+                        "unit_number": "101",
+                        "market_rent_low": 1200,
+                        "sqft": "700",
+                    }
+                ],
+                "extraction_tier_used": "TIER_3_DOM",
+            }
+        if base_url == b2_url:
+            return {
+                "units": [
+                    {
+                        "unit_number": "201",
+                        "market_rent_low": 1800,
+                        "sqft": "950",
+                    }
+                ],
+                "extraction_tier_used": "TIER_3_DOM",
+            }
+        return {"units": []}
+
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_CRAWL_GET_GATE", False)
+    monkeypatch.setattr("ma_poc.config.feature_flags.LINK_HOP_BUDGET_S", 30)
+    with (
+        patch.object(fetch_mod, "fetch", new=_fake_fetch),
+        patch.object(scraper_mod, "scrape", new=_fake_scrape),
+    ):
+        result = await scraper_mod._try_link_hop(
+            entry_url=entry_url,
+            entry_page_html='<a href="/floorplans/">Floor Plans</a>',
+            detected=detect_pms(entry_url),
+            profile=None,
+            expected_total_units=None,
+            property_id="LINKED-CARDS-TEST",
+            csv_row=None,
+            max_hops=3,
+            llm_navigation_hints=["/floorplans/"],
+            embedded_portal_hints=None,
+            visited_urls={entry_url},
+            shared_budget=None,
+        )
+
+    assert a1_url in fetched and b2_url in fetched
+    assert result is not None
+    assert {u["unit_number"] for u in result["units"]} == {"101", "201"}
 
 
 def test_detect_floorplan_subpage_urls_skips_deep_paths() -> None:

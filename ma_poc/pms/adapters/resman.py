@@ -40,6 +40,7 @@ _RESMAN_AVAIL_RE = re.compile(
 _RESMAN_HOST_RE = re.compile(r"https?://([a-z0-9-]+)\.myresman\.com", re.IGNORECASE)
 _UNITTYPES_RE = re.compile(r"var\s+unitTypes\s*=\s*(\[)")
 _MSDATE_RE = re.compile(r"/Date\((-?\d+)\)/")
+_STANDARD_LEASE_TERM_MONTHS = 12
 
 
 def _ms_to_iso(val: Any) -> str:
@@ -85,6 +86,52 @@ def _extract_unittypes(html: str) -> list[dict[str, Any]] | None:
     return data if isinstance(data, list) else None
 
 
+def _selected_pricing(pricing: Any) -> tuple[int | None, str]:
+    """Return a canonical public ResMan price and its lease-term provenance.
+
+    A ResMan unit contains a matrix of prices by lease term.  The response
+    commonly orders short terms first, so blindly reading ``Pricing[0]``
+    turns a seven-month price into a false rent mismatch against the public
+    12-month selection.  Prefer an explicit 12-month price; when absent,
+    choose the numeric term nearest to 12 months.  Rows with no numeric term
+    retain their source order as the final fallback.
+    """
+    if not isinstance(pricing, list):
+        return None, ""
+    candidates: list[tuple[int | None, int, int]] = []
+    for position, item in enumerate(pricing):
+        if not isinstance(item, dict):
+            continue
+        raw_rent = item.get("Rent")
+        if raw_rent is None:
+            raw_rent = item.get("RentToDisplay") or item.get("TotalRent")
+        try:
+            rent = int(round(float(raw_rent))) if raw_rent is not None else None
+        except (TypeError, ValueError):
+            rent = None
+        if rent is None or rent <= 0:
+            continue
+        raw_term = item.get("Term")
+        try:
+            term = int(round(float(raw_term))) if raw_term is not None else None
+        except (TypeError, ValueError):
+            term = None
+        candidates.append((term, rent, position))
+    if not candidates:
+        return None, ""
+    term, rent, _ = min(
+        candidates,
+        key=lambda item: (
+            0 if item[0] == _STANDARD_LEASE_TERM_MONTHS else 1,
+            abs(item[0] - _STANDARD_LEASE_TERM_MONTHS)
+            if item[0] is not None
+            else 10_000,
+            item[2],
+        ),
+    )
+    return rent, str(term) if term is not None else ""
+
+
 def parse_resman_unittypes(
     data: list[dict[str, Any]], source_url: str
 ) -> list[dict[str, Any]]:
@@ -109,16 +156,12 @@ def parse_resman_unittypes(
             for u in glist:
                 if not isinstance(u, dict):
                     continue
-                pricing = u.get("Pricing") or []
-                rent = None
-                if pricing and isinstance(pricing[0], dict):
-                    rent = pricing[0].get("Rent") or pricing[0].get("TotalRent")
-                if rent is None:
-                    rent = g.get("MarketRent")
-                try:
-                    rent_i = int(round(float(rent))) if rent is not None else None
-                except (TypeError, ValueError):
-                    rent_i = None
+                rent_i, lease_term = _selected_pricing(u.get("Pricing"))
+                if rent_i is None:
+                    try:
+                        rent_i = int(round(float(g.get("MarketRent"))))
+                    except (TypeError, ValueError):
+                        rent_i = None
                 units.append(
                     make_unit_dict(
                         floor_plan_name=str(u.get("UnitType") or "").strip(),
@@ -129,6 +172,7 @@ def parse_resman_unittypes(
                         floor=str(u.get("Floor") or ""),
                         rent_low=rent_i,
                         rent_high=rent_i,
+                        lease_term=lease_term,
                         availability_status="AVAILABLE",
                         availability_date=_ms_to_iso(u.get("AvailableDate")),
                         source_api_url=source_url,
@@ -202,7 +246,7 @@ class ResManAdapter:
             return "var unitTypes" in body and "myresman" in body.lower()
         return False
 
-    async def extract(self, page: "Page", ctx: AdapterContext) -> AdapterResult:
+    async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used=_TIER)
 
         html = ""

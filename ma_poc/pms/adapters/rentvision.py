@@ -130,7 +130,7 @@ _UNIT_TH_RE = re.compile(
     re.IGNORECASE,
 )
 _UNIT_RENT_SPAN_RE = re.compile(
-    r'<td\b[^>]*class="[^"]*\bidentifiable-links\b[^"]*"[^>]*>\s*'
+    r'<td\b[^>]*class="[^"]*\bidentifiable-links\b[^"]*"[^>]*>[\s\S]{0,250}?'
     r'<span\b[^>]*>\s*\$([\d,]+(?:\.\d+)?)',
     re.IGNORECASE,
 )
@@ -147,9 +147,8 @@ _UNIT_AVAIL_DATE_RE = re.compile(
 # &amp; ('&') survive the source HTML; the parser handles both raw and
 # entity-encoded forms because the live page uses &#61; but a future
 # tenant could swap to plain '='.
-_APPLY_PARAM_RE = re.compile(
-    r"moveInDate(?:&#61;|=)(\d{1,2}/\d{1,2}/\d{4})"
-    r"(?:&amp;|&)unit(?:&#61;|=)([A-Za-z0-9][A-Za-z0-9._/\- ]*?)(?:[&'\"])",
+_APPLY_MOVE_IN_DATE_RE = re.compile(
+    r"moveInDate(?:&#61;|=)(\d{1,2}/\d{1,2}/\d{4})",
     re.IGNORECASE,
 )
 # Backup: term-pricing-popup <h3> confirms unit-number (used to validate
@@ -350,7 +349,7 @@ def parse_rentvision_unit_table(
         # availability_date when the unit-availability cell says
         # "Available Now" (no date). The Apply URL always carries one.
         if not availability_date:
-            apply_m = _APPLY_PARAM_RE.search(block)
+            apply_m = _APPLY_MOVE_IN_DATE_RE.search(block)
             if apply_m:
                 availability_date = _to_iso_date(apply_m.group(1))
 
@@ -450,7 +449,7 @@ class RentVisionAdapter:
         "rentvision.com",
     ]
 
-    async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+    async def extract(self, page: Page | None, ctx: AdapterContext) -> AdapterResult:
         """Extract per-unit (preferred) or plan-level (fallback) data.
 
         Strategy:
@@ -465,24 +464,18 @@ class RentVisionAdapter:
         """
         result = AdapterResult(tier_used="TIER_3_DOM_RENTVISION")
 
-        evaluate = getattr(page, "evaluate", None)
-        if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("RentVision: no live page to parse")
-            return result
-
-        try:
-            cards = await evaluate(_RENTVISION_DOM_JS)
-        except Exception as exc:
-            log.debug("RentVision DOM evaluate failed err=%s", exc)
-            cards = None
-
-        if not isinstance(cards, list) or not cards:
-            result.confidence = 0.0
-            result.errors.append("RentVision: no .floorplanItem blocks found")
-            return result
-
         floorplans_url = self._floorplans_url(page, ctx)
+        cards: list[dict[str, str]] = []
+        evaluate = getattr(page, "evaluate", None)
+        if callable(evaluate):
+            try:
+                candidate_cards = await evaluate(_RENTVISION_DOM_JS)
+            except Exception as exc:
+                log.debug("RentVision DOM evaluate failed err=%s", exc)
+                candidate_cards = None
+            if isinstance(candidate_cards, list):
+                cards = [card for card in candidate_cards if isinstance(card, dict)]
+
         units = parse_rentvision_cards(cards, floorplans_url)
 
         # 2026-05-25 (user-flagged via Walnut Creek pid 45534): drill into
@@ -492,9 +485,10 @@ class RentVisionAdapter:
         # the consolidator). Post-fix: 10 real units like 622-102, C-708-H
         # with $1,249 and per-unit move-in dates.
         unit_level_drill: list[dict[str, str]] = []
-        # Build a {plan-name: card} index so we can plumb the
-        # already-parsed plan-name through to each unit. The detail-page
-        # parser falls back to the URL slug when this lookup misses.
+        # Build a {plan-name: card} index so we can plumb the already-parsed
+        # plan-name through to each unit. Fetch-only Jugnu runs have no live
+        # Playwright page, so ``cards`` can be empty; the detail parser then
+        # derives the plan name from its URL and still emits real unit rows.
         card_by_slug = self._cards_by_slug(cards)
         try:
             floorplans_html = await self._fetch_floorplans_html(
@@ -559,7 +553,7 @@ class RentVisionAdapter:
             )
 
         result.confidence = 0.0
-        result.errors.append("RentVision: no parseable plan data")
+        result.errors.append("RentVision: no parseable plan data or detail rows")
         return result
 
     @staticmethod
@@ -652,7 +646,7 @@ class RentVisionAdapter:
         return ""
 
     @staticmethod
-    def _floorplans_url(page: Page, ctx: AdapterContext) -> str:
+    def _floorplans_url(page: Page | None, ctx: AdapterContext) -> str:
         """Best-effort canonical ``{origin}/floorplans`` URL for provenance."""
         candidate = ""
         try:

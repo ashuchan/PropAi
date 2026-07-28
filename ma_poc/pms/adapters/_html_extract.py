@@ -1672,7 +1672,7 @@ def detect_floorplan_subpage_urls(
     page_html: str,
     base_url: str,
 ) -> list[tuple[str, str]]:
-    """Detect floor-plan sub-page URLs from a floor-plan index page.
+    """Detect safe floor-plan detail URLs from a floor-plan index page.
 
     Jonah Digital (and similar custom CMSes) structure availability as:
       /floorplans/           ← index page (limited unit data per plan)
@@ -1680,12 +1680,20 @@ def detect_floorplan_subpage_urls(
                                an embedded <script type="application/json">
                                block (not behind any XHR).
 
-    This helper recognises the index page by finding a Jonah-style widget
-    config blob (``renderable_endpoint: "_fp-renderable"`` + ``base_uri``)
-    in the embedded JSON, then scans the page HTML for ``<a href>`` tags
-    that are one path-segment deeper than ``base_uri``.  Returns those URLs
-    as ``(url, "floorplan_subpage")`` tuples so link-hop can fetch each
-    and extract units from the sub-page's embedded JSON.
+    The original path recognises a Jonah-style widget config
+    (``renderable_endpoint: "_fp-renderable"`` + ``base_uri``) in embedded
+    JSON.  It now also supports the common vendor-neutral shape where a
+    public ``/floorplans/`` index has repeated *linked* cards and each card
+    leads one path segment deeper.  That second route is deliberately
+    constrained: the candidate must be same-origin, exactly one segment
+    below the current floor-plan path, and its enclosing card must contain
+    at least two independent floor-plan signals (bed/bath, square footage,
+    or rent).  A header/footer ``Floor Plans`` link therefore cannot start a
+    detail crawl.
+
+    Returns ``(url, "floorplan_subpage")`` tuples so link-hop can fetch each
+    detail page and run the normal adapters there.  This is discovery only;
+    it never infers a unit ID or promotes plan-level prices to units.
 
     Args:
         blobs:     Output of ``extract_embedded_blobs_from_html`` — parsed blobs.
@@ -1696,7 +1704,7 @@ def detect_floorplan_subpage_urls(
         Deduplicated list of ``(absolute_url, "floorplan_subpage")`` tuples.
         Empty when the page is not a recognised floor-plan index.
     """
-    if not blobs or not page_html:
+    if not page_html:
         return []
 
     # Step 1 — confirm we're on a floor-plan index by looking for a Jonah
@@ -1712,11 +1720,8 @@ def detect_floorplan_subpage_urls(
                 base_uri = candidate_base.rstrip("/") + "/"
                 break
 
-    if base_uri is None:
-        return []
-
-    # Step 2 — find <a href> tags whose path is exactly one segment deeper
-    # than base_uri (e.g. /floorplans/the-edgefield/ when base_uri=/floorplans/).
+    # Parse once for both the strict Jonah route and the generic linked-card
+    # route.  A malformed document remains a safe no-op.
     import urllib.parse as _urlparse
 
     try:
@@ -1733,36 +1738,75 @@ def detect_floorplan_subpage_urls(
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
 
-    for a in soup.find_all("a", href=True):
-        raw = a.get("href") or ""
+    def _append_if_child(
+        anchor: Any,
+        parent_path: str,
+        *,
+        require_card_signals: bool,
+    ) -> None:
+        """Append ``anchor`` when it is a same-origin one-segment child.
+
+        ``require_card_signals`` is false only for the Jonah widget path,
+        whose signed config already proves this is a floor-plan index.
+        Generic links require independently visible floor-plan evidence.
+        """
+        raw = anchor.get("href") or ""
         href = (raw if isinstance(raw, str) else " ".join(raw)).strip()
         if not href or href.startswith(("#", "tel:", "mailto:", "javascript:")):
-            continue
+            return
         try:
             resolved = _urlparse.urljoin(base_url, href)
-        except Exception:
-            continue
-        try:
             parsed = _urlparse.urlparse(resolved)
         except Exception:
-            continue
-        # Must be same host
+            return
         if (base_parsed.hostname or "").lower() != (parsed.hostname or "").lower():
-            continue
+            return
         path = parsed.path.rstrip("/") + "/"
-        # Must start with base_uri and have exactly one more path segment
-        if not path.startswith(base_uri):
-            continue
-        # Strip the base_uri prefix and see if the remainder is a single slug
-        remainder = path[len(base_uri):]
-        if "/" in remainder.rstrip("/"):
-            continue  # more than one additional segment — skip
-        if not remainder.rstrip("/"):
-            continue  # same page
+        if not path.startswith(parent_path):
+            return
+        remainder = path[len(parent_path):].strip("/")
+        if not remainder or "/" in remainder:
+            return
+        if require_card_signals:
+            # Inspect the nearest card-like ancestor rather than the entire
+            # page.  This keeps a generic navigation link from qualifying
+            # merely because unrelated cards elsewhere have rent/sqft.
+            container = anchor
+            for parent in anchor.parents:
+                classes = " ".join(parent.get("class") or ()).lower()
+                if any(token in classes for token in ("plan", "floor", "card", "unit", "listing", "model", "tile")):
+                    container = parent
+                    break
+            text = container.get_text(" ", strip=True)
+            has_bed_bath = bool(
+                re.search(r"\b(?:studio|\d+\s*(?:bed|bd|br|bath|ba))\b", text, re.I)
+            )
+            has_sqft = bool(SQFT_RE.search(text))
+            has_rent = bool(re.search(r"\$\s*\d[\d,]*", text))
+            if sum((has_bed_bath, has_sqft, has_rent)) < 2:
+                return
         abs_url = base_host + path
         if abs_url not in seen:
             seen.add(abs_url)
             out.append((abs_url, "floorplan_subpage"))
+
+    # Step 2A — the original config-proven Jonah route.
+    if base_uri is not None:
+        for anchor in soup.find_all("a", href=True):
+            _append_if_child(anchor, base_uri, require_card_signals=False)
+        if out:
+            return out
+
+    # Step 2B — public linked-card route.  It only applies when the current
+    # URL is itself a floor-plan index/path, and keeps the per-property fanout
+    # bounded.  Detail pages are one segment deeper than the current URL.
+    current_path = base_parsed.path.rstrip("/") + "/"
+    if "floorplan" not in current_path.lower():
+        return []
+    for anchor in soup.find_all("a", href=True):
+        _append_if_child(anchor, current_path, require_card_signals=True)
+        if len(out) >= 20:
+            break
 
     return out
 

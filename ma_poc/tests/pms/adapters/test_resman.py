@@ -183,6 +183,30 @@ def test_parse_unittypes_falls_back_to_group_market_rent() -> None:
     assert u2["availability_date"] == ""
 
 
+def test_parse_unittypes_prefers_12_month_price_over_first_short_term() -> None:
+    """A seven-month ResMan rate cannot masquerade as the standard lease price."""
+    data = [
+        {
+            "Bedrooms": 1,
+            "Bathrooms": 1,
+            "Units": [
+                {
+                    "Number": "216-306",
+                    "UnitType": "One Bedroom Mini",
+                    "Pricing": [
+                        {"Rent": 1799, "Term": 7},
+                        {"Rent": 1399, "Term": 12},
+                        {"Rent": 1399, "Term": 13},
+                    ],
+                }
+            ],
+        }
+    ]
+    unit = parse_resman_unittypes(data, _AVAIL_URL)[0]
+    assert unit["market_rent_low"] == 1399
+    assert unit["lease_term"] == "12"
+
+
 def test_parse_unittypes_degrades_empty_group_to_plan_level() -> None:
     # Group B1 has no Units but advertises MarketRent → one plan-level row
     # with no unit_number and UNKNOWN availability (flagged downstream).

@@ -62,6 +62,18 @@ class TestPostProcessPipeline:
         assert result.n_unit_level == 0
         assert result.n_plan_level == 1
         assert result.n_rejected == 0
+        plan = result.plan_summaries[0]
+        assert plan["data_quality_flag"] == "PLAN_LEVEL_NO_UNIT_ANCHOR"
+        assert "unit_number" in plan["data_gaps"]
+
+    def test_existing_quality_flag_keeps_its_meaning_and_adds_plan_marker(self):
+        """A pre-existing operator gap must survive plan-level marking."""
+        result = post_process(
+            [{"beds": 1, "area": 700, "data_quality_flag": "SQFT_NOT_PUBLISHED"}],
+            property_id="P1",
+        )
+        plan = result.plan_summaries[0]
+        assert plan["data_quality_flag"] == "SQFT_NOT_PUBLISHED|PLAN_LEVEL_NO_UNIT_ANCHOR"
 
     def test_unit_with_natural_id_routes_to_units(self):
         """A row with a real ``unit_id`` (not inferred) is unit-level."""

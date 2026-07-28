@@ -13,7 +13,7 @@ Research log (live-verified 2026-07-18, timeout-grind Surface C)
 GET returns a ~38-47KB shell whose rendered DOM shows ``.floor-plan-row`` cards,
 but those are JS-rendered — a static body has zero ``floor-plan-row`` nodes.
 
-**However the full unit roster is embedded in the shell as a React props
+**The currently offered unit roster is embedded in the shell as a React props
 island** — a JS object literal with UNQUOTED keys (so ``json.loads`` fails)::
 
     ...unit_availability:{floorplans:[
@@ -26,7 +26,14 @@ island** — a JS object literal with UNQUOTED keys (so ``json.loads`` fails)::
           street_address:"725 Wilson Street",deposit:1000,is_waitlist:false,
           special_description:"",...}]}]}
 
-Each ``units:[]`` entry is a complete **unit-level** record. Live counts:
+Each active ``units:[]`` entry is a complete **unit-level** record. The same
+island also carries ``unit_list:[...]``, the list the live application renders
+in its unit-selection step. The parser treats that list as authoritative when
+present: a raw ``units[]`` object outside it is not published. This avoids
+surfacing stale/orphaned bootstrap records that the public application no
+longer offers.
+
+Live counts:
 pullmansantarosa (606821) 14 fp / 11 units · sienavilla (40114) 16 fp / 10 ·
 tustin-view (214988) 6 fp / 4. Per-unit ``rent`` is genuine (varies within a
 plan), and ``id`` is a **stable source unit id** (no synthetic id needed).
@@ -37,8 +44,8 @@ React-island deep.
 
 Parse strategy: unit objects are flat (only ``amenities:[]`` empty arrays, no
 nested ``{}``), so a balanced-brace slice of the ``unit_availability:{...}``
-object plus a per-unit field regex extracts every unit robustly without a JS
-engine.
+object plus a per-unit field regex extracts every *active* unit robustly
+without a JS engine.
 
 Routing is flag-gated (``ENABLE_ONSITE_APPLY_ADAPTER``, default off): the
 detector only emits ``onsite_apply`` for a page carrying an
@@ -157,6 +164,28 @@ _UNIT_OBJ_RE = re.compile(r"\{[^{}]*?apartment_num:\"[^\"]*\"[^{}]*?\}")
 _PLAN_NAME_RE = re.compile(
     r'name:"([^"]+)",abbreviation:"[^"]*"[^}]*?style_id:(\d+)'
 )
+_UNIT_LIST_RE = re.compile(r"\bunit_list:\[([^\]]*)\]")
+_JS_STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
+
+
+def _active_unit_identifiers(island: str) -> set[str] | None:
+    """Return the On-Site application's active unit whitelist when supplied.
+
+    ``unit_list`` is the unit identifier collection used by the public
+    ``step/unit`` page.  It may contain either ``apartment_num`` or
+    ``display_unit_number`` values (the latter can include a building prefix),
+    so callers must compare both.  ``None`` means an older shell did not
+    provide the field and preserves backwards-compatible parsing; an empty set
+    means the application explicitly exposes no units.
+    """
+    match = _UNIT_LIST_RE.search(island)
+    if match is None:
+        return None
+    return {
+        bytes(value, "utf-8").decode("unicode_escape").strip()
+        for value in _JS_STRING_RE.findall(match.group(1))
+        if value.strip()
+    }
 
 
 def parse_onsite_online_app3(
@@ -165,9 +194,10 @@ def parse_onsite_online_app3(
     """Parse the On-Site ``online_app3`` props island into unit dicts.
 
     Extracts the ``unit_availability:{floorplans:[...]}`` object, builds a
-    ``style_id -> floorplan-name`` map, then emits one unit dict per
-    ``units:[]`` entry. Returns ``[]`` when the island is absent or carries no
-    available units. Never raises.
+    ``style_id -> floorplan-name`` map, then emits one unit dict per active
+    ``units:[]`` entry.  When the island supplies ``unit_list``, only entries
+    present in that live application whitelist are emitted. Returns ``[]``
+    when the island is absent or carries no available units. Never raises.
     """
     if not body:
         return []
@@ -178,12 +208,23 @@ def parse_onsite_online_app3(
     plan_name: dict[str, str] = {}
     for m in _PLAN_NAME_RE.finditer(island):
         plan_name.setdefault(m.group(2), m.group(1))
+    active_identifiers = _active_unit_identifiers(island)
 
     units: list[dict[str, Any]] = []
     for um in _UNIT_OBJ_RE.finditer(island):
         obj = um.group(0)
         apt = _str_field("apartment_num", obj)
         if not apt:
+            continue
+        display_apt = _str_field("display_unit_number", obj)
+        # On-Site can retain obsolete objects in its bootstrap payload after
+        # they disappear from the public unit-selection page.  ``unit_list``
+        # is the page's own active roster, so do not publish any object outside
+        # it.  Compare both identifiers because some communities prefix the
+        # display number with the building (e.g. ``725-301B`` vs ``301B``).
+        if active_identifiers is not None and not (
+            {apt, display_apt} & active_identifiers
+        ):
             continue
         rent = _int_field("rent", obj)
         sqft = _int_field("sq_feet", obj)

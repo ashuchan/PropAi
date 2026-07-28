@@ -21,6 +21,7 @@ import pytest
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.onsite_apply import (
     OnSiteApplyAdapter,
+    _active_unit_identifiers,
     _extract_balanced_object,
     extract_onsite_property_id,
     parse_onsite_online_app3,
@@ -81,6 +82,43 @@ def test_parse_island_absent_returns_empty() -> None:
 def test_parse_source_url_threaded_onto_units() -> None:
     units = parse_onsite_online_app3(_shell("pullman_606821"), source_url="SRC")
     assert all(u["source_api_url"] == "SRC" for u in units)
+
+
+def test_active_unit_identifiers_preserves_display_number_prefix() -> None:
+    """The public roster may list display rather than bare apartment numbers."""
+    assert _active_unit_identifiers('unit_list:["725-301B"]') == {"725-301B"}
+
+
+def test_parse_drops_bootstrap_units_outside_active_unit_list() -> None:
+    """Only units exposed by the public On-Site unit step may be published."""
+    body = '''
+    unit_availability:{floorplans:[{
+      name:"1 Bed",abbreviation:"1 Bed",style_id:99,units:[
+        {apartment_num:"PPT060",display_unit_number:"PPT060",rent:1595,
+         sq_feet:700,num_bedrooms:1,bathrooms:"1 bath",id:1,style_id:99,
+         date_available:"07/30/2026",street_address:"1005 S Gilbert St"},
+        {apartment_num:"PPT010",display_unit_number:"PPT010",rent:1680,
+         sq_feet:700,num_bedrooms:1,bathrooms:"1 bath",id:2,style_id:99,
+         date_available:"08/30/2026",street_address:"1005 S Gilbert St"}
+      ]}],unit_list:["PPT060"]}
+    '''
+
+    units = parse_onsite_online_app3(body, source_url="u")
+
+    assert [unit["unit_number"] for unit in units] == ["PPT060"]
+
+
+def test_parse_empty_active_unit_list_publishes_no_units() -> None:
+    """An explicit empty public roster must not fall back to raw unit objects."""
+    body = '''
+    unit_availability:{floorplans:[{
+      name:"1 Bed",abbreviation:"1 Bed",style_id:99,units:[
+        {apartment_num:"PPT060",display_unit_number:"PPT060",rent:1595,
+         sq_feet:700,num_bedrooms:1,bathrooms:"1 bath",id:1,style_id:99}
+      ]}],unit_list:[]}
+    '''
+
+    assert parse_onsite_online_app3(body, source_url="u") == []
 
 
 # ---------------------------------------------------------------------------

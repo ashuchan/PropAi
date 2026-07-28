@@ -6,7 +6,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ma_poc.core.schema_v2 import _format_v2_unit, _normalize_amenities
+from ma_poc.core.schema_v2 import (
+    _format_v2_floor_plan,
+    _format_v2_unit,
+    _normalize_amenities,
+)
 
 _TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=UTC)
 
@@ -738,3 +742,25 @@ def test_is_floor_plan_level_false_for_real_unit() -> None:
         _TS,
     )
     assert out["is_floor_plan_level"] is False
+
+
+def test_floor_plan_wrapper_clears_identity_but_keeps_public_plan_data() -> None:
+    """Floor-plan output cannot be mistaken for an apartment row."""
+    out = _format_v2_floor_plan(
+        {
+            "unit_id": "inferred_a1_700_1_1",
+            "floor_plan_name": "A1",
+            "beds": 1,
+            "baths": 1,
+            "area": 700,
+            "rent_low": 1500,
+        },
+        _TS,
+        "P1",
+    )
+    assert out["unit_id"] is None
+    assert out["unit_name"] is None
+    assert out["is_floor_plan_level"] is True
+    assert out["rent_low"] == 1500.0
+    assert out["area"] == 700
+    assert "PLAN_LEVEL_NO_UNIT_ANCHOR" in out["data_quality_flag"]

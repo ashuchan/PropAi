@@ -1162,6 +1162,20 @@ def test_securecafe_beats_jonah_widget_when_both_present() -> None:
     )
 
 
+def test_securecafe_public_unit_link_beats_knock_widget() -> None:
+    """A public per-unit Yardi link is inventory evidence, not a chat link."""
+    html = (
+        "<html><body>"
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<a href="https://live.example.securecafe.com/onlineleasing/example/'
+        'oleapplication.aspx?FloorPlanID=6570944&UnitID=49141132">Lease</a>'
+        "</body></html>"
+    )
+    result = detect_pms("https://www.example.com/floorplans/a1", page_html=html)
+    assert result.pms == "rentcafe"
+    assert result.confidence == 0.93
+
+
 def test_sightmap_embed_beats_jonah_widget_when_both_present() -> None:
     """Same principle for sightmap.com/embed iframe + Jonah widget on the
     same page. SightMap is the real data; Jonah is decoration."""

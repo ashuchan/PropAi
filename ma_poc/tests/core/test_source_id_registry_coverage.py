@@ -415,35 +415,22 @@ def test_siblings_on_one_plan_get_distinct_ids() -> None:
     assert "5391405" not in minted, "a floor-plan id was minted as a unit_id"
 
 
-def test_source_id_anchor_is_inert_in_jugnu() -> None:
-    """PINS THE HEADLINE CLAIM: this registry changes NOTHING in production.
+def test_source_id_anchor_is_used_in_jugnu() -> None:
+    """Jugnu must prefer an admitted native ID over a phenotype hash.
 
-    An earlier draft reported +12 units anchored, +2 verdict
-    SUCCESS_PLAN_LEVEL→SUCCESS and +2 recovery-pool exits. All three are ZERO,
-    because ``jugnu._format_v2_unit`` calls ``assign_fallback_unit_id`` on
-    ``out`` BEFORE it populates ``out["source_ids"]`` — so
-    ``_source_id_anchor`` reads a missing key and returns ``None`` every time,
-    whatever this registry admits. Corroborated in the artifacts: across all
-    228,708 units, ZERO shipped an anchor-minted ``unit_id``, while 280 rows
-    carrying an ALREADY-admitted key still shipped ``inferred_``.
-
-    This test is the tripwire. The prerequisite fix is one line — move
-    ``out["source_ids"] = dict(_sids)`` above the ``if not out["unit_id"]``
-    block — and it is NOT free: it turns ~20,874 AppFolio rows into
-    anchor-keyed rows and needs its own canary. When someone lands it, this
-    test fails, which is the point: the "impact: ZERO" claim in
-    ``core/source_ids.py`` must be re-measured in the same commit, not left to
-    rot into a lie.
+    The production formatter populates ``source_ids`` before calling
+    ``assign_fallback_unit_id``.  This prevents a row that already contains a
+    stable per-unit CWS ID from shipping as a fabricated ``inferred_*`` ID.
     """
     from datetime import UTC, datetime
 
     from ma_poc.scripts.runners.jugnu import _format_v2_unit
 
-    # A row whose ONLY real identity is a per-unit backend id: unit_number "G"
-    # is junk-filtered inside the formatter.
+    # A row that passed through an earlier formatter with an inferred id must
+    # still be upgraded when a later parser surfaces its native backend ID.
     out = _format_v2_unit(
         {
-            "unit_number": "G",
+            "unit_id": "inferred_a1_700_1_1",
             "floor_plan_name": "A1",
             "beds": 1,
             "baths": 1,
@@ -453,15 +440,49 @@ def test_source_id_anchor_is_inert_in_jugnu() -> None:
         datetime(2026, 7, 26, tzinfo=UTC),
         "282594",
     )
-    # The anchor IS available on the row the formatter emitted …
+    # The anchor is preserved and becomes the emitted natural identifier.
     assert out["source_ids"] == {"realpage_cws_unit_id": 16399273}
-    # … and was NOT used, because source_ids was populated too late.
-    assert str(out["unit_id"]).startswith("inferred_"), (
-        "The source-id anchor is now LIVE in jugnu. That is a real behaviour "
-        "change: re-measure the gold / verdict / recovery-pool deltas and "
-        "update the MEASURED PRODUCTION IMPACT section of core/source_ids.py "
-        "before deleting this assertion."
+    assert out["unit_id"] == "realpage_cws_unit_id-16399273"
+
+
+def test_jugnu_retains_plan_row_provenance_for_downstream_gates() -> None:
+    """A recombined plan summary remains visibly plan-level after formatting."""
+    from datetime import UTC, datetime
+
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    out = _format_v2_unit(
+        {
+            "floor_plan_name": "A1",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 700,
+            "asking_rent": 1200,
+            "data_quality_flag": "PLAN_LEVEL_NO_UNIT_ANCHOR",
+            "data_gaps": ["unit_number"],
+            "extraction_tier": "TIER_1_API_APTS247_PLAN_LEVEL",
+        },
+        datetime(2026, 7, 27, tzinfo=UTC),
+        "P1",
     )
+
+    assert out["is_floor_plan_level"] is True
+    assert out["data_quality_flag"] == "PLAN_LEVEL_NO_UNIT_ANCHOR"
+    assert out["data_gaps"] == ["unit_number"]
+    assert out["extraction_tier"] == "TIER_1_API_APTS247_PLAN_LEVEL"
+
+
+def test_plan_marker_prevents_junk_unit_token_from_counting_as_real_anchor() -> None:
+    """Post-process plan provenance must win over a stale raw DOM token."""
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    assert unit_has_real_anchor(
+        {
+            "unit_number": "Left",
+            "data_quality_flag": "PLAN_LEVEL_NO_UNIT_ANCHOR",
+            "extraction_tier": "TIER_3_DOM_PLAN_LEVEL",
+        }
+    ) is False
 
 
 def test_unregistered_floorplan_suffix_key_is_still_caught() -> None:

@@ -36,6 +36,26 @@ from ma_poc.pms.detector import (
     detect_pms,
 )
 from ma_poc.pms.resolver import ResolvedTarget, resolve_target
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+)
+from ma_poc.pms.signal_engine.defaults import LLM_HINT_SCORE as _LLM_HINT_SCORE
+from ma_poc.pms.signal_engine.defaults import PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE
 
 if TYPE_CHECKING:
     pass  # Playwright Page type used only in type annotations
@@ -371,6 +391,285 @@ def rows_are_plan_level(units: list[dict[str, Any]] | None) -> bool:
     from ma_poc.core.identity import unit_has_real_anchor
 
     return bool(units) and not any(unit_has_real_anchor(u) for u in units)
+
+
+_SCALAR_SQFT_RE = re.compile(
+    r"^\s*(\d{2,5})(?:\.0+)?\s*(?:sq\.?\s*ft\.?|square\s*feet|sf)?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _exact_scalar_sqft(row: dict[str, Any]) -> int | None:
+    """Return a published scalar area, never a range or inferred midpoint.
+
+    A per-plan page often publishes a single scalar area while each unit row
+    carries the unit number and rent but omits area.  The value is eligible
+    for a join only when it is an unambiguous positive scalar.  Ranges such
+    as ``700–850`` and textual claims such as ``up to 850`` intentionally
+    return ``None`` so we never manufacture a unit measurement.
+    """
+    for field in ("sqft", "area", "square_feet", "squareFeet", "_sqft"):
+        value = row.get(field)
+        if isinstance(value, bool) or value is None:
+            continue
+        if isinstance(value, (int, float)):
+            integer = int(value)
+            if value == integer and 100 <= integer <= 20_000:
+                return integer
+            continue
+        if isinstance(value, str):
+            match = _SCALAR_SQFT_RE.match(value.replace(",", ""))
+            if match:
+                integer = int(match.group(1))
+                if 100 <= integer <= 20_000:
+                    return integer
+    return None
+
+
+def _normalized_plan_keys(row: dict[str, Any]) -> set[str]:
+    """Return deterministic plan identifiers suitable for an exact FK join."""
+    keys: set[str] = set()
+    for field in ("floor_plan_id", "floorplan_id", "plan_id"):
+        value = str(row.get(field) or "").strip()
+        if value:
+            keys.add(f"id:{value.casefold()}")
+    source_ids = row.get("source_ids")
+    if isinstance(source_ids, dict):
+        for field, value in source_ids.items():
+            field_s = str(field).lower()
+            value_s = str(value or "").strip()
+            if value_s and "plan" in field_s:
+                keys.add(f"id:{value_s.casefold()}")
+    name = str(row.get("floor_plan_name") or row.get("floorplan_name") or "").strip()
+    if name:
+        normalized = re.sub(r"[^a-z0-9]+", "", name.casefold())
+        if normalized:
+            keys.add(f"name:{normalized}")
+    return keys
+
+
+def backfill_sqft_from_public_plan_context(adapter_result: AdapterResult) -> int:
+    """Safely join public plan-level scalar area onto anchored unit rows.
+
+    This handles the common marketing-page shape where a plan card exposes a
+    scalar sqft value and a linked/detail page exposes real apartment IDs and
+    rents without repeating sqft.  The join is exact by floor-plan ID or
+    normalized plan name; it is rejected if any candidate key has conflicting
+    areas.  Rent is never copied from a plan row to a unit row.
+
+    Args:
+        adapter_result: Raw mixed adapter output immediately before final
+            unit/plan promotion.  Mutated only for safe sqft backfills.
+
+    Returns:
+        Number of anchored unit rows whose missing sqft was filled.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    context_values: dict[str, set[int]] = {}
+    all_rows = [*adapter_result.units, *adapter_result.plan_summaries]
+    for row in all_rows:
+        if not isinstance(row, dict) or unit_has_real_anchor(row):
+            continue
+        sqft = _exact_scalar_sqft(row)
+        if sqft is None:
+            continue
+        for key in _normalized_plan_keys(row):
+            context_values.setdefault(key, set()).add(sqft)
+
+    if not context_values:
+        return 0
+
+    filled = 0
+    for unit in adapter_result.units:
+        if not isinstance(unit, dict) or not unit_has_real_anchor(unit):
+            continue
+        if _exact_scalar_sqft(unit) is not None:
+            continue
+        candidates: set[int] = set()
+        for key in _normalized_plan_keys(unit):
+            values = context_values.get(key)
+            if values:
+                candidates.update(values)
+        # A unit can match by both plan ID and name.  They must agree; a
+        # disagreement means the source context is ambiguous and is omitted.
+        if len(candidates) != 1:
+            continue
+        unit["sqft"] = str(candidates.pop())
+        unit["_sqft_backfill_source"] = "public_plan_context_exact"
+        filled += 1
+    return filled
+
+
+def promote_verified_unit_rows(
+    adapter_result: AdapterResult, *, property_id: str | None = None
+) -> int:
+    """Keep anchored apartments separate from plan and recovery rows.
+
+    Some PMS responses contain a genuine unit roster beside floor-plan cards,
+    and a few legacy adapters stamp their *result tier* as ``_PLAN_LEVEL``
+    before the rows have been inspected. A row is an emitted *unit* only when
+    public data proves a native, non-surrogate apartment anchor. An anchored
+    row without rent or sqft remains an apartment, but is explicitly marked
+    partial rather than mislabelled as a floor plan. Inferred identities, plan
+    IDs, and plan-only prices are never promoted into ``units``.
+
+    The function is deliberately central rather than adapter-specific so a
+    known-good unit roster cannot be buried by stale tier metadata in Entrata,
+    AppFolio, RentCafe, or future adapters. Unanchored rows are retained as
+    ``plan_summaries`` and flagged ``UNIT_ROUTE_UNVERIFIED`` so their detail
+    route can be retried without contaminating the unit roster.
+
+    Args:
+        adapter_result: Final adapter output immediately before legacy result
+            formatting.
+        property_id: Canonical property identifier used only by the canonical
+            post-processing pass.
+
+    Returns:
+        Number of native-anchor rows retained in ``adapter_result.units``.
+    """
+    if not adapter_result.units:
+        return 0
+
+    from ma_poc.core.identity import unit_has_real_anchor
+    from ma_poc.extraction.post_process import post_process
+    from ma_poc.validation.schema_gate import _is_positive_numeric
+
+    # Match only exact public plan metadata before post-processing moves
+    # unanchored plan rows into their separate output channel.
+    backfill_sqft_from_public_plan_context(adapter_result)
+
+    # Re-run the pure, idempotent post-process step so legacy adapter output
+    # receives the same parser/surrogate checks as current adapters.
+    processed = post_process(adapter_result.units, property_id=property_id)
+    admitted = processed.admitted
+    if not admitted:
+        return 0
+
+    def _has_native_anchor_despite_stale_plan_marker(row: dict[str, Any]) -> bool:
+        """Test raw identity without trusting a legacy plan-level label."""
+        candidate = dict(row)
+        # These are output classifications, not source evidence.  A stale
+        # marker must not hide a real displayed ``unit_number`` or source ID.
+        candidate.pop("is_floor_plan_level", None)
+        tier = str(candidate.get("extraction_tier") or "")
+        if tier.upper().endswith("_PLAN_LEVEL"):
+            candidate["extraction_tier"] = tier[: -len("_PLAN_LEVEL")]
+        flag = str(candidate.get("data_quality_flag") or "")
+        if "PLAN_LEVEL" in flag.upper():
+            kept = [part for part in flag.split("|") if "PLAN_LEVEL" not in part.upper()]
+            candidate["data_quality_flag"] = "|".join(kept)
+        return unit_has_real_anchor(candidate)
+
+    def _has_numeric_rent(row: dict[str, Any]) -> bool:
+        """Return whether the source row carries a numeric advertised rent."""
+        return any(
+            _is_positive_numeric(row.get(field))
+            for field in (
+                "asking_rent",
+                "market_rent_low",
+                "market_rent_high",
+                "rent_low",
+                "rent_high",
+            )
+        )
+
+    def _has_numeric_sqft(row: dict[str, Any]) -> bool:
+        """Return whether a row carries a positive scalar sqft value."""
+        return any(
+            _is_positive_numeric(row.get(field))
+            for field in ("sqft", "area", "square_feet", "squareFeet")
+        )
+
+    def _append_quality_flag(row: dict[str, Any], flag: str) -> None:
+        """Append one pipe-delimited quality flag without duplicating it."""
+        flags = [
+            part.strip()
+            for part in str(row.get("data_quality_flag") or "").split("|")
+            if part.strip()
+        ]
+        if flag not in flags:
+            flags.append(flag)
+        row["data_quality_flag"] = "|".join(flags)
+
+    anchored_units: list[dict[str, Any]] = []
+    unanchored_rows: list[dict[str, Any]] = []
+    for row in admitted:
+        if _has_native_anchor_despite_stale_plan_marker(row):
+            promoted = dict(row)
+            promoted["is_floor_plan_level"] = False
+            row_tier = str(promoted.get("extraction_tier") or "")
+            if row_tier.upper().endswith("_PLAN_LEVEL"):
+                promoted["extraction_tier"] = row_tier[: -len("_PLAN_LEVEL")]
+            row_flag = str(promoted.get("data_quality_flag") or "")
+            if "PLAN_LEVEL" in row_flag.upper():
+                retained_flags = [
+                    part for part in row_flag.split("|") if "PLAN_LEVEL" not in part.upper()
+                ]
+                promoted["data_quality_flag"] = "|".join(retained_flags)
+            if promoted.get("unit_number"):
+                gaps = promoted.get("data_gaps")
+                if isinstance(gaps, list):
+                    promoted["data_gaps"] = [gap for gap in gaps if gap != "unit_number"]
+            if not _has_numeric_rent(promoted):
+                _append_quality_flag(promoted, "UNIT_LEVEL_PRICING_MISSING")
+            elif not _has_numeric_sqft(promoted):
+                _append_quality_flag(promoted, "UNIT_LEVEL_PARTIAL_MISSING_SQFT")
+            anchored_units.append(promoted)
+        else:
+            unverified = dict(row)
+            _append_quality_flag(unverified, "UNIT_ROUTE_UNVERIFIED")
+            unanchored_rows.append(unverified)
+
+    # Retain non-unit rows for V2 consumers without letting them contaminate
+    # the strict physical-unit roster. ``processed.plan_summaries`` and
+    # ``unanchored_rows`` can contain the same source row with different
+    # diagnostic flags, so deduplicate by public plan identity rather than by
+    # whole-dict equality.
+    def _plan_key(row: dict[str, Any]) -> tuple[str, ...]:
+        source_ids = row.get("source_ids")
+        plan_sources: tuple[tuple[str, str], ...] = ()
+        if isinstance(source_ids, dict):
+            plan_sources = tuple(
+                sorted(
+                    (str(key), str(value))
+                    for key, value in source_ids.items()
+                    if "plan" in str(key).lower() and value not in (None, "")
+                )
+            )
+        return (
+            str(row.get("floor_plan_id") or ""),
+            str(row.get("floor_plan_name") or row.get("floorplan_name") or ""),
+            str(row.get("beds") or row.get("bedrooms") or ""),
+            str(row.get("baths") or row.get("bathrooms") or ""),
+            str(row.get("area") or row.get("sqft") or ""),
+            str(row.get("asking_rent") or row.get("rent_low") or ""),
+            repr(plan_sources),
+        )
+
+    merged_plans: list[dict[str, Any]] = []
+    plan_index: dict[tuple[str, ...], dict[str, Any]] = {}
+    for plan in [*adapter_result.plan_summaries, *processed.plan_summaries, *unanchored_rows]:
+        if not isinstance(plan, dict):
+            continue
+        key = _plan_key(plan)
+        existing = plan_index.get(key)
+        if existing is None:
+            copied = dict(plan)
+            plan_index[key] = copied
+            merged_plans.append(copied)
+            continue
+        for flag in str(plan.get("data_quality_flag") or "").split("|"):
+            if flag.strip():
+                _append_quality_flag(existing, flag.strip())
+    adapter_result.units = anchored_units
+    adapter_result.plan_summaries = merged_plans
+
+    tier = adapter_result.tier_used or ""
+    if anchored_units and tier.upper().endswith("_PLAN_LEVEL"):
+        adapter_result.tier_used = tier[: -len("_PLAN_LEVEL")]
+    return len(anchored_units)
 
 
 # 2026-07-26 — the closed outcome vocabulary for ``EventKind.RETRY_EPISODE``.
@@ -1400,23 +1699,35 @@ async def scrape(
             )
         ctx._api_responses = prepared  # type: ignore[attr-defined]
 
-    # --- Step 6b: Router invariant (Change 2) ------------------------------
-    # Before we hand control to the detected PMS adapter, ask the detector
-    # whether any captured response body actually matches that PMS's
-    # envelope. If none do, demote the detection to ``unknown`` and
-    # re-select the generic adapter — which runs the full cascade and
-    # (per Change 5) the LLM gate. This is the router's guard against
-    # URL-based false positives (Windsor sites routed to RentCafe, Vegas
-    # sites routed to SightMap) that Change 1's sub-tier codes made
-    # diagnosable but didn't fix.
+    # --- Step 6b: Router invariant (API adapters only) ---------------------
+    # API-envelope confirmation is meaningful only for an API-first adapter.
+    # A DOM-first adapter such as RentVision intentionally has no unit API:
+    # its public per-plan detail page carries the roster in SSR HTML.  Passing
+    # arbitrary analytics/XHR bodies through ``confirm_detection`` could find
+    # a cross-match for another PMS and silently replace that adapter with
+    # generic before it has a chance to follow its detail links.  That exact
+    # failure hid the live rows for Cypress Grove and Loch Raven (2026-07-27).
+    #
+    # Keep the cross-envelope protection for API-first platforms (Windsor,
+    # Vegas, etc.), but never use absence/noise in API capture to veto a
+    # DOM-first or portal-first public-route extractor.
     responses_for_confirm = getattr(ctx, "_api_responses", []) or []
-    confirmed_detection = confirm_detection(detection, responses_for_confirm)
+    _confirm_api_envelope = detection.recommended_strategy == "api_first"
+    if _confirm_api_envelope:
+        confirmed_detection = confirm_detection(detection, responses_for_confirm)
+    else:
+        confirmed_detection = detection
     detection_confirmed = confirmed_detection.pms == detection.pms
     result["_detection_confirmed"] = {
         "confirmed": detection_confirmed,
         "initial_pms": detection.pms,
         "final_pms": confirmed_detection.pms,
-        "evidence": list(confirmed_detection.evidence),
+        "evidence": (
+            list(confirmed_detection.evidence)
+            if _confirm_api_envelope
+            else list(confirmed_detection.evidence)
+            + [f"api-envelope-confirmation-skipped:{detection.recommended_strategy}"]
+        ),
         "response_count": len(responses_for_confirm),
     }
     if not detection_confirmed:
@@ -1826,6 +2137,11 @@ async def scrape(
                 and _baseline_result is not None
                 and _baseline_result.units
                 and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+                # A missing optional field (notably sqft) is a reason to try
+                # enrichment, never a reason to relabel an already anchored
+                # unit roster as floor-plan data.  Only restore-and-stamp an
+                # actual plan-level baseline when every recovery path loses.
+                and rows_are_plan_level(_baseline_result.units)
             ):
                 adapter_result = _baseline_result
                 # Stamp the tier with a _PLAN_LEVEL suffix and surface the
@@ -2667,8 +2983,22 @@ async def scrape(
         except Exception as exc:
             adapter_result.errors.append(f"universal-recovery-error: {exc}")
 
+    # A winning adapter can still carry legacy ``_PLAN_LEVEL`` metadata even
+    # though its final rows contain native unit IDs and numeric rents. Promote
+    # only those strictly verified rows; inferred / plan rows remain separate.
+    if promote_verified_unit_rows(
+        adapter_result, property_id=getattr(ctx, "property_id", None)
+    ):
+        # Path-C's marker is only valid while the final roster remains
+        # plan-level. A verified native unit roster supersedes it.
+        result.pop("_verdict_quality", None)
+        result.pop("_plan_level_reason", None)
+
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
+    # ``plan_summaries`` are deliberately separate: Jugnu emits them under
+    # ``floor_plans`` and never lets them acquire a synthetic unit identity.
+    result["plan_summaries"] = adapter_result.plan_summaries
     result["extraction_tier_used"] = adapter_result.tier_used or None
     # Salvage checkpoint for the SINGLE-PAGE path (RCA 2026-07-25). Everything
     # after this point — enrichment, null-field recovery, plan snapping — can
@@ -3044,35 +3374,6 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # tracking scripts but don't carry unit data — the real portal is one
 # "View Availability" click away.
 
-
-# Sentinel score for LLM-emitted navigation hints. Detected downstream
-# Phase 2: scoring constants imported from signal_engine.defaults — single
-# source of truth. Aliases preserved here so existing code at call sites
-# compiles without changes until Phase 4 cleanup removes the definitions.
-from ma_poc.pms.signal_engine.defaults import (
-    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
-)
-from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
-    LLM_HINT_SCORE as _LLM_HINT_SCORE,
-)
-from ma_poc.pms.signal_engine.defaults import (
-    PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE,
-)
 
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
 _EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
@@ -4263,9 +4564,18 @@ async def _try_link_hop(
             if isinstance(_ext_ref, dict):
                 _ext_ref["operator_no_availability"] = True
 
+        # A plan-only response is evidence that this is the right inventory
+        # route, but it is *not* unit-level success.  Previously this branch
+        # was keyed only on ``units``.  Once promotion correctly moved
+        # unanchored plan rows into ``plan_summaries``, the crawler stopped
+        # here and never inspected the index page's per-plan detail links.
+        # Keep the route alive for bounded detail discovery without allowing
+        # plan rows to satisfy a unit-level result.
         had_data = bool(sub_result.get("units"))
-        explored[sub_url] = had_data
-        if had_data:
+        has_plan_evidence = bool(sub_result.get("plan_summaries"))
+        has_inventory_evidence = had_data or has_plan_evidence
+        explored[sub_url] = has_inventory_evidence
+        if has_inventory_evidence:
             sub_result["_link_hop_from"] = entry_url
             sub_result["_link_hop_depth"] = 1
             sub_result["_link_hop_score"] = score
@@ -4276,10 +4586,11 @@ async def _try_link_hop(
             existing_explored.update(explored)
             sub_result["_explored_links"] = existing_explored
 
-            # Track the page that has delivered the most units so the caller
-            # can promote it to winning_page_url if it beats the current record.
+            # Track only actual native-unit rows as a winning page.  A
+            # floor-plan index is useful navigation evidence, not a unit
+            # endpoint worth warming as a roster source.
             unit_count = len(sub_result.get("units") or [])
-            if unit_count > _best_units_page[1]:
+            if had_data and unit_count > _best_units_page[1]:
                 _best_units_page = (sub_url, unit_count)
 
             # Once profile:winning_page_url delivers >1 units on a WARM/HOT
@@ -4287,7 +4598,11 @@ async def _try_link_hop(
             # the last 3 days by proxy), skip lower-scored priors.
             # Cold profiles or profiles with consecutive failures must still
             # explore — their winning_page_url may be stale.
-            if anchor.startswith("profile:winning_page_url") and unit_count > 1:
+            if (
+                had_data
+                and anchor.startswith("profile:winning_page_url")
+                and unit_count > 1
+            ):
                 # Only apply the skip for WARM/HOT profiles whose last run
                 # succeeded (consecutive_failures == 0) — a reliable proxy
                 # for "winning_page_url is valid within the last 3 days".
@@ -4311,7 +4626,32 @@ async def _try_link_hop(
             # Prefer embedded hints (pre-scroll, JSON blob still present)
             # and fall back to HTML link discovery (post-scroll, JS has
             # rendered the card links but consumed the JSON config).
-            fp_hints = sub_result.get("_embedded_floorplan_subpage_hints") or []
+            fp_hints = list(
+                sub_result.get("_embedded_floorplan_subpage_hints") or []
+            )
+            if not fp_hints and not _in_floorplan_accumulation:
+                # Generic card links are just as valuable as explicit Jonah
+                # JSON hints.  Run this before the looser ranker fallback so
+                # we only fan out to same-origin linked plan cards carrying
+                # visible floor-plan evidence.  This path covers properties
+                # where the plan page has no JSON blob at all.
+                sub_html = (
+                    (sub_fetch.body.decode("utf-8", errors="replace"))
+                    if (hasattr(sub_fetch, "body") and sub_fetch.body)
+                    else ""
+                )
+                if sub_html:
+                    try:
+                        from ma_poc.pms.adapters._html_extract import (
+                            detect_floorplan_subpage_urls,
+                        )
+
+                        fp_hints = detect_floorplan_subpage_urls(
+                            [], sub_html, sub_url
+                        )
+                    except Exception:
+                        fp_hints = []
+
             if not fp_hints and not _in_floorplan_accumulation:
                 # HTML fallback: look for same-host sub-page links that
                 # score highly from the page's rendered anchor tags.
@@ -4331,7 +4671,7 @@ async def _try_link_hop(
                         r"/(?:unit|apt|apartment)-[0-9a-f]{16,}/", _re_fp.IGNORECASE
                     )
                     sub_links = _rank_internal_links(sub_html, sub_url, limit=20)
-                    for lnk_url, lnk_score, lnk_anchor in sub_links:
+                    for lnk_url, lnk_score, _lnk_anchor in sub_links:
                         if lnk_score < 88 or lnk_url in visited:
                             continue
                         if _HASH_PATH_RE.search(lnk_url):
@@ -4489,6 +4829,13 @@ async def _try_link_hop(
                     hop_index=idx,
                     score=score,
                 )
+                continue
+
+            # A plan-only index without detail links must not be returned as
+            # a successful unit hop.  Continue with the remaining bounded
+            # candidates; the original plan summaries stay attached to the
+            # caller's result for truthful floor-plan output.
+            if not had_data:
                 continue
 
             emit(

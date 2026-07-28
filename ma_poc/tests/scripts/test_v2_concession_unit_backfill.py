@@ -61,3 +61,32 @@ def test_no_banner_no_backfill():
     prop = _format_v2(result, {"property_id": "1", "apartment_id": "1"})
     assert prop["concessions"] is None
     assert prop["units"][0].get("concession_text") is None
+
+
+def test_plan_summaries_emit_separately_without_fallback_unit_id():
+    """A plan card never leaks an ``inferred_*`` ID into ``units``."""
+    result = {
+        "units": [],
+        "plan_summaries": [
+            {
+                "floor_plan_name": "A1",
+                "bedrooms": 1,
+                "bathrooms": 1,
+                "sqft": 700,
+                "asking_rent": 1500,
+                "data_quality_flag": "UNIT_ROUTE_UNVERIFIED",
+            }
+        ],
+        "base_url": "https://x.test/",
+    }
+
+    prop = _format_v2(result, {"property_id": "1", "apartment_id": "1"})
+
+    assert prop["units"] == []
+    assert len(prop["floor_plans"]) == 1
+    plan = prop["floor_plans"][0]
+    assert plan["unit_id"] is None
+    assert plan["unit_name"] is None
+    assert plan["is_floor_plan_level"] is True
+    assert "inferred_" not in str(plan)
+    assert plan["rent_low"] == 1500.0

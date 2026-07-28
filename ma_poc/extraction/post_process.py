@@ -6,6 +6,7 @@ Single entry point that composes the canonical extraction pipeline:
               → sanity (clamp impossible values to absent)
               → is_valid_unit (gate: at least one numeric dimension)
               → classify (unit-level vs plan-level)
+              → stamp durable plan-level provenance
               → admitted (units) | admitted (plan_summaries) | rejected
 
 Every adapter should call ``post_process(units, property_id=...)`` once,
@@ -140,10 +141,29 @@ def post_process(
         if not is_valid_unit(sanitized):
             out.rejected.append((sanitized, absence_reasons(sanitized)))
             continue
-        # Admitted — partition by unit-level vs plan-level.
+        # Admitted — partition by unit-level vs plan-level.  Adapters keep a
+        # combined ``units`` list for backwards compatibility, so this marker
+        # is essential: the output formatter and verdict/recovery gates must
+        # still identify a plan row after the two lists are later recombined.
         if classify(sanitized) == "unit":
             out.units.append(sanitized)
         else:
-            out.plan_summaries.append(sanitized)
+            plan = dict(sanitized)
+            existing_flag = str(plan.get("data_quality_flag") or "").strip()
+            if "PLAN" not in existing_flag.upper():
+                plan["data_quality_flag"] = (
+                    f"{existing_flag}|PLAN_LEVEL_NO_UNIT_ANCHOR"
+                    if existing_flag
+                    else "PLAN_LEVEL_NO_UNIT_ANCHOR"
+                )
+            tier = str(plan.get("extraction_tier") or "").strip()
+            if tier and not tier.upper().endswith("_PLAN_LEVEL"):
+                plan["extraction_tier"] = f"{tier}_PLAN_LEVEL"
+            gaps = plan.get("data_gaps")
+            normalized_gaps = list(gaps) if isinstance(gaps, list) else []
+            if "unit_number" not in normalized_gaps:
+                normalized_gaps.append("unit_number")
+            plan["data_gaps"] = normalized_gaps
+            out.plan_summaries.append(plan)
 
     return out

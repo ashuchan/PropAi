@@ -219,7 +219,7 @@ def _last_resort_key(unit: dict[str, Any], property_id: str) -> str | None:
     if not floor_plan:
         return None
     digest = hashlib.sha256(
-        f"{property_id or ''}|fp:{floor_plan}".encode("utf-8")
+        f"{property_id or ''}|fp:{floor_plan}".encode()
     ).hexdigest()[:16]
     return f"inferred_{digest}"
 
@@ -254,20 +254,12 @@ def _source_id_anchor(unit: dict[str, Any]) -> str | None:
     would both collapse onto ``realpage-<id>`` and silently merge distinct
     apartments at upsert.
 
-    ⚠ THIS FUNCTION IS UNREACHABLE FROM THE PRODUCTION FORMATTER TODAY.
-    ``jugnu._format_v2_unit`` calls :func:`assign_fallback_unit_id` at
-    ``jugnu.py:3118`` but does not populate ``out["source_ids"]`` until
-    :3134, so the lookup below reads a missing key and returns ``None`` every
-    time. A prefix scan across all 228,708 units in the three run-artifact
-    sets finds 0 occurrences of ``appfolio-`` / ``apts247-`` / ``entrata-`` /
-    ``knock-`` AND 0 of the new full-key form — that is NOT "re-keying churn
-    is nil", it is proof the path is dead; 280 rows carrying an
-    already-admitted key still shipped ``inferred_``. Widening
-    ``PER_UNIT_IDENTITY_KEYS`` therefore changes NOTHING in production until
-    the jugnu ordering is fixed. See the MEASURED PRODUCTION IMPACT section of
-    ``ma_poc/core/source_ids.py`` for the prerequisite and why it needs its own
-    canary. ``test_source_id_anchor_is_inert_in_jugnu`` pins this so the claim
-    cannot silently go stale.
+    The production formatter supplies ``source_ids`` before calling
+    :func:`assign_fallback_unit_id`, so this is now a live identity path.
+    It intentionally applies only after an apparent unit number has been
+    rejected as a plan surrogate. A canary must measure any resulting
+    re-keying before broad deployment; native source IDs are preferred to
+    phenotype hashes because they are stable per-unit anchors.
     """
     sids = unit.get("source_ids")
     if not isinstance(sids, dict):
@@ -422,6 +414,19 @@ def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
       * pre-format  — identity lives in ``unit_number`` (or ``source_ids``)
       * post-format — identity lives in ``unit_id``, possibly ``inferred_*``
     """
+    # A row classified as plan-level must stay plan-level through the legacy
+    # combined ``units`` wire format. Without this early guard a junk token
+    # retained on the raw row (for example "Left") could re-promote a plan
+    # after post-processing and suppress the unit-route recovery path.
+    quality = str(unit.get("data_quality_flag") or "").upper()
+    tier = str(unit.get("extraction_tier") or "").upper()
+    if (
+        bool(unit.get("is_floor_plan_level"))
+        or "PLAN_LEVEL" in quality
+        or "PLAN_LEVEL" in tier
+    ):
+        return False
+
     uid = str(unit.get("unit_id") or "").strip()
     if (
         uid
@@ -436,7 +441,13 @@ def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
         and number.lower() not in {"null", "none"}
         and not _is_floorplan_surrogate(unit, number)
     ):
-        return True
+        try:
+            from ma_poc.pms.adapters._parsing import is_junk_unit_number
+
+            if not is_junk_unit_number(number):
+                return True
+        except Exception:
+            return True
     return _has_per_unit_evidence(unit)
 
 
@@ -504,7 +515,7 @@ def synthesize_unkeyable_id(unit: dict[str, Any], property_id: str) -> str:
     """
     payload_hash = unit.get("data_sha256") or compute_unit_data_sha256(unit)
     digest = hashlib.sha256(
-        f"{property_id or ''}|payload:{payload_hash}".encode("utf-8")
+        f"{property_id or ''}|payload:{payload_hash}".encode()
     ).hexdigest()[:16]
     uid = f"unkeyable_{digest}"
     unit["unit_id"] = uid
