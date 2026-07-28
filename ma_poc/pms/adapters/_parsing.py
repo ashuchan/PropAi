@@ -218,6 +218,156 @@ SQFT_RE = re.compile(
 )
 
 
+# ── Canonical free-text area parser (2026-07-28) ─────────────────────────
+#
+# ONE rule: a number is an area only when an area-unit token BINDS to it,
+# and only an IMPERIAL token yields a square-foot answer.
+#
+# Before this existed the job was done by three independent regexes, each
+# wrong in a different way — all three failures share the same cause: they
+# select a number by pattern proximity instead of by which unit token owns
+# it.
+#
+#   * ``_html_extract._SQFT_PATTERN`` could not see a thousands separator.
+#     Its ``(?<![\$\d,])`` lookbehind blocks the post-comma group and the
+#     pre-comma group is a single digit, so "1,118 sq ft" matched NOTHING.
+#   * With the number-first pattern silent, ``_container_yields_unit`` fell
+#     through to a LABEL-first fallback that binds the number AFTER the
+#     "sq ft" token.  On a dual-unit string that number is the metric one
+#     ("2,000 sq ft 186 m2" -> 186); next to a balcony it is the balcony
+#     ("1,118 sq ft Balcony Sq Ft: 60" -> 60).  That fallback also skipped
+#     the [150, 10000] bounds check the number-first path applied.
+#   * ``plan_text._SQFT_RE`` captured ``(\d{2,4})`` with no lookbehind, so
+#     "1,200 sq ft" produced 200 and "$1145 Sq Ft" produced 1145.
+#
+# Metric-ONLY input ("83.6 m2" with no imperial twin) returns None — the
+# absent sentinel — rather than a converted value.  Rationale: ``area`` is
+# documented and clamped as a source-measured square-foot integer and sits
+# beside ``area_raw``; a converted 83.6 m2 -> 900 would be indistinguishable
+# downstream from a real "900 sq ft" measurement, so the conversion would
+# launder a derived number into a measured field with no provenance to
+# mark it.  US multifamily listings essentially never publish metric-only,
+# so the realistic producer of a metric-only string is a mis-parse, and
+# absent is the honest outcome.  Metric tokens are still *recognised* —
+# that recognition is what stops the metric number being read as sqft.
+
+# Integer part only; a trailing decimal is consumed but not captured.
+_AREA_NUM = r"(\d{1,3}(?:,\d{3})+|\d{2,5})(?:\.\d+)?"
+
+# Imperial unit tokens.  NO leading \b: in the number-first form the number
+# plus separator already anchors the left edge, and a \b cannot exist after
+# a digit — "1,200ft2" has no boundary between "0" and "f" (both are \w),
+# which is exactly how an earlier \b-based fix silently dropped that form.
+# The trailing (?!\w) guards stop "sf" matching inside "sfgate" and "ft2"
+# matching inside "ft20".
+_AREA_IMPERIAL_UNIT = (
+    r"(?:sq\.?\s*(?:ft\.?|feet|foot)"
+    r"|sqft"
+    r"|square[-\s]*(?:feet|foot|ft)"
+    r"|ft\s*(?:²|\^2|2(?!\w))"
+    r"|s\.?f\.?(?!\w))"
+)
+
+# Metric unit tokens.  Never produce a value — they exist only so a metric
+# number cannot be mistaken for the square-foot one.
+_AREA_METRIC_UNIT = (
+    r"(?:sq\.?\s*m\.?(?!\w)"
+    r"|sqm(?!\w)"
+    r"|square[-\s]*met(?:re|er)s?"
+    r"|m\s*(?:²|\^2|2(?!\w)))"
+)
+
+# number-first: "900 sqft", "1,200ft2", "1,128-square-foot", "449sf".
+# The ``(?<![\$\d,.])`` lookbehind is what keeps "$1145 Sq Ft" out — the
+# number is money, the label just happens to follow it.
+_AREA_NUMBER_FIRST_RE = re.compile(
+    r"(?<![\$\d,.])" + _AREA_NUM + r"[-\s]*" + _AREA_IMPERIAL_UNIT,
+    re.IGNORECASE,
+)
+
+# label-first: "Square Feet: 850", "SqFt 833", "Sq.ft. 1,025".
+# A LEADING \b is required here and the bare "ft2"/"ft²"/"sf" spellings are
+# deliberately excluded, because without both, "Loft 2: 350" reads as an
+# area of 350.
+_AREA_LABEL_FIRST_RE = re.compile(
+    r"\b(?:sq\.?\s*(?:ft\.?|feet|foot)|sqft|square[-\s]*(?:feet|foot|ft))"
+    r"\s*[:\-]?\s*" + _AREA_NUM,
+    re.IGNORECASE,
+)
+
+# Applied at the position just past a label-first number: if ANY area unit
+# follows it, that number belongs to the following token, not to the label
+# on its left.  This is the dual-unit rule — in "2,000 sq ft 186 m2" the
+# 186 is owned by "m2".
+_AREA_UNIT_AFTER_RE = re.compile(
+    r"\s*(?:" + _AREA_IMPERIAL_UNIT + r"|" + _AREA_METRIC_UNIT + r")",
+    re.IGNORECASE,
+)
+
+# Context words that, when they precede a match, mean the measurement is
+# not the unit's floor area.
+_AREA_NOISE_CONTEXT_RE = re.compile(
+    r"balcon|patio|terrace|storage|closet|garage|amenity|amenities|locker",
+    re.IGNORECASE,
+)
+_AREA_NOISE_WINDOW = 40
+
+# Realistic apartment bounds; mirrors schema_v2._format_area's clamp.
+AREA_MIN_SQFT = 150
+AREA_MAX_SQFT = 10_000
+
+
+def _area_candidate(text: str, m: re.Match[str]) -> int | None:
+    """Bounds- and context-check one area match. None when unusable."""
+    try:
+        n = int(m.group(1).replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+    if not (AREA_MIN_SQFT <= n <= AREA_MAX_SQFT):
+        return None
+    prefix = text[max(0, m.start() - _AREA_NOISE_WINDOW): m.start()]
+    if _AREA_NOISE_CONTEXT_RE.search(prefix):
+        return None
+    return n
+
+
+def parse_area(text: str | None) -> int | None:
+    """Return the unit's floor area in SQUARE FEET, or ``None``.
+
+    Selection rules, in order:
+
+    1. Number-first pairs (``"900 sqft"``) are collected first — the number
+       physically precedes the unit token, so ownership is unambiguous.
+       Among the survivors the LARGEST wins: a listing that mentions both
+       its floor area and an amenity area names the floor area larger.
+    2. Only if there is no number-first pair do we consider a label-first
+       pair (``"Square Feet: 850"``), and only when no area unit follows
+       the captured number — otherwise that number belongs to the following
+       token, which is how the square-metre value used to be returned.
+    3. Every candidate must fall in [150, 10000] and must not be preceded
+       within 40 chars by a balcony/patio/storage-style context word.
+
+    Metric-only input returns ``None``; see the module comment above for
+    why we do not convert.  Never raises.
+    """
+    if not text or not isinstance(text, str):
+        return None
+    number_first = [
+        v
+        for v in (_area_candidate(text, m) for m in _AREA_NUMBER_FIRST_RE.finditer(text))
+        if v is not None
+    ]
+    if number_first:
+        return max(number_first)
+    for m in _AREA_LABEL_FIRST_RE.finditer(text):
+        if _AREA_UNIT_AFTER_RE.match(text, m.end()):
+            continue
+        v = _area_candidate(text, m)
+        if v is not None:
+            return v
+    return None
+
+
 # Patterns for inferring bed/bath count from a floor-plan / unit name.
 # Runs in declared order; first match wins. Patterns are designed to be
 # narrow enough that they don't false-positive on unrelated marketing
