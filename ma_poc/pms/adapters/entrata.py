@@ -582,6 +582,65 @@ _PP_AVAIL_DATE_RE = re.compile(
 )
 
 
+# ── Fee-transparency dual-price display (2026-07-28) ────────────────────
+# Entrata's fee-transparency template renders TWO DIFFERENT QUANTITIES in
+# a single rent cell — not a range:
+#
+#   <span class="fee-transparency-text">
+#     Total Monthly Leasing Price <span class="...-emphasized">$1,583.98</span>
+#     <span class="pp-base-rent pp-base-rent-line">
+#       <span class="pp-base-rent-label">Base Rent:</span>
+#       <span class="pp-base-rent-amount">$1,391/month</span>
+#     </span>
+#   </span>
+#
+# marlowepeoriaplace.com publishes the definitions on its own /floorplans
+# page: "Base Rent: The monthly rent for the rental home." and "Total
+# Monthly Leasing Price: Base Rent plus fixed, mandatory monthly fees."
+# The gross figure is therefore ALWAYS the larger of the two and ALWAYS
+# rendered first, so the legacy ``(first, last)`` read produced an
+# inverted range: run-2026-07-27-full-0d54ca7 shipped 107 rows with
+# rent_low > rent_high, 100% of them Entrata (96 Marlowe Peoria Place I
+# unit-level rows + 11 Cyan on Peachtree plan-level rows).
+#
+# ``rent_low``/``rent_high`` mean ADVERTISED ASKING RENT everywhere else
+# in the corpus, and Entrata's own units-table column header for the
+# advertised price is literally "Base Rent" — so the range is taken from
+# the labelled base-rent portion and the gross figure is dropped. It is a
+# different quantity, not a range endpoint; writing it into rent_high (or
+# swapping the two to satisfy low<=high) would silently launder it into a
+# rent number.
+#
+# The rule keys on Entrata's own ``Base Rent:`` LABEL (label + colon +
+# money). A bare "Base Rent" column header / mobile label with no colon
+# is NOT the marker and leaves the legacy behaviour untouched — see the
+# 16-case table in tests/pms/adapters/test_entrata_pp_fee_transparency_rent.py
+# for the must-match / must-NOT-match set.
+_PP_MONEY_TOKEN = r"\$\s*[\d,]+(?:\.\d{2})?"
+_PP_MONEY_RE = re.compile(r"\$\s*([\d,]+)(?:\.\d{2})?")
+# Deliberately no em-dash in the range separator: "—"/"--" is Entrata's
+# hidden-rent placeholder and is rejected before this pattern is applied.
+_PP_BASE_RENT_LABEL_RE = re.compile(
+    rf"base\s+rent\s*:\s*"
+    rf"(?P<amounts>{_PP_MONEY_TOKEN}"
+    rf"(?:\s*(?:-|–|to)\s*{_PP_MONEY_TOKEN})?)",
+    re.IGNORECASE,
+)
+
+
+def _pp_base_rent_scope(rent_text: str) -> str | None:
+    """Narrow a PP rent-cell string to Entrata's labelled Base-Rent amount(s).
+
+    Returns the substring holding ONLY the money token(s) that follow the
+    ``Base Rent:`` label when the fee-transparency dual price is present,
+    else ``None`` (caller keeps its existing whole-string behaviour). See
+    the block comment above for why the gross "Total Monthly Leasing
+    Price" must never become a rent-range endpoint.
+    """
+    m = _PP_BASE_RENT_LABEL_RE.search(rent_text or "")
+    return m.group("amounts") if m else None
+
+
 def _pp_money_low_high(rent_text: str) -> tuple[int | None, int | None]:
     """Extract (low, high) ints from a rent display string.
 
@@ -589,12 +648,23 @@ def _pp_money_low_high(rent_text: str) -> tuple[int | None, int | None]:
     operator hides the published rent (~80% of plans on some triomke-style
     sites). Without this guard the dash was being captured as ``$``,
     yielding a 0 rent and tripping the validity gate.
+
+    When the string carries Entrata's fee-transparency dual price
+    ("Total Monthly Leasing Price $X ... Base Rent: $Y"), the range is
+    read from the labelled Base-Rent portion ONLY — see the block comment
+    above. Otherwise the first/last money tokens are the range endpoints,
+    unchanged.
     """
     if not rent_text:
         return (None, None)
     if "—" in rent_text or "--" in rent_text:
         return (None, None)
-    matches = re.findall(r"\$\s*([\d,]+)(?:\.\d{2})?", rent_text)
+    base = _pp_base_rent_scope(rent_text)
+    if base:
+        scoped = _PP_MONEY_RE.findall(base)
+        if scoped:
+            return (money_to_int(scoped[0]), money_to_int(scoped[-1]))
+    matches = _PP_MONEY_RE.findall(rent_text)
     if not matches:
         return (None, None)
     lo = money_to_int(matches[0])
@@ -1530,7 +1600,13 @@ def parse_entrata_pp_unit_cards(
                 rent_text = el.get_text(" ", strip=True)
                 if rent_text:
                     break
-        rent_matches = _PP_UNIT_CARD_RENT_RE.findall(rent_text)
+        # Same fee-transparency guard as _pp_money_low_high: when the cell
+        # carries "Total Monthly Leasing Price $X ... Base Rent: $Y", only
+        # the labelled base rent is a rent-range endpoint. No-op on every
+        # other PP theme (no "Base Rent:" label -> whole string, as before).
+        rent_matches = _PP_UNIT_CARD_RENT_RE.findall(
+            _pp_base_rent_scope(rent_text) or rent_text
+        )
         rent_lo: int | None = None
         rent_hi: int | None = None
         if rent_matches:
@@ -1643,7 +1719,8 @@ def parse_entrata_pp_jd_fp_cards(html: str, url: str) -> list[dict[str, str]]:
         baths_val = bam.group(1) if bam else ""
         sm = _JDFP_SQFT_RE.search(text)
         sqft_val = sm.group(1).replace(",", "") if sm else ""
-        rents = _PP_UNIT_CARD_RENT_RE.findall(text)
+        # Fee-transparency guard — see _pp_base_rent_scope.
+        rents = _PP_UNIT_CARD_RENT_RE.findall(_pp_base_rent_scope(text) or text)
         rent_lo = int(rents[0].replace(",", "")) if rents else None
         rent_hi = int(rents[-1].replace(",", "")) if rents else None
         status = "AVAILABLE" if re.search(r"available", text, re.IGNORECASE) else "UNKNOWN"
