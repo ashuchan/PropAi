@@ -60,40 +60,19 @@ in any run artifact). Wiring them in needs a rename first — ``_amli.py``'s
 ``realpage_unit_id`` would land at a scope conflicting with ``camden.py``'s,
 which is exactly the collision rule 1 forbids. Separate PR.
 
-MEASURED PRODUCTION IMPACT OF THIS CONSOLIDATION: ZERO
-------------------------------------------------------
-Stated up front because an earlier draft of this work claimed +12 units
-anchored, +2 verdict SUCCESS_PLAN_LEVEL→SUCCESS and +2 recovery-pool exits.
-All three are ZERO in production. They were replayed against post-format
-output rows rather than against the code paths that actually consume these
-lists. This module is a CORRECTNESS AND CONSOLIDATION cleanup — it removes two
-drifting whitelists, three writer-less entries and one genuine plan-key
-misclassification — and it is worth landing on that basis alone. It is not a
-gold-recovery lever, and must not be sold as one.
+IDENTITY PATH AND CANARY REQUIREMENT
+------------------------------------
+``scripts/runners/jugnu.py`` now copies ``source_ids`` onto the output row
+before calling ``assign_fallback_unit_id``. The registry is therefore a live
+identity path: an admitted native per-unit key replaces an ``inferred_*``
+phenotype hash, but never replaces a real unit number. This repairs the
+ordering defect that previously left native IDs unavailable to identity.
 
-Why each half is inert TODAY:
-
-* IDENTITY. ``scripts/runners/jugnu.py:3118`` calls ``assign_fallback_unit_id``
-  on the ``out`` dict, but ``out["source_ids"]`` is not populated until
-  :3134 — sixteen lines LATER. ``_source_id_anchor`` therefore reads a missing
-  key and returns ``None`` on every call in the production formatter, no
-  matter what this registry admits. Proof from artifacts rather than from
-  reading: across all 228,708 units, the number that shipped an anchor-minted
-  ``unit_id`` is ZERO, and 280 rows carry a key that was ALREADY admitted
-  before this PR yet still shipped ``inferred_``. (A prefix scan finding "0
-  occurrences of ``appfolio-``/``apts247-``" is therefore NOT evidence of
-  "zero re-keying churn", which is how an earlier draft read it — it is the
-  signature of a dead code path.) The 533 empty-``unit_id`` and 836
-  ``unkeyable_`` rows — the only rows where ``core/state_store.py:196`` and
-  ``data_provider/sql/stores.py:578`` would reach the anchor — carry an
-  admitted key on 0 occasions.
-  PREREQUISITE for making it live: move ``out["source_ids"] = dict(_sids)``
-  above the ``if not out["unit_id"]`` block in ``jugnu._format_v2_unit``. That
-  is a one-line change and is NOT free — it turns ~20,874 AppFolio rows into
-  anchor-keyed rows, which is why ``appfolio_listing_id`` had to be measured
-  for cross-run rotation first (see ROTATION MEASUREMENT below) and why it
-  needs its own canary. Pinned by ``test_source_id_anchor_is_inert_in_jugnu``
-  so the day someone lands it, the claim above fails loudly.
+This is a correctness fix, not an automatic completeness win. Each canary
+must measure re-keying by adapter, property and native-key type, verify daily
+stability, and separately reconcile output against the public availability
+route. Do not infer a SUCCESS_PLAN_LEVEL→SUCCESS verdict solely from this
+identity change.
 
 * VERDICT. ``reporting/verdict.compute`` is called from ``jugnu.py:1820`` with
   ``units=result.get("units")`` — PRE-format ADAPTER rows — and

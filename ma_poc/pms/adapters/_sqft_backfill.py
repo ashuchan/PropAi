@@ -22,15 +22,17 @@ This module recovers the sqft by:
   1. Scanning ALL captured API responses for floor-plan-aggregate shapes.
   2. Building a ``(beds_int, baths_int) → sqft_int`` lookup (the context).
   3. Filling ``sqft`` on units where it is absent and the context gives an
-     *unambiguous* value for that (beds, baths) combination.
+     *unambiguous, exact* value for that (beds, baths) combination.
 
 Design constraints
 ------------------
 * **Never-raise** — every function is wrapped so a bug here can never crash
   the run. Failures are returned as an empty context / zero fill count.
-* **Unambiguous only** — if two floor plans share the same (beds, baths) but
-  have different sqft, the field is left blank. Silently assigning the wrong
-  sqft to a unit is worse than leaving it absent.
+* **Unambiguous and exact only** — a ``700–800`` plan range is useful
+  floor-plan context but is not an exact fact about every unit. Likewise, if
+  two floor plans share the same (beds, baths) but have different sqft, the
+  field is left blank. Silently assigning an averaged, maximum, or unrelated
+  plan area to a unit is worse than leaving it absent.
 * **Source-tagged** — backfilled units get ``_sqft_backfill_source`` so
   analytics can distinguish real vs inferred sqft.
 * **Additive** — only fills units where sqft is absent. Never overwrites a
@@ -40,7 +42,6 @@ Design constraints
 from __future__ import annotations
 
 import logging
-import statistics
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -136,37 +137,49 @@ def _parse_beds_from_label(label: str) -> int | None:
 
 
 def _extract_sqft_from_item(item_lc: dict[str, Any]) -> int | None:
-    """Extract a single representative sqft from a floor-plan item.
+    """Extract an exact single sqft value from a floor-plan item.
 
     Priority order:
       1. A single-value key (``sqft``, ``squareFeet``, etc.)
-      2. Range midpoint from min/max keys
-      3. Min only (when max absent)
+      2. Equal min/max keys (a range whose endpoints prove a scalar area)
 
-    Returns None if no value >= _SQFT_FLOOR found.
+    A true range (``700-800``, min/max unequal, or an incomplete range) is
+    deliberately not collapsed into a scalar. The caller is populating a
+    unit-level ``sqft`` field, so a plan's midpoint or ceiling would be a
+    fabricated unit attribute.
+
+    Returns None if no exact value >= _SQFT_FLOOR is found.
     """
     # 1. Single value
     single_raw = _first_val(item_lc, _SQFT_SINGLE_KEYS)
     if single_raw is not None:
-        # May be a range string like "700-800"
+        # A rendered range is plan-level context, not unit-specific area.
         s = str(single_raw).strip()
         if "-" in s:
             parts = s.split("-", 1)
             lo = _parse_int(parts[0])
             hi = _parse_int(parts[1])
-            if lo and hi and lo >= _SQFT_FLOOR and hi >= _SQFT_FLOOR:
-                return (lo + hi) // 2
+            if lo and hi and lo == hi and lo >= _SQFT_FLOOR:
+                return lo
+            return None
         val = _parse_int(single_raw)
         if val is not None and val >= _SQFT_FLOOR:
             return val
 
-    # 2. Min/max range
+    # 2. Min/max range. Presence of both fields declares a range even when
+    # one endpoint is 0/blank, so it cannot be treated as an exact scalar.
     lo_raw = _first_val(item_lc, _SQFT_MIN_KEYS)
     hi_raw = _first_val(item_lc, _SQFT_MAX_KEYS)
     lo = _parse_int(lo_raw)
     hi = _parse_int(hi_raw)
-    if lo and hi and lo >= _SQFT_FLOOR and hi >= _SQFT_FLOOR:
-        return (lo + hi) // 2
+    has_min_key = any(key in item_lc for key in _SQFT_MIN_KEYS)
+    has_max_key = any(key in item_lc for key in _SQFT_MAX_KEYS)
+    if has_min_key and has_max_key:
+        if lo and hi and lo == hi and lo >= _SQFT_FLOOR:
+            return lo
+        return None
+    # A one-sided field is accepted only when the API does not expose its
+    # counterpart at all. Several PMSes label a scalar plan area ``minSqFt``.
     if lo and lo >= _SQFT_FLOOR:
         return lo
     if hi and hi >= _SQFT_FLOOR:
@@ -175,9 +188,13 @@ def _extract_sqft_from_item(item_lc: dict[str, Any]) -> int | None:
     # 3. Check nested floorSize dict (JSON-LD pattern)
     fs = item_lc.get("floorsize")
     if isinstance(fs, dict):
-        val = _parse_int(fs.get("value") or fs.get("minvalue") or fs.get("maxvalue"))
+        val = _parse_int(fs.get("value"))
         if val and val >= _SQFT_FLOOR:
             return val
+        min_v = _parse_int(fs.get("minvalue"))
+        max_v = _parse_int(fs.get("maxvalue"))
+        if min_v and max_v and min_v == max_v and min_v >= _SQFT_FLOOR:
+            return min_v
 
     return None
 
@@ -292,7 +309,7 @@ def build_floorplan_sqft_context(
     a floor-plan catalog (short list, has sqft, lacks per-unit IDs), extracts
     a (beds, baths) → [sqft...] mapping.
 
-    Final context: only (beds, baths) pairs with a **single distinct sqft
+    Final context: only (beds, baths) pairs with a **single exact sqft
     value** across all catalog APIs are included. Ambiguous pairs (multiple
     distinct sqft values for the same bed/bath combo) are dropped so the
     backfill never silently assigns the wrong sqft.
@@ -341,13 +358,8 @@ def build_floorplan_sqft_context(
         distinct = set(sqft_list)
         if len(distinct) == 1:
             context[key] = distinct.pop()
-        # Ambiguous: try median as a best-effort fallback only when values
-        # are close (within 10% of each other) — avoids large misassignments
-        elif len(distinct) > 1:
-            vals = sorted(distinct)
-            lo, hi = vals[0], vals[-1]
-            if lo > 0 and (hi - lo) / lo <= 0.10:
-                context[key] = round(statistics.median(sqft_list))
+        # Ambiguous values deliberately remain absent. Similar-sized plans
+        # are still different plans; a median would be an invented unit area.
 
     return context
 

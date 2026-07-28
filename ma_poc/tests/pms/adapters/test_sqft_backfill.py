@@ -8,16 +8,11 @@ Covers:
   * Real-world shape: repli360.com floor-plan aggregate API
 """
 
-from __future__ import annotations
-
-import pytest
-
 from ma_poc.pms.adapters._sqft_backfill import (
     backfill_unit_sqft,
     build_floorplan_sqft_context,
     run_sqft_backfill,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -57,20 +52,20 @@ class TestBuildContext:
         ctx = build_floorplan_sqft_context([_resp(body)])
         assert ctx[(1, 1)] == 820
 
-    def test_minimumsqft_maximumsqft_range_midpoint(self):
+    def test_minimumsqft_maximumsqft_range_is_not_collapsed(self):
         body = [{"beds": 2, "baths": 2, "minimumSQFT": 900, "maximumSQFT": 1100}]
         ctx = build_floorplan_sqft_context([_resp(body)])
-        assert ctx[(2, 2)] == 1000  # midpoint
+        assert (2, 2) not in ctx
 
     def test_min_sqft_only_used_when_max_absent(self):
         body = [{"beds": 1, "baths": 1, "minimumSQFT": 650}]
         ctx = build_floorplan_sqft_context([_resp(body)])
         assert ctx[(1, 1)] == 650
 
-    def test_sqft_range_string_parsed(self):
+    def test_sqft_range_string_is_not_collapsed(self):
         body = [{"beds": 1, "baths": 1, "sqft": "700-800"}]
         ctx = build_floorplan_sqft_context([_resp(body)])
-        assert ctx[(1, 1)] == 750
+        assert (1, 1) not in ctx
 
     def test_studio_label_inferred_as_0_beds(self):
         body = [{"floorplanName": "Studio", "baths": 1, "sqft": 480}]
@@ -86,15 +81,14 @@ class TestBuildContext:
         ctx = build_floorplan_sqft_context([_resp(body)])
         assert (1, 1) not in ctx
 
-    def test_ambiguous_excluded_except_close_values_take_median(self):
-        """Values within 10% of each other are resolved to median."""
+    def test_close_but_distinct_values_remain_ambiguous(self):
+        """Similar plans are still distinct plans, not a median sqft."""
         body = [
             {"beds": 2, "baths": 2, "sqft": 1000},
             {"beds": 2, "baths": 2, "sqft": 1050},  # 5% apart
         ]
         ctx = build_floorplan_sqft_context([_resp(body)])
-        assert (2, 2) in ctx
-        assert 1000 <= ctx[(2, 2)] <= 1050
+        assert (2, 2) not in ctx
 
     def test_sub_150_sqft_ignored(self):
         """Values below the _SQFT_FLOOR are not real apartment sqft."""
@@ -170,9 +164,7 @@ class TestBuildContext:
             },
         ]
         ctx = build_floorplan_sqft_context([_resp(body)])
-        assert ctx[(0, 1)] == 485   # midpoint 450-520
-        assert ctx[(1, 1)] == 750   # midpoint 700-800
-        assert ctx[(2, 2)] == 1075  # midpoint 1000-1150
+        assert ctx == {}
 
     def test_floorsize_nested_dict(self):
         """JSON-LD floorSize dict shape."""
@@ -269,8 +261,7 @@ class TestBackfillUnitSqft:
 
 class TestRunSqftBackfill:
     def test_end_to_end_repli360_scenario(self):
-        """The real-world case: unit-level API has rent+beds but no sqft;
-        floor-plan API has sqft ranges. Backfill fills the gap."""
+        """A unit API plus floor-plan ranges must not invent unit sqft."""
         # API A: unit-level (has unit_number + rent, no sqft)
         unit_level_api = _resp([
             {"unitNumber": "101", "beds": 0, "rent": 1285},
@@ -292,13 +283,11 @@ class TestRunSqftBackfill:
 
         ctx_keys, filled = run_sqft_backfill(units, [unit_level_api, floorplan_api])
 
-        assert ctx_keys == 3   # 3 (beds, baths) keys from the catalog
-        assert filled == 3     # all 3 units filled
-        assert units[0]["sqft"] == "485"    # midpoint 450-520
-        assert units[1]["sqft"] == "750"    # midpoint 700-800
-        assert units[2]["sqft"] == "1050"   # midpoint 1000-1100
+        assert ctx_keys == 0
+        assert filled == 0
         for u in units:
-            assert u.get("_sqft_backfill_source") == "floorplan_context"
+            assert u["sqft"] == ""
+            assert "_sqft_backfill_source" not in u
 
     def test_no_catalog_api_returns_zero_fills(self):
         units = [_unit(beds=1, baths=1, sqft="")]

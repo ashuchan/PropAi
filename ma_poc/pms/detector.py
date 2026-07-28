@@ -917,11 +917,12 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # page is full plan-level SSR DOM. The platform credit appears
     # site-wide including the landing page, so detection fires before any
     # hop. These sites carry no other PMS.
-    if (
+    _has_rentvision_marker = (
         "created by rentvision" in h
         or "powered by rentvision" in h
         or "rentvision.com" in h
-    ):
+    )
+    if _has_rentvision_marker:
         yield (
             "rentvision",
             0.85,
@@ -1067,7 +1068,19 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         # knock below resman, scoped tightly to the ResMan availability DATA
         # path so genuine Knock-data sites (liveatcalista, livethemaya —
         # knockDoorway present, no ResMan portal) are untouched.
-        if "/portal/applicants/availability" in h:
+        if _has_rentvision_marker:
+            # A Knock widget can be a contact/scheduling integration on a
+            # RentVision marketing site. When RentVision's public detail
+            # pages expose a unit-number/rent roster, prefer that roster over
+            # treating the widget as the property inventory source. Loch
+            # Raven Village is the verified fixture (2026-07-27).
+            yield (
+                "knock",
+                0.80,
+                ["Knock/Doorway marker present but RentVision public roster "
+                 "co-resident — RentVision detail pages own the unit data"],
+            )
+        elif "/portal/applicants/availability" in h:
             yield (
                 "knock",
                 0.85,
@@ -1128,12 +1141,26 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # ``<sub>.securecafenet.com/residentservices/<slug>/userlogin``. The
     # underlying Yardi tenant exposes the same ``onlineleasing/<slug>/
     # availableunits.aspx`` endpoint; rentcafe adapter handles both.
-    if (
+    _has_securecafe_portal = (
         "securecafe.com/onlineleasing" in h
         or ".securecafe.com" in h
         or "securecafenet.com/residentservices" in h
         or ".securecafenet.com" in h
-    ):
+    )
+    if _has_securecafe_portal:
+        # A public UnitID + FloorPlanID link is stronger than a generic
+        # SecureCafe resident/apply link: it identifies a current inventory
+        # row on this property's leasing route.  It must outrank a co-resident
+        # Knock chat widget so the RentCafe adapter reaches the real units.
+        # Requiring all three markers keeps normal Knock+SecureCafe apply-link
+        # pages on their existing tie/next-candidate behaviour.
+        if "floorplanid=" in h and "unitid=" in h:
+            yield (
+                "rentcafe",
+                0.93,
+                ["RentCafe SecureCafe public UnitID + FloorPlanID inventory link"],
+            )
+            return
         yield (
             "rentcafe",
             0.90,
@@ -1229,7 +1256,22 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                 "resman",
                 0.85,
                 ["ResMan marker present but edificecms co-resident — "
-                 "Edifice owns the data API, ResMan is the apply-flow target"],
+                "Edifice owns the data API, ResMan is the apply-flow target"],
+            )
+        elif _has_rentvision_marker:
+            # RentVision detail pages publish the actual unit roster inline
+            # (unit number + asking rent + availability).  Their sites often
+            # link a ResMan portal only from Apply/Check Availability.  The
+            # old 0.90 ResMan priority hid the working RentVision adapter and
+            # left the root page to generic plan-card parsing (Cypress Grove
+            # and Loch Raven, 2026-07-27).  Prefer the public detail table;
+            # the RentVision adapter follows every plan URL and emits only
+            # rows with a real displayed unit number.
+            yield (
+                "resman",
+                0.80,
+                ["ResMan marker present but RentVision co-resident — "
+                 "RentVision detail pages own the public unit roster"],
             )
         else:
             yield (
@@ -1623,8 +1665,6 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "avalonbay": ("avaloncommunities.com",),
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
-    "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
-    "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
     "reinhold": ("rr-unit-block", "rr-pricing-toggle", "reinholdresidential.com"),
     "residentservices365": ("365residentservices.com",),
     "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),

@@ -9,6 +9,7 @@ import pytest
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
+    extract_units_from_dom,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.generic import GenericAdapter
@@ -36,6 +37,82 @@ def test_jsonld_apartment_with_offers() -> None:
     assert u["rent_range"] == "$1,800 - $2,000"
     assert u["sqft"] == "650"
     assert u["extraction_tier"] == "TIER_2_JSONLD"
+
+
+def test_jsonld_marketing_apartment_recovers_labelled_concrete_unit_number() -> None:
+    """A marketing detail page's ``#7953C`` is a real unit, not its FTK plan code."""
+    html = """<html><script type="application/ld+json">
+    {"@type":"Apartment","name":"Sedona #7953C","unitCode":"FTK",
+     "numberOfBedrooms":1,"offers":{"@type":"Offer","price":779}}
+    </script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/Marketing/FloorPlans/Units/id")
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "7953C"
+    assert units[0]["market_rent_low"] == 779
+
+
+def test_dom_data_unit_identity_pair_recovers_concrete_entrata_marketing_unit() -> None:
+    """A labelled Entrata marketing row is a unit even without a ``.unit-card`` class."""
+    html = """
+    <div class="unit-body" data-unit-id="4112268" data-unit-number="0612"
+         data-rent="1938.00" data-bedrooms="2" data-bathrooms="1" data-area="879 SquareFeet">
+      <div class="unit-body-content">
+        <h3>Unit 0612</h3><h4>Available Now</h4>
+        <p>2 bedrooms, 1 bathroom</p><p>From $1,938.00 / month</p>
+      </div>
+    </div>
+    """
+    units, mode = extract_units_from_dom(html, "https://www.thevillagedallas.com/properties/the-village-lakes/")
+    assert mode == "default"
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "0612"
+    assert units[0]["unit_id"] == "4112268"
+    assert units[0]["market_rent_low"] == 1938
+
+
+def test_securecafe_applicant_react_rows_keep_real_unit_identity_not_plan_name() -> None:
+    """The Applicant card has a plan range plus distinct C310/C404 unit prices."""
+    html = """
+    <li><div><h2>2 Bedroom</h2><p>2 Bed / 2 Bath / 1052 Sqft</p><p>$1,893.00 - $1,918.00</p>
+      <div><div>#C310</div><div>From $1,918.00</div><button aria-label="View unit C310 details">View</button></div>
+      <div><div>#C404</div><div>From $1,893.00</div><button aria-label="View unit C404 details">View</button></div>
+    </div></li>
+    """
+    units, mode = extract_units_from_dom(
+        html,
+        "https://bromleyhouse.securecafeapplicant.com/onlineleasing/content3/access/bromley-house/floorplans/2039041",
+    )
+    assert mode == "default"
+    assert [(unit["unit_number"], unit["market_rent_low"]) for unit in units] == [
+        ("C310", 1918),
+        ("C404", 1893),
+    ]
+    assert {unit["floor_plan_name"] for unit in units} == {"2 Bedroom"}
+
+
+def test_appfolio_public_listing_iframe_recovers_unit_from_address_middle_segment() -> None:
+    """AppFolio cards place 0188BE in the address rather than a unit field."""
+    html = """
+    <div class="listing-item result js-listing-item" id="listing_2397">
+      <dl>
+        <div><dt>RENT</dt><dd>$800</dd></div>
+        <div><dt>Square Feet</dt><dd>575</dd></div>
+        <div><dt>Bed / Bath</dt><dd>1 bd / 1 ba</dd></div>
+      </dl>
+      <span class="js-listing-address">1919 Burton Dr, 0188BE, Austin, TX 78741</span>
+      <p>AVAILABLE NOW</p>
+    </div>
+    """
+    units, mode = extract_units_from_dom(
+        html,
+        "https://gordonandbilyeupm.appfolio.com/listings?filters%5Bproperty_list%5D=emerson",
+    )
+    assert mode == "default"
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "0188BE"
+    assert units[0]["market_rent_low"] == 800
+    assert units[0]["sqft"] == "575"
+    assert units[0]["source_ids"] == {"appfolio_listing_id": "2397"}
 
 
 def test_jsonld_skips_property_shell_with_no_offers() -> None:
@@ -309,7 +386,6 @@ class _FetchResult:
         self.body = body
 
 
-
 @pytest.mark.asyncio
 async def test_generic_adapter_recovers_units_from_embedded_json() -> None:
     """Raw HTML with inline floorPlans assignment — no API, no JSON-LD."""
@@ -442,6 +518,7 @@ def test_extract_units_from_dom_handles_prisma_units_row() -> None:
     beds in cells; the row's combined text passes the existing
     structural-signal gate."""
     from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+
     html = """<html><body>
     <table class="prisma-units-table">
       <tbody class="prisma-units-body">
@@ -474,6 +551,7 @@ def test_extract_units_from_dom_handles_unit_row_class_suffix() -> None:
     Without the wildcard suffix selector, every new theme needs its
     own explicit entry."""
     from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+
     html = """<html><body>
     <table>
       <tr class="custom-cms-unit-row">
@@ -494,10 +572,10 @@ def test_dom_container_selectors_includes_tr_patterns() -> None:
     A future refactor that drops them silently would regress Greenwood-
     shape sites without firing any test failure on synthetic fixtures."""
     from ma_poc.pms.adapters._html_extract import _DOM_CONTAINER_SELECTORS
-    assert any(
-        s.startswith("tr.") or s.startswith("tr[")
-        for s in _DOM_CONTAINER_SELECTORS
-    ), "DOM cascade must include TR-row selectors for custom-CMS unit tables"
+
+    assert any(s.startswith("tr.") or s.startswith("tr[") for s in _DOM_CONTAINER_SELECTORS), (
+        "DOM cascade must include TR-row selectors for custom-CMS unit tables"
+    )
 
 
 # ── bucket-B grind (2026-05-22): container text-format parser fixes ──────────
@@ -508,6 +586,7 @@ def test_dom_container_selectors_includes_tr_patterns() -> None:
 class TestContainerTextFormatFixes:
     def _u(self, text):
         from ma_poc.pms.adapters._html_extract import _container_yields_unit
+
         return _container_yields_unit(text)
 
     def test_rent_pattern_no_truncate_4digit_no_comma(self) -> None:
@@ -562,11 +641,13 @@ class TestBucketBDomFixtures:
 
     def _fixture(self, name):
         from pathlib import Path
+
         p = Path(__file__).parents[2] / "fixtures" / "bucketb" / name
         return p.read_text(encoding="utf-8")
 
     def test_apartment_info_block_redoak(self) -> None:
         from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+
         units, _ = extract_units_from_dom(
             self._fixture("apartment_info_block_redoak.html"), "https://x.test/"
         )
@@ -580,9 +661,8 @@ class TestBucketBDomFixtures:
 
     def test_floor_plan_creekview(self) -> None:
         from ma_poc.pms.adapters._html_extract import extract_units_from_dom
-        units, _ = extract_units_from_dom(
-            self._fixture("floor_plan_creekview.html"), "https://x.test/"
-        )
+
+        units, _ = extract_units_from_dom(self._fixture("floor_plan_creekview.html"), "https://x.test/")
         assert len(units) >= 6
         priced = [u for u in units if u.get("sqft") and u.get("market_rent_low")]
         assert len(priced) >= 5

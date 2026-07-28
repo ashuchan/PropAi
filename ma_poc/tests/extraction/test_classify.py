@@ -12,7 +12,6 @@ import pytest
 from ma_poc.extraction.classify import classify
 from ma_poc.models.source import FieldValue, SourceId
 
-
 # ── Unit-level recognition ────────────────────────────────────────────────────
 
 
@@ -31,12 +30,37 @@ class TestClassifyUnitLevel:
         specific physical unit, even without an explicit unit_id."""
         assert classify({"available_date": "2026-05-15", "beds": 2}) == "unit"
 
+    def test_written_calendar_date_signals_unit_level(self):
+        """A human-readable dated availability is also unit-specific."""
+        assert classify({"availability_date": "August 7, 2026", "beds": 2}) == "unit"
+
     def test_floor_signals_unit_level(self):
         """A specific ``floor`` (not "studio") indicates per-unit identity."""
         assert classify({"floor": "2nd Floor", "beds": 2}) == "unit"
 
     def test_building_signals_unit_level(self):
         assert classify({"building": "Bldg A", "beds": 2}) == "unit"
+
+    @pytest.mark.parametrize("availability", ["Available Now", "Lease Now"])
+    def test_marketing_availability_with_real_unit_anchor_is_unit_level(
+        self, availability
+    ):
+        """Availability wording is valid for a real unit when paired with its ID.
+
+        The classifier rejects the wording only as a *standalone* identity
+        signal; it must not demote an actual unit row that uses the same
+        marketing language.
+        """
+        assert classify({"unit_number": "13-1304", "availability_date": availability}) == "unit"
+
+    def test_marketing_availability_with_native_source_id_is_unit_level(self):
+        """A native API identity is also sufficient when no text ID renders."""
+        assert classify(
+            {
+                "source_ids": {"apts247_unit_id": "1180016"},
+                "availability_date": "Lease Now",
+            }
+        ) == "unit"
 
 
 # ── Plan-level recognition ────────────────────────────────────────────────────
@@ -56,6 +80,24 @@ class TestClassifyPlanLevel:
         """``_inferred_id=True`` is the explicit marker."""
         unit = {"unit_id": "abc", "_inferred_id": True, "beds": 1}
         assert classify(unit) == "plan"
+
+    @pytest.mark.parametrize("availability", ["Now", "Available Now", "available now"])
+    def test_available_now_without_an_anchor_is_plan_level(self, availability):
+        """Plan cards commonly say Available Now and must not become units."""
+        assert classify({"availability_date": availability, "beds": 1}) == "plan"
+
+    def test_junk_dom_control_token_is_plan_level(self):
+        """Cypress Grove's captured ``Left`` label is not an apartment ID."""
+        assert classify({"unit_number": "Left", "beds": 3, "baths": 2}) == "plan"
+
+    def test_plan_source_id_cannot_promote_available_now_card(self):
+        """A plan ID is not a unit anchor, even when the plan is available."""
+        assert classify(
+            {
+                "source_ids": {"rentcafe_floorplan_id": "72431"},
+                "availability_date": "Available Now",
+            }
+        ) == "plan"
 
     def test_field_value_with_identity_fallback_source_is_plan_level(self):
         """Merger output carries unit_id as a FieldValue. When the source is

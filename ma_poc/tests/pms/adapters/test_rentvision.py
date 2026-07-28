@@ -146,6 +146,35 @@ def test_detector_routes_rentvision_marker() -> None:
     assert det.recommended_strategy == "dom_first"
 
 
+def test_detector_prefers_rentvision_detail_roster_over_resman_apply_link() -> None:
+    """A ResMan apply portal must not hide a RentVision unit detail page.
+
+    Cypress Grove and Loch Raven both expose public unit-number/rent rows on
+    ``/floorplans/{bed-tier}/{slug}``, while their Apply/Check Availability
+    CTA points at ``myresman.com``.  The direct public roster is the correct
+    first extraction route.
+    """
+    html = (
+        '<footer>Website created by RentVision</footer>'
+        '<a href="https://aptdyn.myresman.com/Portal/Applicants/Availability">'
+        'Check Availability</a>'
+    )
+    det = detect_pms("https://www.cypressgroveaptliving.com/", page_html=html)
+    assert det.pms == "rentvision"
+    assert det.recommended_strategy == "dom_first"
+
+
+def test_detector_prefers_rentvision_detail_roster_over_knock_widget() -> None:
+    """A Knock contact widget must not displace a public RentVision roster."""
+    html = (
+        '<footer>Website created by RentVision</footer>'
+        '<script src="https://doorway.knck.io/v1/widget.js"></script>'
+    )
+    det = detect_pms("https://www.lochravenapts.com/", page_html=html)
+    assert det.pms == "rentvision"
+    assert det.recommended_strategy == "dom_first"
+
+
 def test_rentvision_adapter_registered() -> None:
     adapter = get_adapter("rentvision")
     assert isinstance(adapter, RentVisionAdapter)
@@ -318,6 +347,35 @@ def test_parse_rentvision_unit_table_compound_unit_codes() -> None:
     assert units[1]["market_rent_low"] == 1149
 
 
+def test_parse_rentvision_unit_table_supports_prices_starting_and_unitid_apply() -> None:
+    """RentVision sometimes prefixes a real unit price with prose.
+
+    Loch Raven uses ``Prices Starting At <span>$1,175`` and serializes
+    ``UnitId`` before ``MoveInDate`` in the public apply link. This remains
+    a unit row with a native display ID and numeric rent.
+    """
+    from ma_poc.pms.adapters.rentvision import parse_rentvision_unit_table
+
+    html = (
+        '<tr><th class="left wrap">1711D AB</th>'
+        '<td class="standard identifiable-links right">Prices Starting At '
+        '<span>$1,175</span></td>'
+        '<td class="standard unit-availability">Available Now</td>'
+        '<td class="unit-actions"><button onclick="window.open(\''
+        '?UnitId&#61;95&amp;MoveInDate&#61;07/28/2026\');">Apply Now</button></td>'
+        '</tr>'
+    )
+    units = parse_rentvision_unit_table(
+        html,
+        "https://www.lochravenapts.com/floorplans/one-bedroom/one-bedroom-large-classic",
+        "One Bedroom Large Classic",
+    )
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "1711D AB"
+    assert units[0]["market_rent_low"] == 1175
+    assert units[0]["availability_date"] == "2026-07-28"
+
+
 def test_parse_rentvision_unit_table_empty_when_no_units() -> None:
     """Heritage plan: detail page rendered but no <th class="left wrap">
     rows (no availability today). Parser returns empty list — caller
@@ -431,6 +489,37 @@ async def test_adapter_drill_end_to_end(monkeypatch) -> None:
     assert u["unit_number"] == "622-102"
     assert u["market_rent_low"] == 1249
     assert u["availability_date"] == "2026-05-26"
+
+
+@pytest.mark.asyncio
+async def test_adapter_drill_works_in_fetch_only_mode(monkeypatch) -> None:
+    """Fetch-only Jugnu runs still follow public RentVision detail routes."""
+    fp_html = (
+        '<a href="/floorplans/three-bedroom/three-bed-two-bath-garden">'
+        'Three Bedroom</a>'
+    )
+    detail_html = (
+        '<tr><th class="left wrap">24-B</th>'
+        '<td class="standard identifiable-links right"><span>$1,500</span></td>'
+        '<td class="standard unit-availability">Available Now</td></tr>'
+    )
+
+    async def _mock_fp(*args, **kwargs):
+        return fp_html
+
+    async def _mock_detail(*args, **kwargs):
+        return detail_html
+
+    monkeypatch.setattr(RentVisionAdapter, "_fetch_floorplans_html", staticmethod(_mock_fp))
+    monkeypatch.setattr(RentVisionAdapter, "_fetch_detail_html", staticmethod(_mock_detail))
+
+    result = await RentVisionAdapter().extract(
+        None, _ctx("https://www.cypressgroveaptliving.com/")
+    )
+    assert result.tier_used == "TIER_3_DOM_RENTVISION_UNIT_LEVEL"
+    assert [(u["unit_number"], u["market_rent_low"]) for u in result.units] == [
+        ("24-B", 1500)
+    ]
 
 
 @pytest.mark.asyncio

@@ -14,7 +14,11 @@ import pytest
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
 from ma_poc.pms.resolver import ResolvedTarget
-from ma_poc.pms.scraper import scrape
+from ma_poc.pms.scraper import (
+    backfill_sqft_from_public_plan_context,
+    promote_verified_unit_rows,
+    scrape,
+)
 
 # ---------------------------------------------------------------------------
 # Network seam — see ma_poc/conftest.py
@@ -131,6 +135,144 @@ def _make_adapter_result(
     )
 
 
+def test_promote_verified_unit_rows_keeps_only_native_id_plus_rent() -> None:
+    """A stale plan tier cannot bury real units or promote a plan surrogate."""
+    result = AdapterResult(
+        tier_used="TIER_1_API_ENTRATA_PLAN_LEVEL",
+        units=[
+            {
+                "unit_number": "5216",
+                "asking_rent": 904,
+                "beds": 1,
+                "baths": 1,
+                "floor_plan_name": "A1",
+                "floor_plan_id": "a1-plan",
+                "is_floor_plan_level": True,
+                "data_quality_flag": "PLAN_LEVEL_NO_UNIT_ANCHOR",
+                "extraction_tier": "TIER_1_API_ENTRATA_PLAN_LEVEL",
+            },
+            {
+                # Looks priced, but its supposed id is the floor-plan id.
+                "unit_id": "b2-plan",
+                "floor_plan_id": "b2-plan",
+                "source_ids": {"entrata_floor_plan_id": "b2-plan"},
+                "floor_plan_name": "B2",
+                "asking_rent": 1200,
+                "beds": 2,
+                "baths": 2,
+            },
+        ],
+    )
+
+    promoted = promote_verified_unit_rows(result, property_id="27790")
+
+    assert promoted == 1
+    assert result.tier_used == "TIER_1_API_ENTRATA"
+    assert [row["unit_number"] for row in result.units] == ["5216"]
+    assert result.units[0]["is_floor_plan_level"] is False
+    assert "PLAN_LEVEL" not in str(result.units[0]["data_quality_flag"])
+    assert len(result.plan_summaries) == 1
+    assert result.plan_summaries[0]["unit_id"] == "b2-plan"
+
+
+def test_promotion_keeps_partial_units_and_routes_unanchored_rows() -> None:
+    """Missing price/sqft stays unit-level; an inferred plan card does not."""
+    result = AdapterResult(
+        tier_used="TIER_1_API",
+        units=[
+            {
+                "unit_number": "201",
+                "floor_plan_name": "A1",
+                "area": 700,
+                "beds": 1,
+                "baths": 1,
+            },
+            {
+                "unit_number": "202",
+                "floor_plan_name": "A1",
+                "asking_rent": 1500,
+                "area": -1,
+                "beds": 1,
+                "baths": 1,
+            },
+            {
+                "floor_plan_name": "B1",
+                "asking_rent": 1450,
+                "area": 700,
+                "beds": 1,
+                "baths": 1,
+            },
+        ],
+    )
+
+    promoted = promote_verified_unit_rows(result, property_id="partial-test")
+
+    assert promoted == 2
+    assert [row["unit_number"] for row in result.units] == ["201", "202"]
+    assert "UNIT_LEVEL_PRICING_MISSING" in result.units[0]["data_quality_flag"]
+    assert "UNIT_LEVEL_PARTIAL_MISSING_SQFT" in result.units[1]["data_quality_flag"]
+    assert len(result.plan_summaries) == 1
+    assert "UNIT_ROUTE_UNVERIFIED" in result.plan_summaries[0]["data_quality_flag"]
+
+
+def test_public_plan_sqft_backfill_requires_exact_plan_scalar() -> None:
+    """Plan-page sqft fills a matching real unit, never a range/mismatch."""
+    result = AdapterResult(
+        units=[
+            {
+                "unit_number": "08-B",
+                "floor_plan_name": "One Bed One Bath Garden",
+                "asking_rent": 1199,
+                "sqft": "",
+            },
+            {
+                # A real unit with an unrelated plan must not borrow A1's
+                # area merely because both appear in the same response.
+                "unit_number": "09-C",
+                "floor_plan_name": "Two Bed Townhome",
+                "asking_rent": 1500,
+                "area": -1,
+            },
+            {
+                # Public plan context — no unit anchor, exact scalar sqft.
+                "floor_plan_name": "one-bed one-bath garden",
+                "sqft": "763 sq ft",
+                "asking_rent": 1199,
+            },
+            {
+                # A range is deliberately unusable even for an exact name.
+                "floor_plan_name": "Two Bed Townhome",
+                "sqft": "900 - 1,050 sq ft",
+                "asking_rent": 1500,
+            },
+        ]
+    )
+
+    assert backfill_sqft_from_public_plan_context(result) == 1
+    assert result.units[0]["sqft"] == "763"
+    assert result.units[0]["_sqft_backfill_source"] == "public_plan_context_exact"
+    assert result.units[1]["area"] == -1
+
+
+def test_public_plan_sqft_backfill_rejects_conflicting_exact_context() -> None:
+    """Conflicting plan metadata remains missing rather than guessed."""
+    result = AdapterResult(
+        units=[
+            {
+                "unit_number": "101",
+                "floor_plan_name": "A1",
+                "asking_rent": 1200,
+                "area": -1,
+            },
+            {"floor_plan_name": "A1", "sqft": "700"},
+            {"floor_plan_name": "A1", "sqft": "750"},
+        ]
+    )
+
+    assert backfill_sqft_from_public_plan_context(result) == 0
+    assert result.units[0]["area"] == -1
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -156,6 +298,60 @@ async def test_orchestrator_detects_then_calls_correct_adapter() -> None:
     assert result["units"] == expected_units
     assert result["_adapter_used"] == "entrata"
     assert "entrata" in result["_fallback_chain"]
+    mock_adapter.extract.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_dom_first_adapter_is_not_demoted_by_api_envelope_confirmation() -> None:
+    """A public DOM roster must run even when unrelated network bodies exist.
+
+    RentVision sites expose units on per-plan SSR detail pages.  Cypress
+    Grove and Loch Raven also load third-party widgets, so using those widget
+    responses as an API-envelope veto used to force the generic adapter and
+    lose their real unit rows.
+    """
+    page = _make_page(content="<html>Website created by RentVision</html>")
+    rentvision = DetectedPMS(
+        pms="rentvision",
+        confidence=0.85,
+        evidence=["RentVision marker"],
+        recommended_strategy="dom_first",
+    )
+    resolved = ResolvedTarget(
+        original_url="https://example.com/",
+        resolved_url="https://example.com/",
+        hop_path=["https://example.com/"],
+        final_detection=rentvision,
+        method="no_hop",
+    )
+    expected_units = [{"unit_number": "24-B", "asking_rent": "1500"}]
+    mock_adapter = AsyncMock()
+    mock_adapter.pms_name = "rentvision"
+    mock_adapter.extract = AsyncMock(
+        return_value=_make_adapter_result(units=expected_units, tier="TIER_3_DOM_RENTVISION")
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.detect_pms", return_value=rentvision),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=resolved),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
+        patch(
+            "ma_poc.pms.scraper.confirm_detection",
+            side_effect=AssertionError("DOM-first adapter must not be API-confirmed"),
+        ),
+    ):
+        result = await scrape(
+            "https://example.com/",
+            page=page,
+            api_responses=[{"url": "https://widgets.example/x", "body": {"noise": 1}}],
+        )
+
+    assert result["units"] == expected_units
+    assert result["_adapter_used"] == "rentvision"
+    assert result["_detection_confirmed"]["confirmed"] is True
+    assert result["_detection_confirmed"]["evidence"][-1] == (
+        "api-envelope-confirmation-skipped:dom_first"
+    )
     mock_adapter.extract.assert_awaited_once()
 
 
@@ -567,4 +763,3 @@ def test_bug5_rich_hop_handles_str_body() -> None:
 
     payload = '{"@type":"FloorPlan"}' + ("x" * 60_000)
     assert _link_hop_is_rich(_StubFetch(payload)) is True
-

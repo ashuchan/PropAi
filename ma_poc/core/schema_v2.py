@@ -176,6 +176,13 @@ def build_v2_property(
             _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
             for u in target_units
         ],
+        # Public plan cards are preserved separately from physical apartments.
+        # A plan may advertise rent and area but must never ship as a unit.
+        "floor_plans": [
+            _format_v2_floor_plan(plan, scrape_ts, str(_safe_int(csv_id) or ""))
+            for plan in (scrape_result.get("plan_summaries") or [])
+            if isinstance(plan, dict)
+        ],
     }
 
     return prop
@@ -477,6 +484,31 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # raw so nothing is silently lost. None when nothing extra.
         "_extra": _extra_attrs(unit),
     }
+
+
+def _format_v2_floor_plan(
+    plan: dict, scrape_ts: datetime, property_id: str = ""
+) -> dict:
+    """Format public plan evidence without publishing a synthetic unit ID.
+
+    The shared unit formatter gives the plan the normal schema shape, then
+    this wrapper removes identity fields and marks the row as plan-level.
+    This keeps plan rent/area evidence available without allowing downstream
+    consumers to count it as an available apartment.
+    """
+    out = _format_v2_unit(plan, scrape_ts, property_id)
+    out["unit_id"] = None
+    out["unit_name"] = None
+    out["is_floor_plan_level"] = True
+    flags = [
+        part.strip()
+        for part in str(out.get("data_quality_flag") or "").split("|")
+        if part.strip()
+    ]
+    if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
+        flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
+    out["data_quality_flag"] = "|".join(flags)
+    return out
 
 
 def _safe_float(val: Any) -> float | None:

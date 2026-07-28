@@ -29,8 +29,10 @@ See docs/2026_05_11_regressions_fix_design.md, Stage 2.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Final, Literal
 
+from ma_poc.core.source_ids import PER_UNIT_EVIDENCE_KEYS, normalize_source_id_key
 from ma_poc.extraction.canonical import (
     UID_KEYS,
     get_str,
@@ -55,6 +57,31 @@ _UNIT_LEVEL_SIGNAL_KEYS: Final[tuple[str, ...]] = (
     "building_name",
 )
 
+# ``Available Now`` is published on both floor-plan cards and actual-unit
+# cards, so it is not identity evidence. A calendar date, in contrast, is
+# materially more specific: it can only promote an otherwise-anchorless row
+# when the source actually displayed a dated availability.
+_CALENDAR_DATE_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?:\b(?:19|20)\d{2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,2}\b|"
+    r"\b\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*(?:19|20)\d{2}\b|"
+    r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+    r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
+    r"nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?[,]?\s+(?:19|20)\d{2}\b)",
+    re.IGNORECASE,
+)
+
+
+def _is_specific_calendar_date(value: Any) -> bool:
+    """Return whether an availability field contains a published calendar date.
+
+    Textual availability states such as ``Now`` / ``Available Now`` are not
+    sufficient because a marketing floor-plan card commonly carries exactly
+    the same state. The classifier stays deliberately conservative here: an
+    anchorless row with only that state remains a plan summary and is eligible
+    for an availability-route recovery.
+    """
+    return isinstance(value, str) and bool(_CALENDAR_DATE_RE.search(value))
+
 
 def _has_natural_unit_identity(unit: dict[str, Any]) -> bool:
     """``True`` when ``unit_id`` (or its aliases) carries a real per-apartment
@@ -73,7 +100,8 @@ def _has_natural_unit_identity(unit: dict[str, Any]) -> bool:
     # the in-band signal that the unit_id was computed, not extracted.
     uid_fv = unit.get("unit_id")
     if hasattr(uid_fv, "source") and hasattr(uid_fv, "value"):
-        source_name = getattr(uid_fv.source, "value", uid_fv.source)
+        source = getattr(uid_fv, "source", None)
+        source_name = getattr(source, "value", source)
         if isinstance(source_name, str) and source_name == "identity_fallback":
             return False
     uid_str = get_str(unit, UID_KEYS)
@@ -81,7 +109,42 @@ def _has_natural_unit_identity(unit: dict[str, Any]) -> bool:
         return False
     if uid_str.startswith("inferred_"):
         return False
+    # The generic DOM fallback can mistake a layout/control label (for
+    # example ``Left`` on Cypress Grove) for a unit number. Reuse the
+    # adapter's conservative junk-token vocabulary before that value can
+    # suppress unit-level recovery.
+    try:
+        from ma_poc.pms.adapters._parsing import is_junk_unit_number
+
+        if is_junk_unit_number(uid_str):
+            return False
+    except Exception:
+        # Classification must remain total even if an optional adapter helper
+        # is unavailable during an isolated unit test.
+        pass
     return True
+
+
+def _has_per_unit_source_id(unit: dict[str, Any]) -> bool:
+    """Return whether registered source provenance proves a physical unit.
+
+    Some API payloads expose a native identifier only in ``source_ids``.  It
+    is still a real anchor: paired with ``Available Now`` or ``Lease Now`` it
+    must remain a unit row.  The registry keeps this deliberately narrow so
+    plan IDs (including RentCafe ``floorplanId``) cannot promote a plan card.
+    """
+    source_ids = unit.get("source_ids")
+    if not isinstance(source_ids, dict):
+        return False
+    for raw_key, value in source_ids.items():
+        if normalize_source_id_key(raw_key) not in PER_UNIT_EVIDENCE_KEYS:
+            continue
+        if value in (None, "", -1, "-1"):
+            continue
+        text = str(value).strip()
+        if text and text.lower() not in {"null", "none"}:
+            return True
+    return False
 
 
 def _has_per_unit_signal(unit: dict[str, Any]) -> bool:
@@ -91,7 +154,12 @@ def _has_per_unit_signal(unit: dict[str, Any]) -> bool:
     those are specific to a physical apartment in inventory.
     """
     for k in _UNIT_LEVEL_SIGNAL_KEYS:
-        if is_present(unit.get(k)):
+        value = unit.get(k)
+        if k in {"available_date", "availability_date", "availabledate"}:
+            if _is_specific_calendar_date(value):
+                return True
+            continue
+        if is_present(value):
             return True
     return False
 
@@ -109,6 +177,8 @@ def classify(unit: dict[str, Any]) -> UnitLevel:
     if not isinstance(unit, dict):
         return "plan"
     if _has_natural_unit_identity(unit):
+        return "unit"
+    if _has_per_unit_source_id(unit):
         return "unit"
     if _has_per_unit_signal(unit):
         return "unit"

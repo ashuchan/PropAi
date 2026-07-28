@@ -255,12 +255,12 @@ def _sc_unit(
 
 def _plan(
     beds: int, baths: float, sqft: int,
-    rent_lo: int | None = None, rent_hi: int | None = None,
+    rent_lo: int | None = None, rent_hi: int | None = None, name: str = "",
 ) -> dict[str, Any]:
     return {
         "beds": beds, "baths": baths, "sqft": sqft,
         "rent_lo": rent_lo, "rent_hi": rent_hi,
-        "name": "", "source": "test",
+        "name": name, "source": "test",
     }
 
 
@@ -297,33 +297,27 @@ def test_merge_overwrites_zero_sqft() -> None:
     assert units[0]["sqft"] == "700"
 
 
-# ─── FK-join: multi-plan bucket → closest-rent tie-break ─────────────────
+# ─── FK-join: multi-plan bucket → exact plan identity ─────────────────────
 
 
-def test_merge_multi_plan_bucket_picks_closest_rent() -> None:
-    """When 3 plans share (1bed, 1bath) but carry different rents +
-    sqft, pick the plan whose mid-rent is closest to the unit's rent.
-    Critical to avoid the regression mode the user flagged: blindly
-    picking the first-bucket plan would mis-fill rents."""
-    # Unit rent: $1500 — closer to plan 2 ($1450 mid) than plan 1
-    # ($1100 mid) or plan 3 ($1900 mid).
+def test_merge_multi_plan_bucket_uses_exact_plan_name() -> None:
+    """A plan-name foreign key safely selects the sibling plan's sqft."""
     units = [
         _sc_unit(beds="1", baths="1.0", sqft="", rent_low=1500, rent_high=1500),
     ]
+    units[0]["floor_plan_name"] = "B2 - Renovated"
     plans = [
-        _plan(1, 1.0, 700, rent_lo=1000, rent_hi=1200),
-        _plan(1, 1.0, 850, rent_lo=1400, rent_hi=1500),  # closest
-        _plan(1, 1.0, 1000, rent_lo=1800, rent_hi=2000),
+        _plan(1, 1.0, 700, name="A1"),
+        _plan(1, 1.0, 850, name="B2 Renovated"),
+        _plan(1, 1.0, 1000, name="C3"),
     ]
     n = merge_vanity_floorplans_into_securecafe(units, plans)
     assert n == 1
     assert units[0]["sqft"] == "850"
 
 
-def test_merge_multi_plan_bucket_falls_back_to_median_sqft_when_no_rent() -> None:
-    """Prose-pattern plans have no rent metadata. When the unit's bucket
-    has multiple such plans, fall back to the median-sqft pick (stable,
-    favours the canonical plan)."""
+def test_merge_multi_plan_bucket_without_exact_name_stays_partial() -> None:
+    """Do not choose a sibling plan by rent or median area."""
     units = [
         _sc_unit(beds="2", baths="1.0", sqft="", rent_low=None, rent_high=None),
     ]
@@ -333,9 +327,8 @@ def test_merge_multi_plan_bucket_falls_back_to_median_sqft_when_no_rent() -> Non
         _plan(2, 1.0, 1100),  # max
     ]
     n = merge_vanity_floorplans_into_securecafe(units, plans)
-    assert n == 1
-    # Median of [800, 900, 1100] sorted is index 1 → 900.
-    assert units[0]["sqft"] == "900"
+    assert n == 0
+    assert units[0]["sqft"] == ""
 
 
 def test_merge_skips_unit_when_no_bucket_match() -> None:

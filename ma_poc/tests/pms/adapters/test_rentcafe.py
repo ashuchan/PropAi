@@ -1049,3 +1049,24 @@ def test_securecafe_applicant_floorplans_v2() -> None:
     assert any(u["unit_number"] == "A1-101" and str(u["market_rent_low"]) == "1225" for u in units)
     assert any(u["floor_plan_name"] == "B2" and not u["unit_number"] for u in units)
     assert not any(u["floor_plan_name"] == "Hidden" for u in units)
+
+
+def test_securecafe_applicant_plan_range_does_not_become_unit_sqft() -> None:
+    """A parent plan's 700–800 range is not an exact fact about unit A1-101."""
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_applicant_floorplans
+
+    payload = {"status": True, "floorPlanList": [
+        {"floorPlan": {
+            "FloorPlanName": "A1", "Beds": 1, "Baths": 1,
+            "MinimumRent": 1200, "MinimumArea": 700, "MaximumArea": 800,
+        }, "UnitAvailability": [
+            {"unitcode": "A1-101", "DisplayMinRent": 1225},
+        ]},
+    ]}
+    units = parse_securecafe_applicant_floorplans(
+        payload, "https://x.securecafeapplicant.com/"
+    )
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "A1-101"
+    assert units[0]["market_rent_low"] == 1225
+    assert units[0]["sqft"] == ""

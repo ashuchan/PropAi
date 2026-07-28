@@ -740,6 +740,7 @@ async def _run_retry_loop_under_test(
             and baseline_result is not None
             and baseline_result.units
             and initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+            and rows_are_plan_level(baseline_result.units)
         ):
             adapter_result = baseline_result
             baseline_tier = baseline_result.tier_used or ""
@@ -1471,6 +1472,50 @@ async def test_path_c_plan_level_fallback_when_all_retries_fail(
     # Retries did fire (and emit telemetry).
     assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) >= 1
     assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_path_c_no_area_keeps_real_unit_roster_unit_level_when_retry_loses(
+    captured: _CapturedEvents,
+) -> None:
+    """A published unit id plus rent remains unit-level when sqft is absent.
+
+    The retry may still look for an enrichment route, but a failed retry must
+    not append ``_PLAN_LEVEL`` or replace the verdict with a plan-level one.
+    This is the public RentVision roster shape used by Cypress Grove and Loch
+    Raven.
+    """
+    baseline_units = [
+        {"unit_number": "24-B", "asking_rent": 1500, "beds": 3, "baths": 2},
+        {"unit_number": "20-D", "asking_rent": 1199, "beds": 1, "baths": 1},
+    ]
+    initial = _StubAdapterResult(
+        tier_used="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+        units=baseline_units,
+    )
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+
+    _name, result, _chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="rentvision",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-real-no-area"),
+        adapter_table=table,
+    )
+
+    assert result.units == baseline_units
+    assert result.tier_used == "TIER_3_DOM_RENTVISION_UNIT_LEVEL"
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+    assert result_dict.get("_plan_level_reason") is None
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) >= 1
 
 
 @pytest.mark.asyncio

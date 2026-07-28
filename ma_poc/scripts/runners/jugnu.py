@@ -54,6 +54,7 @@ except ImportError:
 # unit (~50K calls per run) and import caching makes the repeated lookup
 # free, but module-level keeps the hot loop clean.
 from ma_poc.core.identity import (  # noqa: E402, I001  (intentional: must follow the sys.path bootstrap above)
+    SYNTHETIC_ID_PREFIXES,
     assign_fallback_unit_id,
 )
 
@@ -2389,6 +2390,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
+    plan_summaries = result.get("plan_summaries", [])
     scrape_ts = datetime.now(UTC)
 
     def _csv(key: str) -> Any:
@@ -2471,6 +2473,15 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "units": _emit_v2_units_for_property(
             [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units]
         ),
+        # A floor-plan card is useful public evidence but never an apartment.
+        # The dedicated formatter removes any fallback ``inferred_*`` ID.
+        "floor_plans": [
+            _format_v2_floor_plan(
+                plan, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)
+            )
+            for plan in plan_summaries
+            if isinstance(plan, dict)
+        ],
         # Keep _meta for internal tracking (stripped on final delivery)
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),
@@ -2487,6 +2498,33 @@ def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> 
     unit in the same property still hashes consistently.
     """
     return str(meta.get("canonical_id") or apartment_id or "").strip()
+
+
+def _format_v2_floor_plan(
+    plan: dict[str, Any], scrape_ts: datetime, property_id: str = ""
+) -> dict[str, Any]:
+    """Format plan evidence while guaranteeing it has no unit identity.
+
+    The normal formatter is intentionally allowed to mint a fallback ID for
+    legacy apartment rows. That fallback is invalid for a plan card, so this
+    wrapper preserves price, dimensions and source provenance but clears all
+    unit-identity fields and stamps explicit plan/recovery provenance.
+    """
+    out = _format_v2_unit(plan, scrape_ts, property_id)
+    out["unit_id"] = None
+    out["unit_id_raw"] = None
+    out["unit_name"] = None
+    out["unit_name_raw"] = None
+    out["is_floor_plan_level"] = True
+    flags = [
+        part.strip()
+        for part in str(out.get("data_quality_flag") or "").split("|")
+        if part.strip()
+    ]
+    if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
+        flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
+    out["data_quality_flag"] = "|".join(flags)
+    return out
 
 
 # 2026-05-26 (canary 87b837b QC follow-up): post-extraction unit dedup
@@ -2763,7 +2801,7 @@ def _apply_p0_fp_name_canonicalization(units: list[dict[str, Any]]) -> int:
             groups[fpid].append(u)
 
     rewritten = 0
-    for fpid, group in groups.items():
+    for _fpid, group in groups.items():
         names = [u.get("floor_plan_name") for u in group]
         if len(set(names)) < 2:
             continue
@@ -3107,6 +3145,26 @@ def _format_v2_unit(
         "offer_target": unit.get("offer_target") or None,
         "offer_value": unit.get("offer_value") or None,
         "offer_conditions": unit.get("offer_conditions") or None,
+        # Keep native per-unit IDs available before fallback identity
+        # resolution.  The previous ordering populated source_ids after
+        # assign_fallback_unit_id(), making real CWS/Apts247/etc. anchors
+        # unreachable and fabricating inferred IDs instead.
+        "source_ids": (
+            dict(unit.get("source_ids"))
+            if isinstance(unit.get("source_ids"), dict)
+            else {}
+        ),
+        # Row-level lineage and data-quality gaps are required to distinguish
+        # an API plan summary from a real unit after output formatting.
+        "extraction_tier": (
+            unit.get("extraction_tier") or unit.get("_extraction_tier") or None
+        ),
+        "data_quality_flag": unit.get("data_quality_flag") or None,
+        "data_gaps": (
+            list(unit.get("data_gaps"))
+            if isinstance(unit.get("data_gaps"), list)
+            else []
+        ),
     }
 
     # Merge-rescue: if no natural id survived, derive a stable inferred id
@@ -3114,7 +3172,13 @@ def _format_v2_unit(
     # and returns the resolved id (or None when even the floor plan is
     # missing — those records still skip downstream, but the per-tier "no
     # unit_id" rate drops by ~17K units/run for JSON-LD + LLM tiers).
-    if not out["unit_id"]:
+    # A prior formatter pass can already have minted an ``inferred_*`` id.
+    # It is not a real identity and must not prevent a newly surfaced native
+    # per-unit source ID from taking precedence on replay/recovery.
+    _emitted_id = str(out["unit_id"] or "").lower()
+    if not out["unit_id"] or _emitted_id.startswith(SYNTHETIC_ID_PREFIXES):
+        if _emitted_id.startswith(SYNTHETIC_ID_PREFIXES):
+            out["unit_id"] = None
         assign_fallback_unit_id(out, property_id)
 
     # First-class raw companions for every emitted field. Uncoerced
@@ -3127,11 +3191,6 @@ def _format_v2_unit(
             None if _v is None or str(_v).strip() == "" else str(_v).strip()
         )
 
-    # Stable PMS-native ids for daily merge — carried through as-is (a
-    # dict; already raw, so no string _raw companion). Empty {} when the
-    # adapter hasn't been wired to populate it yet (additive, non-breaking).
-    _sids = unit.get("source_ids")
-    out["source_ids"] = dict(_sids) if isinstance(_sids, dict) else {}
     return out
 
 
