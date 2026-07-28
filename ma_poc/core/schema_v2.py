@@ -637,6 +637,68 @@ def _format_area(val: Any) -> int:
     return -1
 
 
+# ── ABSENT sentinels ─────────────────────────────────────────────────────────
+#
+# Most V2 unit fields say "unknown" with None / "" / [] / {}, so a plain
+# emptiness test is enough to decide whether a field was populated.
+# ``area`` cannot: ``_format_area`` returns the integer ``-1`` for every
+# unknown sqft, and ``validate_v2_units`` requires area to be ``> 0`` or
+# exactly ``-1`` — there is no ``None`` for area on the wire.
+#
+# Consequence for any consumer that counts "filled" fields with a plain
+# emptiness test: ``-1`` is not empty, so EVERY row scores as filled.
+# Measured 2026-07-28 on run-2026-07-27-full-0d54ca7: all 100 shard
+# reports published ``area`` fill = 100.0% when the true fill was 92.61%
+# (97,212 positive areas of 104,964 units; 7,752 rows carried ``-1``).
+#
+# Anything computing completeness/fill must call ``field_is_absent``
+# rather than testing emptiness inline.
+_GENERIC_ABSENT: tuple[Any, ...] = (None, "", "null", [], {})
+
+# field name -> extra typed sentinels that also mean ABSENT for that field.
+ABSENT_SENTINELS: dict[str, tuple[Any, ...]] = {
+    "area": (-1,),
+}
+
+
+def field_is_absent(field: str, value: Any) -> bool:
+    """True when ``value`` carries no information for ``field``.
+
+    Absent means either a generic empty (``None``, ``""``, ``"null"``,
+    ``[]``, ``{}``) or a field-specific typed sentinel from
+    ``ABSENT_SENTINELS`` (today: ``area == -1``).
+
+    Sentinel matching is deliberately narrow — only a real number, or a
+    string that parses cleanly to that number, counts. ``True``/``False``
+    are excluded so a bool never collides with a numeric sentinel, and a
+    free-text value that merely *contains* the digits is never matched.
+
+    Args:
+        field: V2 unit field name (e.g. ``"area"``).
+        value: The value read off the formatted unit dict.
+
+    Returns:
+        ``True`` if the field should be counted as NOT filled.
+    """
+    if value in _GENERIC_ABSENT:
+        return True
+    sentinels = ABSENT_SENTINELS.get(field)
+    if not sentinels:
+        return False
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        num: float = float(value)
+    elif isinstance(value, str):
+        try:
+            num = float(value.strip())
+        except (ValueError, TypeError):
+            return False
+    else:
+        return False
+    return any(num == float(s) for s in sentinels)
+
+
 # 2026-05-24 (user follow-up to Q1): "apply now / apply" should also be
 # considered AVAILABLE. The prior fixed-string set missed common operator
 # CTA-style phrasings. This regex matches any phrase where the operator
