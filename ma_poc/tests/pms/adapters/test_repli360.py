@@ -730,3 +730,199 @@ def test_parse_plan_meta_word_to_digit_map_complete() -> None:
         )
         meta = parse_repli360_plan_meta(html)
         assert meta["FP"]["bedrooms"] == expected, phrase
+
+
+# ─── 2026-07-28 `building` read the label, not the first column ────────
+#
+# ``building`` was taken from the FIRST <td> of every row, with the
+# literal string "Building Number" stripped off it:
+#
+#     building = tds[0].get_text(strip=True).replace("Building Number", "")
+#
+# That holds on royceattrumbull (the 2026-05-17 reference property),
+# whose first column really is "Building Number". On the CURRENT repli360
+# template the first column is "Unit Number" and there is no Building
+# column at all, so the strip matched nothing and the label text shipped
+# concatenated with the unit number.
+#
+# Reference run 2026-07-27 (run-2026-07-27-full-0d54ca7) — every unit of
+# every affected property, not a sample:
+#   14117 Marquis at Great Hills  30/30 rows  building="Unit Number0313"
+#   27950 Marquis Parkside                    building="Unit Number1025"
+#   62953 Marq on Burnet                      building="Unit Number208"
+#   39494 Hamburg Farms                       building="Unit Number3412"
+#   58452 Enclave at Brookside                building="Unit Number1-143"
+#
+# Across the 10 captured repli360 payloads: 212 of 229 rows. The other 17
+# are royce's, which has a real Building column and was always correct —
+# so the fix must BLANK the 212 without touching the 17.
+
+# Captured verbatim from mqgreathills.com getUnitListByFloor (site_id
+# 1608). Note the header row: Unit Number, Unit SQFT, … — no Building
+# column exists on this template at all.
+_STR_HTML_NO_BUILDING_COLUMN = """
+<div class="rrac_listAvailableUnit"><table class="table" id="fp_table1">
+<tr><th>Unit Number</th><th>Unit SQFT</th><th class="rrac_amenties">Unit Amenities</th>
+<th class="bedRename">Starting At</th><th>Availability</th><th>Lease Now</th></tr>
+<tr class="unitlisting 33752741 lease_term_wrap_33752741" data-count="0"
+    data-available_date="2026-08-05">
+  <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+      <b class="unitNumber">0219</b></td>
+  <td><span class="mobile_rrac">Unit SQFT</span><b class="">932 SQFT</b></td>
+  <td class="rrac_amenties"><span class="mobile_rrac">Unit Amenities</span>
+      <a class="entrata_unitwise_amenity_info">See Amenities</a></td>
+  <td class="rrac_unit_price lease-price"><span class="mobile_rrac">Starting At</span>
+      <span class="unit_price_value unit-rrac-price">$1,731</span></td>
+  <td><span class="mobile_rrac">Availability</span>08/05/2026</td>
+  <td><a href="https://mqgreathills.securecafe.com/x">Lease Now</a></td>
+</tr>
+</table></div>
+"""
+
+
+def test_building_is_empty_when_the_template_has_no_building_column() -> None:
+    """The current repli360 template leads with "Unit Number".
+
+    Pre-fix this shipped ``building="Unit Number0219"`` — the column
+    label glued to the unit number — on every unit of every property on
+    this template. There is no Building column here, so the honest
+    answer is empty: absent, not invented.
+    """
+    units = parse_repli360_str(
+        _STR_HTML_NO_BUILDING_COLUMN, "https://app.repli360.com/x"
+    )
+    assert len(units) == 1
+    u = units[0]
+    assert u["unit_number"] == "0219"
+    assert u["building"] == "", (
+        f"building={u['building']!r} — the 'Unit Number' column label was "
+        f"read as a building"
+    )
+    # The rest of the row is unaffected.
+    assert u["sqft"] == "932"
+    assert u["market_rent_low"] == 1731
+
+
+def test_building_never_echoes_a_column_label_or_the_unit_number() -> None:
+    """Guards the exact shape of the bug rather than one literal value.
+
+    Any first column whose label is not a building label must yield an
+    empty building — never the label text, and never the unit number
+    (a unit number in the building field silently corrupts the
+    ``unit_number|building`` dedup key in ``Repli360Adapter.extract``).
+    """
+    for label in ("Unit Number", "Apartment Number", "Unit", "Apt #"):
+        html = f"""
+        <table class="table">
+        <tr><th>{label}</th><th>Starting At</th></tr>
+        <tr class="unitlisting 1" data-available_date="2026-09-01">
+          <td><span class="mobile_rrac">{label}</span>
+              <b class="unitNumber">0219</b></td>
+          <td><span class="mobile_rrac">Starting At</span>
+              <span class="unit_price_value">$1,731</span></td>
+        </tr></table>
+        """
+        units = parse_repli360_str(html, "https://app.repli360.com/x")
+        assert len(units) == 1, label
+        got = units[0]["building"]
+        assert got == "", f"{label}: building={got!r}"
+        assert "0219" not in got, f"{label}: unit number leaked into building"
+
+
+def test_building_still_read_when_the_column_is_real() -> None:
+    """royceattrumbull (site_id 1619) — the property the original code was
+    written against — has a genuine "Building Number" column. Those 17
+    captured rows were always correct and must stay correct: unit 4114 is
+    in building 4, per the endpoint's own BuildingID=4 lease link.
+    """
+    units = parse_repli360_str(_STR_HTML, "https://app.repli360.com/x")
+    assert [u["building"] for u in units] == ["4", "6"]
+    assert [u["unit_number"] for u in units] == ["4114", "6203"]
+
+
+def test_building_survives_reordered_columns() -> None:
+    """The building cell is located by its LABEL, so it is found wherever
+    the template puts it — not assumed to be first."""
+    html = """
+    <table class="table">
+    <tr><th>Unit Number</th><th>Starting At</th><th>Building Number</th></tr>
+    <tr class="unitlisting 1" data-available_date="2026-09-01">
+      <td><span class="mobile_rrac">Unit Number</span>
+          <b class="unitNumber">312</b></td>
+      <td><span class="mobile_rrac">Starting At</span>
+          <span class="unit_price_value">$1,900</span></td>
+      <td><span class="mobile_rrac">Building Number</span>7</td>
+    </tr></table>
+    """
+    units = parse_repli360_str(html, "https://app.repli360.com/x")
+    assert len(units) == 1
+    assert units[0]["building"] == "7"
+    assert units[0]["unit_number"] == "312"
+
+
+def test_building_header_index_fallback_when_cell_labels_absent() -> None:
+    """Mirrors the sqft fallback: a template that drops the per-cell
+    ``span.mobile_rrac`` labels still resolves the column from that
+    table's own <th> header row."""
+    html = """
+    <table class="table">
+    <tr><th>Bldg</th><th>Unit Number</th><th>Starting At</th></tr>
+    <tr class="unitlisting 1" data-available_date="2026-09-01">
+      <td>12</td>
+      <td><b class="unitNumber">312</b></td>
+      <td><span class="unit_price_value">$1,900</span></td>
+    </tr></table>
+    """
+    units = parse_repli360_str(html, "https://app.repli360.com/x")
+    assert len(units) == 1
+    assert units[0]["building"] == "12"
+
+
+def test_building_value_keeps_names_that_merely_start_like_the_label() -> None:
+    """The redundant-label strip is word-bounded.
+
+    A cell reached by the header-index path may repeat its label as
+    literal text ("Building Number 6" → "6"), but a building genuinely
+    NAMED "Bldgwood" must survive intact rather than arrive as "wood".
+    """
+    cases = {
+        "Building Number 6": "6",
+        "Bldg 12": "12",
+        "Building A": "A",
+        "Bldgwood": "Bldgwood",
+        "Buildings West": "Buildings West",
+        "Building Number": "",  # label with no value → absent
+        "-": "",
+    }
+    for cell, expected in cases.items():
+        html = f"""
+        <table class="table">
+        <tr><th>Building</th><th>Unit Number</th></tr>
+        <tr class="unitlisting 1" data-available_date="2026-09-01">
+          <td>{cell}</td>
+          <td><b class="unitNumber">312</b></td>
+        </tr></table>
+        """
+        units = parse_repli360_str(html, "https://app.repli360.com/x")
+        assert len(units) == 1, cell
+        assert units[0]["building"] == expected, (
+            f"cell={cell!r} -> {units[0]['building']!r}, expected {expected!r}"
+        )
+
+
+def test_building_label_matching_is_whole_label_not_substring() -> None:
+    """"Building Amenities" contains "Building" but is not a building
+    column. Whole-label matching fails closed; a substring rule would
+    ship "See Amenities" as a building name."""
+    html = """
+    <table class="table">
+    <tr><th>Unit Number</th><th>Building Amenities</th></tr>
+    <tr class="unitlisting 1" data-available_date="2026-09-01">
+      <td><span class="mobile_rrac">Unit Number</span>
+          <b class="unitNumber">312</b></td>
+      <td><span class="mobile_rrac">Building Amenities</span>See Amenities</td>
+    </tr></table>
+    """
+    units = parse_repli360_str(html, "https://app.repli360.com/x")
+    assert len(units) == 1
+    assert units[0]["building"] == ""
