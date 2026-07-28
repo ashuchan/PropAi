@@ -30,11 +30,13 @@ from typing import Any
 from google.api_core.exceptions import PreconditionFailed
 from google.cloud import storage  # type: ignore[import-untyped]
 
+from ma_poc.scripts.diagnostics._public_url import normalize_public_url
 
 _RUN_PREFIX = "runs/2026-07-27-full-0d54ca7"
 _INVESTIGATION_PREFIX = "investigations/2026-07-28-upgrade-analysis-944"
 _DECLARED_COUNTS = {"SUCCESS_PLAN_LEVEL": 656, "FAILED_NO_DATA": 288}
 _SAMPLE_SIZE = 25
+UNSETTLED_LEVER = "UNSETTLED_NOT_CLASSIFIABLE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +52,7 @@ class CandidateProperty:
     publish_ceiling: str | None
     render_mode: str | None
     fetch_error: str | None
+    unsettled_reason: str | None = None
 
 
 def _text(value: object | None) -> str:
@@ -60,36 +63,47 @@ def _text(value: object | None) -> str:
 def candidate_from_property(property_row: dict[str, Any]) -> CandidateProperty:
     """Create a safe candidate record from one v2 Canary property object.
 
+    A row whose identity or public route cannot be established is *not*
+    dropped and does not abort the run: it is returned carrying an
+    ``unsettled_reason`` so it stays visible and countable in the Phase-1
+    report.  The seeded ``website`` column legitimately holds a scheme-less
+    marketing host for part of the cohort, so it is normalized through the
+    same rule the fetch path uses rather than being rejected.
+
     Args:
         property_row: One property from a Canary shard's ``properties.json``.
 
     Returns:
         The minimal metadata necessary for offline segmentation.
-
-    Raises:
-        ValueError: If the immutable run row does not have a canonical ID or
-            public marketing URL.
     """
     meta = property_row.get("_meta") or {}
     provenance = meta.get("provenance") or {}
     fetch = provenance.get("fetch") or {}
+    raw_website = _text(property_row.get("website"))
+    property_name = _text(property_row.get("proj_name"))
     apartment_id = _text(meta.get("canonical_id") or property_row.get("apartment_id"))
-    website = _text(property_row.get("website"))
+    website = normalize_public_url(raw_website)
+    reasons: list[str] = []
     if not apartment_id:
-        raise ValueError("missing_apartment_id")
-    if not website.startswith(("https://", "http://")):
-        raise ValueError(f"invalid_public_website:{apartment_id}")
+        # Keep the row addressable instead of losing it: a stable surrogate key
+        # derived from the row's own sanitized evidence.
+        digest = hashlib.sha256(f"{raw_website}\x1f{property_name}".encode()).hexdigest()[:12]
+        apartment_id = f"unidentified-{digest}"
+        reasons.append("MISSING_CANONICAL_ID")
+    if website is None:
+        reasons.append(f"UNUSABLE_PUBLIC_WEBSITE:{raw_website or '<empty>'}")
     ceiling = meta.get("publish_ceiling") or {}
     return CandidateProperty(
         apartment_id=apartment_id,
-        website=website,
-        property_name=_text(property_row.get("proj_name")),
+        website=website or "",
+        property_name=property_name,
         verdict=_text(meta.get("verdict")),
         detected_pms=_text(provenance.get("detected_pms") or "unknown").lower(),
         winning_tier=_text(provenance.get("winning_tier")),
         publish_ceiling=_text(ceiling.get("verdict")) or None,
         render_mode=_text(fetch.get("render_mode")) or None,
         fetch_error=_text(fetch.get("error_signature")) or None,
+        unsettled_reason="; ".join(reasons) or None,
     )
 
 
@@ -99,7 +113,13 @@ def assign_lever(candidate: CandidateProperty) -> str:
     The priority order keeps directly observed API failure modes separate from
     broad rendering and route-discovery work.  It is a *segmentation*, not a
     claim that the mechanism will convert the property.
+
+    A candidate carrying an ``unsettled_reason`` has no usable public starting
+    route or identity, so it gets its own bucket: it is reported, never
+    silently folded into a mechanism it cannot be worked through.
     """
+    if candidate.unsettled_reason:
+        return UNSETTLED_LEVER
     tier = candidate.winning_tier.upper()
     pms = candidate.detected_pms
     ceiling = (candidate.publish_ceiling or "").upper()
@@ -159,17 +179,26 @@ def phase_one_payload(candidates: Sequence[CandidateProperty]) -> dict[str, Any]
     segments = segment_candidates(candidates)
     levers: list[dict[str, Any]] = []
     for lever, rows in segments.items():
-        sample = deterministic_sample(rows, lever=lever)
+        unsettled = lever == UNSETTLED_LEVER
+        # Unsettled rows are listed in full: a sample would hide part of an
+        # already-unexplained residue.
+        sample = rows if unsettled else deterministic_sample(rows, lever=lever)
         levers.append(
             {
                 "lever": lever,
                 "properties_addressed": len(rows),
                 "sample_n_planned": len(sample),
                 "conversion_rate": None,
-                "rate_status": "UNMEASURED_PHASE_1",
+                "rate_status": "UNSETTLED" if unsettled else "UNMEASURED_PHASE_1",
                 "sample": [asdict(item) for item in sample],
             }
         )
+    # Rank by how much of the residue each mechanism addresses; the unsettled
+    # bucket is never ranked as work, it sorts last regardless of size.
+    levers.sort(key=lambda entry: (entry["lever"] == UNSETTLED_LEVER, -int(entry["properties_addressed"]), entry["lever"]))
+    for rank, entry in enumerate(levers, start=1):
+        entry["rank"] = None if entry["lever"] == UNSETTLED_LEVER else rank
+    unsettled_rows = segments.get(UNSETTLED_LEVER, [])
     return {
         "workflow_version": "upgrade-analysis-944-phase1-v1",
         "created_at": datetime.now(UTC).isoformat(),
@@ -185,6 +214,11 @@ def phase_one_payload(candidates: Sequence[CandidateProperty]) -> dict[str, Any]
             else "Immutable shard verdicts differ from the brief; no properties were silently removed. "
             "Resolve the six-plan-level discrepancy before publishing a 944-only forecast."
         ),
+        "unsettled_total": len(unsettled_rows),
+        "unsettled": [
+            {"apartment_id": row.apartment_id, "verdict": row.verdict, "reason": row.unsettled_reason}
+            for row in unsettled_rows
+        ],
         "levers": levers,
     }
 
@@ -245,7 +279,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     payload = phase_one_payload(candidates)
     if not args.dry_run:
         publish_first_generation(client, bucket_name=args.bucket, object_name=args.output_object, payload=payload)
-    print(json.dumps({key: payload[key] for key in ("observed_counts", "observed_total", "cohort_matches_brief", "levers")}, indent=2))
+    summary_keys = ("observed_counts", "observed_total", "cohort_matches_brief", "unsettled_total", "unsettled", "levers")
+    print(json.dumps({key: payload[key] for key in summary_keys}, indent=2))
     return 0
 
 

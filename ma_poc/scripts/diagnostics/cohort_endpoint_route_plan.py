@@ -27,7 +27,10 @@ from urllib.parse import urlparse
 from google.cloud import storage  # type: ignore[import-untyped]
 
 from ma_poc.models.scrape_profile import ScrapeProfile
+from ma_poc.scripts.diagnostics._public_url import normalize_public_url
 from ma_poc.services.endpoint_discovery_profiles import durable_endpoint_template
+
+__all__ = ["DiscoveryRoute", "RoutePlanRecord", "make_route_record", "normalize_public_url", "select_route"]
 
 
 class DiscoveryRoute(StrEnum):
@@ -61,30 +64,6 @@ def _parse_gcs_uri(uri: str) -> tuple[str, str]:
     if parsed.scheme != "gs" or not parsed.netloc:
         raise ValueError(f"not_a_gcs_uri:{uri!r}")
     return parsed.netloc, parsed.path.lstrip("/")
-
-
-def normalize_public_url(raw_url: str) -> str | None:
-    """Return an absolute public URL, adding HTTPS for a bare marketing host.
-
-    The source cohort contains a small number of otherwise valid marketing
-    hosts such as ``www.reserveatlenoxpark.net/floorplans/#/`` without a URL
-    scheme.  Treating those as malformed removed the only public starting
-    route before browser discovery began.  Relative paths and arbitrary text
-    remain invalid: this normalizer only accepts host-like values with a dot.
-    """
-    value = str(raw_url or "").strip()
-    if not value or value.startswith(("/", "#")) or any(char.isspace() for char in value):
-        return None
-    parsed = urlparse(value)
-    if parsed.scheme in {"http", "https"} and parsed.netloc:
-        return value
-    if parsed.scheme or parsed.netloc:
-        return None
-    normalized = urlparse(f"https://{value}")
-    host = normalized.hostname or ""
-    if not normalized.netloc or "." not in host:
-        return None
-    return normalized.geturl()
 
 
 def _public_urls(source_url: str, profile: ScrapeProfile | None) -> tuple[str, ...]:
