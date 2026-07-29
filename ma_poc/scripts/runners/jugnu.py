@@ -1790,6 +1790,12 @@ async def _process_property(
                         run_dir,
                         task.property_id,
                     )
+                    # NB: _run_null_field_recovery patches rent_low /
+                    # rent_high / unit_id into the rows _format_output has
+                    # already formatted, and re-asserts the zero-inventory
+                    # contract over them before returning — so the dict stashed
+                    # below is contract-clean, not merely format-clean. See
+                    # ``core.schema_v2.enforce_zero_inventory_contract``.
                     # Stash so the outer _process_one reuses it for the
                     # property report instead of re-running _format_output
                     # (saves ~1ms × 5,000 properties / day).
@@ -2608,6 +2614,18 @@ def _format_v2_floor_plan(
         has_rent=(out.get("rent_low") is not None or out.get("rent_high") is not None),
         has_anchor=False,
     )
+    # …and drop the manufactured date, lock-step with
+    # ``core.schema_v2._format_v2_floor_plan``. ``_format_v2_unit`` ran before
+    # the flag was forced, so ``_resolve_available_date`` could stamp the
+    # scrape date out of its AVAILABLE branch and this wrapper then rewrote the
+    # status to UNAVAILABLE underneath it. Here the source-date companion is
+    # ``available_date_raw`` (jugnu emits first-class ``<field>_raw`` columns,
+    # not the underscore-private ones core/ uses); a date without one was
+    # manufactured by definition.
+    if out.get("availability_status") == "UNAVAILABLE" and not out.get(
+        "available_date_raw"
+    ):
+        out["available_date"] = None
     flags = [
         part.strip()
         for part in str(out.get("data_quality_flag") or "").split("|")
@@ -3559,6 +3577,35 @@ async def _run_null_field_recovery(
                 })
     except Exception as exc:
         log.debug("F2 null_field_recovery hook failed for %s: %s", canonical_id, exc)
+    finally:
+        # This function is the ONLY thing in production that mutates rows the
+        # v2 formatter has already finished — the patch loop above writes
+        # rent_low / rent_high / unit_id straight into them, after
+        # ``resolve_plan_row_availability`` has already stamped the row and
+        # before the caller stashes it as ``result["_v2_formatted"]`` and ships
+        # it to properties.json. A plan row that gains a rent here must not
+        # keep the UNAVAILABLE it was given when it had none, so the mutator
+        # repairs after itself rather than leaving that to a caller that might
+        # forget. ``finally`` so a mid-loop failure cannot leave a partially
+        # patched row inconsistent. Withdraw-only and idempotent; the write
+        # boundary re-asserts it again in ``_write_properties_incremental``.
+        try:
+            from ma_poc.core.schema_v2 import enforce_zero_inventory_contract
+
+            _withdrawn = enforce_zero_inventory_contract(formatted.get("units"))
+            if _withdrawn:
+                log.info(
+                    "zero-inventory: withdrew UNAVAILABLE from %d plan row(s) "
+                    "for %s — null-field recovery restored a published rent",
+                    _withdrawn,
+                    canonical_id,
+                )
+        except Exception as exc:  # pragma: no cover — never block the caller
+            log.warning(
+                "zero-inventory re-assert after F2 failed for %s: %s",
+                canonical_id,
+                exc,
+            )
 
 
 def _write_property_report(
@@ -4151,6 +4198,23 @@ def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) 
         properties: Properties to write (already merged with prior contents
             by the caller — this writer is a plain overwrite).
     """
+    # THE write boundary for properties.json. The zero-inventory contract is
+    # stamped by the v2 formatter, but formatting is not writing: anything that
+    # mutates a formatted row in between (today
+    # ``_run_null_field_recovery``'s patch loop; tomorrow whatever else) would
+    # otherwise ship a plan row marked UNAVAILABLE that has since regained a
+    # published rent. Asserting it here as well as at the recovery call site
+    # costs one no-op pass and makes the guarantee independent of who mutates
+    # what upstream. Withdraw-only and idempotent, so re-running it over rows
+    # merged in from a previous partial run changes nothing.
+    try:
+        from ma_poc.core.schema_v2 import enforce_zero_inventory_contract
+
+        for _prop in properties or ():
+            if isinstance(_prop, dict):
+                enforce_zero_inventory_contract(_prop.get("units"))
+    except Exception as exc:  # pragma: no cover — never block a write
+        log.warning("zero-inventory re-assert at write boundary failed: %s", exc)
     try:
         import os as _os
 
