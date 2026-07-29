@@ -2888,9 +2888,39 @@ def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
     Only fires on ``inferred_*`` IDs — real adapter-provided unit_ids
     are never modified.
 
+    2026-07-29 — THE POSITIONAL TIEBREAK IS DECLARED, NOT HIDDEN.
+    When two rows of a collision group are identical on every stable field, the
+    suffix falls through to ``-<n>``, the row's ORDINAL IN THE INPUT LIST. That
+    ordinal describes this run's capture order, not the apartment, so the id
+    silently re-points at a different apartment whenever the roster is returned
+    in another order or one sibling leases and leaves. Those rows now carry
+    ``data_quality_flag=UNIT_ID_POSITIONAL``
+    (:data:`~ma_poc.core.identity.POSITIONAL_UNIT_ID_FLAG`) so a daily-join
+    consumer can see that the key is not joinable rather than reading a
+    reassignment as a rent change.
+
+    Why the flag and not a stable key: measured over the 2026-07-27 run
+    (104,964 rows), the 381 positional collision groups differ ONLY on mutable
+    fields — rent_low in 374 groups, availability_status in 42, available_date
+    in 24. The sole non-mutable differences are cosmetic re-spellings of fields
+    the phenotype hash already normalises ("2" vs "2.0", "975" vs "975.0", "2X1"
+    vs "2x1"), which would split ONE apartment into two ids the day the
+    extraction path changes its string form. ``unit_number`` in the tuple below
+    is dead weight on this path — 0 of 11,045 ``inferred_*`` rows in that run
+    carry one (a real unit number would have become the natural id upstream) —
+    so the tuple is effectively (area, building, floor). Any tiebreak these rows
+    could actually resolve on is a tiebreak on rent or availability, i.e. fix
+    #33's daily-join churn reintroduced through the ordering instead of the
+    hash. No stable key exists here; the honest output is a declared one.
+
     Returns count of rewritten rows."""
     import hashlib as _hl
     from collections import defaultdict
+
+    from ma_poc.core.identity import (
+        POSITIONAL_UNIT_ID_FLAG,
+        append_data_quality_flag,
+    )
 
     groups: dict[str, list[int]] = defaultdict(list)
     for i, u in enumerate(units):
@@ -2908,18 +2938,26 @@ def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
     for uid, idxs in groups.items():
         if len(idxs) < 2:
             continue
-        seen_base: dict[str, int] = {}
+        # Bucket first, THEN assign — the ordinal is unchanged (dict and list
+        # both keep insertion order, so members run in ascending index order
+        # exactly as the previous single pass did), but bucketing first is what
+        # lets the ``-0`` row know it has siblings. It does: when the tiebreak
+        # fires, EVERY member of the bucket is positional, including the one
+        # that keeps the bare ``base``.
+        by_base: dict[str, list[int]] = defaultdict(list)
         for i in idxs:
-            u = units[i]
-            stable = tuple(u.get(k) for k in _STABLE_SUFFIX_FIELDS)
-            base = _hl.sha256(repr(stable).encode()).hexdigest()[:6]
+            stable = tuple(units[i].get(k) for k in _STABLE_SUFFIX_FIELDS)
+            by_base[_hl.sha256(repr(stable).encode()).hexdigest()[:6]].append(i)
+        for base, members in by_base.items():
             # Positional tiebreak ONLY for rows identical on every stable field
             # (inherently indistinguishable without a per-unit id).
-            n = seen_base.get(base, 0)
-            seen_base[base] = n + 1
-            sfx = base if n == 0 else f"{base}-{n}"
-            u["unit_id"] = f"{uid}-{sfx}"
-            rewritten += 1
+            positional = len(members) > 1
+            for n, i in enumerate(members):
+                u = units[i]
+                u["unit_id"] = f"{uid}-{base}" if n == 0 else f"{uid}-{base}-{n}"
+                if positional:
+                    append_data_quality_flag(u, POSITIONAL_UNIT_ID_FLAG)
+                rewritten += 1
     return rewritten
 
 
