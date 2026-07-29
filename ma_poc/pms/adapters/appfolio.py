@@ -46,6 +46,7 @@ from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
     get_field,
+    is_street_address,
     make_unit_dict,
     money_to_int,
     resolve_scattered_site_ids,
@@ -758,9 +759,21 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
         return []
 
     h1 = _DETAIL_H1_RE.search(html)
-    floor_plan_name = ""
+    title = ""
     if h1:
-        floor_plan_name = _DETAIL_TAG_RE.sub("", h1.group("txt")).strip()
+        title = _DETAIL_TAG_RE.sub("", h1.group("txt")).strip()
+
+    # 2026-07-28: the detail-page h1 is a TITLE, not a plan name. Verified
+    # live 2026-07-28 (pagewood.appfolio.com/listings/detail/<uuid>): the
+    # h1 renders the street address — "9767 Pagewood Lane #710, Houston,
+    # TX 77042 MAP". Unlike the SSR card (whose js-listing-address field is
+    # an address by construction) this h1 is genuinely ambiguous, so route
+    # on shape rather than blanking unconditionally: an address-shaped
+    # title belongs in unit_name, anything else is plausibly a real plan
+    # label and is left in floor_plan_name.
+    title_is_address = is_street_address(title)
+    floor_plan_name = "" if title_is_address else title
+    unit_name = title if title_is_address else ""
 
     beds = _DETAIL_BED_RE.search(text)
     baths = _DETAIL_BATH_RE.search(text)
@@ -775,6 +788,7 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     unit: dict[str, Any] = {
         "unit_number": "",
         "floor_plan_name": floor_plan_name,
+        "unit_name": unit_name,
         "bedrooms": beds.group(1) if beds else "",
         "bathrooms": baths.group(1) if baths else "",
         "sqft": sqft_str,
@@ -791,7 +805,9 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     # without this it falls through to an ``inferred_<hash>`` id. When the h1
     # is a street address (scattered-site homes), anchor unit_id to it — a
     # stable, marketing-visible key instead of a physical-attribute hash.
-    addr_uid = address_unit_id(floor_plan_name)
+    # 2026-07-28: reads the raw ``title`` (was ``floor_plan_name``, which no
+    # longer holds the address) so the id stays byte-identical.
+    addr_uid = address_unit_id(title)
     if addr_uid:
         unit["unit_id"] = addr_uid
     return [unit]
@@ -1071,18 +1087,48 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
         # present so the no_area retry doesn't fire and the verdict lands
         # SUCCESS instead of SUCCESS_PLAN_LEVEL.
         sqft_gap = not sqft or sqft == "0"
+        # 2026-07-28: AppFolio's SSR listing card publishes NO floor plan
+        # name. Verified live (curl_cffi impersonate=chrome, 2026-07-28)
+        # against olympicmanagement (300 cards), americancapitalrealty
+        # (147) and pagewood (3): every card carries exactly
+        # ``js-listing-blurb-rent`` / ``js-listing-blurb-bed-bath``
+        # ("2 bd / 1 ba") / ``js-listing-square-feet`` /
+        # ``js-listing-available`` / ``js-listing-address`` — and the
+        # detail-box labels are only RENT / Square Feet / Bed / Bath /
+        # Available. The one remaining candidate, ``js-listing-title``, is
+        # free-text marketing copy, NOT a plan name ("Welcome Home to
+        # Talise", "Absolutely Gorgeous, Fully Furnished 2x2!", and even
+        # bare property names like "Enclave at Arrowhead"), so promoting it
+        # would swap one wrong value for a worse one.
+        #
+        # Until 2026-07-28 this field was set to the listing ADDRESS (or,
+        # when address capture missed, the synthetic ``AppFolio listing
+        # {id}`` placeholder). In run-2026-07-27-full-0d54ca7 that put a
+        # full street address into floor_plan_name on 11,877 rows across
+        # the SSR / VANITY / VANITY_PLAN_LEVEL tiers — and in 100% of them
+        # the SAME string was already in ``unit_name``, so the plan-name
+        # column carried nothing the address column didn't.
+        #
+        # The bed/bath descriptor is the only plan-like signal AppFolio
+        # publishes, and it is already captured in bedrooms/bathrooms (and
+        # feeds compute_floor_plan_id downstream). So leave floor_plan_name
+        # EMPTY and let the address live in unit_name alone.
         unit = make_unit_dict(
-            floor_plan_name=address or f"AppFolio listing {listing_id}",
-            bed_label=bed_label_from(beds, address),
+            floor_plan_name="",
+            # Derive the bed label from ``beds`` only. Passing the address
+            # here made bed_label_from's "studio" substring test read a
+            # STREET name: "4419 Ludlow St - Standard Studio, Philadelphia"
+            # returned "Studio" for a beds=1 unit (2 such rows in the
+            # 07-27 run). beds==0 still yields "Studio" via the numeric arm.
+            bed_label=bed_label_from(beds),
             bedrooms=str(beds) if beds is not None else "",
             bathrooms=str(baths) if baths is not None else "",
             sqft=sqft,
             unit_number=unit_number_display,
             # AppFolio's listing address IS the operator's as-displayed label
-            # for a scattered-site unit ("1420 Oak St Apt 3"). It is currently
-            # also written into floor_plan_name above for want of anywhere
-            # better; capture it in its own field so consumers stop having to
-            # read an address out of a plan-name column.
+            # for a scattered-site unit ("1420 Oak St Apt 3"). This is its
+            # only home now — consumers no longer have to read an address
+            # out of a plan-name column.
             unit_name=address or "",
             rent_range=format_rent_range(rent_val, rent_val),
             availability_status="AVAILABLE",

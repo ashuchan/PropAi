@@ -220,9 +220,11 @@ def test_ssr_parser_prefers_address_suffix_over_listing_id() -> None:
         f"expected '810' (from #810 in address), got {u['unit_number']!r} "
         f"— the AppFolio listing_id leak is back."
     )
-    # Address should be the floor_plan_name (it's the only meaningful
-    # plan identifier these SSR rows ship).
-    assert "1422 Som Center Road" in u["floor_plan_name"]
+    # 2026-07-28: the address belongs in unit_name, NOT floor_plan_name.
+    # AppFolio SSR cards publish no plan name at all (verified live), so
+    # floor_plan_name stays empty rather than carrying an address.
+    assert "1422 Som Center Road" in u["unit_name"]
+    assert u["floor_plan_name"] == ""
     # listing_id preserved in source_ids for downstream provenance.
     # (Make_unit_dict returns it as 'source_ids', a serialized dict, OR
     # it appears in the appfolio_listing_id field on the unit dict —
@@ -236,7 +238,8 @@ def test_ssr_parser_handles_address_span_without_inner_tag() -> None:
     """kelseymanagement (Brantley Pines I) shape: the address text sits
     DIRECTLY inside the js-listing-address span, with no inner <span>.
     The prior regex required an inner tag — this is the bug that made
-    Brantley Pines' floor_plan_name collapse to 'AppFolio listing 193'."""
+    Brantley Pines' address capture fail entirely (which used to surface
+    as the 'AppFolio listing 193' placeholder in floor_plan_name)."""
     html = """
     <article class="listing-item js-listing-item" data-listing-id="193">
       <div class="js-listing-blurb-rent">$1,625</div>
@@ -253,9 +256,15 @@ def test_ssr_parser_handles_address_span_without_inner_tag() -> None:
         f"address-suffix should extract 'Apt 429' → '429'; "
         f"got {u['unit_number']!r} (likely the listing_id 193 leaked)"
     )
-    assert "2620 Wild Pines Ln" in u["floor_plan_name"]
-    assert u["floor_plan_name"] != "AppFolio listing 193", (
-        "floor_plan_name should be the address, not the bare listing_id fallback"
+    # 2026-07-28: address capture is still the thing under test — it just
+    # lands in unit_name now. An empty unit_name would mean the inner-tag
+    # regression is back.
+    assert "2620 Wild Pines Ln" in u["unit_name"], (
+        "address capture failed — the inner-tag regex regression is back"
+    )
+    assert u["floor_plan_name"] == "", (
+        "AppFolio SSR publishes no plan name; floor_plan_name must stay "
+        "empty rather than carry an address or a listing_id placeholder"
     )
 
 

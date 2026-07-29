@@ -325,6 +325,14 @@ async def test_showings_anchor_still_yields_units_when_address_matches() -> None
     )
     assert [u["floor_plan_name"] for u in units] == ["10 Creek Rd"]
 
+    assert len(units) == 2
+    # 2026-07-28: the SSR address lands in unit_name; floor_plan_name is
+    # empty because AppFolio SSR cards publish no plan name. Asserting on
+    # unit_name still proves the fetch canonicalized to the listings index
+    # (the actual subject of this test) rather than the showings form.
+    assert units[0]["unit_name"] == "10 Creek Rd"
+    assert units[0]["floor_plan_name"] == ""
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Tenant-only fallback (2026-05-20 — feature-fail-1429 probe finding):
