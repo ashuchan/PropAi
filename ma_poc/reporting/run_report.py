@@ -16,6 +16,7 @@ from typing import Any
 # ``resolve_verdict`` lives in reporting/verdict.py so both run_report
 # and slo_watcher can share the dual-source resolution semantics. See
 # Bug A v0.2 in docs/2026_05_11_regressions_fix_design.md.
+from ma_poc.core.schema_v2 import field_is_absent
 from ma_poc.reporting.verdict import resolve_verdict
 
 log = logging.getLogger(__name__)
@@ -308,7 +309,13 @@ def build(
         for u in (p.get("units") or []):
             n_units += 1
             for k in _FILL_FIELDS:
-                if u.get(k) not in (None, "", "null", [], {}):
+                # 2026-07-28: must go through field_is_absent, not an inline
+                # emptiness test. ``area`` says "unknown" with the integer
+                # -1 sentinel (schema_v2._format_area), which is not empty —
+                # so the inline test scored every row as filled and all 100
+                # shard reports of run-2026-07-27 published area fill 100.0%
+                # against a true 92.61%.
+                if not field_is_absent(k, u.get(k)):
                     fill_counts[k] += 1
             u_tier = str(u.get("extraction_tier") or "")
             tier_family_units[_report_tier_family(u_tier)] += 1

@@ -293,6 +293,151 @@ def _compute_quality_signals(
     return unit_level, plan_level, coverage, rent_ratio, flag
 
 
+# ── Roster contamination (2026-07-28) ──────────────────────────────────────
+#
+# ``_compute_quality_signals`` raises CONTAMINATED only when the caller
+# supplies ``expected`` — and the production input
+# (``config/properties.csv``: apartmentid,name,address,city,state,zip,website)
+# has no unit-count column, so ``_expected_total_units`` is never populated on
+# a jugnu run and that branch is **dead in production**. Measured on the
+# 2026-07-27 full run (4,982 properties): zero properties carried an
+# expectation. Gating the winning-URL write on that flag alone would have
+# been an inert fix.
+#
+# The signal that IS present is the row text. An adapter that lands on a
+# property-management ACCOUNT roster instead of the property's own surface
+# (AppFolio ``/listings`` is the canonical case) names each row by its own
+# street address, so the dump announces itself: the rows resolve to ZIPs that
+# are not this property's. That is platform-neutral — it simply never fires
+# for adapters whose rows are named "101"/"Unit B" — and it is the same
+# criterion the AppFolio vanity path already applies in-adapter
+# (``filter_units_by_ctx_address``), applied here one layer later as a
+# persistence guard.
+#
+# Measured separation on the 2026-07-27 run (denominator = all 4,982
+# properties / 104,964 rows, 100/100 shards):
+#   • 248 properties have >=1 row whose text resolves to a ZIP — all AppFolio.
+#   • TIER_1_DOM_APPFOLIO_VANITY (the correctly-scoped control): 128/128 at a
+#     0.00 mismatch ratio. The rule fires on NONE of them.
+#   • TIER_1_DOM_APPFOLIO_SSR: 70 properties at >=0.90 → flagged.
+#   • Every other tier/platform in the run: 0 flagged.
+# The threshold is deliberately conservative: 40 further SSR properties sit
+# between 0.09 and 0.89 and are very likely rosters too, but a genuinely
+# scattered-site property is plausible there, so they are left alone.
+
+# Two-letter USPS codes. Requiring a real state code is what keeps the ZIP
+# matcher from firing on "1 BA 12345"-shaped unit descriptions.
+_US_STATE_CODES: frozenset[str] = frozenset(
+    """AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS
+    MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI
+    WY DC PR VI GU AS MP""".split()
+)
+
+# "<STATE> <ZIP>" as it appears at the tail of a US address, e.g.
+# "999 E Baseline Rd, 2406, Tempe, AZ 85283". Anchored on a word boundary so
+# the state code cannot be the tail of a longer token ("APT 12345" does not
+# match — there is no boundary inside "APT").
+_ADDRESS_ZIP_RE = re.compile(r"\b([A-Z]{2})[ ,]+(\d{5})(?:-\d{4})?\b")
+
+# Row fields that may carry address-shaped text. Address-naming adapters put
+# it in unit_name/floor_plan_name; the others carry "101" and resolve to None.
+_ROW_ADDRESS_FIELDS: tuple[str, ...] = (
+    "unit_name",
+    "unit_number",
+    "floor_plan_name",
+    "address",
+    "unit_id",
+)
+
+# Minimum rows that must resolve to a ZIP before the ratio means anything,
+# and the share of them that must be foreign to call the result a roster.
+_ROSTER_MIN_RESOLVED_ROWS = 3
+_ROSTER_FOREIGN_ZIP_RATIO = 0.9
+
+
+def _row_zip(unit: Any) -> str | None:
+    """Return the 5-digit ZIP named in a unit row's text, or None.
+
+    Only a ZIP preceded by a real USPS state code counts, so bare 5-digit
+    numbers (sqft, rent, listing ids) can never be read as an address.
+    """
+    if not isinstance(unit, dict):
+        return None
+    for field in _ROW_ADDRESS_FIELDS:
+        value = unit.get(field)
+        if not isinstance(value, str) or not value:
+            continue
+        for match in _ADDRESS_ZIP_RE.finditer(value.upper()):
+            if match.group(1) in _US_STATE_CODES:
+                return match.group(2)
+    return None
+
+
+def _foreign_zip_counts(units: Any, property_zip: Any) -> tuple[int, int]:
+    """Return ``(rows_resolving_to_a_zip, rows_whose_zip is not ours)``.
+
+    Returns ``(0, 0)`` when the property's own ZIP is unknown or malformed —
+    with nothing to compare against, the check declines rather than guesses.
+    """
+    pzip = str(property_zip or "").strip()[:5]
+    if len(pzip) != 5 or not pzip.isdigit():
+        return 0, 0
+    resolved = 0
+    foreign = 0
+    for unit in units or []:
+        z = _row_zip(unit)
+        if z is None:
+            continue
+        resolved += 1
+        if z != pzip:
+            foreign += 1
+    return resolved, foreign
+
+
+def result_contamination_reason(
+    units: Any,
+    expected: int | None,
+    property_zip: Any,
+    *,
+    quality_flag: str | None = None,
+) -> str:
+    """Return a non-empty reason when this result is NOT this property's data.
+
+    Two independent checks, either of which condemns the result:
+
+    1. ``quality_flag == "CONTAMINATED"`` — the volume check that
+       ``_compute_quality_signals`` already computes (needs ``expected``;
+       recomputed here when the caller did not pass it in).
+    2. Roster scope — at least ``_ROSTER_MIN_RESOLVED_ROWS`` rows name a ZIP
+       and at least ``_ROSTER_FOREIGN_ZIP_RATIO`` of them are not this
+       property's ZIP.
+
+    Returns ``""`` when the result passes. Never raises.
+    """
+    try:
+        flag = quality_flag
+        if flag is None:
+            flag = _compute_quality_signals(units, expected)[4]
+        if flag == "CONTAMINATED":
+            return "quality_flag_contaminated"
+        resolved, foreign = _foreign_zip_counts(units, property_zip)
+        if (
+            resolved >= _ROSTER_MIN_RESOLVED_ROWS
+            and foreign / resolved >= _ROSTER_FOREIGN_ZIP_RATIO
+        ):
+            return f"foreign_zip_scope:{foreign}/{resolved}"
+    except Exception:  # noqa: BLE001 — a contamination check must never
+        return ""      # sink the profile update; declining is the safe side
+    return ""
+
+
+def _same_surface(a: Any, b: Any) -> bool:
+    """True when two URLs address the same replay surface (host+path)."""
+    if not isinstance(a, str) or not isinstance(b, str) or not a or not b:
+        return False
+    return normalize_url_pattern(a) == normalize_url_pattern(b)
+
+
 def _response_looks_like_units(body: Any) -> bool:
     """Quick check if an API response body looks like it contains unit data."""
     if not body:
@@ -701,6 +846,20 @@ def update_profile_after_extraction(
     """Update profile based on what worked during this scrape."""
     tier = scrape_result.get("extraction_tier_used")
 
+    # Data-quality signals, computed ONCE up front (2026-07-28). They were
+    # previously computed inside the success branch as locals, which is why
+    # the CONTAMINATED verdict could not be consulted 50 lines later at the
+    # winning-URL write — the defect this hoist exists to close.
+    _ul, _pl, _cov, _rent, _flag = _compute_quality_signals(
+        scrape_result.get("units"), scrape_result.get("_expected_total_units")
+    )
+    contamination = result_contamination_reason(
+        scrape_result.get("units"),
+        scrape_result.get("_expected_total_units"),
+        scrape_result.get("_property_zip"),
+        quality_flag=_flag,
+    )
+
     # Phase 1: monotonic stats — never go backward
     profile.stats.total_scrapes += 1
     profile.stats.last_tier_used = tier or None
@@ -732,9 +891,7 @@ def update_profile_after_extraction(
         profile.confidence.last_unit_count = units_extracted
         # Phase Q (2026-07-19): capture data-quality of this success so a policy
         # can prefer clean unit-level methods + spot plan-level upgrade chances.
-        _ul, _pl, _cov, _rent, _flag = _compute_quality_signals(
-            scrape_result.get("units"), scrape_result.get("_expected_total_units")
-        )
+        # (signals computed at the top of this function — see the hoist note)
         q = profile.quality
         q.last_unit_level_count = _ul
         q.last_plan_level_count = _pl
@@ -782,30 +939,83 @@ def update_profile_after_extraction(
     # On subsequent runs the scraper can prioritise this URL.
     # Guard: skip infrastructure / third-party backend URLs that require
     # auth headers and can never be replayed via direct HTTP fetch.
+    # Guard 2 (2026-07-28): never persist the URL that produced a result
+    # belonging to OTHER properties. Persisting it is what makes the damage
+    # permanent — it comes back next run at the top hop score (10_001) and
+    # re-ships the same wrong roster, so the residual is a function of which
+    # URLs got persisted rather than of how many properties use the platform.
     winning_url = scrape_result.get("_winning_page_url")
+    # Captured BEFORE the write: the invalidation below must judge the URL
+    # this run INHERITED from disk, not one this same call just wrote.
+    _stored_wpu = profile.navigation.winning_page_url
     if winning_url and units_extracted > 0 and not _is_infra_api_url(winning_url):
-        profile.navigation.winning_page_url = winning_url
-        path = urllib.parse.urlparse(winning_url).path
-        if path and path != "/":
-            profile.navigation.availability_page_path = path
+        if contamination:
+            log.warning(
+                "refusing to persist winning_page_url for %s (%s): %s",
+                profile.canonical_id, contamination, winning_url,
+            )
+            _emit_mapping_save_dropped(
+                profile.canonical_id, f"contaminated_winning_url:{contamination}"
+            )
+        else:
+            profile.navigation.winning_page_url = winning_url
+            path = urllib.parse.urlparse(winning_url).path
+            if path and path != "/":
+                profile.navigation.availability_page_path = path
 
-    # ── Invalidate a stale winning_page_url that produced zero units ───
-    # If the scraper tried profile:winning_page_url as a hop candidate
-    # and it returned 0 units (HARD_FAIL, BOT_BLOCKED, or empty extraction),
-    # clear the stale URL so the next run doesn't waste hop #1 on it again.
-    # Also demote to COLD immediately — the property needs a fresh discovery.
+    # ── Invalidate a winning_page_url that must not be replayed ────────
+    # (a) zero units — the scraper tried profile:winning_page_url as a hop
+    #     candidate and it returned nothing (HARD_FAIL, BOT_BLOCKED, empty
+    #     extraction), so hop #1 is being wasted on it every run.
+    # (b) contaminated units — the stored URL was replayed and CONFIDENTLY
+    #     produced another property's roster. Skipping the write is not
+    #     enough here: the poison is already on disk from a prior run, and
+    #     branch (a) never fires for it because it does not yield zero units.
+    #     A poisoned surface can only be recognised by REPLAYING it (a
+    #     cross-host URL is not evidence — 541 of the 1,884 persisted
+    #     profiles that carry a winning_page_url are legitimately cross-host:
+    #     rentcafe/knock/resman/securecafe portals), so this is the earliest
+    #     honest point of detection, and it self-heals in one run.
+    # Both demote to COLD so the next run re-derives from the entry URL
+    # instead of taking the profile shortcut.
     _hop_anchor_used = scrape_result.get("_winning_page_url_hop_outcome")
+    _invalidate_reason = ""
     if (
         units_extracted == 0
         and _hop_anchor_used == "profile:winning_page_url:failed"
-        and profile.navigation.winning_page_url
+        and _stored_wpu
     ):
+        _invalidate_reason = "zero_units"
+    elif contamination and _stored_wpu and _same_surface(winning_url, _stored_wpu):
+        _invalidate_reason = f"contaminated:{contamination}"
+
+    if _invalidate_reason:
         profile.navigation.winning_page_url = None
         profile.navigation.availability_page_path = None
         profile.confidence.maturity = ProfileMaturity.COLD  # type: ignore[attr-defined]
         profile.confidence.consecutive_failures = max(
             3, profile.confidence.consecutive_failures
         )
+        if contamination and _stored_wpu:
+            # Clearing winning_page_url alone only demotes the poisoned URL
+            # from score 10_001 to 10_000 — availability_links is injected as
+            # the next-highest hop candidate. Drop it there too, and add it to
+            # the explored (skip-next-run) list so re-discovery routes around
+            # it. Note explored_skip subtracts winning_page_url +
+            # availability_links, so the skip only bites once both are clear.
+            profile.navigation.availability_links = [
+                u
+                for u in (profile.navigation.availability_links or [])
+                if not _same_surface(u, _stored_wpu)
+            ]
+            record_explored_link(profile, _stored_wpu, had_data=False)
+            log.warning(
+                "invalidated poisoned winning_page_url for %s (%s): %s",
+                profile.canonical_id, _invalidate_reason, _stored_wpu,
+            )
+            _emit_mapping_save_dropped(
+                profile.canonical_id, f"invalidated_winning_url:{contamination}"
+            )
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
     # 2026-07-19 fix: gate on the resolved tier FAMILY (base 1), not the exact
@@ -1078,9 +1288,13 @@ def update_profile_after_extraction(
         profile.llm_artifacts.last_api_analysis_results = prior
 
     # ── Record explored links ────────────────────────────────
+    # A contaminated run learned nothing about where THIS property's data
+    # lives, so none of its links may be recorded as data-bearing — otherwise
+    # the surface just invalidated above walks straight back into
+    # ``availability_links`` (hop score 10_000) on the same call.
     explored = scrape_result.get("_explored_links", {})
     for link, had_data in explored.items():
-        record_explored_link(profile, link, had_data)
+        record_explored_link(profile, link, bool(had_data) and not contamination)
 
     # ── Phase 7: persist field patches from null_field_recovery ──
     patches_payload = scrape_result.get("_field_patches", []) or []

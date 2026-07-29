@@ -1489,3 +1489,230 @@ def test_static_payload_template_g_plaintext() -> None:
     assert units[0]["floor_plan_name"] == "The Carr"
     assert str(units[0]["sqft"]) == "602"
     assert str(units[0]["market_rent_low"]) == "1282"
+
+
+# ── plan-name / leasing-special bleed (2026-07-28) ──────────────────
+#
+# DEFECT: MarketApts nests the property's leasing-special banner INSIDE
+# the plan-title element, so ``textContent`` welded the banner onto the
+# plan name:
+#   'A1-675 For a limited time, you can enjoy a special move-in rate up
+#    to $750.00 when you sign a 12-month lease on selected apartments.'
+# Measured on run-2026-07-27-full-0d54ca7: 42/209 MarketApts unit rows
+# over 9 of 26 reachable properties carried a welded banner (only 17
+# rows fleet-wide contained a '$' — most banners have none).
+#
+# The split is STRUCTURAL (remove the ``.special`` child node), never a
+# content regex: real plan names legitimately carry prices and marketing
+# words ("2 Bed 2.5 bath Townhouse (2UP) + $160 Garage").
+
+
+def test_split_title_table() -> None:
+    """Table test for ``_ma_split_title``.
+
+    Rows 1-5 MUST split (real live banners, 4 of them with no '$').
+    Rows 6-12 MUST NOT be touched — including the exact plan names that
+    a content-matching rule would have destroyed.
+    """
+    from bs4 import BeautifulSoup
+
+    from ma_poc.pms.adapters.marketapts import _ma_split_title
+
+    cases: list[tuple[str, str, str, str]] = [
+        # (label, title-element HTML, expected name, expected special)
+        (
+            "live ventanapalms A1-675 (banner with $)",
+            '<div class="floorplan-title">A1-675<br>'
+            '<span class="special red"><i class="fa fa-star"><div>For a limited '
+            "time, you can enjoy a special move-in rate up to $750.00 when you "
+            "sign a 12-month lease on selected apartments.</div></i></span></div>",
+            "A1-675",
+            "For a limited time, you can enjoy a special move-in rate up to "
+            "$750.00 when you sign a 12-month lease on selected apartments.",
+        ),
+        (
+            "live portolabiltmore The Loft (banner, NO $)",
+            '<div class="floorplan-title">The Loft<br>'
+            '<span class="special red"><i class="fa fa-star"><div>AMAZING LOFT '
+            "FLOORPLAN! MOVE IN TODAY!</div></i></span></div>",
+            "The Loft",
+            "AMAZING LOFT FLOORPLAN! MOVE IN TODAY!",
+        ),
+        (
+            "live progressterrace Douglas Fir (banner, NO $)",
+            '<div class="floorplan-title">Douglas Fir<br>'
+            '<span class="special red">Get 4 weeks free on all apartments!'
+            "</span></div>",
+            "Douglas Fir",
+            "Get 4 weeks free on all apartments!",
+        ),
+        (
+            "live mountainridge C3 (banner is chatter, NO $)",
+            '<div class="floorplan-title">C3<br><span class="special red">'
+            "Call for pricing and availability.</span></div>",
+            "C3",
+            "Call for pricing and availability.",
+        ),
+        (
+            "alternate CMS class .floorplan-special",
+            '<div class="floorplan-title">B2<span class="floorplan-special">'
+            "Ask about our specials</span></div>",
+            "B2",
+            "Ask about our specials",
+        ),
+        # ── MUST NOT be altered ──────────────────────────────────────
+        (
+            "plain plan name, no banner node",
+            '<div class="floorplan-title">A1-631</div>',
+            "A1-631",
+            "",
+        ),
+        (
+            "price-bearing descriptor IS the plan name (SecureCafe shape)",
+            '<div class="floorplan-title">2 Bed 2.5 bath Townhouse (2UP) + $160 '
+            "Garage (Fireplace Optional)</div>",
+            "2 Bed 2.5 bath Townhouse (2UP) + $160 Garage (Fireplace Optional)",
+            "",
+        ),
+        (
+            "plan name containing the word 'Special', no banner node",
+            '<div class="floorplan-title">The Special Edition Loft</div>',
+            "The Special Edition Loft",
+            "",
+        ),
+        (
+            "plan name with marketing-sounding words but no banner node",
+            '<div class="floorplan-title">Limited Edition Penthouse</div>',
+            "Limited Edition Penthouse",
+            "",
+        ),
+        (
+            "income-restriction qualifier is part of the name",
+            '<div class="floorplan-title">1A - AMFI 80% - INCOME RESTRICTIONS '
+            "APPLY</div>",
+            "1A - AMFI 80% - INCOME RESTRICTIONS APPLY",
+            "",
+        ),
+        (
+            "banner node wraps the WHOLE title → keep name verbatim, no special",
+            '<div class="floorplan-title"><span class="special">Penthouse A'
+            "</span></div>",
+            "Penthouse A",
+            "",
+        ),
+        (
+            "nested markup without a special class is kept",
+            '<div class="floorplan-title"><b>2x2</b> <em>Deluxe</em></div>',
+            "2x2 Deluxe",
+            "",
+        ),
+    ]
+
+    failures: list[str] = []
+    print(f"\n{'case':<58} | {'name':<46} | special")
+    for label, html, want_name, want_special in cases:
+        el = BeautifulSoup(html, "lxml").select_one(".floorplan-title")
+        got_name, got_special = _ma_split_title(el)
+        ok = (got_name == want_name) and (got_special == want_special)
+        print(f"{label[:58]:<58} | {got_name[:46]:<46} | {got_special[:60]}")
+        if not ok:
+            failures.append(
+                f"{label}: name {got_name!r} (want {want_name!r}) / "
+                f"special {got_special!r} (want {want_special!r})"
+            )
+    assert not failures, "\n".join(failures)
+
+
+def test_ventanapalms_live_fixture_plan_name_has_no_banner() -> None:
+    """End-to-end over verbatim live markup: the plan name must be the
+    plan code alone, and the banner must land in the concession field.
+
+    Fixture captured 2026-07-28 from ventanapalmsapartments.com — one of
+    the 9 run-2026-07-27 properties that shipped welded names.
+    """
+    listing = _read_fixture("ventanapalms_floorplans.html")
+    drill = _read_fixture("ventanapalms_unit_a1_675.html")
+
+    def _drill(url: str, xhr: bool = False) -> str | None:
+        return drill if "/unit/a1-675" in url else None
+
+    payload = marketapts_static_payload(
+        listing, "https://www.ventanapalmsapartments.com/floorplans", _drill
+    )
+    assert payload["template"] == "B"
+    units = marketapts_payload_to_units(
+        payload, "https://www.ventanapalmsapartments.com/floorplans"
+    )
+    assert units, "fixture must produce rows"
+
+    names = [u["floor_plan_name"] for u in units]
+    assert names == ["A1-675", "B2-916"], names
+    for u in units:
+        assert "$" not in (u["floor_plan_name"] or ""), u["floor_plan_name"]
+        assert "limited time" not in (u["floor_plan_name"] or "").lower()
+        assert len(u["floor_plan_name"]) <= 12, u["floor_plan_name"]
+
+    # Unit-level payload from the drill still parses (no collateral loss).
+    a1 = [u for u in units if u["floor_plan_name"] == "A1-675"][0]
+    assert a1["unit_number"] == "171"
+    assert a1["market_rent_low"] == 1385
+    assert a1["sqft"] == "675"
+    assert a1["availability_date"] == "08/10/2026"
+
+    # The banner is routed, not dropped: it names a value AND a target,
+    # so the shared offer classifier accepts it.
+    assert a1["concession_text"] == (
+        "For a limited time, you can enjoy a special move-in rate up to "
+        "$750.00 when you sign a 12-month lease on selected apartments."
+    )
+    assert a1["concession_source"] == "marketapts_plan_special"
+
+
+def test_plan_special_chatter_does_not_evict_property_concession() -> None:
+    """A ``.special`` banner that is NOT an offer must clean the plan
+    name but leave the concession fields empty, so the property-level
+    backfill (which carries the real offer) still wins.
+
+    Live case: mountainridge-apts plan C3 banner is "Call for pricing
+    and availability…" while the property banner carries a real
+    "$400 off move in".
+    """
+    listing = """
+    <html><body>
+      <div class="floorplan-item">
+        <div class="floorplan-title">C3<br>
+          <span class="special red">Call for pricing and availability.
+          Living Starts Here - Lower Utilities &amp; Transparent Rent!</span>
+        </div>
+        <div class="floorplan-features">BEDROOMS: 3 BATHROOMS: 2.0 SQ. FEET: 1100</div>
+        <div class="floorplan-num">$1,450</div>
+        <a href="/unit/c3">1 Unit Available</a>
+      </div>
+    </body></html>
+    """
+    payload = marketapts_static_payload(listing, "https://ex.com/", _null_drill)
+    units = marketapts_payload_to_units(payload, "https://ex.com/floorplans")
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"] == "C3"
+    assert not units[0].get("concession_text")
+    assert not units[0].get("concession_source")
+
+
+def test_js_mirror_carries_the_title_splitter() -> None:
+    """Source-shape contract: the live-page JS must carry the same
+    structural splitter as the Python mirror. Production ran the JS path
+    for every TIER_1_DOM_MARKETAPTS_* row in run-2026-07-27, so fixing
+    only the Python side would leave the fleet unchanged."""
+    assert "const SPECIAL_SEL = '.special, .specials, .floorplan-special';" in (
+        _MARKETAPTS_DOM_JS
+    ), "JS must define the special-banner selector"
+    assert "const TITLE = (el) =>" in _MARKETAPTS_DOM_JS, (
+        "JS must define the TITLE() name/special splitter"
+    )
+    # Every plan-name read must go through TITLE(), never bare T().
+    assert "T(item.querySelector('.floorplan-title'))" not in _MARKETAPTS_DOM_JS, (
+        "Template B must not read the plan title with bare T()"
+    )
+    assert "T(b.querySelector('.floorplan-name, .floorplan-title'))" not in (
+        _MARKETAPTS_DOM_JS
+    ), "Template A must not read the plan name with bare T()"

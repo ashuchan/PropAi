@@ -172,8 +172,17 @@ def build_v2_property(
         "concessions": concessions_text,
         "concessions_json": concessions_json,
         # ── Units ────────────────────────────────────────────────────────
+        # ``property_plan_level`` carries the PROPERTY-level plan marker into
+        # the per-row flag: adapters that record plan-ness on
+        # ``AdapterResult.tier_used`` (rather than on every row) would
+        # otherwise ship unflagged plan rows.
         "units": [
-            _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
+            _format_v2_unit(
+                u,
+                scrape_ts,
+                str(_safe_int(csv_id) or ""),
+                property_plan_level=property_is_plan_level(scrape_result),
+            )
             for u in target_units
         ],
         # Public plan cards are preserved separately from physical apartments.
@@ -188,24 +197,132 @@ def build_v2_property(
     return prop
 
 
-def _is_floor_plan_level(unit: dict) -> bool:
+# Extraction-tier fragments that MARK a row as a floor-plan summary. Matched as
+# substrings of the tier code, WITH the leading underscore, so only a real tier
+# segment can trip them: ``TIER_1_API_RENTCAFE_SECURECAFE_FROM_PLAN``,
+# ``TIER_1_API_APTS247_FLOORPLANS``, ``TIER_1_DOM_WIX_FLOOR_PLANS`` and
+# ``TIER_1_DOM_MARK_TAYLOR_RENDERED_PLAN_CARD`` all contain "PLAN" and none of
+# them is a plan-level marker — see the table test in
+# tests/scripts/test_schema_v2_unit.py.
+_PLAN_TIER_MARKERS: tuple[str, ...] = ("_PLAN_LEVEL", "_PLAN_TEXT")
+
+
+def _has_plan_marker(tier: str, dqf: str) -> bool:
+    """True when a row's own tier / data-quality flag declares it plan-level.
+
+    ``dqf`` is pipe-delimited; each token is tested with ``startswith("PLAN_")``
+    rather than a substring search so ``SQFT_NOT_PUBLISHED``,
+    ``UNIT_LEVEL_PRICING_MISSING`` and ``NO_AVAILABILITY_NOW`` cannot match.
+
+    Args:
+        tier: Upper-cased extraction tier code.
+        dqf: Upper-cased pipe-delimited data_quality_flag string.
+
+    Returns:
+        Whether a plan-level marker is present.
+    """
+    if any(marker in tier for marker in _PLAN_TIER_MARKERS):
+        return True
+    return any(part.strip().startswith("PLAN_") for part in dqf.split("|"))
+
+
+def property_is_plan_level(scrape_result: Any) -> bool:
+    """True when the PROPERTY's own result metadata declares a plan-level roster.
+
+    Several emission sites (``pms/scraper.py`` Path-C at :2151 and the
+    empty-exit plan path at :2308, plus every adapter that stamps its
+    ``AdapterResult.tier_used`` with a ``_PLAN_LEVEL`` suffix) record plan-ness
+    on the *property* result and leave the individual rows carrying the plain
+    adapter tier. The output formatter only ever saw the row, so the flag was
+    lost for every one of those adapters.
+
+    Args:
+        scrape_result: Internal result mapping for one property. Any object
+            exposing ``.get`` is accepted; anything else yields ``False``.
+
+    Returns:
+        Whether the property-level metadata marks this roster plan-level.
+    """
+    getter = getattr(scrape_result, "get", None)
+    if not callable(getter):
+        return False
+    tier = str(getter("extraction_tier_used") or "").upper()
+    if any(marker in tier for marker in _PLAN_TIER_MARKERS):
+        return True
+    return str(getter("_verdict_quality") or "").upper() == "SUCCESS_PLAN_LEVEL"
+
+
+def _is_floor_plan_level(
+    unit: dict[str, Any], *, property_plan_level: bool = False
+) -> bool:
     """True if the unit is a plan-LEVEL placeholder, not a real individual unit.
 
     Stamped explicitly on the output so downstream (and our own audits) can
     tell a floor-plan placeholder apart from a real-unit-missing-an-id without
     fragile inference over the synthetic-id + UNAVAILABLE + no-available_units
-    combo. Signals: the adapter's own ``data_quality_flag`` (SightMap sets
-    ``SIGHTMAP_PLAN_PRESENCE`` for plans with no units) or a ``*_PLAN_LEVEL``
-    extraction tier.
+    combo.
+
+    This is the SINGLE choke point for the client-facing flag: both v2 unit
+    formatters (``core.schema_v2._format_v2_unit`` and the production fork in
+    ``scripts/runners/jugnu.py``) delegate here, so an adapter cannot ship an
+    unflagged plan row by forgetting to set the flag itself — it only has to
+    use one of the plan conventions the codebase already has.
+
+    Signals, in order:
+
+      1. An explicit ``is_floor_plan_level=True`` already decided upstream
+         (``pms.scraper.promote_verified_unit_rows`` writes the boolean).
+      2. The adapter's own ``data_quality_flag`` — SightMap sets
+         ``SIGHTMAP_PLAN_PRESENCE``; ``extraction.post_process`` appends
+         ``PLAN_LEVEL_NO_UNIT_ANCHOR``.
+      3. A ``*_PLAN_LEVEL`` extraction tier.
+      4. (2026-07-28) A plan marker anywhere in the row's tier / flag tokens
+         (``TIER_3_PLAN_TEXT``, ``PLAN_RANGE_ONLY``, …) **or** on the property
+         result (``property_plan_level``) — gated on the row having no real
+         apartment anchor.
+
+    The step-4 anchor gate is what stops the inverse error: a plan-text parser
+    can legitimately emit a UNIT-level row (``generic_plan_text`` line 903
+    emits ``TIER_1_DOM_GENERIC_PLAN_TEXT_UNIT_STREET`` *with* a unit number),
+    and a plan-level property can still contain anchored apartments. Those keep
+    ``is_floor_plan_level=False``. Steps 1-3 are unchanged, so the predicate is
+    monotone: nothing that used to be flagged becomes unflagged.
+
+    Args:
+        unit: Internal (pre-format) unit dict from an adapter.
+        property_plan_level: Result of :func:`property_is_plan_level` for the
+            property this row belongs to. Defaults to ``False`` so existing
+            single-row callers keep working.
+
+    Returns:
+        Whether the row is a floor-plan summary rather than one apartment.
     """
+    if unit.get("is_floor_plan_level") is True:
+        return True
     dqf = str(unit.get("data_quality_flag") or "").upper()
     if "PLAN_PRESENCE" in dqf or "PLAN_LEVEL" in dqf:
         return True
     tier = str(unit.get("extraction_tier") or unit.get("_extraction_tier") or "").upper()
-    return tier.endswith("_PLAN_LEVEL")
+    if tier.endswith("_PLAN_LEVEL"):
+        return True
+    if not (property_plan_level or _has_plan_marker(tier, dqf)):
+        return False
+    # A row that proves ONE REAL APARTMENT is never a plan summary, whatever
+    # the surrounding tier is called. ``unit_has_real_anchor`` is the codebase's
+    # canonical unit-vs-plan classifier (verdict + Path-B retry gate use it too)
+    # and accepts pre-format rows (unit_number / source_ids evidence).
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    return not unit_has_real_anchor(unit)
 
 
-def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> dict:
+def _format_v2_unit(
+    unit: dict,
+    scrape_ts: datetime,
+    property_id: str = "",
+    *,
+    property_plan_level: bool = False,
+) -> dict:
     """Transform a single internal unit dict to V2 unit format.
 
     Internal unit dicts carry private fields (prefixed with ``_``) from
@@ -325,7 +442,9 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.
-        "is_floor_plan_level": _is_floor_plan_level(unit),
+        "is_floor_plan_level": _is_floor_plan_level(
+            unit, property_plan_level=property_plan_level
+        ),
         # Per-unit provenance — which extraction tier produced THIS unit, so a
         # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
         # plan-level placeholder). Captured on the internal unit dict but was
@@ -635,6 +754,68 @@ def _format_area(val: Any) -> int:
     if 150 <= n <= 10_000:
         return n
     return -1
+
+
+# ── ABSENT sentinels ─────────────────────────────────────────────────────────
+#
+# Most V2 unit fields say "unknown" with None / "" / [] / {}, so a plain
+# emptiness test is enough to decide whether a field was populated.
+# ``area`` cannot: ``_format_area`` returns the integer ``-1`` for every
+# unknown sqft, and ``validate_v2_units`` requires area to be ``> 0`` or
+# exactly ``-1`` — there is no ``None`` for area on the wire.
+#
+# Consequence for any consumer that counts "filled" fields with a plain
+# emptiness test: ``-1`` is not empty, so EVERY row scores as filled.
+# Measured 2026-07-28 on run-2026-07-27-full-0d54ca7: all 100 shard
+# reports published ``area`` fill = 100.0% when the true fill was 92.61%
+# (97,212 positive areas of 104,964 units; 7,752 rows carried ``-1``).
+#
+# Anything computing completeness/fill must call ``field_is_absent``
+# rather than testing emptiness inline.
+_GENERIC_ABSENT: tuple[Any, ...] = (None, "", "null", [], {})
+
+# field name -> extra typed sentinels that also mean ABSENT for that field.
+ABSENT_SENTINELS: dict[str, tuple[Any, ...]] = {
+    "area": (-1,),
+}
+
+
+def field_is_absent(field: str, value: Any) -> bool:
+    """True when ``value`` carries no information for ``field``.
+
+    Absent means either a generic empty (``None``, ``""``, ``"null"``,
+    ``[]``, ``{}``) or a field-specific typed sentinel from
+    ``ABSENT_SENTINELS`` (today: ``area == -1``).
+
+    Sentinel matching is deliberately narrow — only a real number, or a
+    string that parses cleanly to that number, counts. ``True``/``False``
+    are excluded so a bool never collides with a numeric sentinel, and a
+    free-text value that merely *contains* the digits is never matched.
+
+    Args:
+        field: V2 unit field name (e.g. ``"area"``).
+        value: The value read off the formatted unit dict.
+
+    Returns:
+        ``True`` if the field should be counted as NOT filled.
+    """
+    if value in _GENERIC_ABSENT:
+        return True
+    sentinels = ABSENT_SENTINELS.get(field)
+    if not sentinels:
+        return False
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        num: float = float(value)
+    elif isinstance(value, str):
+        try:
+            num = float(value.strip())
+        except (ValueError, TypeError):
+            return False
+    else:
+        return False
+    return any(num == float(s) for s in sentinels)
 
 
 # 2026-05-24 (user follow-up to Q1): "apply now / apply" should also be

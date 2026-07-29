@@ -9,6 +9,7 @@ from services.profile_store import ProfileStore
 from services.profile_updater import (
     _base_tier_num,
     _compute_quality_signals,
+    _row_zip,
     update_profile_after_extraction,
 )
 
@@ -243,3 +244,194 @@ def test_quality_survives_round_trip(store: ProfileStore) -> None:
     assert loaded is not None
     assert loaded.quality.last_quality_flag == "UNIT_LEVEL"
     assert loaded.quality.last_coverage_ratio == 1.0
+
+
+# ── 2026-07-28: roster-contamination guard on winning_page_url ────────────
+#
+# Reproduced on the 2026-07-27 full run: property 260505 (Onyx Uptown PHX,
+# Phoenix AZ 85013) shipped 211 rows named for Tempe/Memphis addresses because
+# a prior run persisted ``chamberlin.appfolio.com/listings`` as its
+# winning_page_url; that run's own event log shows it replayed at score 10001
+# (``extract.link_hop_started`` … anchor="profile:winning_page_url"). Skipping
+# the write is not sufficient on its own — the poison was already on disk.
+
+
+def _roster_rows(zip_code: str, n: int) -> list[dict]:
+    """n rows named for addresses in a single ZIP (the roster row shape)."""
+    return [
+        {
+            "unit_name": f"999 E Baseline Rd, {2400 + i}, Tempe, AZ {zip_code}",
+            "unit_number": str(2400 + i),
+            "market_rent_low": 1200 + i,
+        }
+        for i in range(n)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # MUST resolve — real address tails
+        ("999 E Baseline Rd, 2406, Tempe, AZ 85283", "85283"),
+        ("2069 N. Argyle Ave., 304, Hollywood Hills, CA 90068", "90068"),
+        ("3140 N Clybourn Ave Unit 205, Chicago, IL 60618", "60618"),
+        ("100 Main St, Springfield, MA 01020-1234", "01020"),
+        ("100 Main St, Springfield, MA,01020", "01020"),
+        ("Chicago IL 60618", "60618"),
+        ("wa 98503 lacey", "98503"),
+        # MUST NOT resolve — anything that is not an address tail. A loose
+        # 5-digit matcher here would misread ordinary unit text as an address.
+        ("101", None),
+        ("Unit B2", None),
+        ("1 BA 12345 sqft", None),
+        ("2 BR 90210", None),
+        ("APT 12345", None),
+        ("BLDG 60618", None),
+        ("The Sycamore - 2 Bed / 2 Bath", None),
+        ("AppFolio listing 8545", None),
+        ("Studio 12345", None),
+        ("MLS 12345", None),
+        ("A2 60618", None),
+        ("Rent $1,450 / 850 sq ft", None),
+    ],
+)
+def test_row_zip_matcher_table(text: str, expected: str | None) -> None:
+    assert _row_zip({"unit_name": text}) == expected
+
+
+def test_contaminated_result_is_not_persisted_as_winning_url(store: ProfileStore) -> None:
+    """The write gate: a roster result must not become the replay anchor."""
+    p = ScrapeProfile(canonical_id="contam-001")
+    store.save(p)
+    result = {
+        "extraction_tier_used": "TIER_1_DOM_APPFOLIO_SSR",
+        "units": _roster_rows("85283", 8),
+        "_winning_page_url": "https://chamberlin.appfolio.com/listings",
+        "_property_zip": "85013",
+    }
+    up = update_profile_after_extraction(p, result, 8, store)
+    assert up.navigation.winning_page_url is None
+    assert up.navigation.availability_page_path is None
+
+
+def test_persisted_poisoned_winning_url_is_invalidated_on_replay(
+    store: ProfileStore,
+) -> None:
+    """The poison already on disk: replaying it must clear it everywhere.
+
+    Clearing ``winning_page_url`` alone only demotes the URL from hop score
+    10_001 to 10_000, because ``availability_links`` is the next-highest
+    injected candidate — so the URL must leave that list too.
+    """
+    poisoned = "https://chamberlin.appfolio.com/listings"
+    p = ScrapeProfile(canonical_id="contam-002")
+    p.navigation.winning_page_url = poisoned
+    p.navigation.availability_page_path = "/listings"
+    p.navigation.availability_links = [poisoned]
+    p.confidence.maturity = ProfileMaturity.HOT
+    store.save(p)
+
+    result = {
+        "extraction_tier_used": "TIER_1_DOM_APPFOLIO_SSR",
+        "units": _roster_rows("85283", 211),
+        "_winning_page_url": poisoned,
+        "_property_zip": "85013",
+        "_explored_links": {poisoned: True},
+    }
+    up = update_profile_after_extraction(p, result, 211, store)
+
+    assert up.navigation.winning_page_url is None
+    assert up.navigation.availability_page_path is None
+    assert poisoned not in up.navigation.availability_links
+    assert poisoned in up.navigation.explored_links
+    assert up.confidence.maturity == ProfileMaturity.COLD
+
+
+def test_quality_flag_contaminated_also_blocks_the_write(store: ProfileStore) -> None:
+    """The pre-existing volume flag, now actually consulted at the write.
+
+    These rows carry no address text at all, so only the CONTAMINATED flag
+    can condemn this result.
+    """
+    p = ScrapeProfile(canonical_id="contam-003")
+    store.save(p)
+    result = {
+        "extraction_tier_used": "TIER_1_DOM_APPFOLIO_SSR",
+        "units": [{"unit_number": str(i), "market_rent_low": 1200} for i in range(200)],
+        "_expected_total_units": 20,
+        "_winning_page_url": "https://pmc.example.com/listings",
+    }
+    up = update_profile_after_extraction(p, result, 200, store)
+    assert up.quality.last_quality_flag == "CONTAMINATED"
+    assert up.navigation.winning_page_url is None
+
+
+def test_clean_cross_host_portal_url_still_persists(store: ProfileStore) -> None:
+    """Guard against the opposite failure: 541 of the 1,884 persisted profiles
+    that carry a winning_page_url are legitimately cross-host (rentcafe /
+    knock / resman / securecafe portals). Host mismatch is NOT contamination.
+    """
+    p = ScrapeProfile(canonical_id="clean-001")
+    p.navigation.entry_url = "https://www.parkatidlewild.com/"
+    store.save(p)
+    portal = "https://parkatidlewild.securecafe.com/onlineleasing/availability"
+    result = {
+        "extraction_tier_used": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_winning_page_url": portal,
+        "_property_zip": "29650",
+        "_explored_links": {portal: True},
+    }
+    up = update_profile_after_extraction(p, result, 1, store)
+    assert up.navigation.winning_page_url == portal
+    assert portal in up.navigation.availability_links
+
+
+def test_matching_zip_roster_is_not_contamination(store: ProfileStore) -> None:
+    """Address-named rows in the property's OWN ZIP are its own buildings, not
+    a roster dump — the URL must still be learned. This is the scoped-filter
+    shape (``?filters[property_list]=COLLEGE PARK`` → 12 cards, all 98503).
+    """
+    p = ScrapeProfile(canonical_id="clean-002")
+    store.save(p)
+    url = "https://olympicmanagement.appfolio.com/listings?filters%5Bproperty_list%5D=COLLEGE%20PARK"
+    result = {
+        "extraction_tier_used": "TIER_1_DOM_APPFOLIO_SSR",
+        "units": _roster_rows("98503", 12),
+        "_winning_page_url": url,
+        "_property_zip": "98503",
+    }
+    up = update_profile_after_extraction(p, result, 12, store)
+    assert up.navigation.winning_page_url == url
+
+
+def test_unknown_property_zip_declines_rather_than_guesses(store: ProfileStore) -> None:
+    """No CSV ZIP → nothing to compare against → the URL is still learned.
+    The check must not turn "couldn't look" into "contaminated"."""
+    p = ScrapeProfile(canonical_id="clean-003")
+    store.save(p)
+    url = "https://pmc.example.com/listings"
+    result = {
+        "extraction_tier_used": "TIER_1_DOM_APPFOLIO_SSR",
+        "units": _roster_rows("85283", 40),
+        "_winning_page_url": url,
+    }
+    up = update_profile_after_extraction(p, result, 40, store)
+    assert up.navigation.winning_page_url == url
+
+
+def test_zero_unit_invalidation_still_fires(store: ProfileStore) -> None:
+    """The pre-existing invalidation branch must keep working unchanged."""
+    p = ScrapeProfile(canonical_id="stale-001")
+    p.navigation.winning_page_url = "https://example.com/floorplans"
+    p.navigation.availability_page_path = "/floorplans"
+    p.confidence.maturity = ProfileMaturity.HOT
+    store.save(p)
+    result = {
+        "extraction_tier_used": "FAILED",
+        "units": [],
+        "_winning_page_url_hop_outcome": "profile:winning_page_url:failed",
+    }
+    up = update_profile_after_extraction(p, result, 0, store)
+    assert up.navigation.winning_page_url is None
+    assert up.confidence.maturity == ProfileMaturity.COLD

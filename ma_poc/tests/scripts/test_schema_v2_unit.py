@@ -764,3 +764,198 @@ def test_floor_plan_wrapper_clears_identity_but_keeps_public_plan_data() -> None
     assert out["rent_low"] == 1500.0
     assert out["area"] == 700
     assert "PLAN_LEVEL_NO_UNIT_ANCHOR" in out["data_quality_flag"]
+
+
+# ── plan-level-flag completeness (2026-07-28) ───────────────────────────────
+#
+# Measured on run-2026-07-27-full-0d54ca7 (4,982 properties / 104,964 unit
+# rows): 5,427 rows carried ``is_floor_plan_level`` and 5,399 of them (99.5%)
+# were SightMap — the one adapter that stamps a ROW-level
+# ``data_quality_flag``. 1,675 rows were plan-level in shape yet unflagged,
+# including 259 from ``TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL`` and 145
+# from ``TIER_1_DOM_GENERIC_PLAN_TEXT`` — tiers that declare plan-ness in their
+# own names. The flag is now derived at the single output-boundary choke point
+# from the row's markers AND the property-level marker, gated on the row having
+# no real apartment anchor.
+
+# Every tier literal here is a real code in this repo (harvested with
+# ``grep -rhoE '"TIER[A-Z0-9_]*"' --include=*.py ma_poc | sort -u``).
+_PLAN_MARKER_TABLE: list[tuple[str, str, bool, str]] = [
+    # (extraction_tier, data_quality_flag, marker_expected, why)
+    # ---- MUST match -------------------------------------------------------
+    ("TIER_3_PLAN_TEXT", "", True, "plan_text.py marketing plan rows"),
+    ("TIER_1_DOM_GENERIC_PLAN_TEXT", "", True, "generic_plan_text.py"),
+    ("TIER_1_DOM_GENERIC_PLAN_TEXT_UNIT_STREET", "", True,
+     "marker present; the ANCHOR gate is what saves this row"),
+    ("TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL", "", True, "scraper Path-C"),
+    ("TIER_1_DOM_RENTALADDRESS_PLAN_LEVEL", "", True, "rentaladdress plan rows"),
+    ("TIER_2_JSONLD_PLAN_LEVEL", "", True, "post_process-suffixed tier"),
+    ("", "PLAN_RANGE_ONLY", True, "generic_plan_text.py:1096"),
+    ("", "PLAN_LEVEL_MIN_ONLY", True, "_mark_taylor.py:286"),
+    ("", "PLAN_LEVEL_STARTING_RENT", True, "_mark_taylor.py:410"),
+    ("", "PLAN_LEVEL_NO_VACANT_UNIT", True, "_apts247.py:317"),
+    ("", "PLAN_LEVEL_NO_UNIT_ANCHOR", True, "post_process.py:155"),
+    ("", "SQFT_NOT_PUBLISHED|PLAN_RANGE_ONLY", True, "pipe-delimited, 2nd token"),
+    # ---- MUST NOT match ---------------------------------------------------
+    ("TIER_1_API_SIGHTMAP", "", False, "real SightMap unit rows"),
+    ("TIER_1_API_SIGHTMAP_DIRECT", "", False, "real SightMap unit rows"),
+    ("TIER_1_API_APTS247_FLOORPLANS", "", False,
+     "'FLOORPLANS' is a route name, not a plan-level marker"),
+    ("TIER_1_API_RENTCAFE_SECURECAFE_FROM_PLAN", "", False,
+     "a unit sourced FROM a plan page is still a unit"),
+    ("TIER_1_DOM_WIX_FLOOR_PLANS", "", False, "route name"),
+    ("TIER_1_DOM_MARK_TAYLOR_RENDERED_PLAN_CARD", "", False,
+     "carries its own PLAN_LEVEL_* dqf; the tier alone must not fire"),
+    ("ENCORESKYLINE_NO_PLAN_LINKS", "", False, "'NO_PLAN_LINKS' is a diagnosis"),
+    ("TIER_1_DOM_UNIT_TABLE", "", False, "plan_text.py unit-table rows"),
+    ("TIER_1_DOM_APPFOLIO_VANITY", "", False, "real units"),
+    ("TIER_MERGED_CROSS_PAGE", "", False, "no plan marker"),
+    ("TIER_1_API_RENTCAFE_SECURECAFE", "", False, "no plan marker"),
+    ("", "SQFT_NOT_PUBLISHED", False, "rentcafe.py:1912 / appfolio.py:516"),
+    ("", "RENT_NOT_PUBLISHED", False, "sightmap.py:733"),
+    ("", "NO_AVAILABILITY_NOW", False, "_no_availability.py:362"),
+    ("", "UNIT_LEVEL_PRICING_MISSING", False, "scraper.py:616 — a UNIT flag"),
+    ("", "UNIT_LEVEL_PARTIAL_MISSING_SQFT", False, "scraper.py:618 — a UNIT flag"),
+    ("", "UNIT_ROUTE_UNVERIFIED", False,
+     "'we could not verify the unit route', not 'this is a plan'"),
+]
+
+
+@pytest.mark.parametrize(
+    ("tier", "dqf", "expected", "why"),
+    _PLAN_MARKER_TABLE,
+    ids=[f"{t or 'no-tier'}|{d or 'no-dqf'}" for t, d, _, _ in _PLAN_MARKER_TABLE],
+)
+def test_plan_marker_table(tier: str, dqf: str, expected: bool, why: str) -> None:
+    """Table test — the marker matcher must not over-reach onto 'PLAN' words."""
+    from ma_poc.core.schema_v2 import _has_plan_marker
+
+    assert _has_plan_marker(tier.upper(), dqf.upper()) is expected, why
+
+
+# Every distinct ``*_PLAN_LEVEL`` / ``*PLAN_TEXT`` tier this repo emits, plus
+# the plan-level tiers observed in the 2026-07-27 run.
+_PLAN_TIERS: tuple[str, ...] = (
+    "TIER_1_API_APTS247_PLAN_LEVEL",
+    "TIER_1_API_ENTRATA_PLAN_LEVEL",
+    "TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL",
+    "TIER_1_API_RENTCAFE_PLAN_LEVEL",
+    "TIER_1_API_RENTCAFE_SECURECAFE_PLAN_LEVEL",
+    "TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL",
+    "TIER_1_API_REPLI360_PLAN_LEVEL",
+    "TIER_1_API_SIGHTMAP_IFRAME_PLAN_LEVEL",
+    "TIER_1_API_SIGHTMAP_PLAN_LEVEL",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_FROM_PRICE",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_JSONLD_PRICERANGE",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_LABELED_PRICE",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_REALPAGE_BLOB",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_WIX_LABELED_BLOCK",
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_WIX_SECTION_PLAN",
+    "TIER_1_DOM_REALPAGE_CWS_PLAN_LEVEL",
+    "TIER_1_DOM_RENTALADDRESS_PLAN_LEVEL",
+    "TIER_2_JSONLD_PLAN_LEVEL",
+    "TIER_3_DOM_GENERIC_PLAN_LEVEL",
+    "TIER_3_DOM_PLAN_LEVEL",
+    "TIER_3_PLAN_TEXT",
+)
+
+
+@pytest.mark.parametrize("tier", _PLAN_TIERS)
+def test_no_plan_level_tier_can_emit_an_unflagged_row(tier: str) -> None:
+    """No tier whose name contains PLAN_LEVEL or PLAN_TEXT may ship a row with
+    ``is_floor_plan_level`` unset, when that row has no apartment anchor.
+
+    This is the guard the 2026-07-27 run needed: 145 TIER_1_DOM_GENERIC_PLAN_TEXT
+    and 259 TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL rows shipped unflagged.
+    """
+    out = _format_v2_unit(
+        {"floor_plan_name": "A1", "beds": 1, "baths": 1, "extraction_tier": tier},
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is True, tier
+
+
+# Tiers that MARK plan-text extraction without asserting the row is a plan.
+# A ``*_PLAN_LEVEL`` SUFFIX is deliberately excluded: that suffix is an
+# adapter's explicit "this row IS a plan" assertion (and
+# ``scraper.promote_verified_unit_rows`` strips it the moment the row gains a
+# native anchor), so it stays authoritative — pinned by the pre-existing
+# ``test_is_floor_plan_level_plan_level_tier``.
+_PLAN_TEXT_TIERS: tuple[str, ...] = tuple(
+    t for t in _PLAN_TIERS if not t.endswith("_PLAN_LEVEL")
+) + ("TIER_1_DOM_GENERIC_PLAN_TEXT_UNIT_STREET",)
+
+
+@pytest.mark.parametrize("tier", _PLAN_TEXT_TIERS)
+def test_plan_level_tier_with_a_real_anchor_stays_unit_level(tier: str) -> None:
+    """INVERSE-ERROR guard. ``generic_plan_text`` legitimately emits a
+    unit-level row (``..._PLAN_TEXT_UNIT_STREET``) carrying a real unit number;
+    flagging it would move a genuine apartment out of the client's unit set."""
+    out = _format_v2_unit(
+        {
+            "floor_plan_name": "A1",
+            "unit_number": "20H",
+            "rent_low": 2600,
+            "availability_status": "AVAILABLE",
+            "extraction_tier": tier,
+        },
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is False, tier
+
+
+def test_property_level_plan_marker_flags_rows_carrying_a_plain_tier() -> None:
+    """The property records plan-ness on ``extraction_tier_used`` (scraper.py
+    :2151 / :2308) while the ROWS keep the plain adapter tier. The row-only
+    predicate never saw it — 605 TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL
+    rows in the 2026-07-27 run shipped unflagged for exactly this reason."""
+    from ma_poc.core.schema_v2 import property_is_plan_level
+
+    result = {"extraction_tier_used": "TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL"}
+    assert property_is_plan_level(result) is True
+    plan_row = {"floor_plan_name": "A1", "extraction_tier": "TIER_1_API_RENTCAFE"}
+    out = _format_v2_unit(
+        plan_row, _TS, "P1", property_plan_level=property_is_plan_level(result)
+    )
+    assert out["is_floor_plan_level"] is True
+    # …and the same property's anchored rows stay units.
+    unit_row = {
+        "floor_plan_name": "A1",
+        "unit_number": "412",
+        "extraction_tier": "TIER_1_API_RENTCAFE",
+    }
+    out2 = _format_v2_unit(
+        unit_row, _TS, "P1", property_plan_level=property_is_plan_level(result)
+    )
+    assert out2["is_floor_plan_level"] is False
+
+
+def test_property_is_plan_level_reads_verdict_quality() -> None:
+    """``_verdict_quality=SUCCESS_PLAN_LEVEL`` is the other property-level
+    convention the scraper writes at the same two sites."""
+    from ma_poc.core.schema_v2 import property_is_plan_level
+
+    assert property_is_plan_level({"_verdict_quality": "SUCCESS_PLAN_LEVEL"}) is True
+    assert property_is_plan_level({"extraction_tier_used": "TIER_1_API_SIGHTMAP"}) is False
+    assert property_is_plan_level({}) is False
+    assert property_is_plan_level(None) is False
+
+
+def test_plan_level_flag_never_un_flags_a_previously_flagged_row() -> None:
+    """Monotonicity — the pre-2026-07-28 True arms must still return True.
+
+    50 flagged SightMap rows in the 2026-07-27 run carry a REAL area (662, 950,
+    691, 300, 450 sqft): a plan row may legitimately publish a size while having
+    no availability. Those must not be 'fixed' back into units."""
+    from ma_poc.core.schema_v2 import _is_floor_plan_level
+
+    for unit in (
+        {"data_quality_flag": "SIGHTMAP_PLAN_PRESENCE", "area": 662,
+         "unit_number": "A1", "floor_plan_name": "A1"},
+        {"extraction_tier": "TIER_1_API_SIGHTMAP_IFRAME_PLAN_LEVEL",
+         "unit_number": "101", "area": 950},
+        {"is_floor_plan_level": True, "unit_number": "202", "area": 691},
+    ):
+        assert _is_floor_plan_level(unit) is True, unit

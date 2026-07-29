@@ -167,6 +167,123 @@ _CANON_UNIT_SIGNAL_KEYS: frozenset[str] = frozenset({
 _WALK_MAX_NODES = 50_000
 
 
+# ── Media / file-descriptor rejection ───────────────────────────────────────
+# 2026-07-28, run-2026-07-27-full-0d54ca7: three unrelated properties — Sync at
+# Harmony (63482), Sync at Vinings (7726), Uptown Fayetteville (78990) — each
+# shipped exactly one phantom unit with
+#     floor_plan_name = "2023 epIQ Top 100 Badge.png",  area = 8714
+# and every other field NULL. Live probe (plain unauthenticated GET):
+#     GET https://images.myrazz.com/uc-image/51e2c3b7-6dbd-4388-995a-200656df50a6
+#         /2023_epiq_top_100_badge.png
+#     -> 200, Content-Type image/png, Content-Length 8714
+# 8714 is the badge PNG's size in BYTES — identical on all three sites because
+# it is the same shared CMS asset. The mechanism: a media-library XHR returns
+# file descriptors ``{name, size, mimeType, url}``; ``size`` sits in the sqft
+# alias chain and ``name`` in the floor-plan-name chain, so each image in the
+# CMS media library was emitted as a "floor plan" whose "square footage" was
+# its file size. ``_LIST_KEYS`` contains the generic "items"/"results", so the
+# media response was admitted with no per-item signal gate at all.
+#
+# The guard below rejects file/media descriptors. It is deliberately
+# double-locked: an item is dropped only when it carries a media discriminator
+# AND has no dwelling evidence whatsoever, so a real unit can never be lost
+# even if the filename heuristic misfires.
+
+# Extension must sit immediately after the dot and at end of string, so
+# "St. Ives", "Bldg. A", "Loft 1.5" and "The Ico" cannot match. See the
+# table test in tests/pms/adapters/test_api_parser_media_objects.py.
+_MEDIA_FILE_EXT_RE = re.compile(
+    r"\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico|tiff?|heic|heif"
+    r"|mp4|m4v|mov|webm|avi|mkv|wmv"
+    r"|mp3|wav|ogg|aac"
+    r"|pdf|docx?|xlsx?|pptx?|csv|zip)\s*$",
+    re.IGNORECASE,
+)
+
+# A dict carrying one of these keys with an ``image/`` | ``video/`` | ``audio/``
+# | ``font/`` | ``application/`` value is a file descriptor, not a dwelling.
+_MEDIA_MIME_RE = re.compile(
+    r"^\s*(?:image|video|audio|font|application)/", re.IGNORECASE
+)
+_MIME_KEYS: tuple[str, ...] = (
+    "mimeType", "mime_type", "mimetype", "MimeType",
+    "contentType", "content_type", "ContentType", "mime",
+)
+_FILENAME_KEYS: tuple[str, ...] = (
+    "name", "fileName", "file_name", "filename", "Name",
+    "originalFilename", "original_filename", "original_file_name",
+    "title", "label",
+)
+
+# Evidence that an item describes a DWELLING. This is _CANON_UNIT_SIGNAL_KEYS
+# minus "floor_plan_name" — a filename normalises to "name"/"title", never to
+# a rent/bed/bath/unit-number/availability fact, so a media descriptor scores
+# zero here while any genuine unit or floor plan scores at least one.
+# ``size`` is NOT evidence: it is exactly the overloaded key (bytes vs sqft)
+# that produced this defect.
+_DWELLING_EVIDENCE_KEYS: frozenset[str] = frozenset({
+    "rent", "min_rent", "max_rent",
+    "sqft",
+    "bedrooms", "bathrooms",
+    "unit_number", "unit_id",
+    "available_date",
+})
+
+
+def _has_dwelling_evidence(item: dict) -> bool:
+    """True iff *item* carries at least one non-empty canonical dwelling fact.
+
+    Uses ``normalize_field_key`` so vendor spellings collapse. Returns True on
+    any internal error — failing open here keeps the media guard from ever
+    dropping a row it cannot classify.
+    """
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm,
+        )
+    except Exception:
+        return True
+    for k, v in item.items():
+        if not isinstance(k, str) or k.startswith("@"):
+            continue
+        if v in (None, "", [], {}):
+            continue
+        if _norm(k) in _DWELLING_EVIDENCE_KEYS:
+            return True
+    return False
+
+
+def _is_media_file_item(item: Any) -> bool:
+    """True iff *item* is a media/file descriptor rather than a dwelling.
+
+    Requires BOTH:
+      1. a media discriminator — a MIME-typed field (``image/…``, ``video/…``,
+         …) or a name-shaped field holding a filename with a media extension;
+      2. no dwelling evidence at all (:func:`_has_dwelling_evidence`).
+
+    Requirement 2 is what makes this safe: a floor plan that legitimately
+    carries a ``.pdf`` brochure name or an ``image/png`` thumbnail field still
+    has rent / beds / sqft / unit-number, so it is never rejected.
+    """
+    if not isinstance(item, dict):
+        return False
+    discriminator = False
+    for k in _MIME_KEYS:
+        v = item.get(k)
+        if isinstance(v, str) and _MEDIA_MIME_RE.match(v):
+            discriminator = True
+            break
+    if not discriminator:
+        for k in _FILENAME_KEYS:
+            v = item.get(k)
+            if isinstance(v, str) and _MEDIA_FILE_EXT_RE.search(v):
+                discriminator = True
+                break
+    if not discriminator:
+        return False
+    return not _has_dwelling_evidence(item)
+
+
 def _item_has_unit_signals(item: Any, min_signals: int = 2) -> bool:
     """True iff ``item`` is a dict whose keys (normalised) include at least
     ``min_signals`` distinct canonical unit signal keys.
@@ -178,6 +295,9 @@ def _item_has_unit_signals(item: Any, min_signals: int = 2) -> bool:
     keys without per-call regex work.
     """
     if not isinstance(item, dict):
+        return False
+    # A CMS media-library entry is never a dwelling — see _is_media_file_item.
+    if _is_media_file_item(item):
         return False
     try:
         from ma_poc.pms.signal_engine.floor_plan_signals import (
@@ -1038,6 +1158,7 @@ def parse_api_responses(
     units: list[dict] = []
     seen: set[str] = set()
     skipped_no_fields = 0
+    skipped_media = 0
 
     for resp in api_responses:
         url = resp["url"]
@@ -1130,6 +1251,14 @@ def parse_api_responses(
 
         for item in candidates:
             if not isinstance(item, dict):
+                continue
+
+            # CMS media-library descriptors reach here through the keyed
+            # walker: _LIST_KEYS matches the generic "items"/"results", which
+            # admits a whole response with no per-item signal gate. Dropping
+            # them here is the only place that catches that path.
+            if _is_media_file_item(item):
+                skipped_media += 1
                 continue
 
             name = _get(item,
@@ -1314,8 +1443,10 @@ def parse_api_responses(
         stub_count = before - len(units)
 
     log.debug(
-        "parse_api_responses: %d APIs → %d units (skipped: %d no-fields, %d stubs)",
+        "parse_api_responses: %d APIs → %d units "
+        "(skipped: %d no-fields, %d stubs, %d media-file descriptors)",
         len(api_responses), len(units), skipped_no_fields, stub_count,
+        skipped_media,
     )
     return units
 

@@ -35,6 +35,8 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from ma_poc.core.schema_v2 import field_is_absent
+
 _HEADER_FILL = PatternFill("solid", fgColor="1F3864")
 _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _TITLE_FONT = Font(bold=True, size=13)
@@ -230,7 +232,10 @@ def _recompute_report(properties: list[dict[str, Any]]) -> dict[str, Any]:
             n_units += 1
             tiers[str(u.get("extraction_tier") or "NONE")] += 1
             for k in _FILL_FIELDS:
-                if u.get(k) not in (None, "", "null", [], {}):
+                # Same sentinel rule as run_report.build — ``area`` uses the
+                # -1 ABSENT sentinel, which an inline emptiness test scores
+                # as filled. See schema_v2.field_is_absent.
+                if not field_is_absent(k, u.get(k)):
                     fill[k] += 1
     succeeded = sum(v for k, v in verdicts.items() if k.startswith("SUCCESS"))
     total = len(properties)

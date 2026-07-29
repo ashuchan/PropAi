@@ -131,6 +131,37 @@ async () => {
   const T = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
   const A = (el, name) => (el ? (el.getAttribute(name) || '') : '');
 
+  // ── plan-name / leasing-special splitter ─────────────────────────
+  // The MarketApts CMS renders the property's leasing-special banner
+  // INSIDE the plan-title element:
+  //   <div class="floorplan-title">A1-675<br>
+  //     <span class="special red"><i …><div>For a limited time … $750.00
+  //     …</div></i></span></div>
+  // ``textContent`` therefore welds the banner onto the plan name
+  // ("A1-675 For a limited time, you can enjoy …"). The plan name is
+  // the title's own text; the banner is a child node with the CMS's
+  // ``special`` class. Split them structurally (remove the node from a
+  // clone) rather than by pattern-matching the copy — the banner is
+  // free text and no content regex can be made safe against real plan
+  // names that legitimately carry prices ("2 Bed Townhouse + $160
+  // Garage"). Returns {name, special}; when stripping would leave an
+  // EMPTY name the original text is kept verbatim and no special is
+  // reported, so a site that styles its plan label with a ``special``
+  // class can never lose its name.
+  const SPECIAL_SEL = '.special, .specials, .floorplan-special';
+  const TITLE = (el) => {
+    if (!el) return {name: '', special: ''};
+    const full = T(el);
+    if (!el.querySelector(SPECIAL_SEL)) return {name: full, special: ''};
+    const banner = Array.from(el.querySelectorAll(SPECIAL_SEL))
+      .map(T).filter(Boolean).join(' ').trim();
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll(SPECIAL_SEL).forEach((n) => n.remove());
+    const stripped = T(clone);
+    if (!stripped) return {name: full, special: ''};
+    return {name: stripped, special: banner};
+  };
+
   // ── locate the floorplans document ───────────────────────────────
   // Live page already on a floorplans-style path? Use document directly.
   // Otherwise probe ``/floorplans`` first (Templates A/B/C), then
@@ -204,11 +235,13 @@ async () => {
   const aBlocks = Array.from(doc.querySelectorAll('.floorplan-block'));
   if (aBlocks.length > 0 && doc.querySelector('.floorplan-unit-single')) {
     const planRows = aBlocks.map((b) => {
+      const aTitle = TITLE(b.querySelector('.floorplan-name, .floorplan-title'));
       const plan = {
         template: 'A',
         beds: A(b, 'data-bedrooms'),
         baths: A(b, 'data-bathrooms'),
-        name: T(b.querySelector('.floorplan-name, .floorplan-title')),
+        name: aTitle.name,
+        special: aTitle.special,
         // Floor-plan starting price often lives in a "from $X" element.
         startingPrice: T(b.querySelector('.floorplan-num, .floorplan-rent')),
         units: Array.from(b.querySelectorAll('.floorplan-unit-single')).map((u) => ({
@@ -250,11 +283,12 @@ async () => {
                /\b\d+\s+units?\s+available\b/.test(t) ||
                /\b\d+\s+apartments?\s+available\b/.test(t);
       });
-      const title = T(item.querySelector('.floorplan-title'));
+      const bTitle = TITLE(item.querySelector('.floorplan-title'));
       const features = T(item.querySelector('.floorplan-features'));
       const num = T(item.querySelector('.floorplan-num'));
       return {
-        title: title,
+        title: bTitle.name,
+        special: bTitle.special,
         features: features,
         startingPrice: num,
         drillPath: drillAnchor ? drillAnchor.getAttribute('href') || '' : '',
@@ -328,13 +362,16 @@ async () => {
         if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
       }
       let title = '';
+      let special = '';
       let specsBlob = '';
       let units = [];
       try {
         const r = await fetch(drillUrl, {credentials: 'include'});
         if (r.ok) {
           const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
-          title = T(drillDoc.querySelector('h1'));
+          const cTitle = TITLE(drillDoc.querySelector('h1'));
+          title = cTitle.name;
+          special = cTitle.special;
           // Drill body has "BED: X BATH: Y SQ. FEET: Z" — capture the
           // surrounding container that holds these labels.
           const bodyText = T(drillDoc.querySelector('section.unit, .section.unit')) ||
@@ -348,7 +385,7 @@ async () => {
           });
         }
       } catch (e) { /* drill failure → skip this plan */ }
-      planRows.push({title, specsBlob, drillPath: href, units, template: 'C'});
+      planRows.push({title, special, specsBlob, drillPath: href, units, template: 'C'});
     }
     return {template: 'C', plans: planRows};
   }
@@ -370,7 +407,8 @@ async () => {
         return /\/apartments\//.test(href) ||
                /apartments?\s+available|view\s+available|view\s+details/.test(t);
       });
-      const heading = T(block.querySelector('h1, h2, h3, h4, h5, h6'));
+      const dTitle = TITLE(block.querySelector('h1, h2, h3, h4, h5, h6'));
+      const heading = dTitle.name;
       const detailsBlock = T(block.querySelector('.floor-plans-block-details, .list-group'));
       // Pull a starting price out of the body text — Template D often
       // states "FROM: $X,XXX" inline.
@@ -379,6 +417,7 @@ async () => {
       const startingPrice = fromMatch ? '$' + fromMatch[1] : '';
       return {
         title: heading,
+        special: dTitle.special,
         features: detailsBlock,
         startingPrice: startingPrice,
         drillPath: drillAnchor ? drillAnchor.getAttribute('href') || '' : '',
@@ -440,9 +479,11 @@ async () => {
       const items = Array.from(card.querySelectorAll('.list-group-item, .floorplan-info li'))
         .map((li) => T(li))
         .filter((t) => t);
+      const eTitle = TITLE(nameEl);
       planRows.push({
         template: 'E',
-        name: T(nameEl),
+        name: eTitle.name,
+        special: eTitle.special,
         infoItems: items,
       });
     }
@@ -637,6 +678,9 @@ def parse_marketapts_template_a(
         if not isinstance(plan, dict):
             continue
         plan_name = str(plan.get("name") or "").strip()
+        conc_text, conc_src = _ma_plan_concession(
+            str(plan.get("special") or "").strip()
+        )
         plan_beds_str = str(plan.get("beds") or "").strip()
         plan_baths_str = str(plan.get("baths") or "").strip()
         try:
@@ -668,6 +712,8 @@ def parse_marketapts_template_a(
                         availability_status="AVAILABLE",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_MARKETAPTS",
+                        concession_text=conc_text,
+                        concession_source=conc_src,
                     )
                 )
             continue
@@ -715,6 +761,8 @@ def parse_marketapts_template_a(
                     availability_date=avail_date,
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_MARKETAPTS",
+                    concession_text=conc_text,
+                    concession_source=conc_src,
                 )
             )
     return out
@@ -737,6 +785,9 @@ def parse_marketapts_template_b(
         if not isinstance(plan, dict):
             continue
         title = str(plan.get("title") or "").strip()
+        conc_text, conc_src = _ma_plan_concession(
+            str(plan.get("special") or "").strip()
+        )
         features = str(plan.get("features") or "")
         beds, baths, sqft = _parse_specs_blob(features)
         sp_text = str(plan.get("startingPrice") or "")
@@ -762,6 +813,8 @@ def parse_marketapts_template_b(
                         availability_status="AVAILABLE" if plan_floor_price else "UNAVAILABLE",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_MARKETAPTS",
+                        concession_text=conc_text,
+                        concession_source=conc_src,
                     )
                 )
             continue
@@ -827,6 +880,8 @@ def parse_marketapts_template_b(
                     availability_date=avail_date,
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_MARKETAPTS",
+                    concession_text=conc_text,
+                    concession_source=conc_src,
                 )
             )
     return out
@@ -849,6 +904,9 @@ def parse_marketapts_template_c(
         if not isinstance(plan, dict):
             continue
         title = str(plan.get("title") or "").strip()
+        conc_text, conc_src = _ma_plan_concession(
+            str(plan.get("special") or "").strip()
+        )
         specs_blob = str(plan.get("specsBlob") or "")
         beds, baths, sqft = _parse_specs_blob(specs_blob)
 
@@ -868,6 +926,8 @@ def parse_marketapts_template_c(
                         availability_status="UNAVAILABLE",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_MARKETAPTS",
+                        concession_text=conc_text,
+                        concession_source=conc_src,
                     )
                 )
             continue
@@ -923,6 +983,8 @@ def parse_marketapts_template_c(
                     availability_date=avail_date,
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_MARKETAPTS",
+                    concession_text=conc_text,
+                    concession_source=conc_src,
                 )
             )
     return out
@@ -948,6 +1010,9 @@ def parse_marketapts_template_e(
         if not isinstance(plan, dict):
             continue
         name = str(plan.get("name") or "").strip()
+        conc_text, conc_src = _ma_plan_concession(
+            str(plan.get("special") or "").strip()
+        )
         items_raw = plan.get("infoItems") or []
         if not isinstance(items_raw, list):
             continue
@@ -1003,6 +1068,8 @@ def parse_marketapts_template_e(
                 availability_status="AVAILABLE" if rent is not None else "UNAVAILABLE",
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_MARKETAPTS",
+                concession_text=conc_text,
+                concession_source=conc_src,
             )
         )
     return out
@@ -1144,12 +1211,105 @@ _MA_D_DRILL_TEXT = re.compile(
     r"apartments?\s+available|view\s+available|view\s+details", re.I
 )
 
+# CSS classes the MarketApts CMS uses for the leasing-special banner it
+# nests INSIDE the plan-title element. A CLASS match, never a content
+# match — see ``_ma_split_title`` for why that distinction matters.
+_MA_SPECIAL_SELECTOR = ".special, .specials, .floorplan-special"
+
 
 def _ma_txt(el: Any) -> str:
     """Mirror of JS ``T(el)``: collapsed, trimmed textContent."""
     if el is None:
         return ""
     return re.sub(r"\s+", " ", el.get_text()).strip()
+
+
+def _ma_split_title(el: Any) -> tuple[str, str]:
+    """Split a MarketApts plan-title node into ``(plan_name, special)``.
+
+    Python mirror of the JS ``TITLE(el)`` helper. The CMS renders the
+    property's leasing-special banner as a child of the plan-title
+    element::
+
+        <div class="floorplan-title">A1-675<br>
+          <span class="special red"><i …><div>For a limited time … up to
+          $750.00 …</div></i></span></div>
+
+    A plain ``get_text()`` therefore welds the banner onto the plan name.
+    The split is STRUCTURAL — the banner node is removed from a clone and
+    the remainder is the name. It is deliberately NOT a content regex:
+    real plan names legitimately carry prices and marketing-ish words
+    ("2 Bed 2.5 bath Townhouse (2UP) + $160 Garage"), so any pattern over
+    the copy would eventually eat one.
+
+    Fail-safe: if removing the banner would leave an EMPTY name (a site
+    that styles the plan label itself with a ``special`` class), the
+    original full text is returned unchanged and no special is reported.
+    Nothing can be lost by this helper that was not already lost.
+    """
+    if el is None:
+        return "", ""
+    full = _ma_txt(el)
+    banner_nodes = el.select(_MA_SPECIAL_SELECTOR)
+    if not banner_nodes:
+        return full, ""
+    banner = " ".join(t for t in (_ma_txt(n) for n in banner_nodes) if t).strip()
+    clone = copy.copy(el)
+    for node in clone.select(_MA_SPECIAL_SELECTOR):
+        node.decompose()
+    stripped = _ma_txt(clone)
+    if not stripped:
+        return full, ""
+    return stripped, banner
+
+
+def _ma_plan_concession(special: str) -> tuple[str | None, str | None]:
+    """Route a stripped plan-card special banner to the concession field.
+
+    Returns ``(concession_text, concession_source)`` — ``(None, None)``
+    when the banner should not be promoted.
+
+    The banner is promoted to ``concession_text`` only when the SHARED
+    offer classifier (``ma_poc.core.offer_extract``) recognises it as a
+    leasing offer — either it names an offer type, or it names both a
+    target and a value. The decision is delegated to that module on
+    purpose: this adapter adds no content regex of its own.
+
+    Two reasons the gate exists instead of "always promote":
+
+      * Not every ``.special`` banner is a concession. Live corpus
+        (2026-07-28, 26 banners over 9 MarketApts properties) includes
+        "Call for pricing and availability. …", "AMAZING LOFT
+        FLOORPLAN! MOVE IN TODAY!" and "Great Rates! Join The Franklin
+        Flats Community Today!" — marketing chatter with no offer.
+      * A unit-level ``concession_text`` OUTRANKS the property-level
+        banner in ``enrich_unit_concession_fields``. Writing chatter
+        here would EVICT a real, richer property-level concession —
+        e.g. mountainridge-apts plan C3's banner is "Call for pricing
+        and availability", while the property banner carries a real
+        "$400 off move in" ( concession_value=400.0 ).
+
+    When the gate rejects a banner the concession fields are left
+    untouched, so the property-level backfill still applies. The name
+    is still cleaned either way — the split and the routing are
+    independent.
+    """
+    if not special:
+        return None, None
+    try:
+        from ma_poc.core.offer_extract import extract_offer
+
+        fields = extract_offer(special)
+    except Exception:  # pragma: no cover — classifier is best-effort
+        return None, None
+    if not isinstance(fields, dict):
+        return None, None
+    is_offer = bool(fields.get("offer_type")) or bool(
+        fields.get("offer_value") and fields.get("offer_target")
+    )
+    if not is_offer:
+        return None, None
+    return special, "marketapts_plan_special"
 
 
 def _ma_origin(url: str) -> str:
@@ -1302,22 +1462,27 @@ def marketapts_static_payload(
     # ── Template A — inline unit rows ──
     a_blocks = doc.select(".floorplan-block")
     if a_blocks and doc.select_one(".floorplan-unit-single"):
-        plans = [
-            {
-                "template": "A",
-                "beds": b.get("data-bedrooms", "") or "",
-                "baths": b.get("data-bathrooms", "") or "",
-                "name": _ma_txt(b.select_one(".floorplan-name, .floorplan-title")),
-                "startingPrice": _ma_txt(
-                    b.select_one(".floorplan-num, .floorplan-rent")
-                ),
-                "units": [
-                    _ma_template_a_unit(u)
-                    for u in b.select(".floorplan-unit-single")
-                ],
-            }
-            for b in a_blocks
-        ]
+        plans = []
+        for b in a_blocks:
+            a_name, a_special = _ma_split_title(
+                b.select_one(".floorplan-name, .floorplan-title")
+            )
+            plans.append(
+                {
+                    "template": "A",
+                    "beds": b.get("data-bedrooms", "") or "",
+                    "baths": b.get("data-bathrooms", "") or "",
+                    "name": a_name,
+                    "special": a_special,
+                    "startingPrice": _ma_txt(
+                        b.select_one(".floorplan-num, .floorplan-rent")
+                    ),
+                    "units": [
+                        _ma_template_a_unit(u)
+                        for u in b.select(".floorplan-unit-single")
+                    ],
+                }
+            )
         return {"template": "A", "plans": plans}
 
     # ── Template B — .floorplan-item + /unit/ drill ──
@@ -1326,10 +1491,12 @@ def marketapts_static_payload(
         plans = []
         for item in b_items:
             drill_path = _ma_find_drill(item, kind="unit")
+            b_title, b_special = _ma_split_title(item.select_one(".floorplan-title"))
             plans.append(
                 {
                     "template": "B",
-                    "title": _ma_txt(item.select_one(".floorplan-title")),
+                    "title": b_title,
+                    "special": b_special,
                     "features": _ma_txt(item.select_one(".floorplan-features")),
                     "startingPrice": _ma_txt(item.select_one(".floorplan-num")),
                     "drillPath": drill_path,
@@ -1352,12 +1519,13 @@ def marketapts_static_payload(
         plans = []
         for href in hrefs:
             title = ""
+            special = ""
             specs = ""
             units: list[dict[str, Any]] = []
             drill_html = drill_fetch(urljoin(base_url, href), False)
             if drill_html:
                 ddoc = BeautifulSoup(drill_html, "lxml")
-                title = _ma_txt(ddoc.select_one("h1"))
+                title, special = _ma_split_title(ddoc.select_one("h1"))
                 specs = _ma_txt(
                     ddoc.select_one("section.unit, .section.unit")
                 ) or _ma_txt(ddoc.body)[:2000]
@@ -1367,6 +1535,7 @@ def marketapts_static_payload(
             plans.append(
                 {
                     "title": title,
+                    "special": special,
                     "specsBlob": specs,
                     "drillPath": href,
                     "units": units,
@@ -1384,10 +1553,14 @@ def marketapts_static_payload(
             from_m = re.search(
                 r"FROM\s*:?\s*\$\s*([\d,]+)", _ma_txt(block), re.I
             )
+            d_title, d_special = _ma_split_title(
+                block.select_one("h1, h2, h3, h4, h5, h6")
+            )
             plans.append(
                 {
                     "template": "D",
-                    "title": _ma_txt(block.select_one("h1, h2, h3, h4, h5, h6")),
+                    "title": d_title,
+                    "special": d_special,
                     "features": _ma_txt(
                         block.select_one(".floor-plans-block-details, .list-group")
                     ),
@@ -1416,8 +1589,14 @@ def marketapts_static_payload(
                 )
                 if t
             ]
+            e_name, e_special = _ma_split_title(name_el)
             plans.append(
-                {"template": "E", "name": _ma_txt(name_el), "infoItems": items}
+                {
+                    "template": "E",
+                    "name": e_name,
+                    "special": e_special,
+                    "infoItems": items,
+                }
             )
         if plans:
             return {"template": "E", "plans": plans}
