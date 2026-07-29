@@ -1896,12 +1896,27 @@ async def _process_property(
     # carries an explicit "no units available" statement
     # (krcapartments-class cohort). The verdict layer routes those to
     # SUCCESS_NO_AVAILABILITY instead of FAILED_NO_DATA.
+    # 2026-07-29: pass ``plan_summaries``. ``promote_verified_unit_rows``
+    # (scraper.py) admits a row into ``units`` only when it carries a native
+    # apartment anchor and MOVES every unanchored plan row to
+    # ``result["plan_summaries"]`` (set at scraper.py:3032). Before this
+    # argument existed here, compute() saw ``units == []`` and returned
+    # FAILED_NO_DATA / "no records extracted" for a property whose plan-level
+    # data had been extracted and shipped perfectly well — the page's plan
+    # cards are in ``floor_plans`` in the emitted record. compute() has
+    # accepted this parameter (and returned SUCCESS_PLAN_LEVEL for it) all
+    # along; only this call site never forwarded it, so the producer's new
+    # channel and the verdict consumer disagreed. Measured on the 265-property
+    # dq29 canary: 37 of 77 zero-unit properties are this bug, data intact.
+    # Gold is unaffected either way — plan rows were never gold — but the
+    # SUCCESS RATE reads as a collapse.
     verdict = compute_verdict(
         fetch_outcome=outcome_val,
         extract_result=extract_result,
         carry_forward_applied=result.get("_meta", {}).get("carry_forward_used", False),
         verdict_quality_override=result.get("_verdict_quality"),
         units=result.get("units"),
+        plan_summaries=result.get("plan_summaries"),
         operator_no_availability=bool(result.get("_operator_no_availability")),
     )
     meta = result.setdefault("_meta", {})
