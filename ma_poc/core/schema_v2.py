@@ -182,6 +182,10 @@ def build_v2_property(
                 scrape_ts,
                 str(_safe_int(csv_id) or ""),
                 property_plan_level=property_is_plan_level(scrape_result),
+                # Whether THIS property published a real square footage to us
+                # anywhere in this scrape — the sibling evidence that makes a
+                # missing area our failure rather than the operator's silence.
+                property_has_area=property_publishes_area(target_units),
             )
             for u in target_units
         ],
@@ -316,12 +320,185 @@ def _is_floor_plan_level(
     return not unit_has_real_anchor(unit)
 
 
+# ── Area-absence taxonomy ────────────────────────────────────────────────────
+#
+# ``area`` ships ``-1`` for every unknown square footage (see ABSENT_SENTINELS
+# below). ``-1`` is opaque: it merges four situations a client must be able to
+# tell apart, and three of them make DIFFERENT claims about the world.
+#
+#   NOT_APPLICABLE  — a claim about the ROW.    "no apartment behind this plan"
+#   NOT_CAPTURED    — a claim about US.         "we failed to get it"
+#   NOT_PUBLISHED   — a claim about the OPERATOR."they publish no square footage"
+#   UNKNOWN         — a claim about nothing.    "we cannot tell which"
+#
+# Only NOT_PUBLISHED asserts something about the operator, so it carries the
+# highest evidential bar — see ``AREA_ABSENCE_NOT_PUBLISHED``.
+#
+# WHY THE OBVIOUS RULES ARE NOT USED (measured, 2026-07-29, run
+# run-2026-07-27-full-0d54ca7):
+#   "the property published no area on any row" looks like operator evidence.
+#   It is not. 49 properties in that run had a positive rent + a real unit
+#   anchor on every row and an area on none. Re-fetched live by plain static
+#   GET, 31 of the 48 reachable ones DO publish a square footage on their own
+#   floor-plans page. Tightening the gate to the exact shape of the accepted
+#   ``RENT_NOT_PUBLISHED`` gate (>=3 rows, 100% priced, 100% anchored, 0 area)
+#   left it wrong 26 times out of 39. A rule that is a coin flip cannot back a
+#   statement about somebody's business.
+
+#: The plan behind this row has no apartment, and square footage is an
+#: attribute of an apartment in the surface we read. Says nothing about
+#: whether the operator publishes a size for the plan elsewhere.
+AREA_ABSENCE_NOT_APPLICABLE = "NOT_APPLICABLE"
+
+#: We did not obtain the square footage. Either our own bounds rejected the
+#: value the source supplied, or the same property shipped a real area on
+#: another row of the same scrape. Explicitly NOT a statement that the
+#: operator withholds it.
+AREA_ABSENCE_NOT_CAPTURED = "NOT_CAPTURED"
+
+#: The operator publishes no square footage. Requires POSITIVE, surface-level
+#: evidence from the adapter that parsed the data — the schema it read has no
+#: square-footage field for this property — and requires that nothing
+#: contradicts it. Never inferred from the shape of our own output.
+AREA_ABSENCE_NOT_PUBLISHED = "NOT_PUBLISHED"
+
+#: We could not establish which of the above applies. An honest answer, and
+#: the default: absence of evidence is routed here, never upgraded.
+AREA_ABSENCE_UNKNOWN = "UNKNOWN"
+
+#: Adapter-set key carrying the positive surface evidence NOT_PUBLISHED needs:
+#: ``True`` means "the response schema I parsed for this property has no
+#: square-footage field at all". An adapter may only set it from the shape of
+#: the SOURCE, never from the shape of its own output.
+AREA_SURFACE_NO_SQFT_KEY = "_area_surface_publishes_no_sqft"
+
+#: Field-labels ``extraction.sanity._sanitize_field`` records when it nulls a
+#: square footage for being out of bounds.
+_SANITY_AREA_LABELS: frozenset[str] = frozenset(
+    {"area", "area_implausible_for_beds"}
+)
+
+
+def _sanity_nulled_area(unit: dict[str, Any]) -> bool:
+    """True when ``extraction.sanity`` nulled this row's square footage.
+
+    Read ONE-WAY ONLY. A ``True`` proves a value existed and we discarded it.
+    A ``False`` proves nothing: ``sanity_bound`` leaves no marker when it did
+    not fire, and not every row reaches it — so ``False`` means "no evidence
+    of a clamp", never "no clamp happened".
+    """
+    dropped = unit.get("_sanity_dropped")
+    if not isinstance(dropped, (list, tuple, set)):
+        return False
+    return any(str(d).strip().lower() in _SANITY_AREA_LABELS for d in dropped)
+
+
+def _is_plan_presence_row(unit: dict[str, Any]) -> bool:
+    """True when the row exists only to record that a plan is in the
+    catalogue with no apartment behind it.
+
+    ``PLAN_PRESENCE`` is the codebase's existing convention for that row (the
+    same token :func:`_is_floor_plan_level` already keys on). It is matched as
+    a substring, not against any one vendor's spelling, so a second adapter
+    adopting the convention is covered without a code change.
+
+    The real-anchor gate is what keeps a genuine apartment out: a row that
+    proves one apartment is not a catalogue marker whatever it is flagged.
+    """
+    dqf = str(unit.get("data_quality_flag") or "").upper()
+    if "PLAN_PRESENCE" not in dqf:
+        return False
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    return not unit_has_real_anchor(unit)
+
+
+def property_publishes_area(units: Any) -> bool:
+    """True when ANY row of this property carries a real square footage.
+
+    Proof, from the scrape itself, that the operator does publish a size to
+    us — which is what makes a sibling row's absence OUR failure rather than
+    the operator's silence. Takes the internal (pre-format) unit dicts so it
+    reads the same aliases :func:`_format_v2_unit` formats.
+    """
+    if not isinstance(units, (list, tuple)):
+        return False
+    for u in units:
+        if not isinstance(u, dict):
+            continue
+        val = _first(u, "_sqft", "sqft", "area", "squareFeet",
+                     "square_feet", "size", "sq_ft")
+        if _format_area(val) > 0:
+            return True
+    return False
+
+
+def classify_area_absence(
+    unit: dict[str, Any],
+    *,
+    formatted_area: int,
+    supplied_value: Any = None,
+    property_publishes_area: bool = False,
+) -> tuple[str | None, str | None]:
+    """Label WHY ``area`` is absent, and name the evidence for the label.
+
+    Single choke point for the client-facing area-absence label: both V2 unit
+    formatters delegate here, so an adapter cannot ship an unlabelled row.
+
+    Args:
+        unit: Internal (pre-format) unit dict from an adapter.
+        formatted_area: What :func:`_format_area` returned for this row.
+            Anything other than ``-1`` means the area is present.
+        supplied_value: The value handed to :func:`_format_area`. Passed in
+            rather than re-derived so the two formatters' differing alias
+            chains cannot drift apart.
+        property_publishes_area: :func:`property_publishes_area` for the
+            property this row belongs to.
+
+    Returns:
+        ``(label, evidence)``. Both ``None`` when the area is present.
+        ``evidence`` is a stable machine token naming what decided the label,
+        so any single row can be audited back to its reason.
+    """
+    if formatted_area != -1:
+        return (None, None)
+
+    # (a) There is no apartment behind this row, so there is no apartment to
+    #     have a square footage. Checked first: it is the only branch that is
+    #     true of the ROW rather than of the data we did or did not get.
+    if _is_plan_presence_row(unit):
+        return (AREA_ABSENCE_NOT_APPLICABLE, "plan_presence_no_apartment")
+
+    # (c) Ours, not theirs. Two independent proofs, either one sufficient.
+    #     Both are one-way: they can only ADD confidence that we failed.
+    if _sanity_nulled_area(unit):
+        return (AREA_ABSENCE_NOT_CAPTURED, "value_dropped_by_sanity_bounds")
+    if supplied_value not in (None, "") and str(supplied_value).strip():
+        # The source handed us something and ``_format_area`` refused it —
+        # out of the [150, 10000] bounds, or unparseable. Whatever the source
+        # meant, we do not know this operator's square footage.
+        return (AREA_ABSENCE_NOT_CAPTURED, "value_rejected_by_area_bounds")
+    if property_publishes_area:
+        return (AREA_ABSENCE_NOT_CAPTURED, "sibling_row_published_area")
+
+    # (b) Theirs. Needs the adapter's positive surface evidence AND nothing
+    #     above contradicting it. Deliberately unreachable for every adapter
+    #     that does not supply that evidence — see the module note: no
+    #     property of OUR OUTPUT is admissible here.
+    if unit.get(AREA_SURFACE_NO_SQFT_KEY) is True:
+        return (AREA_ABSENCE_NOT_PUBLISHED, "surface_has_no_sqft_field")
+
+    # (d) We could not tell. Say so.
+    return (AREA_ABSENCE_UNKNOWN, "no_evidence")
+
+
 def _format_v2_unit(
     unit: dict,
     scrape_ts: datetime,
     property_id: str = "",
     *,
     property_plan_level: bool = False,
+    property_has_area: bool = False,
 ) -> dict:
     """Transform a single internal unit dict to V2 unit format.
 
@@ -423,12 +600,25 @@ def _format_v2_unit(
     except Exception:
         floor_plan_id = None
 
+    # Area + the reason it is absent. The numeric ``-1`` contract is
+    # UNCHANGED; ``area_absence`` is an additive label that says which of the
+    # four situations the -1 stands for. See ``classify_area_absence``.
+    area_out = _format_area(sqft)
+    area_absence, area_absence_evidence = classify_area_absence(
+        unit,
+        formatted_area=area_out,
+        supplied_value=sqft,
+        property_publishes_area=property_has_area,
+    )
+
     return {
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name if fp_name else None,
         "floor_plan_id": floor_plan_id,
-        "area": _format_area(sqft),
+        "area": area_out,
+        "area_absence": area_absence,
+        "area_absence_evidence": area_absence_evidence,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         # As-displayed operator label ("HOME 302", "APT PH14", an AppFolio
         # street address). Capture-only and frequently NULL — see
@@ -772,6 +962,11 @@ def _format_area(val: Any) -> int:
 #
 # Anything computing completeness/fill must call ``field_is_absent``
 # rather than testing emptiness inline.
+#
+# ``-1`` still means exactly what it meant — the numeric contract is
+# UNCHANGED. What it does NOT tell you is WHY the value is missing, and the
+# four reasons make different claims about the world. The ``area_absence``
+# label emitted alongside it says which one — see ``classify_area_absence``.
 _GENERIC_ABSENT: tuple[Any, ...] = (None, "", "null", [], {})
 
 # field name -> extra typed sentinels that also mean ABSENT for that field.
@@ -1092,6 +1287,10 @@ _MAPPED_SRC = {
     "concession", "concession_text", "concession_value",
     "concession_source", "specials_description", "amenities",
     "bed_label", "floor_plan_id", "source_api_url", "extraction_tier",
+    # Adapter-set evidence flag consumed by ``classify_area_absence``. Ends
+    # in "sqft" so the attribute-token net would otherwise republish it into
+    # ``_extra`` as if it were an unmapped square-footage column.
+    "_area_surface_publishes_no_sqft",
 }
 
 
