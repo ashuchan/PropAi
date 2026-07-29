@@ -1,0 +1,205 @@
+"""A plan-only link-hop must not lose its floor plans.
+
+`promote_verified_unit_rows` admits a row into ``units`` only when it carries a
+native apartment anchor, and moves every unanchored plan row to
+``plan_summaries``. A hopped page can therefore be a perfectly good floor-plan
+surface while ``units`` is empty.
+
+Two independent leaks existed, both introduced by f46a490 wiring that new
+channel without teaching its consumers:
+
+  A. ``_try_link_hop`` hit ``if not had_data: continue`` and dropped the whole
+     ``sub_result`` — the only object holding those plan rows. Its comment
+     claimed they "stay attached to the caller's result"; they do not, because
+     ``sub_result`` is the HOPPED page's dict while the caller holds the ENTRY
+     page's (empty, for a barren homepage).
+  B. ``scrape_jugnu``'s post-hop merge copies an explicit key whitelist that
+     includes ``units`` and not ``plan_summaries``, and its ``_units_empty``
+     branch takes only ``_explored_links``. So ``floor_plans[]`` in the emitted
+     v2 record was structurally unreachable for any link-hop-recovered property.
+
+Before f46a490 neither could bite: adapters wired ``result.units =
+pp.admitted`` (units AND plan rows together), so ``had_data`` was true for any
+page with rows at all.
+
+These tests target the two pure helpers that carry the fix, so they need no
+network, no browser and no event loop. The orchestration around them is covered
+by the existing link-hop integration tests.
+"""
+
+from __future__ import annotations
+
+import ast
+import inspect
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from ma_poc.pms import scraper as _scraper_mod
+from ma_poc.pms.scraper import _attach_hop_plans, _hop_plan_identity
+
+_SCRAPER_SRC = Path(inspect.getsourcefile(_scraper_mod) or "")
+
+
+class TestDiscardSiteHarvests:
+    """Leak A lives in async orchestration, so guard it at the source level.
+
+    The pure-helper tests below cannot reach ``_try_link_hop``'s
+    ``if not had_data: continue``, and a mutation run proved it: restoring the
+    bare ``continue`` left every other test in this file green. Driving the real
+    coroutine would need a fetch stub, adapter dispatch and an event loop — a
+    lot of machinery to assert one branch does not throw data away. So assert
+    the invariant structurally instead: whatever that branch does, it must not
+    reach ``continue`` without first reading ``plan_summaries``.
+    """
+
+    @staticmethod
+    def _not_had_data_branches() -> list[ast.If]:
+        """Every ``if not had_data:`` statement in the module."""
+        tree = ast.parse(_SCRAPER_SRC.read_text(encoding="utf-8"))
+        found = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If):
+                continue
+            t = node.test
+            if (
+                isinstance(t, ast.UnaryOp)
+                and isinstance(t.op, ast.Not)
+                and isinstance(t.operand, ast.Name)
+                and t.operand.id == "had_data"
+            ):
+                found.append(node)
+        return found
+
+    def test_the_branch_still_exists(self) -> None:
+        """Guard the guard — a renamed variable must fail loudly, not vacuously."""
+        branches = self._not_had_data_branches()
+        assert branches, (
+            "no `if not had_data:` branch found in scraper.py. The plan-only hop "
+            "gate was renamed or removed; update this guard so it keeps checking "
+            "the real branch instead of passing on an empty set."
+        )
+
+    def test_plan_rows_are_harvested_before_continue(self) -> None:
+        """A plan-only hop must not be discarded without keeping its plans.
+
+        ``sub_result`` is the hopped page's own dict and the only place those
+        rows exist — no post-hop copy list reconstructs them.
+        """
+        for branch in self._not_had_data_branches():
+            body = ast.unparse(ast.Module(body=branch.body, type_ignores=[]))
+            assert "plan_summaries" in body, (
+                "`if not had_data:` discards the hop result without harvesting "
+                f"plan_summaries. Branch body:\n{body}\n"
+                "sub_result is the HOPPED page's dict; the caller holds the "
+                "ENTRY page's plan rows, so dropping it loses them outright."
+            )
+
+
+def _plan(name: str, **over: Any) -> dict[str, Any]:
+    """A floor-plan row in the ADAPTER vocabulary (make_unit_dict's output).
+
+    Deliberately uses ``bedrooms`` / ``bathrooms`` / ``sqft`` /
+    ``market_rent_low`` — the names ``_parsing.make_unit_dict`` actually writes.
+    A key that reads only ``beds`` / ``area`` / ``rent_low`` degenerates to a
+    constant here, which is the live defect in ``_plan_key``.
+    """
+    row = {
+        "floor_plan_name": name,
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "sqft": 798,
+        "market_rent_low": 1298,
+        "market_rent_high": 1298,
+    }
+    row.update(over)
+    return row
+
+
+class TestHopPlanIdentity:
+    """The dedup key must not be dead on either field vocabulary."""
+
+    def test_reads_the_adapter_vocabulary(self) -> None:
+        """bedrooms/bathrooms/sqft/market_rent_low must all reach the key.
+
+        Regression guard for the ``_plan_key`` failure mode: reading only the
+        v2 spellings leaves the rent and area slots empty for every row that
+        came straight from an adapter.
+        """
+        ident = _hop_plan_identity(_plan("A1"))
+        assert ident == ("A1", "1", "1", "798", "1298", "1298"), ident
+        assert "" not in ident, (
+            f"a slot is dead on adapter-vocabulary rows: {ident} — the key is "
+            "reading field names make_unit_dict does not write"
+        )
+
+    def test_reads_the_v2_vocabulary(self) -> None:
+        """beds/baths/area/rent_low must also reach the key."""
+        v2 = {
+            "floor_plan_name": "A1",
+            "beds": 1,
+            "baths": 1,
+            "area": 798,
+            "rent_low": 1298,
+            "rent_high": 1298,
+        }
+        assert _hop_plan_identity(v2) == ("A1", "1", "1", "798", "1298", "1298")
+
+    def test_rent_is_part_of_identity(self) -> None:
+        """Same plan shape at two different rents = two published offers.
+
+        This is the exact collapse ``_plan_key`` causes: its rent slot is dead,
+        so these two rows share a key and one is destroyed.
+        """
+        a = _plan("A1", market_rent_low=1299, market_rent_high=1299)
+        b = _plan("A1", market_rent_low=1499, market_rent_high=1499)
+        assert _hop_plan_identity(a) != _hop_plan_identity(b)
+
+
+class TestAttachHopPlans:
+    """Harvested plan rows must reach the result without clobbering it."""
+
+    def test_harvest_reaches_an_empty_result(self) -> None:
+        """The dominant real case: barren entry page, plan-rich hop page."""
+        result: dict[str, Any] = {"units": []}
+        _attach_hop_plans(result, [_plan("A1"), _plan("B2")])
+        assert [p["floor_plan_name"] for p in result["plan_summaries"]] == ["A1", "B2"]
+        assert result["_hop_plan_harvest"] == 2
+
+    def test_entry_page_plans_are_not_discarded(self) -> None:
+        """Union, not overwrite.
+
+        Adding ``plan_summaries`` to the merge's key-whitelist would have done
+        ``result[k] = hop_result[k]`` and destroyed the entry page's own plans.
+        """
+        result: dict[str, Any] = {"plan_summaries": [_plan("ENTRY")]}
+        _attach_hop_plans(result, [_plan("HOP")])
+        assert [p["floor_plan_name"] for p in result["plan_summaries"]] == [
+            "ENTRY",
+            "HOP",
+        ]
+
+    def test_exact_duplicates_collapse(self) -> None:
+        """The same plan on both pages ships once."""
+        result: dict[str, Any] = {"plan_summaries": [_plan("A1")]}
+        _attach_hop_plans(result, [_plan("A1")])
+        assert len(result["plan_summaries"]) == 1
+
+    def test_empty_harvest_is_a_no_op(self) -> None:
+        """A hop that found real units must be handed back untouched."""
+        original = [_plan("KEEP")]
+        result: dict[str, Any] = {"plan_summaries": original}
+        _attach_hop_plans(result, [])
+        assert result["plan_summaries"] is original
+        assert "_hop_plan_harvest" not in result
+
+    @pytest.mark.parametrize("junk", [None, "not-a-dict", 42])
+    def test_non_dict_rows_are_ignored(self, junk: Any) -> None:
+        """Never raise on a malformed row — this runs inside the scrape path."""
+        result: dict[str, Any] = {"plan_summaries": [junk]}
+        _attach_hop_plans(result, [_plan("A1")])
+        names = [
+            p.get("floor_plan_name") for p in result["plan_summaries"] if isinstance(p, dict)
+        ]
+        assert "A1" in names

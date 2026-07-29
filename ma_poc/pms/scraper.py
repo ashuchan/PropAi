@@ -3807,6 +3807,75 @@ def _is_priced_sightmap_result(result: dict[str, Any]) -> bool:
     return priced >= max(1, (len(units) + 1) // 2)
 
 
+def _hop_plan_identity(row: dict[str, Any]) -> tuple[str, ...]:
+    """Identity of a floor-plan row, for de-duplicating a hop harvest.
+
+    Reads BOTH field vocabularies at every slot. Adapter rows built by
+    ``_parsing.make_unit_dict`` carry ``bedrooms`` / ``bathrooms`` / ``sqft`` /
+    ``market_rent_low``; rows that have been through the v2 formatter carry
+    ``beds`` / ``baths`` / ``area`` / ``rent_low``. A key that reads only one
+    vocabulary silently degenerates to a constant on the other — which is
+    exactly the live defect in ``_plan_key`` (it reads ``asking_rent`` /
+    ``rent_low`` and ``floor_plan_id``, none of which make_unit_dict writes, so
+    two of its seven slots are dead and plans differing only in rent collapse).
+
+    Rent is part of the identity on purpose: two rows with the same name, beds,
+    baths and area but different rents are different published offers, not
+    duplicates.
+
+    Args:
+        row: A floor-plan row from either vocabulary.
+
+    Returns:
+        A tuple usable as a dict key; equal tuples mean the same published plan.
+    """
+    def first(*names: str) -> str:
+        for n in names:
+            v = row.get(n)
+            if v not in (None, ""):
+                return str(v)
+        return ""
+
+    return (
+        first("floor_plan_name", "floorplan_name", "name"),
+        first("beds", "bedrooms"),
+        first("baths", "bathrooms"),
+        first("area", "sqft"),
+        first("rent_low", "market_rent_low", "asking_rent"),
+        first("rent_high", "market_rent_high"),
+    )
+
+
+def _attach_hop_plans(
+    result: dict[str, Any], harvested: list[dict[str, Any]]
+) -> None:
+    """Merge plan rows harvested from plan-only hops into *result*.
+
+    A no-op when nothing was harvested, so a hop that found real units is left
+    exactly as it was. Otherwise the harvest is unioned with any plan rows the
+    result already carries, de-duplicated on :func:`_hop_plan_identity`, with
+    the result's own rows kept first — they came from the page that won, so
+    they are the more authoritative rendering of the same plan.
+
+    Args:
+        result: The dict ``_try_link_hop`` is about to return. Mutated in place.
+        harvested: Plan rows collected from hops that yielded no units.
+    """
+    if not harvested:
+        return
+    existing = [p for p in (result.get("plan_summaries") or []) if isinstance(p, dict)]
+    merged: list[dict[str, Any]] = []
+    seen: set[tuple[str, ...]] = set()
+    for row in [*existing, *harvested]:
+        ident = _hop_plan_identity(row)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        merged.append(row)
+    result["plan_summaries"] = merged
+    result["_hop_plan_harvest"] = len(harvested)
+
+
 async def _try_link_hop(
     entry_url: str,
     entry_page_html: str,
@@ -4066,6 +4135,28 @@ async def _try_link_hop(
     # profile.navigation.explored_links (skip-next-run) and
     # profile.navigation.availability_links (prioritise-next-run).
     explored: dict[str, bool] = {}
+
+    # Plan rows harvested from hops that yielded NO anchored units.
+    #
+    # ``promote_verified_unit_rows`` admits a row into ``units`` only when it
+    # carries a native apartment anchor and moves every unanchored plan row to
+    # ``plan_summaries``. A hopped page can therefore be a perfectly good
+    # floor-plan surface while ``units`` is empty. The ``if not had_data:
+    # continue`` below used to drop that whole ``sub_result``, and its comment
+    # claimed the plan rows "stay attached to the caller's result" — they do
+    # not. ``sub_result`` is the HOPPED page's dict; the caller's result holds
+    # the ENTRY page's plan_summaries, which for a barren homepage is empty.
+    # Nothing else reconstructs them: every post-hop copy list in scrape_jugnu
+    # enumerates explicit keys and none includes plan_summaries.
+    #
+    # Newly load-bearing as of f46a490. Before it, adapters wired
+    # ``result.units = pp.admitted`` (units AND plan rows combined), so
+    # ``had_data`` was always true for a page with any rows at all and this
+    # branch could not be reached with data in hand.
+    #
+    # Accumulate instead of dropping, and attach to whichever result the
+    # function returns, so a plan-only hop still reaches floor_plans[].
+    hop_plan_summaries: list[dict[str, Any]] = []
 
     # Iterate as a queue (not a fixed for-loop) so that hints discovered
     # mid-iteration — leasing-portal pointers AND floor-plan sub-page
@@ -4792,6 +4883,7 @@ async def _try_link_hop(
                     )
                     sub_result["_best_units_page"] = _best_units_page[0] or sub_url
                     sub_result["_best_units_count"] = _best_units_page[1]
+                    _attach_hop_plans(sub_result, hop_plan_summaries)
                     return sub_result
                 # Mark accumulation mode so recursive sub-pages are merged,
                 # not treated as new floor-plan index pages.
@@ -4880,10 +4972,14 @@ async def _try_link_hop(
                 continue
 
             # A plan-only index without detail links must not be returned as
-            # a successful unit hop.  Continue with the remaining bounded
-            # candidates; the original plan summaries stay attached to the
-            # caller's result for truthful floor-plan output.
+            # a successful unit hop — keep trying the remaining bounded
+            # candidates for a real unit roster. But harvest its plan rows on
+            # the way past: this ``sub_result`` is the only place they exist,
+            # and dropping it loses them outright (see hop_plan_summaries).
             if not had_data:
+                for _plan in sub_result.get("plan_summaries") or []:
+                    if isinstance(_plan, dict):
+                        hop_plan_summaries.append(_plan)
                 continue
 
             emit(
@@ -4898,6 +4994,7 @@ async def _try_link_hop(
             )
             sub_result["_best_units_page"] = _best_units_page[0] or sub_url
             sub_result["_best_units_count"] = _best_units_page[1]
+            _attach_hop_plans(sub_result, hop_plan_summaries)
             return sub_result
 
         # Dynamic discovery: a sub-fetch may itself have surfaced
@@ -4956,14 +5053,26 @@ async def _try_link_hop(
         if _best_units_page[0]:
             _first_successful_result["_best_units_page"] = _best_units_page[0]
             _first_successful_result["_best_units_count"] = _best_units_page[1]
+        _attach_hop_plans(_first_successful_result, hop_plan_summaries)
         return _first_successful_result
 
     # No hop recovered — return None but stash the explored map on the
     # outer link-hop caller via a sentinel dict. The caller (scrape_jugnu)
     # can drop it onto the final empty result so learning still happens on
     # failure too.
-    if explored:
-        return {"_units_empty": True, "_explored_links": explored}
+    #
+    # ``_units_empty`` is set whenever we have anything at all to hand back,
+    # INCLUDING a plan-only harvest. The caller dispatches on
+    # ``units`` -> ``_units_empty`` -> ignore, so a dict carrying only
+    # plan rows and no sentinel would fall through both branches and be
+    # silently discarded — the same loss by a different route.
+    if explored or hop_plan_summaries:
+        _sentinel: dict[str, Any] = {
+            "_units_empty": True,
+            "_explored_links": explored,
+        }
+        _attach_hop_plans(_sentinel, hop_plan_summaries)
+        return _sentinel
     return None
 
 
@@ -5565,6 +5674,32 @@ async def scrape_jugnu(
                 result["_explored_links"] = hop_result.get("_explored_links") or {}
                 # Update adapter_name so downstream events see the real winner.
                 adapter_name = result.get("_adapter_used", adapter_name)
+
+            # Carry the hop's floor plans across — ONE choke point covering
+            # every branch above.
+            #
+            # The three key-whitelists in the success branch each copy "units"
+            # and never "plan_summaries", and the ``_units_empty`` branch takes
+            # only ``_explored_links``. So before this, ``floor_plans[]`` in the
+            # emitted v2 record was structurally unreachable for ANY
+            # link-hop-recovered property: schema_v2 builds it solely from
+            # ``result["plan_summaries"]``, which kept the entry page's value.
+            #
+            # Deliberately NOT added to those whitelists: they assign
+            # ``result[k] = hop_result[k]``, which would DISCARD the entry
+            # page's own plan rows whenever the hop carried any. Plans from the
+            # two pages are both real, so this unions them. Doing it here also
+            # keeps it a single implementation rather than a fourth copy of the
+            # same rule.
+            if hop_result:
+                _attach_hop_plans(
+                    result,
+                    [
+                        p
+                        for p in (hop_result.get("plan_summaries") or [])
+                        if isinstance(p, dict)
+                    ],
+                )
 
     # Phase 3 — post-extraction CSV snap. Runs *after* extraction (H4) so
     # any record that hits the canonical floor-plan list inherits the
