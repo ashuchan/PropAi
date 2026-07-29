@@ -801,10 +801,62 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
 #   richelsonmanagement.appfolio.com (8 cards), becovic (300), pillarrei (23),
 #   blackrealtymanagement (82), plentyofplaces (44).
 # All five tenants emit identical class names; absent classes survive as None.
+# 2026-07-28 OFF-BY-ONE FIX. Segmentation now anchors on the CARD CONTAINER.
+#
+# ``data-listing-id`` is NOT on the card — AppFolio puts it on a map-link
+# anchor in the MIDDLE of the card, and the fields straddle it:
+#
+#     <div class="listing-item result js-listing-item" id="listing_728">
+#         js-listing-blurb-rent          <- before
+#         js-listing-address             <- before
+#         <a ... data-listing-id="728">  <- the old split point
+#         js-listing-square-feet         <- AFTER
+#     </div>
+#
+# So a block cut from anchor 728 to anchor 441 carried 728's SQFT together
+# with 441's ADDRESS and RENT. Because ``unit_number`` is derived from the
+# address, every emitted row was identified as card N+1 while reporting card
+# N's square footage — each unit inheriting the PREVIOUS listing's area.
+#
+# Measured on illumepm.appfolio.com/listings (78 cards, fetched 2026-07-28):
+# 22 of 76 rows carried a provably different unit's sqft, e.g.
+#   242 Hemlock St., Seaside  site=1,994  emitted=525    (previous card's)
+#   849 1st Ave - Unit A      site=1,584  emitted=1,994  (Hemlock's)
+#   2130 NW Fillmore Ave      site=208    emitted=1,584
+# The remainder only matched because neighbouring cards often share a value,
+# so 22/76 is the DETECTABLE floor, not the true rate. Rent and address were
+# always mutually consistent (both sit before the anchor), which is why this
+# read as a sqft-coverage gap rather than a segmentation bug.
+#
+# The ``area = -1`` rows were the visible tail of the same defect: a card
+# lacking a sqft span left the FOLLOWING unit with no area at all.
+_LISTING_CARD_RE = re.compile(
+    r'<div[^>]*\bjs-listing-item\b[^>]*\bid="listing_(?P<id>[0-9]+)"[^>]*>'
+    r'(?P<body>.*?)'
+    r'(?=<div[^>]*\bjs-listing-item\b[^>]*\bid="listing_[0-9]+"|<footer|</main|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+# Retained as a fallback ONLY. Any tenant that does not emit the
+# js-listing-item container still parses exactly as it did before, rather
+# than silently returning zero cards. It carries the off-by-one, so it must
+# never be preferred when the container form is present.
 _LISTING_BLOCK_RE = re.compile(
     r'<[^>]*data-listing-id="(?P<id>[0-9]+)"[^>]*>(?P<body>.*?)(?=<[^>]*data-listing-id="[0-9]+"|<footer|</main|$)',
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def _iter_listing_cards(html: str) -> list[re.Match[str]]:
+    """Yield one match per AppFolio listing card, container-anchored.
+
+    Falls back to the legacy ``data-listing-id`` split when the page has no
+    ``js-listing-item`` containers, so tenants on an older/other template are
+    unaffected. Both forms expose the same ``id`` / ``body`` groups.
+    """
+    cards = list(_LISTING_CARD_RE.finditer(html))
+    if cards:
+        return cards
+    return list(_LISTING_BLOCK_RE.finditer(html))
 _RENT_RE = re.compile(r'js-listing-blurb-rent[^>]*>([^<]+)<', re.IGNORECASE)
 _BED_BATH_RE = re.compile(r'js-listing-blurb-bed-bath[^>]*>([^<]+)<', re.IGNORECASE)
 _SQFT_RE = re.compile(r'js-listing-square-feet[^>]*>([^<]+)<', re.IGNORECASE)
@@ -957,7 +1009,7 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
     """
     units: list[dict[str, str]] = []
     addr_units: list[dict[str, Any]] = []
-    for m in _LISTING_BLOCK_RE.finditer(html):
+    for m in _iter_listing_cards(html):
         body = m.group("body")
         listing_id = m.group("id")
         rent_m = _RENT_RE.search(body)

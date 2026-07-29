@@ -470,3 +470,92 @@ async def test_bug7_adapter_routes_detail_url_to_detail_parser() -> None:
     assert len(result.units) == 1
     assert result.tier_used == "TIER_1_DOM_APPFOLIO_DETAIL"
     assert result.confidence == 0.85
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-28 — SSR card segmentation off-by-one.
+#
+# ``data-listing-id`` is not on the card. AppFolio puts it on a map-link anchor
+# in the MIDDLE of the card, and the fields straddle it:
+#     <div class="listing-item result js-listing-item" id="listing_728">
+#         rent, address ...  <a data-listing-id="728">  ... square-feet
+#     </div>
+# Splitting on the anchor therefore paired card N's SQFT with card N+1's
+# ADDRESS and RENT. Since unit_number derives from the address, every unit
+# reported the PREVIOUS listing's square footage.
+#
+# Live evidence, illumepm.appfolio.com/listings (78 cards, 2026-07-28):
+#   242 Hemlock St., Seaside   site 1,994 -> emitted 525
+#   849 1st Ave - Unit A       site 1,584 -> emitted 1,994  (Hemlock's)
+#   2130 NW Fillmore Ave       site   208 -> emitted 1,584
+# ---------------------------------------------------------------------------
+
+_OFF_BY_ONE_HTML = """
+<main>
+  <div class="listing-item result js-listing-item" id="listing_101">
+    <span class="js-listing-blurb-rent">$3,600</span>
+    <span class="js-listing-address">242 Hemlock St., Seaside, OR 97138</span>
+    <a href="#" class="js-listing-map-view-link" data-listing-id="101"></a>
+    <span class="js-listing-square-feet">Square Feet: 1,994</span>
+  </div>
+  <div class="listing-item result js-listing-item" id="listing_102">
+    <span class="js-listing-blurb-rent">$2,600</span>
+    <span class="js-listing-address">849 1st Ave - Unit A, Seaside, OR 97138</span>
+    <a href="#" class="js-listing-map-view-link" data-listing-id="102"></a>
+    <span class="js-listing-square-feet">Square Feet: 1,584</span>
+  </div>
+  <div class="listing-item result js-listing-item" id="listing_103">
+    <span class="js-listing-blurb-rent">$2,800</span>
+    <span class="js-listing-address">2130 NW Fillmore Ave., 8A, Corvallis, OR 97330</span>
+    <a href="#" class="js-listing-map-view-link" data-listing-id="103"></a>
+    <span class="js-listing-square-feet">Square Feet: 208</span>
+  </div>
+</main>
+"""
+
+
+def _by_address(units: list[dict[str, str]]) -> dict[str, str]:
+    return {
+        str(u.get("floor_plan_name") or ""): str(u.get("sqft") or "")
+        for u in units
+    }
+
+
+def test_each_card_keeps_its_own_square_footage() -> None:
+    """The whole point: sqft must belong to the unit it is emitted with."""
+    units = parse_appfolio_listings_ssr(_OFF_BY_ONE_HTML, "https://x.appfolio.com/listings")
+    got = _by_address(units)
+    assert len(units) == 3, f"expected 3 cards, got {len(units)}"
+    for addr, want in (
+        ("242 Hemlock St., Seaside, OR 97138", "1994"),
+        ("849 1st Ave - Unit A, Seaside, OR 97138", "1584"),
+        ("2130 NW Fillmore Ave., 8A, Corvallis, OR 97330", "208"),
+    ):
+        hit = [v for k, v in got.items() if k.startswith(addr[:22])]
+        assert hit, f"no row emitted for {addr!r} (got {list(got)})"
+        assert want in hit[0].replace(",", ""), (
+            f"{addr!r} reported sqft {hit[0]!r}, wanted {want} — "
+            "this is the off-by-one: it is the neighbouring card's area"
+        )
+
+
+def test_a_card_without_sqft_does_not_strip_the_next_card() -> None:
+    """The area=-1 rows were the tail of the same bug: a card lacking a sqft
+    span left the FOLLOWING unit with no area at all."""
+    html = _OFF_BY_ONE_HTML.replace(
+        '<span class="js-listing-square-feet">Square Feet: 1,994</span>', ""
+    )
+    units = parse_appfolio_listings_ssr(html, "https://x.appfolio.com/listings")
+    got = _by_address(units)
+    nxt = [v for k, v in got.items() if k.startswith("849 1st Ave")]
+    assert nxt and "1584" in nxt[0].replace(",", ""), (
+        f"the card after a sqft-less one lost its own area: {got}"
+    )
+
+
+def test_legacy_anchor_split_still_parses_a_page_without_containers() -> None:
+    """Tenants on a template with no js-listing-item container must keep
+    working via the retained fallback rather than yielding zero cards."""
+    legacy = _OFF_BY_ONE_HTML.replace("js-listing-item", "legacy-card")
+    units = parse_appfolio_listings_ssr(legacy, "https://x.appfolio.com/listings")
+    assert units, "fallback produced no cards at all"
