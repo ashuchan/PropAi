@@ -83,3 +83,40 @@ def test_update_profile_after_extraction_accepts_jugnu_result_shape(tmp_path: Pa
     assert updated.confidence.maturity == ProfileMaturity.WARM
     # Winning URL recorded for next run.
     assert updated.navigation.winning_page_url == scrape_result["_winning_page_url"]
+
+
+# ── 2026-07-28: the property ZIP the contamination guard needs ────────────
+#
+# The profile updater can only tell "this property's units" from "the whole
+# management account's roster" if the run tells it which property this is.
+# The unit-count column the CONTAMINATED volume flag needs does not exist in
+# config/properties.csv (apartmentid,name,address,city,state,zip,website), so
+# the ZIP is the signal actually available.
+
+
+def test_csv_property_zip_reads_the_production_column() -> None:
+    from ma_poc.scripts.runners.jugnu import csv_property_zip
+
+    # The real production header set — lower-case "zip".
+    row = {
+        "apartmentid": "260505",
+        "name": "Onyx Uptown PHX",
+        "address": "4444 N 7th Ave",
+        "city": "Phoenix",
+        "state": "AZ",
+        "zip": "85013",
+        "website": "https://broadstoneuptownphx.com/",
+    }
+    assert csv_property_zip(row) == "85013"
+
+
+def test_csv_property_zip_handles_aliases_and_absence() -> None:
+    from ma_poc.scripts.runners.jugnu import csv_property_zip
+
+    assert csv_property_zip({"ZIP Code": " 98503 "}) == "98503"
+    assert csv_property_zip({"zip_code": "97222"}) == "97222"
+    # Absent / blank / the CSV loader's null sentinels → no guess.
+    assert csv_property_zip({}) == ""
+    assert csv_property_zip(None) == ""
+    assert csv_property_zip({"zip": ""}) == ""
+    assert csv_property_zip({"zip": "null"}) == ""

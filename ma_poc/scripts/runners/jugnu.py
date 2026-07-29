@@ -91,6 +91,35 @@ _PROFILE_GCS_PREFIX = os.getenv("PROFILE_GCS_PREFIX", "").strip()
 _PROFILE_PULL_WATERMARK: float | None = None
 
 
+# CSV column aliases carrying the property's postal code. Mirrors the set
+# ``AdapterContext.zip_code`` already reads in pms/scraper.py, plus the
+# spelled-out variants seen in older catalogue exports.
+_PROPERTY_ZIP_CSV_KEYS: tuple[str, ...] = (
+    "zip",
+    "Zip",
+    "zip_code",
+    "ZIP Code",
+    "postal_code",
+)
+
+
+def csv_property_zip(csv_row: dict[str, Any] | None) -> str:
+    """Return the property's ZIP from its CSV row, or ``""``.
+
+    Surfaced onto the scrape result as ``_property_zip`` so the profile
+    updater can tell this property's units from a management-account roster
+    dump before it persists (or keeps replaying) the URL that produced them.
+    """
+    if not csv_row:
+        return ""
+    for key in _PROPERTY_ZIP_CSV_KEYS:
+        value = csv_row.get(key)
+        if value in (None, "", "null", "None"):
+            continue
+        return str(value).strip()
+    return ""
+
+
 def _pull_profiles_from_gcs(profiles_dir: Path) -> None:
     """Warm-start: pull persisted profile JSONs from GCS before processing."""
     global _PROFILE_PULL_WATERMARK
@@ -1709,6 +1738,18 @@ async def _process_property(
                     break
                 except (ValueError, TypeError):
                     continue
+
+    # 2026-07-28: surface the CSV ZIP so the profile updater can tell a result
+    # that belongs to THIS property from a management-account roster dump, and
+    # refuse to persist (or keep replaying) the URL that produced the latter.
+    # The unit-count column above does not exist in config/properties.csv, so
+    # the CONTAMINATED volume check never fires in production — the ZIP is the
+    # signal that is actually present. AdapterContext already reads the same
+    # column set for the in-adapter address filter.
+    if csv_row and "_property_zip" not in result:
+        _pz = csv_property_zip(csv_row)
+        if _pz:
+            result["_property_zip"] = _pz
 
     # ── Profile self-learning loop ────────────────────────────────────
     # After every scrape, update what the profile knows: winning URL,
