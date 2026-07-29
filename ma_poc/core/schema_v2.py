@@ -762,6 +762,8 @@ def _format_v2_unit(
         formatted_area=area_out,
         supplied_value=sqft,
         property_publishes_area=property_has_area,
+    )
+
     # Zero-inventory availability contract (2026-07-29). Resolved ONCE here so
     # the shipped ``availability_status`` and the ``available_date`` fallback
     # below cannot disagree: a plan row we have just declared UNAVAILABLE must

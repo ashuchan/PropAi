@@ -3250,6 +3250,8 @@ def _format_v2_unit(
         formatted_area=area_out,
         supplied_value=sqft,
         property_publishes_area=property_has_area,
+    )
+
     # Zero-inventory availability contract (2026-07-29) — resolved ONCE, before
     # the dict literal, so ``availability_status`` and the ``available_date``
     # scrape-date fallback below read the same truth. Lock-step with
