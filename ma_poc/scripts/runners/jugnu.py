@@ -960,6 +960,37 @@ async def run_jugnu(
     # totals reflect everything in the run dir, not just this invocation.
     properties_path = run_dir / "properties.json"
     merged_properties = _merge_with_existing_properties(properties_path, properties)
+
+    # Property-identity annotation (task #73). ANNOTATE ONLY: this stamps
+    # ``_meta["roster_identity"]`` and the ``roster_scope`` tag and changes nothing else —
+    # no row is dropped or quarantined and no verdict is demoted. The signals (a roster
+    # shared with another property; unit identifiers spread over more than three city+zip
+    # pairs) are heuristics, and ma_poc/core/roster_identity.py records the measurement
+    # that says they are not precise enough to act on: 82.5% of the flags contain the
+    # property's own city, and 3 of the 6 flags settled by live probe were false or
+    # ambiguous. Demoting on that would manufacture an absence out of an inference.
+    #
+    # It must run HERE — after the merge, because every collision group measured spans
+    # shards (cross-shard 56 properties flagged, per-shard 2), and before the write, so
+    # the evidence lands in properties.json. Non-fatal by construction: an annotation
+    # failing must never cost the run its output.
+    try:
+        from ma_poc.core.roster_identity import apply_roster_identity
+
+        merged_properties, _roster_report = apply_roster_identity(
+            merged_properties, demote=False
+        )
+        if _roster_report.annotated_properties:
+            log.info(
+                "roster-identity: annotated %d of %d properties (%d unit rows) — "
+                "no rows dropped, no verdicts changed",
+                _roster_report.annotated_properties,
+                len(merged_properties),
+                _roster_report.annotated_rows,
+            )
+    except Exception as _ri_exc:  # never break the run on an annotation
+        log.warning("roster-identity annotation failed (non-fatal): %s", _ri_exc)
+
     _write_properties_incremental(properties_path, merged_properties)
 
     # Durable maintenance: re-probe cached hot URLs and invalidate any that have
