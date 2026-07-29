@@ -42,7 +42,6 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
     _walk_jsonld,
 )
 from ma_poc.pms.adapters._parsing import (
-    AREA_MIN_SQFT,
     SQFT_RE,
     clean_unit_number,
     parse_area,
@@ -2665,13 +2664,6 @@ def _extract_securecafe_applicant_units(soup: BeautifulSoup, source_url: str) ->
     return units
 
 
-# Minimum realistic apartment sqft. Matches _format_area's [150, 10000] clamp.
-# Values below this are amenity descriptions, not unit sizes. The bounds and
-# the balcony/storage context guard now live in ``_parsing.parse_area``; this
-# alias is kept for the compact-row extractors that clamp their own values.
-_SQFT_MIN = AREA_MIN_SQFT
-
-
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
     """Return a unit dict when ``text`` has floor-plan structural signals.
 
@@ -2690,9 +2682,12 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
 
     # Value extraction — run the specific patterns to pull out numeric values.
     # sqft: one unit-aware parser handles number-first ("750 sq ft"),
-    # label-first ("SqFt 833") and dual-unit ("2,000 sq ft 186 m2") forms,
-    # applies the [150, 10000] bounds and the amenity-context guard.
-    area_val = parse_area(text)
+    # label-first ("SqFt 833") and dual-unit ("2,000 sq ft 186 m2") forms and
+    # applies the [150, 10000] bounds.  ``amenity_guard`` stays ON here — this
+    # is whole-CARD text, the only shape where a competing balcony/storage
+    # measurement realistically appears, and the guard has run on this path
+    # since 2026-05-22.
+    area_val = parse_area(text, amenity_guard=True)
 
     m_beds = _BEDS_PATTERN.search(text)
     m_baths = _BATHS_PATTERN.search(text)
@@ -2994,10 +2989,19 @@ def _extract_rentcafe_option_row(
             pass
 
     # sqft: the RentCafe row shape puts the number AFTER the keyword
-    # ("Sq.ft. 1,025") and also carries a rent ("$1,115"). parse_area handles
-    # both — the money lookbehind keeps "$1,115" out, and the label-first pass
-    # picks up "Sq.ft. 1,025" only when no area unit follows that number.
-    area = parse_area(text)
+    # ("Sq.ft. 1,025") and also carries a rent ("$1,115").  parse_area's money
+    # lookbehind keeps "$1,115" out, and its POSITIONAL selection keeps the
+    # labelled unit area ahead of any later number-first amenity area — which
+    # is what the old ``_RENTCAFE_SQFT_NUM_RE``-first ordering was for.
+    #
+    # ``amenity_guard=False``: this row is not card text and never had the
+    # guard.  With it on, "ROBIN WITH PATIO 2 BEDROOM | 1 BATHROOM SQFT 952"
+    # loses its area to a feature word in the plan NAME.  `.option-row` itself
+    # appears on only 2 of the 4,097 pages captured by
+    # run-2026-07-27-full-0d54ca7 and neither carries an area, so that is a
+    # shape measurement, not a row measurement: scanning every row-sized text
+    # node in the corpus, the guard fires on 20 of them and is wrong on all 20.
+    area = parse_area(text, amenity_guard=False)
     if area is not None:
         unit["sqft"] = str(area)
 
@@ -3129,7 +3133,10 @@ def _extract_appfolio_listing_item(
     unit["market_rent_low"] = rent
     unit["market_rent_high"] = rent
     unit["rent_range"] = str(rent)
-    listing_area = parse_area(text)
+    # ``amenity_guard=False``: an AppFolio listing card is a marketing blurb,
+    # not a unit card, and this path never had the guard.  A blurb that names
+    # a patio before stating the apartment's size would otherwise lose it.
+    listing_area = parse_area(text, amenity_guard=False)
     if listing_area is not None:
         unit["sqft"] = str(listing_area)
     bed_bath = _APPFOLIO_BED_BATH_RE.search(text)
@@ -3416,7 +3423,11 @@ def extract_with_hints(
                 unit["market_rent_low"] = lo
                 unit["market_rent_high"] = hi
         if (v := _select_one_text(node, sel_sqft)):
-            sel_area = parse_area(v)
+            # ``amenity_guard=False``: ``v`` is the text of the one element the
+            # profile nominates as THE area field, so there is no competing
+            # measurement for the guard to protect against — only feature words
+            # ("Patio home", "with balcony") for it to trip over.
+            sel_area = parse_area(v, amenity_guard=False)
             if sel_area is not None:
                 unit["sqft"] = str(sel_area)
         if (v := _select_one_text(node, sel_beds)):

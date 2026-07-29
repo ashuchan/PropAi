@@ -287,14 +287,27 @@ def parse_marketing_plan_text(html: str, url: str = "") -> list[dict[str, Any]]:
         end = min(end, i + 6)  # cap so a distant rent isn't mis-attributed
         sqft: int | None = None
         rent: int | None = None
-        # form-2 anchor carries sqft on its own line
+        # form-2 anchor carries sqft on its own line.
+        #
+        # ``amenity_guard=False`` on both calls: these are marketing PROSE and
+        # plan-NAME lines, where "2 Bedroom with Patio 904 sq ft" and "the huge
+        # storage closet and oversized patio in this 944 sq. ft. apartment"
+        # state the apartment's own area.  With the guard on, both lose it —
+        # and because this loop requires an sqft to emit at all, the whole plan
+        # row disappears (2 rows dropped over the 4,097 pages captured by
+        # run-2026-07-27-full-0d54ca7; 11 suppressions, 0 true positives).
+        #
+        # NB the pre-loop call below is redundant with the loop's first
+        # iteration (``lines[i:end]`` always starts at ``lines[i] == name``,
+        # and both apply the same fee filter).  It predates this change and is
+        # left alone; it is why neutering it alone cannot fail a test.
         if not _FEE_RE.search(name):
-            sqft = parse_area(name)
+            sqft = parse_area(name, amenity_guard=False)
         for w in lines[i:end]:
             if _FEE_RE.search(w):
                 continue
             if sqft is None:
-                sqft = parse_area(w)
+                sqft = parse_area(w, amenity_guard=False)
             if rent is None:
                 rm = _RENT_RE.search(w) or _RANGE_RE.search(w) or _BARE_RENT_RE.search(w)
                 if rm:
