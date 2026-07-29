@@ -2499,6 +2499,12 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         except Exception:  # defensive — never block the property emit
             pass
 
+    # Property-level facts the per-row formatter needs. Computed ONCE — both
+    # scan every unit, so evaluating them inside the row comprehension would
+    # be quadratic on the 300-row properties this run already contains.
+    _prop_plan_level = _property_is_plan_level(result)
+    _prop_has_area = _property_publishes_area(units)
+
     prop: dict[str, Any] = {
         "apartment_id": apartment_id,
         "proj_name": _pick(
@@ -2529,7 +2535,11 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
                     u,
                     scrape_ts,
                     _v2_property_id_for_unit(meta, apartment_id),
-                    property_plan_level=_property_is_plan_level(result),
+                    property_plan_level=_prop_plan_level,
+                    # Whether THIS property published a real square footage to
+                    # us anywhere in this scrape — the sibling evidence that
+                    # makes a missing area our failure, not operator silence.
+                    property_has_area=_prop_has_area,
                 )
                 for u in units
             ]
@@ -2566,6 +2576,31 @@ def _property_is_plan_level(result: dict[str, Any]) -> bool:
         from ma_poc.core.schema_v2 import property_is_plan_level
 
         return property_is_plan_level(result)
+    except Exception:  # pragma: no cover — defensive, never block an emit
+        return False
+
+
+def _property_publishes_area(units: list[dict[str, Any]]) -> bool:
+    """Whether ANY row of this property carried a real square footage.
+
+    Thin, never-raising delegate to the canonical predicate in
+    ``core.schema_v2`` so the runner fork cannot drift from it. Feeds the
+    ``NOT_CAPTURED`` branch of the area-absence taxonomy: a property that
+    published an area to us on one row is proof that a missing area on
+    another row is OUR gap, not the operator's silence.
+
+    Args:
+        units: Internal (pre-format) unit dicts for one property.
+
+    Returns:
+        True when at least one row has an in-bounds square footage. False on
+        any error — the conservative direction, since False can only route a
+        row to ``UNKNOWN`` instead of asserting anything.
+    """
+    try:
+        from ma_poc.core.schema_v2 import property_publishes_area
+
+        return property_publishes_area(units)
     except Exception:  # pragma: no cover — defensive, never block an emit
         return False
 
@@ -2910,6 +2945,7 @@ def _format_v2_unit(
     property_id: str = "",
     *,
     property_plan_level: bool = False,
+    property_has_area: bool = False,
 ) -> dict[str, Any]:
     """Format a single unit to v2 schema.
 
@@ -2933,6 +2969,7 @@ def _format_v2_unit(
     from ma_poc.core.schema_v2 import (
         _is_floor_plan_level,
         _resolve_available_date,
+        classify_area_absence,
     )
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
@@ -3142,12 +3179,26 @@ def _format_v2_unit(
     except (TypeError, ValueError):
         concession_value = None
 
+    # Area + the reason it is absent. The numeric ``-1`` contract is
+    # UNCHANGED; ``area_absence`` is an additive label naming which of the four
+    # situations the -1 stands for. Delegated to the single choke point in
+    # core/schema_v2 so this production fork cannot drift from it.
+    area_out = _format_area(sqft)
+    area_absence, area_absence_evidence = classify_area_absence(
+        unit,
+        formatted_area=area_out,
+        supplied_value=sqft,
+        property_publishes_area=property_has_area,
+    )
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name or None,
         "floor_plan_id": floor_plan_id,
-        "area": _format_area(sqft),
+        "area": area_out,
+        "area_absence": area_absence,
+        "area_absence_evidence": area_absence_evidence,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         # As-displayed operator label. Kept in lock-step with
         # core/schema_v2.py — this fork is the one production actually runs,
