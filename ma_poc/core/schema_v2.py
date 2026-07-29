@@ -490,6 +490,159 @@ def classify_area_absence(
 
     # (d) We could not tell. Say so.
     return (AREA_ABSENCE_UNKNOWN, "no_evidence")
+def resolve_plan_row_availability(
+    status: str | None,
+    *,
+    plan_level: bool,
+    has_rent: bool,
+    has_anchor: bool,
+) -> str | None:
+    """Availability contract for plan-LEVEL rows. Non-plan rows pass through.
+
+    Product-owner decision 2026-07-29: zero-inventory plan rows ARE still
+    emitted — the client wants to know the plan exists — but they must be
+    marked *cleanly* UNAVAILABLE rather than shipping ``null`` / ``UNKNOWN``
+    / a stale ``AVAILABLE``.
+
+    ZERO-INVENTORY is defined RENT-BEARING-ly, not flag-bearingly::
+
+        plan-level row  AND  no published rent  AND  no unit anchor
+
+    All three conjuncts matter. **A plan row with a rent is not
+    zero-inventory** and is never coerced: on the 2026-07-27 run 3,113 plan
+    rows carry a real published price (a Squarespace plan row at
+    ``rent_low=2967.0``, Entrata plan cards, …). The property genuinely
+    offers that plan at that price, so forcing them to UNAVAILABLE would
+    destroy real data — that is the single worst outcome this function
+    exists to prevent, and it is why ``has_rent`` short-circuits ahead of
+    every status branch. Likewise a row that anchors ONE REAL APARTMENT
+    (``identity.unit_has_real_anchor``) is describing inventory, not a plan
+    summary, so it keeps whatever the source said.
+
+    For plan rows that are NOT zero-inventory, only ``None`` is rewritten,
+    and it is rewritten to ``UNKNOWN``, never to a substantive value.
+    Rationale: ``None`` means "this pipeline has no opinion", which for a row
+    we are publishing is not an honest answer — the row IS shipped, so the
+    field must say something. ``UNKNOWN`` is the honest thing to say when the
+    source genuinely does not state availability, and unlike AVAILABLE or
+    UNAVAILABLE it asserts nothing about the world. Coercing these
+    (445 rent-bearing + 68 dated rows on the 2026-07-27 run) to either
+    substantive value would be inventing a fact.
+
+    Args:
+        status: Already-normalised status (``_norm_status`` output) or None.
+        plan_level: Result of :func:`_is_floor_plan_level` for this row.
+        has_rent: Whether ``_format_rent`` produced a positive rent for
+            either bound. A published price is the inventory signal.
+        has_anchor: Result of ``identity.unit_has_real_anchor`` for this row.
+
+    Returns:
+        The status to publish. Never ``None`` for a plan-level row.
+    """
+    if not plan_level:
+        return status
+    if not has_rent and not has_anchor:
+        return "UNAVAILABLE"
+    if status is None:
+        return "UNKNOWN"
+    return status
+
+
+def enforce_zero_inventory_contract(units: Any) -> int:
+    """Re-assert the contract on ALREADY-FORMATTED rows, at the write boundary.
+
+    ``resolve_plan_row_availability`` runs inside the two v2 unit formatters,
+    i.e. at the moment a row is first FORMATTED. That is not the moment a row
+    is WRITTEN. ``scripts/runners/jugnu._run_null_field_recovery`` runs after
+    ``_format_output`` and patches ``rent_low`` / ``rent_high`` / ``unit_id``
+    straight into the formatted dicts, which are then stashed as
+    ``result["_v2_formatted"]`` and shipped verbatim into ``properties.json``.
+    A plan row that had no rent at format time and GAINS one from that recovery
+    therefore kept the UNAVAILABLE the contract had just stamped on it — the
+    exact status/reality disagreement the contract exists to remove. Measured
+    on run-2026-07-27-full-0d54ca7 (offline replay, PROXY): 404 rows across 117
+    properties gain a rent after formatting; 3 of them, all on property 251908
+    "The Post House" (verdict SUCCESS_PLAN_LEVEL, F2 recovered
+    ``$.units_data.units[0].rent`` at confidence 0.95), would ship UNAVAILABLE
+    at $1,775 / $1,595 / $1,549.
+
+    This function is deliberately **withdraw-only**: it can turn a manufactured
+    UNAVAILABLE back into what the source actually said, and it can do nothing
+    else. It never coerces a row *into* UNAVAILABLE, never sets a flag, never
+    drops a row, never manufactures a date.
+
+    Why withdraw-only, when "authoritative at the write boundary" sounds like
+    it should mean re-running the whole contract here? Because the third
+    conjunct is no longer knowable post-format. ``has_anchor`` is
+    ``identity.unit_has_real_anchor`` over the PRE-format row, where identity
+    lives in ``unit_number`` / an un-minted ``unit_id``;
+    ``identity.assign_fallback_unit_id`` then overwrites ``unit_id`` with a
+    synthetic and jugnu renames the number to ``unit_name``, so re-deriving
+    ``has_anchor`` here would be a guess — and a wrong guess coerces a REAL
+    plan row to UNAVAILABLE, the single worst outcome
+    ``resolve_plan_row_availability`` exists to prevent. The withdrawal
+    direction needs no anchor evidence at all: ``has_rent`` short-circuits
+    ahead of ``has_anchor``, so ``has_anchor=False`` is both conservative and
+    sufficient. Coercion stays where the evidence is; withdrawal happens where
+    the mutation is.
+
+    Idempotent by construction, so it is safe to call more than once and safe
+    to run over rows merged in from a previous partial run: the source status
+    is re-read from the row's own ``availability_status_raw`` companion (which
+    the jugnu formatter snapshots BEFORE the contract runs), not from the
+    already-contracted ``availability_status``.
+
+    Rows without an ``availability_status_raw`` key — this module's own
+    formatter emits none — fall back to the current status, which makes the
+    whole body a no-op for them. That is correct rather than merely safe: with
+    no record of what the source said, an UNAVAILABLE is indistinguishable
+    from a genuine one, and withdrawing it would destroy real data. Those rows
+    also have no post-format mutator, so there is nothing to withdraw.
+
+    Args:
+        units: The formatted unit rows of one property (``property["units"]``).
+            Non-iterable / falsy input is tolerated and yields 0.
+
+    Returns:
+        Number of rows whose ``availability_status`` was rewritten.
+    """
+    changed = 0
+    try:
+        rows = list(units or ())
+    except TypeError:  # pragma: no cover — defensive, never block a write
+        return 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        # Shape is not evidence of plan-ness: only rows the formatter actually
+        # FLAGGED are in scope, so the plan-SHAPED-but-unmarked rows (867 on
+        # the 2026-07-27 run under this replay's reconstruction: area == -1 and
+        # no unit_name, yet no plan marker) stay untouched here exactly as they
+        # do at format time.
+        if not row.get("is_floor_plan_level"):
+            continue
+        # Withdraw-only gate #1: nothing to withdraw unless the row currently
+        # carries the coercion.
+        current = row.get("availability_status")
+        if current != "UNAVAILABLE":
+            continue
+        # Withdraw-only gate #2: a published price is the only new evidence a
+        # post-format mutation can add that bears on zero-inventory. Without
+        # one the coercion still stands.
+        if row.get("rent_low") is None and row.get("rent_high") is None:
+            continue
+        source = (
+            _norm_status(row["availability_status_raw"])
+            if "availability_status_raw" in row
+            else current
+        )
+        resolved = resolve_plan_row_availability(
+            source, plan_level=True, has_rent=True, has_anchor=False
+        )
+        if resolved != current:
+            row["availability_status"] = resolved
+            changed += 1
+    return changed
 
 
 def _format_v2_unit(
@@ -609,6 +762,25 @@ def _format_v2_unit(
         formatted_area=area_out,
         supplied_value=sqft,
         property_publishes_area=property_has_area,
+    # Zero-inventory availability contract (2026-07-29). Resolved ONCE here so
+    # the shipped ``availability_status`` and the ``available_date`` fallback
+    # below cannot disagree: a plan row we have just declared UNAVAILABLE must
+    # not simultaneously get a scrape-date "available today" stamp out of
+    # ``_resolve_available_date``'s AVAILABLE branch. Kept in lock-step with
+    # the production fork in scripts/runners/jugnu.py.
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    _plan_level = _is_floor_plan_level(unit, property_plan_level=property_plan_level)
+    _rent_lo_fmt = _format_rent(rent_lo)
+    _rent_hi_fmt = _format_rent(rent_hi)
+    _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
+    _availability_status = resolve_plan_row_availability(
+        _norm_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
+        plan_level=_plan_level,
+        has_rent=_has_rent,
+        has_anchor=unit_has_real_anchor(unit),
     )
 
     return {
@@ -632,9 +804,7 @@ def _format_v2_unit(
         # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.
-        "is_floor_plan_level": _is_floor_plan_level(
-            unit, property_plan_level=property_plan_level
-        ),
+        "is_floor_plan_level": _plan_level,
         # Per-unit provenance — which extraction tier produced THIS unit, so a
         # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
         # plan-level placeholder). Captured on the internal unit dict but was
@@ -642,8 +812,8 @@ def _format_v2_unit(
         "extraction_tier": (
             unit.get("extraction_tier") or unit.get("_extraction_tier") or None
         ),
-        "rent_low": _format_rent(rent_lo),
-        "rent_high": _format_rent(rent_hi),
+        "rent_low": _rent_lo_fmt,
+        "rent_high": _rent_hi_fmt,
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         # Bug 2026-05-13: most adapters emit the long-form key
         # ``availability_date`` (via ``make_unit_dict`` in
@@ -693,18 +863,13 @@ def _format_v2_unit(
                 unit, "available_date", "availability_date",
                 "internalAvailableDate", "availableDate",
                 "date_available", "dateAvailable")),
-            _norm_status(
-                unit.get("availability_status")
-                or unit.get("_availability_status")
-            ),
+            # 2026-07-29: the RESOLVED status, not a second independent
+            # _norm_status() call. A zero-inventory plan row now reads
+            # UNAVAILABLE here, so the AVAILABLE branch below cannot stamp
+            # today's scrape date onto a plan with no inventory and no price.
+            _availability_status,
             scrape_ts,
-            has_rent=(
-                (
-                    _format_rent(rent_lo) is not None
-                    or _format_rent(rent_hi) is not None
-                )
-                and uid not in (None, "", "null")
-            ),
+            has_rent=(_has_rent and uid not in (None, "", "null")),
         ),
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
@@ -720,9 +885,7 @@ def _format_v2_unit(
         # transform never mapped it -> 99.7% missing in output. Capture
         # it (same class as available_date). Raw-preserving: light
         # upper-normalize known tokens, else passthrough; None when unset.
-        "availability_status": _norm_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        "availability_status": _availability_status,
         # 2026-05-18: deposit is emitted by securecafe/onesite/others and
         # was dropped. Raw passthrough (clean later) — value has worth.
         "deposit": _raw_str(unit.get("deposit") or unit.get("_deposit")),
@@ -809,6 +972,32 @@ def _format_v2_floor_plan(
     out["unit_id"] = None
     out["unit_name"] = None
     out["is_floor_plan_level"] = True
+    # This wrapper FORCES the plan flag after the fact, so re-apply the
+    # zero-inventory contract against the forced value — otherwise a plan card
+    # the row-level predicate did not recognise would ship flagged plan-level
+    # yet keep a null / stale status. Identity has just been stripped above, so
+    # ``has_anchor`` is False by construction here.
+    out["availability_status"] = resolve_plan_row_availability(
+        out.get("availability_status"),
+        plan_level=True,
+        has_rent=(out.get("rent_low") is not None or out.get("rent_high") is not None),
+        has_anchor=False,
+    )
+    # …and drop the date the row cannot have earned. ``_format_v2_unit`` ran
+    # BEFORE the flag was forced, so ``_resolve_available_date`` was free to
+    # stamp the scrape date out of its AVAILABLE branch; this wrapper then
+    # rewrote the status to UNAVAILABLE underneath it. Reproduced pre-fix on a
+    # bare ``{"floor_plan_name": "A1", "availability_status": "AVAILABLE"}``:
+    # ``availability_status='UNAVAILABLE', available_date='2026-07-27',
+    # _available_date_raw=None`` — precisely the status/date disagreement the
+    # contract targets. A date with no ``_available_date_raw`` companion was
+    # manufactured by definition (``_resolve_available_date`` only invents one
+    # when the parsed source date is falsy), so dropping it loses nothing the
+    # source published.
+    if out.get("availability_status") == "UNAVAILABLE" and not out.get(
+        "_available_date_raw"
+    ):
+        out["available_date"] = None
     flags = [
         part.strip()
         for part in str(out.get("data_quality_flag") or "").split("|")
