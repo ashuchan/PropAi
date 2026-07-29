@@ -287,7 +287,12 @@ async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> N
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.yourmetropolitan.com/"))  # type: ignore[arg-type]
     assert len(units) == 2
-    assert units[0]["floor_plan_name"] == "10 Creek Rd"
+    # 2026-07-28: the SSR address lands in unit_name; floor_plan_name is
+    # empty because AppFolio SSR cards publish no plan name. Asserting on
+    # unit_name still proves the fetch canonicalized to the listings index
+    # (the actual subject of this test) rather than the showings form.
+    assert units[0]["unit_name"] == "10 Creek Rd"
+    assert units[0]["floor_plan_name"] == ""
 
 
 # ─────────────────────────────────────────────────────────────────────

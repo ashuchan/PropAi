@@ -240,11 +240,17 @@ def parse_appfolio_websites_listing(
     appfolio_id = str(appfolio_id_raw) if appfolio_id_raw is not None else ""
     unit_number = addr2 or listable_uid[:12] or appfolio_id
 
-    floor_plan_name = (
-        (data.get("unit_template_name") or "").strip()
-        or (data.get("full_address") or "").strip()
-        or (data.get("marketing_title") or "").strip()
-    )
+    # 2026-07-28: ``unit_template_name`` is AppFolio's REAL plan label and is
+    # the only one of these three fields that is one. ``full_address`` is a
+    # street address and ``marketing_title`` is free-text marketing copy —
+    # chaining them as fallbacks put addresses into the plan-name column
+    # (the same defect the SSR/VANITY card parser had, which accounted for
+    # 11,877 rows in run-2026-07-27-full-0d54ca7). Keep the plan name when
+    # the operator publishes one; otherwise leave it EMPTY and route the
+    # address to its own field rather than manufacturing a plan name.
+    floor_plan_name = (data.get("unit_template_name") or "").strip()
+    full_address = (data.get("full_address") or "").strip()
+    unit_name = full_address or (data.get("marketing_title") or "").strip()
 
     avail = data.get("available")
     avail_status = "AVAILABLE" if avail else "UNAVAILABLE"
@@ -278,6 +284,7 @@ def parse_appfolio_websites_listing(
 
     unit = make_unit_dict(
         floor_plan_name=floor_plan_name,
+        unit_name=unit_name,
         bed_label=bed_label_from(beds, floor_plan_name),
         bedrooms=str(beds) if beds is not None else "",
         bathrooms=str(baths) if baths is not None else "",
