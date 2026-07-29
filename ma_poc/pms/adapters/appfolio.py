@@ -104,6 +104,15 @@ def _is_non_housing_listing(*text_fields: str) -> bool:
 
     Used to skip AppFolio listings for parking spaces, storage units, etc.
     that share the /listings endpoint with actual apartment listings.
+
+    Pass only NAMING fields — the address, the API item's ``name`` /
+    ``listing_type``. Never pass a card body, a description or an amenity
+    list: those state what an apartment HAS, not what the listing IS, and
+    every one of "ample storage", "attached garage", "off-street parking",
+    "Bike Room", "Covered Carport" is ordinary apartment copy. Measured
+    2026-07-29 across 65 live tenants: scanning the card body dropped 2,352
+    of 8,430 rows and caught nothing the address arm did not (see the call
+    site in ``parse_appfolio_listings_ssr``).
     """
     for t in text_fields:
         if t and _NON_HOUSING_RE.search(t):
@@ -964,10 +973,33 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
         address = addr_m.group(1).strip() if addr_m else ""
 
         # 2026-05-25: skip non-housing listings (parking, storage, etc.).
-        # These pollute the unit count + show up as low-rent zero-sqft
-        # rows. Address is the most reliable text field for the keyword
-        # check; the entire body is a safety net for variants.
-        if _is_non_housing_listing(address, body):
+        # These pollute the unit count + show up as low-rent zero-sqft rows.
+        #
+        # 2026-07-29 — the second argument used to be ``body``, the WHOLE
+        # card, "as a safety net for variants". Measured live the same day
+        # (65 tenants, {slug}.appfolio.com/listings, plain static GET,
+        # curl_cffi impersonate=chrome, all 65 HTTP 200):
+        #
+        #   card containers               8,430
+        #   dropped by the ADDRESS arm        1   <- the only genuine catch
+        #   dropped by the BODY-only arm  2,352   <- 2,094 have a bed/bath
+        #                                            blurb AND rent >= $500
+        #
+        # The body arm was matching a normal apartment's own amenity list
+        # and description: "ample storage", "attached garage", "off-street
+        # parking", "Bike Room". richelsonmanagement lost 10 of 10 rows, all
+        # on the word "storage" in "lots of storage space with multiple
+        # closets". On that sample the body arm contributed 100% of the loss
+        # and 0% of the intended benefit — the one true non-housing listing
+        # on the whole sample (gmholdings, "2001-15 E Glenwood Ave - Storage
+        # Units", $175) is caught by the ADDRESS arm alone.
+        #
+        # The card title (``js-listing-title``) is NOT a safe substitute
+        # either: it is a marketing headline. Scanning it would have dropped
+        # a further 199 rows on the same sample ("The Luray - 2 Bedroom with
+        # Attached Garage", "FREE RENT! WAIVING ALL PET, AND CARPORT FEES!").
+        # The address is the only field that states what the listing IS.
+        if _is_non_housing_listing(address):
             continue
 
         # 2026-05-24 (audit xlsx 2026-05-23): prefer the apartment
