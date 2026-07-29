@@ -8,6 +8,7 @@ property's result dict.
 Output files (under ``data/runs/{date}/``):
     amenities_report.json
     concessions_report.json
+    clamp_report.json      — #69, sanity-clamp evidence
 """
 
 from __future__ import annotations
@@ -207,4 +208,58 @@ def build_concessions_report(
     out_path = run_dir / "concessions_report.json"
     out_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     log.info("concessions_report written to %s", out_path)
+    return report
+
+
+# ── Sanity clamps (#69) ──────────────────────────────────────────────────────
+
+
+def build_clamp_report(
+    run_dir: Path,
+    run_date: str,
+) -> dict[str, Any]:
+    """Build and write ``clamp_report.json`` — the sanity-clamp evidence.
+
+    ``ma_poc/extraction/sanity.py`` nulls implausible beds / baths / area /
+    rent_low / rent_high into a value indistinguishable from genuine
+    operator absence. Before #69 that conversion was silent, so a run's
+    null rents and area sentinels were undecomposable. The clamp ledger
+    makes the destroyed values countable and attributable; this report is
+    where they land on disk.
+
+    Observation-only: derived entirely from the process-wide
+    :func:`ma_poc.extraction.sanity.clamp_ledger`, reads nothing from
+    ``properties.json``, and changes no emitted unit value.
+
+    Args:
+        run_dir: The ``data/runs/{date}/`` directory to write into.
+        run_date: Run date string, echoed into the report.
+
+    Returns:
+        The report dict that was written. Shape:
+        ``{run_date, generated_at, total_clamps, properties_affected,
+        by_field, by_tier, rows[], per_property{}}``. ``rows`` is one
+        entry per ``(field, tier, reason)`` sorted by descending count, so
+        "which tier produces the most clamped rents" is a filter on
+        ``rows`` — not a log grep. ``per_property`` lets a consumer ask
+        whether a specific property's area was clamped rather than
+        genuinely not published (the #56 prerequisite).
+    """
+    from ma_poc.extraction.sanity import clamp_ledger
+
+    report: dict[str, Any] = {
+        "run_date": run_date,
+        "execution": "task_69_sanity_clamp_evidence",
+        "generated_at": datetime.now(UTC).isoformat(),
+        **clamp_ledger().to_dict(),
+    }
+
+    out_path = run_dir / "clamp_report.json"
+    out_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+    log.info(
+        "clamp_report written to %s (%d clamps across %d properties)",
+        out_path,
+        report["total_clamps"],
+        report["properties_affected"],
+    )
     return report

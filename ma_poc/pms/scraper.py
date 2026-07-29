@@ -534,6 +534,7 @@ def promote_verified_unit_rows(
 
     from ma_poc.core.identity import unit_has_real_anchor
     from ma_poc.extraction.post_process import post_process
+    from ma_poc.extraction.sanity import clamp_tier_context
     from ma_poc.validation.schema_gate import _is_positive_numeric
 
     # Match only exact public plan metadata before post-processing moves
@@ -542,7 +543,14 @@ def promote_verified_unit_rows(
 
     # Re-run the pure, idempotent post-process step so legacy adapter output
     # receives the same parser/surrogate checks as current adapters.
-    processed = post_process(adapter_result.units, property_id=property_id)
+    #
+    # #69: this is the one place in the pipeline that knows BOTH the rows
+    # and the tier that produced them, so it is where clamp attribution
+    # gets its label. Without it every clamp the sanity pass fires here
+    # lands under "UNKNOWN" and "which tier produces the most clamped
+    # rents" has no answer. Purely a label — no value changes.
+    with clamp_tier_context(adapter_result.tier_used):
+        processed = post_process(adapter_result.units, property_id=property_id)
     admitted = processed.admitted
     if not admitted:
         return 0

@@ -137,7 +137,11 @@ def post_process(
 
         # Stage 1+2 pipeline: infer → sanity → validity → classify.
         inferred = infer(raw, property_id=property_id)
-        sanitized = sanity_bound(inferred)
+        # #69: pass property_id so every clamp the sanity pass fires is
+        # attributable to a property in the run-level ClampLedger. The
+        # tier is resolved by sanity itself (unit alias / ambient
+        # clamp_tier_context) — post_process does not know it here.
+        sanitized = sanity_bound(inferred, property_id=property_id)
         if not is_valid_unit(sanitized):
             out.rejected.append((sanitized, absence_reasons(sanitized)))
             continue
