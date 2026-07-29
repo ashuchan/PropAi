@@ -386,8 +386,14 @@ def test_address_fallback_does_not_mistake_a_unit_number_for_an_address() -> Non
         assert _listing_address_of(
             {"floor_plan_name": "", "unit_name": bare}, "floor_plan_name"
         ) == "", f"{bare!r} must not be judged as a street address"
-    # ...and the configured field always wins when it is populated (the
-    # DUDA path genuinely maps ``full_address`` -> ``floor_plan_name``).
+    # ...and the configured field always wins when it is populated.
+    # 2026-07-29: the note that used to sit here — "the DUDA path genuinely
+    # maps full_address -> floor_plan_name" — was stale and is why the DUDA
+    # call site kept riding the default. Since 2026-07-28 that path maps
+    # ``unit_template_name`` -> floor_plan_name and ``full_address`` ->
+    # unit_name, so it now names ``address_field="unit_name"`` explicitly
+    # (see test_appfolio_address_gate_parity.py). The precedence asserted
+    # below is unchanged and still correct.
     assert _listing_address_of(
         {"floor_plan_name": "500 W Camelback Rd, Phoenix, AZ 85013",
          "unit_name": "210"},

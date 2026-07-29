@@ -977,6 +977,10 @@ _STREET_TYPE_RE = re.compile(
 # ``\b`` + the AND-gate on a street token / ZIP / suffix keeps plan
 # descriptors ("2 Bed", "550 Sqft Studio") out.
 _HOUSE_NUMBER_RE = re.compile(r"^\s*\d{1,6}[A-Za-z]?\b")
+# The same house number, UNANCHORED — see ``contains_street_address``. Both
+# ``\b``s are load-bearing: without the leading one "A1" matches on its "1"
+# and a bare unit label starts looking like an address.
+_HOUSE_NUMBER_ANYWHERE_RE = re.compile(r"\b\d{1,6}[A-Za-z]?\b")
 _SUFFIX_MARKER_RE = re.compile(
     r"(?:#|\bapt\b|\bunit\b|\bsuite\b|\bste\b)", re.IGNORECASE
 )
@@ -994,6 +998,42 @@ def is_street_address(s: str) -> bool:
     token, ZIP, or suffix marker and are correctly rejected.
     """
     if not s or not isinstance(s, str) or not _HOUSE_NUMBER_RE.match(s):
+        return False
+    return bool(
+        _US_ZIP_RE.search(s)
+        or _STREET_TYPE_RE.search(s)
+        or _SUFFIX_MARKER_RE.search(s)
+    )
+
+
+def contains_street_address(s: str) -> bool:
+    """True when ``s`` carries a street address ANYWHERE inside it.
+
+    Identical three-signal test to :func:`is_street_address` — a house number
+    AND at least one of ZIP / street-type token / unit-suffix marker — with
+    the house number no longer anchored to position 0. It is therefore
+    STRICTLY LOOSER: every string ``is_street_address`` accepts, this accepts
+    too (an anchored match is also an unanchored one, and the corroborator set
+    is the same object).
+
+    Why a second predicate rather than relaxing the first: ``is_street_address``
+    also gates ``address_unit_id``, so loosening it would re-slug unit ids and
+    break the daily join. This one answers a different question — "can the
+    address filter read an address out of this string?" — for which the
+    leading-house-number rule is simply wrong. Operators routinely prefix the
+    community name or a directional, and AppFolio ships both live:
+
+        "OAK TERRACE APARTMENTS - 107, 42 THUNDERBIRD PARKWAY SW, LAKEWOOD, WA 98498"
+        "W 1526 Bell St 324, Amarillo, TX 79106"
+
+    Bare unit labels ("101", "2B", "A1", "") still fail: they carry a number
+    but no ZIP, street token, or suffix marker. That rejection matters — an
+    address string makes a row JUDGEABLE, and a judgeable row that cannot
+    match is dropped, so calling a unit number an address destroys real rows.
+    """
+    if not s or not isinstance(s, str):
+        return False
+    if not _HOUSE_NUMBER_ANYWHERE_RE.search(s):
         return False
     return bool(
         _US_ZIP_RE.search(s)

@@ -44,6 +44,7 @@ from ma_poc.pms.adapters._appfolio_websites_duda import (
 from ma_poc.pms.adapters._parsing import (
     address_unit_id,
     bed_label_from,
+    contains_street_address,
     format_rent_range,
     get_field,
     is_street_address,
@@ -583,12 +584,31 @@ def _listing_address_of(unit: dict[str, Any], address_field: str) -> str:
     The shape test matters — on a normal property ``unit_name`` is a unit number
     like "101", and treating that as an address would make it judgeable and then
     unmatchable, dropping real rows.
+
+    2026-07-29 (second pass) — THE GATE MUST NOT OUT-RANK THE CONSUMER. That
+    shape test was ``is_street_address``, which demands a LEADING house number.
+    Its consumers do not: ``_address_matches`` reads a ZIP from anywhere in the
+    string and fuzzy-matches ANY comma-segment that could be a street (see
+    ``_street_candidates``, which exists precisely because operators prefix the
+    community name), and ``_listing_address_is_judgeable`` needs only a ZIP or a
+    leading digit. So the gate rejected strings the matcher would have matched,
+    returned "", and the row lost its address — becoming unjudgeable and then
+    either dropped or waved through depending on the evidence grade. Measured
+    over run-2026-07-27-full-0d54ca7 (offline replay of the 12,011 AppFolio
+    SSR/VANITY rows, applying HEAD's field layout): 408 rows across 20
+    properties, all of the shape
+
+        "OAK TERRACE APARTMENTS - 107, 42 THUNDERBIRD PARKWAY SW, LAKEWOOD, WA 98498"
+
+    ``contains_street_address`` is the same three-signal test with the anchor
+    dropped: strictly looser than the old gate, still rejects "101" / "2B" /
+    "A1" / "".
     """
     primary = (unit.get(address_field) or "").strip()
     if primary:
         return primary
     fallback = (unit.get("unit_name") or "").strip()
-    return fallback if fallback and is_street_address(fallback) else ""
+    return fallback if contains_street_address(fallback) else ""
 
 
 def _listing_address_is_judgeable(listing_address: str) -> bool:
@@ -1540,6 +1560,17 @@ class AppFolioAdapter:
                         # 2026-07-18: always scope, even when propertyGroup is
                         # set — the URL-level propertyGroup filter proved
                         # unreliable (94 props leaked the whole PMC despite it).
+                        #
+                        # 2026-07-29 — the default ``address_field`` is CORRECT
+                        # here, unlike on the DUDA path below. These rows come
+                        # from ``parse_appfolio_listings_ssr``, which sets
+                        # ``floor_plan_name=""`` unconditionally, so the default
+                        # is inert and every row routes through
+                        # ``_listing_address_of``'s gated ``unit_name``
+                        # fallback. Naming ``unit_name`` explicitly would skip
+                        # that shape gate and hand the filter whatever the
+                        # address regex captured, mis-capture included; the gate
+                        # is the safety net and is deliberately kept in circuit.
                         if vanity_units:
                             ctx_address = getattr(ctx, "address", "") or ""
                             ctx_zip = getattr(ctx, "zip_code", "") or ""
@@ -1645,18 +1676,31 @@ class AppFolioAdapter:
                     #
                     # Same fix as the VANITY path (chip #107): drop
                     # units whose address + ZIP don't match the CSV
-                    # property context. DUDA stores the address in
-                    # ``full_address`` which is mapped to
-                    # ``floor_plan_name`` by ``parse_collection_payload``
-                    # — the filter's default ``address_field`` matches.
+                    # property context.
                     # 2026-07-18: always scope (see the vanity path) — the
                     # propertyGroup URL-filter is not reliable enough to skip it.
+                    #
+                    # 2026-07-29 — ``address_field`` is EXPLICIT here; the
+                    # note it replaces ("full_address maps to floor_plan_name,
+                    # so the default matches") went stale on 2026-07-28, when
+                    # ``parse_appfolio_websites_listing`` started mapping
+                    # unit_template_name -> floor_plan_name and full_address ->
+                    # unit_name. The default then fed the filter a PLAN NAME
+                    # whenever the operator publishes one (the unit_name
+                    # fallback never fires — the primary field is non-empty),
+                    # and a plan name has no ZIP and no house number, so the
+                    # property demoted to ZERO units. See
+                    # test_appfolio_address_gate_parity.py. The SSR / VANITY
+                    # paths keep the default on purpose: their card parser
+                    # blanks floor_plan_name, so the gated fallback is the
+                    # designed route there.
                     if duda_units:
                         ctx_address = getattr(ctx, "address", "") or ""
                         ctx_zip = getattr(ctx, "zip_code", "") or ""
                         duda_units, addr_filter_tel = (
                             filter_listings_by_property_address(
-                                duda_units, ctx_address, ctx_zip
+                                duda_units, ctx_address, ctx_zip,
+                                address_field="unit_name",
                             )
                         )
                         if addr_filter_tel.get("filter_activated"):
