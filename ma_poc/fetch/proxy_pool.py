@@ -39,11 +39,17 @@ class ProxyPool:
 
     Args:
         urls: List of proxy URLs (with credentials).
+        rng: Random source for the health-weighted draw in :meth:`pick`. Defaults
+            to a private, os.urandom-seeded ``random.Random`` instance. Tests pass
+            ``random.Random(seed)`` to make selection deterministic — the global
+            ``random`` module is deliberately NOT used, so neither this pool nor a
+            test can perturb the other through global seed state.
     """
 
-    def __init__(self, urls: list[str]) -> None:
+    def __init__(self, urls: list[str], rng: random.Random | None = None) -> None:
         self._proxies: dict[str, ProxyHealth] = {url: ProxyHealth(url=url) for url in urls}
         self._sticky: dict[str, str] = {}
+        self._rng: random.Random = rng if rng is not None else random.Random()
 
     def pick(self, sticky_key: str | None = None) -> str | None:
         """Select a proxy, preferring healthier ones.
@@ -70,7 +76,7 @@ class ProxyPool:
 
         # Weighted random selection by health
         weights = [p.health for p in healthy]
-        chosen = random.choices(healthy, weights=weights, k=1)[0]
+        chosen = self._rng.choices(healthy, weights=weights, k=1)[0]
         chosen.last_used = datetime.now(UTC)
 
         if sticky_key:
