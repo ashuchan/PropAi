@@ -49,6 +49,7 @@ from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
     make_unit_dict,
+    rent_in_sanity_range,
 )
 
 log = logging.getLogger(__name__)
@@ -95,7 +96,8 @@ _APPLYGA_BUTTON_RE = re.compile(
     r"""\s*['"]([^'"]*)['"]"""           # arg1: plan_name
     r"""\s*,\s*['"]([^'"]*)['"]"""       # arg2: beds-label
     r"""\s*,\s*['"]([^'"]*)['"]"""       # arg3: sqft
-    r"""\s*,\s*['"]([^'"]*)['"]"""       # arg4: rent
+    r"""\s*,\s*['"]([^'"]*)['"]"""       # arg4: rent LOW
+    r"""(?:\s*,\s*['"]([^'"]*)['"])?"""  # arg5: rent HIGH (optional; see below)
     r""".*?["']\s*>""",
     re.IGNORECASE | re.DOTALL,
 )
@@ -106,6 +108,33 @@ _APPLYGA_BUTTON_RE = re.compile(
 # ``\$[1-9][0-9],?[0-9]{2,3}`` missed sub-$1k rents AND decimals; this
 # version handles both.
 _RENT_VALUE_RE = re.compile(r"\$\s?([\d,]+(?:\.\d{1,2})?)")
+
+# 2026-07-28 (nestin-rent-range-collapse): a RENDERED low–high rent range.
+#
+# Measured live on 2026-07-28 against all 113 Nestin properties in the
+# 2026-07-27 run: 24 of them publish a per-unit RANGE in the Rent cell and
+# the parser was collapsing it to the low. The template markup is
+#
+#   <td class="td-card-rent">
+#     <p class="td-label">Rent:</p>$997 <span class='sr-only'>to</span> -$1,229
+#   </td>
+#
+# i.e. sighted users read "$997 - $1,229" and the ``sr-only`` "to" is the
+# screen-reader spelling of the dash. ``get_text(separator=" ")`` flattens
+# that to ``"Rent: $997 to -$1,229"``. Other skins emit ``"$997 - $1,229"``,
+# ``"$997-$1,229"`` and ``"$1,885 to - $2,300"``.
+#
+# A separator token ("to", a dash, or both) is REQUIRED. Two money values
+# that merely sit near each other in a text blob are NOT a range — the same
+# cell on the "Total Monthly Leasing Price" skin reads
+#   "Rent: $2,270.00 to -$3,142.00 Base rent $2,195.00 · 14-month term"
+# and a min/max over every ``$`` in the blob would report $2,195–$3,142,
+# inventing a low the operator never published.
+_RENT_PAIR_RE = re.compile(
+    r"\$\s?(?P<lo>[\d,]+(?:\.\d{1,2})?)"
+    r"\s*(?:to\s*[-–—]?|[-–—])\s*"
+    r"\$\s?(?P<hi>[\d,]+(?:\.\d{1,2})?)"
+)
 
 # Date column / card-text pattern: ``M/D/YYYY``, ``MM/DD/YYYY``,
 # ``M-D-YYYY``. ISO-format (``YYYY-MM-DD``) is also accepted by adapters
@@ -139,6 +168,41 @@ def _money_to_int(text: str) -> int | None:
         return int(round(float(raw)))
     except (ValueError, TypeError):
         return None
+
+
+def _money_range(text: str) -> tuple[int | None, int | None]:
+    """Parse a rent cell into ``(low, high)``.
+
+    ``low`` is byte-for-byte what :func:`_money_to_int` returns — the FIRST
+    money value in *text*. The range match is anchored at that same offset,
+    so this function can never move a rent that is already right; it can only
+    add a high.
+
+    ``high`` is non-``None`` only when the source RENDERS a low–high pair
+    (see ``_RENT_PAIR_RE``) starting at that first value, the pair is ordered
+    (``high > low``) and the high passes the $200–$50,000 sanity bound.
+    Otherwise ``high`` is ``None`` and the caller keeps the point value —
+    which is the correct answer for the ~73% of Nestin rows where the
+    operator publishes a single asking rent.
+    """
+    if not text:
+        return None, None
+    first = _RENT_VALUE_RE.search(text)
+    if not first:
+        return None, None
+    low = _money_to_int(text)
+    if low is None:
+        return None, None
+    pair = _RENT_PAIR_RE.match(text, first.start())
+    if pair is None:
+        return low, None
+    try:
+        high = int(round(float(pair.group("hi").replace(",", ""))))
+    except (ValueError, TypeError):
+        return low, None
+    if high <= low or not rent_in_sanity_range(high):
+        return low, None
+    return low, high
 
 
 # Extract the apartment-number value from a text cell that may include
@@ -295,7 +359,7 @@ def _parse_table_layout(
             unit_number = _normalize_unit_number(apt_text)
             if not unit_number:
                 continue
-            rent_int = _money_to_int(_by_label("rent"))
+            rent_low, rent_high = _money_range(_by_label("rent"))
             sqft_text = _by_label("sq. ft.") or _by_label("sq ft") or _by_label("sqft")
             sqft = "".join(c for c in sqft_text if c.isdigit())
             date_text = _by_label("date available")
@@ -310,9 +374,14 @@ def _parse_table_layout(
                     bathrooms="",
                     sqft=sqft,
                     unit_number=unit_number,
-                    rent_range=format_rent_range(rent_int, rent_int),
-                    rent_low=rent_int,
-                    rent_high=rent_int,
+                    # Preserve the published spread. ``rent_high`` falls back
+                    # to ``rent_low`` when the cell renders one value, so the
+                    # single-rent majority is untouched.
+                    rent_range=format_rent_range(
+                        rent_low, rent_high if rent_high is not None else rent_low
+                    ),
+                    rent_low=rent_low,
+                    rent_high=rent_high if rent_high is not None else rent_low,
                     availability_status="AVAILABLE",
                     availability_date=availability_date,
                     source_api_url=source_url,
@@ -369,8 +438,8 @@ def _parse_card_layout(
             container = container.parent
         if not rent_text:
             continue
-        rent_int = _money_to_int(rent_text)
-        if rent_int is None:
+        rent_low, rent_high = _money_range(rent_text)
+        if rent_low is None:
             continue
 
         date_m = _AVAILABILITY_DATE_RE.search(rent_text)
@@ -385,9 +454,11 @@ def _parse_card_layout(
                 bathrooms="",
                 sqft="",
                 unit_number=unit_number,
-                rent_range=format_rent_range(rent_int, rent_int),
-                rent_low=rent_int,
-                rent_high=rent_int,
+                rent_range=format_rent_range(
+                    rent_low, rent_high if rent_high is not None else rent_low
+                ),
+                rent_low=rent_low,
+                rent_high=rent_high if rent_high is not None else rent_low,
                 availability_status="AVAILABLE",
                 availability_date=availability_date,
                 source_api_url=source_url,
@@ -395,6 +466,35 @@ def _parse_card_layout(
             )
         )
     return units
+
+
+def _rendered_rent_pairs(detail_html: str) -> set[tuple[int, int]]:
+    """Every ``(low, high)`` money range the page RENDERS as visible text.
+
+    Used to decide whether an ``applyGAClick`` arg5 is a range the operator
+    actually published or an internal maximum the page never shows. Matching
+    is on the flattened text — not the raw HTML — so a range split across
+    ``<span>`` boundaries (the ``sr-only`` "to") is seen exactly as a reader
+    sees it, and markup that merely happens to contain two dollar amounts is
+    not.
+    """
+    if not detail_html:
+        return set()
+    try:
+        text = BeautifulSoup(detail_html, "html.parser").get_text(
+            separator=" ", strip=True
+        )
+    except Exception:
+        return set()
+    pairs: set[tuple[int, int]] = set()
+    for m in _RENT_PAIR_RE.finditer(text):
+        try:
+            lo = int(round(float(m.group("lo").replace(",", ""))))
+            hi = int(round(float(m.group("hi").replace(",", ""))))
+        except (ValueError, TypeError):
+            continue
+        pairs.add((lo, hi))
+    return pairs
 
 
 def _parse_applyga_button_layout(
@@ -410,10 +510,23 @@ def _parse_applyga_button_layout(
     The button ``id`` is the unit_number; ``onclick`` args carry the plan
     name, beds-label, sqft, and rent.
 
+    2026-07-28 (nestin-rent-range-collapse): ``applyGAClick`` arg5 is the
+    HIGH of the unit's rent range (verified live — pickwickfarms #1513C
+    ``'997.00', '1229.00'`` renders "Rent: $997 to -$1,229"). It is
+    deliberately NOT trusted on its own: bellavistaonpark emits
+    ``'1805.00', '2537.00'`` for a unit whose page renders only
+    "Starting at: $1,805.00" — the operator published one number and $2,537
+    appears nowhere a human can see it. Widening those rows would be a worse
+    defect than the one being fixed (544 rows in the 2026-07-28 live sweep
+    carry an arg5 high that is never rendered). So arg5 is used only when the
+    page actually RENDERS the ``(arg4, arg5)`` pair as a range.
+
     Returns ``[]`` if no apply-button matches.
     """
     if not detail_html or "applyGAClick" not in detail_html:
         return []
+
+    rendered_pairs = _rendered_rent_pairs(detail_html)
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -425,6 +538,7 @@ def _parse_applyga_button_layout(
         beds_label = (m.group(3) or "").strip()  # e.g. "1 Bed(s)" / "Studio"
         sqft_raw = (m.group(4) or "").strip()
         rent_raw = (m.group(5) or "").strip()
+        rent_high_raw = (m.group(6) or "").strip()
         sqft = "".join(c for c in sqft_raw if c.isdigit())
         # onclick args carry the bare rent number ("1099.00") without a
         # ``$`` prefix — ``_money_to_int`` requires ``$``, so parse via
@@ -435,6 +549,25 @@ def _parse_applyga_button_layout(
             rent_int = None
         if rent_int is None or rent_int <= 0:
             continue
+
+        # arg5 becomes the high ONLY if the page renders this exact pair as a
+        # range (see the docstring). Otherwise the row stays a point value.
+        rent_high_int = rent_int
+        try:
+            _hi = (
+                int(round(float(rent_high_raw.replace(",", ""))))
+                if rent_high_raw
+                else None
+            )
+        except (ValueError, TypeError):
+            _hi = None
+        if (
+            _hi is not None
+            and _hi > rent_int
+            and rent_in_sanity_range(_hi)
+            and (rent_int, _hi) in rendered_pairs
+        ):
+            rent_high_int = _hi
 
         # beds-label → numeric extraction (Studio → 0, "1 Bed(s)" → 1)
         beds = ""
@@ -454,9 +587,9 @@ def _parse_applyga_button_layout(
                 bathrooms="",
                 sqft=sqft,
                 unit_number=unit_number,
-                rent_range=format_rent_range(rent_int, rent_int),
+                rent_range=format_rent_range(rent_int, rent_high_int),
                 rent_low=rent_int,
-                rent_high=rent_int,
+                rent_high=rent_high_int,
                 availability_status="AVAILABLE",
                 availability_date="",
                 source_api_url=source_url,

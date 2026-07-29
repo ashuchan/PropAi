@@ -738,3 +738,227 @@ async def test_recovery_restores_clearance_cookies_after_fetches() -> None:
         )
     finally:
         _probe.reset_clearance_cookies(tok)
+
+
+# ── Rent-range preservation (2026-07-28: nestin-rent-range-collapse) ────────
+#
+# Defect: every one of the 1,622 unit rows the 2026-07-27 run produced on
+# TIER_1_DOM_RENTCAFE_NESTIN had rent_low == rent_high, because all three
+# layout parsers passed a single ``_money_to_int`` value into BOTH slots.
+# A live sweep of all 113 Nestin properties on 2026-07-28 (113/113 index
+# pages HTTP 200, 630/632 detail pages HTTP 200) found 24 of them publish a
+# per-unit low–high RANGE in the Rent cell.
+#
+# The markup below is copied verbatim from those live pages. Crucially, the
+# majority (~73% of run rows) publish a genuine SINGLE asking rent, so the
+# guards that a point stays a point are as important as the range tests.
+
+_LIVE_RANGE_TABLE_HTML = """
+<html><body>
+<h2>1 BR, 1 Bath</h2>
+<table>
+  <thead><tr>
+    <th>Apartment</th><th>Sq. Ft.</th><th>Rent</th>
+    <th>Date Available</th><th>Action</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="td-card-apt"><p class="td-label">Apartment:</p>#1513C</td>
+      <td class="td-card-sqft"><p class="td-label">Sq. Ft.:</p> 700</td>
+      <td class="td-card-rent"><p class="td-label">Rent:</p>$997
+          <span class='sr-only'>to</span> -$1,229<span></span></td>
+      <td class="td-card-date"><p class="td-label">Date:</p> 7/31/2026</td>
+      <td><a class="btn">Apply Now</a></td>
+    </tr>
+    <tr>
+      <td class="td-card-apt"><p class="td-label">Apartment:</p>#1624C</td>
+      <td class="td-card-sqft"><p class="td-label">Sq. Ft.:</p> 700</td>
+      <td class="td-card-rent"><p class="td-label">Rent:</p>$1,450.00</td>
+      <td class="td-card-date"><p class="td-label">Date:</p> 8/7/2026</td>
+      <td><a class="btn">Apply Now</a></td>
+    </tr>
+  </tbody>
+</table>
+</body></html>
+"""
+
+
+def test_table_layout_preserves_published_rent_range() -> None:
+    """pickwickfarms-apartments.com renders ``$997 <sr-only>to</sr-only>
+    -$1,229`` — a sighted reader sees "$997 - $1,229". Collapsing that to
+    $997 asserts a precision the operator did not publish."""
+    units = parse_nestin_detail_page(
+        _LIVE_RANGE_TABLE_HTML, "https://x.com/floorplans/1-br", "1 BR, 1 Bath"
+    )
+    assert len(units) == 2
+    ranged = units[0]
+    assert ranged["unit_number"] == "1513C"
+    assert ranged["market_rent_low"] == 997
+    assert ranged["market_rent_high"] == 1229
+    assert ranged["rent_range"] == "$997 - $1,229"
+
+
+def test_table_layout_single_rent_is_not_widened() -> None:
+    """The same table's second row publishes ONE number. rent_low ==
+    rent_high is the CORRECT answer for ~73% of Nestin rows and must not be
+    disturbed by the range fix."""
+    units = parse_nestin_detail_page(
+        _LIVE_RANGE_TABLE_HTML, "https://x.com/floorplans/1-br", "1 BR, 1 Bath"
+    )
+    point = units[1]
+    assert point["unit_number"] == "1624C"
+    assert point["market_rent_low"] == 1450
+    assert point["market_rent_high"] == 1450
+    assert point["rent_range"] == "$1,450"
+
+
+_LIVE_TOTAL_PRICE_TABLE_HTML = """
+<html><body>
+<h2>Baldwin East</h2>
+<table>
+  <thead><tr>
+    <th>Apartment</th><th>Sq. Ft.</th><th>Rent</th>
+    <th>Date Available</th><th>Action</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><p class="td-label">Apartment:</p>#27334</td>
+      <td><p class="td-label">Sq. Ft.:</p> 1246</td>
+      <td class="td-card-rent">
+        <p class="text-xs">Total Monthly Leasing Price</p>
+        <p class="td-label">Rent:</p>$2,270.00
+        <span class='sr-only'>to</span> -$3,142.00
+        <span class="text-muted">Base rent $2,195.00 &middot; 14-month term</span>
+      </td>
+      <td><p class="td-label">Date:</p> 9/1/2026</td>
+      <td><a class="btn">Apply Now</a></td>
+    </tr>
+  </tbody>
+</table>
+</body></html>
+"""
+
+
+def test_table_layout_range_ignores_unrelated_money_in_the_same_cell() -> None:
+    """townwalkhamden.com's Rent cell carries THREE dollar amounts: the
+    published range ($2,270–$3,142) plus a "Base rent $2,195.00" footnote.
+
+    A min/max over every ``$`` in the cell would report $2,195–$3,142 —
+    inventing a low the operator never published. The range must be read as
+    the adjacent low–high PAIR, anchored on the first money value.
+    """
+    units = parse_nestin_detail_page(
+        _LIVE_TOTAL_PRICE_TABLE_HTML, "https://x.com/floorplans/baldwin", "Baldwin East"
+    )
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] == 2270
+    assert units[0]["market_rent_high"] == 3142
+
+
+# ``applyGAClick(plan, beds, sqft, LOW, HIGH, ...)`` — arg5 is the high, but
+# it is only sometimes RENDERED. Two live shapes, byte-identical in their JS
+# args and opposite in what the operator published.
+
+_APPLYGA_RANGE_RENDERED_HTML = """
+<html><body>
+<h2>2x2</h2>
+<table>
+  <thead><tr><th>Apartment</th><th>Sq. Ft.</th><th>Rent</th><th>Action</th></tr></thead>
+  <tbody><tr>
+    <td><p class="td-label">Apartment:</p>#804W</td>
+    <td><p class="td-label">Sq. Ft.:</p> 920</td>
+    <td class="td-card-rent"><p class="td-label">Rent:</p>$3,540.00
+        <span class='sr-only'>to</span> -$5,750.00</td>
+    <td><button id="804W" onclick="applyGAClick('2x2', '2 Bed(s)', '920',
+        '3540.00', '5750.00', 'x')">Apply Now</button></td>
+  </tr></tbody>
+</table>
+</body></html>
+"""
+
+_APPLYGA_HIGH_NOT_RENDERED_HTML = """
+<html><body>
+<h2>The Laurel</h2>
+<div id="availApts">
+  <div class="card"><div class="card-body">
+    <h3 class="card-title">Apartment: <span># 221204</span></h3>
+    <p class="card-subtitle">Available Now</p>
+    <p class="card-subtitle"><span>Starting at:</span> $1,805.00</p>
+    <button id="221204" onclick="applyGAClick('The Laurel', '3 Bed(s)', '1290',
+        '1805.00', '2537.00', 'x')">Apply Now</button>
+  </div></div>
+</div>
+</body></html>
+"""
+
+
+def test_applyga_layout_uses_arg5_high_when_the_page_renders_the_range() -> None:
+    """liveatheritageparkapts.com: the Rent cell renders
+    ``$3,540.00 to -$5,750.00`` and the button carries the same pair."""
+    units = parse_nestin_detail_page(
+        _APPLYGA_RANGE_RENDERED_HTML, "https://x.com/floorplans/2x2", "2x2"
+    )
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] == 3540
+    assert units[0]["market_rent_high"] == 5750
+
+
+def test_applyga_layout_ignores_arg5_high_the_page_never_renders() -> None:
+    """bellavistaonpark.com emits ``'1805.00', '2537.00'`` for a unit whose
+    page shows only "Starting at: $1,805.00" — $2,537 appears nowhere a
+    human can see it.
+
+    Trusting arg5 unconditionally would widen 544 rows in the 2026-07-28
+    live sweep on evidence the operator never published — a worse defect
+    than the collapse being fixed. This is the guard against that.
+    """
+    units = parse_nestin_detail_page(
+        _APPLYGA_HIGH_NOT_RENDERED_HTML, "https://x.com/floorplans/laurel", "The Laurel"
+    )
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "221204"
+    assert units[0]["market_rent_low"] == 1805
+    assert units[0]["market_rent_high"] == 1805
+
+
+@pytest.mark.parametrize(
+    "cell,expected",
+    [
+        # ── ranges the source publishes (all seen live 2026-07-28) ──
+        ("Rent: $997 to -$1,229", (997, 1229)),               # pickwickfarms
+        ("Rent: $1,143 to -$1,384", (1143, 1384)),            # arborpointe
+        ("Rent: $1,989.00 to -$19,889.00", (1989, 19889)),    # cabanaclub
+        ("$1,885 to - $2,300", (1885, 2300)),                 # bellacreekrp skin
+        ("$1,217.75 to -$1,821.75", (1218, 1822)),            # livewildwood, cents
+        ("$1,099 - $1,299", (1099, 1299)),                    # plain-dash skin
+        ("$1,099-$1,299", (1099, 1299)),
+        ("$823.00 to $1,050.00", (823, 1050)),                # "to", no dash
+        ("$1,099 – $1,299", (1099, 1299)),               # en-dash
+        # ── must NOT be read as a range ──
+        ("Rent: $1,805.00", (1805, None)),                    # single asking rent
+        ("Starting at: $2,622.88", (2623, None)),
+        ("Rent: $1,500 Deposit: $500", (1500, None)),         # no separator token
+        ("Rent: $1,500 Base rent $1,400", (1500, None)),
+        ("$1,500 and $1,600", (1500, None)),                  # "and" is not a range
+        ("Rent: $2,300 - Save $200 today", (2300, None)),     # dash, but low>high
+        ("Rent: $1,200 - $99 admin fee", (1200, None)),       # high < low
+        ("Rent: $1,200 - $1,200", (1200, None)),              # equal is not a spread
+        ("Rent: $1,200 to -$60", (1200, None)),               # below $200 sanity floor
+        ("Rent: $1,200 to -$99,000", (1200, None)),           # above $50,000 cap
+        ("Monday: 9 AM to - 6 PM", (None, None)),             # office-hours chrome
+        ("Sq. Ft.: 700", (None, None)),
+        ("Call for pricing", (None, None)),
+        ("", (None, None)),
+    ],
+)
+def test_money_range_table(cell: str, expected: tuple) -> None:
+    """Every rent-cell shape the range reader must and must not accept.
+
+    The ``low`` it returns is required to stay identical to the legacy
+    single-value ``_money_to_int`` on every input — the fix may add a high,
+    never move a low.
+    """
+    from ma_poc.pms.adapters._rentcafe_nestin import _money_range
+
+    assert _money_range(cell) == expected
+    assert _money_range(cell)[0] == _money_to_int(cell)
