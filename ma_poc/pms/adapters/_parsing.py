@@ -218,6 +218,208 @@ SQFT_RE = re.compile(
 )
 
 
+# ── Canonical free-text area parser (2026-07-28) ─────────────────────────
+#
+# ONE rule: a number is an area only when an area-unit token BINDS to it,
+# and only an IMPERIAL token yields a square-foot answer.
+#
+# Before this existed the job was done by three independent regexes, each
+# wrong in a different way — all three failures share the same cause: they
+# select a number by pattern proximity instead of by which unit token owns
+# it.
+#
+#   * ``_html_extract._SQFT_PATTERN`` could not see a thousands separator.
+#     Its ``(?<![\$\d,])`` lookbehind blocks the post-comma group and the
+#     pre-comma group is a single digit, so "1,118 sq ft" matched NOTHING.
+#   * With the number-first pattern silent, ``_container_yields_unit`` fell
+#     through to a LABEL-first fallback that binds the number AFTER the
+#     "sq ft" token.  On a dual-unit string that number is the metric one
+#     ("2,000 sq ft 186 m2" -> 186); next to a balcony it is the balcony
+#     ("1,118 sq ft Balcony Sq Ft: 60" -> 60).  That fallback also skipped
+#     the [150, 10000] bounds check the number-first path applied.
+#   * ``plan_text._SQFT_RE`` captured ``(\d{2,4})`` with no lookbehind, so
+#     "1,200 sq ft" produced 200 and "$1145 Sq Ft" produced 1145.
+#
+# Metric-ONLY input ("83.6 m2" with no imperial twin) returns None — the
+# absent sentinel — rather than a converted value.  Rationale: ``area`` is
+# documented and clamped as a source-measured square-foot integer and sits
+# beside ``area_raw``; a converted 83.6 m2 -> 900 would be indistinguishable
+# downstream from a real "900 sq ft" measurement, so the conversion would
+# launder a derived number into a measured field with no provenance to
+# mark it.  US multifamily listings essentially never publish metric-only,
+# so the realistic producer of a metric-only string is a mis-parse, and
+# absent is the honest outcome.  Metric tokens are still *recognised* —
+# that recognition is what stops the metric number being read as sqft.
+
+# Integer part only; a trailing decimal is consumed but not captured.
+_AREA_NUM = r"(\d{1,3}(?:,\d{3})+|\d{2,5})(?:\.\d+)?"
+
+# Imperial unit tokens.  NO leading \b: in the number-first form the number
+# plus separator already anchors the left edge, and a \b cannot exist after
+# a digit — "1,200ft2" has no boundary between "0" and "f" (both are \w),
+# which is exactly how an earlier \b-based fix silently dropped that form.
+# The trailing (?!\w) guards stop "sf" matching inside "sfgate" and "ft2"
+# matching inside "ft20".
+_AREA_IMPERIAL_UNIT = (
+    r"(?:sq\.?\s*(?:ft\.?|feet|foot)"
+    r"|sqft"
+    r"|square[-\s]*(?:feet|foot|ft)"
+    r"|ft\s*(?:²|\^2|2(?!\w))"
+    r"|s\.?f\.?(?!\w))"
+)
+
+# Metric unit tokens.  Never produce a value — they exist only so a metric
+# number cannot be mistaken for the square-foot one.
+_AREA_METRIC_UNIT = (
+    r"(?:sq\.?\s*m\.?(?!\w)"
+    r"|sqm(?!\w)"
+    r"|square[-\s]*met(?:re|er)s?"
+    r"|m\s*(?:²|\^2|2(?!\w)))"
+)
+
+# number-first: "900 sqft", "1,200ft2", "1,128-square-foot", "449sf".
+# The ``(?<![\$\d,.])`` lookbehind is what keeps "$1145 Sq Ft" out — the
+# number is money, the label just happens to follow it.
+_AREA_NUMBER_FIRST_RE = re.compile(
+    r"(?<![\$\d,.])" + _AREA_NUM + r"[-\s]*" + _AREA_IMPERIAL_UNIT,
+    re.IGNORECASE,
+)
+
+# label-first: "Square Feet: 850", "SqFt 833", "Sq.ft. 1,025".
+# A LEADING \b is required here and the bare "ft2"/"ft²"/"sf" spellings are
+# deliberately excluded, because without both, "Loft 2: 350" reads as an
+# area of 350.
+_AREA_LABEL_FIRST_RE = re.compile(
+    r"\b(?:sq\.?\s*(?:ft\.?|feet|foot)|sqft|square[-\s]*(?:feet|foot|ft))"
+    r"\s*[:\-]?\s*" + _AREA_NUM,
+    re.IGNORECASE,
+)
+
+# Applied at the position just past a label-first number: if ANY area unit
+# follows it, that number belongs to the following token, not to the label
+# on its left.  This is the dual-unit rule — in "2,000 sq ft 186 m2" the
+# 186 is owned by "m2".
+_AREA_UNIT_AFTER_RE = re.compile(
+    r"\s*(?:" + _AREA_IMPERIAL_UNIT + r"|" + _AREA_METRIC_UNIT + r")",
+    re.IGNORECASE,
+)
+
+# Context words that, when they immediately precede a match, MAY mean the
+# measurement belongs to an amenity rather than to the unit's floor.
+#
+# 2026-07-28 rework — this guard is OPT-IN (``amenity_guard=True``) and is
+# only correct for whole-CARD text, where a competing amenity measurement can
+# actually appear.  It is a proximity heuristic and it cannot tell
+#
+#     "Balcony Sq Ft: 160"                    (the balcony's area)
+# from
+#     "2 Bedroom with Patio 904 sq ft"        (the unit's area; "Patio" is a
+#                                              feature word in the PLAN NAME)
+#
+# because the amenity word sits the same distance from the number in both.
+# Measured over the 4,097 pages captured by run-2026-07-27-full-0d54ca7, every
+# single firing on prose / plan-name / listing-row text was a FALSE
+# suppression — 11 occurrences on the plan-text path, plus 20 more across the
+# corpus's row-sized text nodes, and 0 true positives — so those callers must
+# pass ``amenity_guard=False``.
+# Only ``_container_yields_unit`` — which has applied this guard to card text
+# since 2026-05-22 — keeps it on.
+_AREA_NOISE_CONTEXT_RE = re.compile(
+    r"balcon|patio|terrace|storage|closet|garage|amenity|amenities|locker",
+    re.IGNORECASE,
+)
+_AREA_NOISE_WINDOW = 40
+
+# Realistic apartment bounds; mirrors schema_v2._format_area's clamp.
+AREA_MIN_SQFT = 150
+AREA_MAX_SQFT = 10_000
+
+
+def _area_candidate(text: str, m: re.Match[str], *, amenity_guard: bool) -> int | None:
+    """Bounds- and context-check one area match. None when unusable."""
+    try:
+        n = int(m.group(1).replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+    if not (AREA_MIN_SQFT <= n <= AREA_MAX_SQFT):
+        return None
+    if amenity_guard:
+        prefix = text[max(0, m.start() - _AREA_NOISE_WINDOW): m.start()]
+        if _AREA_NOISE_CONTEXT_RE.search(prefix):
+            return None
+    return n
+
+
+def _area_candidates(text: str, *, amenity_guard: bool) -> list[tuple[int, int, int]]:
+    """Every usable area match as ``(start, orientation, value)``.
+
+    ``orientation`` is 0 for label-first and 1 for number-first; it only ever
+    breaks a positional tie, so the more explicit labelled form wins one.
+    """
+    out: list[tuple[int, int, int]] = []
+    for m in _AREA_NUMBER_FIRST_RE.finditer(text):
+        v = _area_candidate(text, m, amenity_guard=amenity_guard)
+        if v is not None:
+            out.append((m.start(), 1, v))
+    for m in _AREA_LABEL_FIRST_RE.finditer(text):
+        # Dual-unit rule: if an area unit follows the captured number, that
+        # number is owned by the following token, not by the label on its
+        # left — "2,000 sq ft 186 m2" must not yield 186.
+        if _AREA_UNIT_AFTER_RE.match(text, m.end()):
+            continue
+        v = _area_candidate(text, m, amenity_guard=amenity_guard)
+        if v is not None:
+            out.append((m.start(), 0, v))
+    return out
+
+
+def parse_area(text: str | None, *, amenity_guard: bool = True) -> int | None:
+    """Return the unit's floor area in SQUARE FEET, or ``None``.
+
+    Selection is by POSITION — the EARLIEST usable candidate in the string
+    wins, whichever orientation it came from, ties going to the labelled
+    form.  That is the rule commit d72a6ea landed on ``SQFT_RE`` after three
+    attempts, and it is the only rule that survives all four shapes at once:
+
+      * ``"Unit 402 1,118 sq ft Balcony Sq Ft: 60"`` → 1118, because the
+        apartment states its own area before the balcony's.
+      * ``"Unit 402 Rent $1,895 Sq.ft. 725 ... Balcony 200 sq ft"`` → 725,
+        for the same reason with the orientations swapped.  Preferring one
+        ORIENTATION over the other gets exactly one of these two right; this
+        is the bug that has been reintroduced in this module three times.
+      * ``"Rent: $1145 Sq Ft: 565"`` → 565: position alone would take the
+        rent, so the number-first form additionally refuses a number
+        preceded by ``[$\\d,.]``.
+      * ``"2,000 sq ft 186 m2"`` → 2000: the label-first form additionally
+        refuses a number that has an area unit of its own to the right.
+
+    Position also keeps the area CONSISTENT WITH ITS SIBLINGS.  Every other
+    field ``_container_yields_unit`` reads — rent, beds, baths, unit number —
+    is taken by ``.search()``, i.e. the first match.  Taking the LARGEST area
+    instead bound it to a different plan than the rest of the row whenever a
+    page-wide blob became one container: on the 2026-07-27 corpus that put
+    1,207 sq ft on a row whose own text reads "1 BED 1 BATH $1225 | 727SF",
+    and 1,334 ft² on a plan row whose rent came from "$900 & $1,100" beside
+    "922 ft² & 1,334 ft²".  Eleven such rows; every one is now the value that
+    matches the row's own rent and bed/bath count.
+
+    Every candidate must fall in [150, 10000].  ``amenity_guard`` adds a
+    balcony/patio/storage proximity check; it is only meaningful for whole
+    unit-CARD text and must be left off for prose, plan names and per-field
+    selector text, where a feature word is not a measurement.  See the
+    comment on ``_AREA_NOISE_CONTEXT_RE``.
+
+    Metric-only input returns ``None``; see the module comment above for
+    why we do not convert.  Never raises.
+    """
+    if not text or not isinstance(text, str):
+        return None
+    candidates = _area_candidates(text, amenity_guard=amenity_guard)
+    if not candidates:
+        return None
+    return min(candidates)[2]
+
+
 # Patterns for inferring bed/bath count from a floor-plan / unit name.
 # Runs in declared order; first match wins. Patterns are designed to be
 # narrow enough that they don't false-positive on unrelated marketing

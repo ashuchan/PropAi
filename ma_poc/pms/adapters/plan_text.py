@@ -22,6 +22,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ma_poc.pms.adapters._parsing import parse_area
+
 # plan-name tokens (Studio / N Bed[room] [N Bath] / One-Two-Three-Four Bed…)
 _WORDNUM = {"studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
 _PLAN_RE = re.compile(
@@ -29,6 +31,10 @@ _PLAN_RE = re.compile(
     r"(?:\s*[,/&-]?\s*(?:(?:one|two|three|four|\d)\s*-?\s*bath(?:room)?s?|\d\s*ba))?)\s*:?\s*$",
     re.I,
 )
+# Anchor DETECTOR only — "does this line mention an area at all". The VALUE
+# comes from ``_parsing.parse_area``; this regex must not be used to read one.
+# Its ``(\d{2,4})`` group silently truncates a thousands separator, so
+# "1,152 sq ft" yielded 152 and "$1145 Sq Ft" yielded the rent as an area.
 _SQFT_RE = re.compile(r"(\d{2,4})\s*(?:sq\.?\s?ft\.?|sqft|square\s?f(?:ee)?t|ft\s?[²³⁲-⁹²2])", re.I)
 _RENT_RE = re.compile(r"(?:from|starting\s*at|rent:?)\s*\$\s?([\d,]{3,})", re.I)
 _RANGE_RE = re.compile(r"\$\s?([\d,]{3,})\s*[-–—]\s*\$?\s?[\d,]{3,}", re.I)
@@ -281,16 +287,27 @@ def parse_marketing_plan_text(html: str, url: str = "") -> list[dict[str, Any]]:
         end = min(end, i + 6)  # cap so a distant rent isn't mis-attributed
         sqft: int | None = None
         rent: int | None = None
-        sm0 = _SQFT_RE.search(name)  # form-2 anchor carries sqft on its own line
-        if sm0 and not _FEE_RE.search(name):
-            sqft = _to_int(sm0.group(1))
+        # form-2 anchor carries sqft on its own line.
+        #
+        # ``amenity_guard=False`` on both calls: these are marketing PROSE and
+        # plan-NAME lines, where "2 Bedroom with Patio 904 sq ft" and "the huge
+        # storage closet and oversized patio in this 944 sq. ft. apartment"
+        # state the apartment's own area.  With the guard on, both lose it —
+        # and because this loop requires an sqft to emit at all, the whole plan
+        # row disappears (2 rows dropped over the 4,097 pages captured by
+        # run-2026-07-27-full-0d54ca7; 11 suppressions, 0 true positives).
+        #
+        # NB the pre-loop call below is redundant with the loop's first
+        # iteration (``lines[i:end]`` always starts at ``lines[i] == name``,
+        # and both apply the same fee filter).  It predates this change and is
+        # left alone; it is why neutering it alone cannot fail a test.
+        if not _FEE_RE.search(name):
+            sqft = parse_area(name, amenity_guard=False)
         for w in lines[i:end]:
             if _FEE_RE.search(w):
                 continue
             if sqft is None:
-                sm = _SQFT_RE.search(w)
-                if sm:
-                    sqft = _to_int(sm.group(1))
+                sqft = parse_area(w, amenity_guard=False)
             if rent is None:
                 rm = _RENT_RE.search(w) or _RANGE_RE.search(w) or _BARE_RENT_RE.search(w)
                 if rm:

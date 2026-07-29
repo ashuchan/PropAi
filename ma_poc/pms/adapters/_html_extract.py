@@ -41,7 +41,11 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
     _money_to_int,
     _walk_jsonld,
 )
-from ma_poc.pms.adapters._parsing import SQFT_RE, clean_unit_number
+from ma_poc.pms.adapters._parsing import (
+    SQFT_RE,
+    clean_unit_number,
+    parse_area,
+)
 from ma_poc.pms.signal_engine.floor_plan_signals import (
     SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL,
 )
@@ -2476,19 +2480,13 @@ _PRICE_RANGE_PATTERN = re.compile(
     r"(?:[^0-9]{0,15}(\d{1,3}(?:,\d{3})*|\d{3,5}))?",
     re.IGNORECASE,
 )
-_SQFT_PATTERN = re.compile(
-    # number-first: "750 sq ft", "750 sqft", "750 ft²". The
-    # ``(?<![\$\d,])`` lookbehind stops a price number from being read as
-    # sqft — "Deposit: $200 Square Feet: 980" was matching "200" because
-    # the deposit amount sits right before the "Square Feet" label.
-    r"(?<![\$\d,])(\d{2,5})\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet|ft²|ft2)",
-    re.IGNORECASE,
-)
-# label-first: "SqFt 833", "Square Feet: 980", "Sq. Ft. 700"
-_SQFT_LABEL_PATTERN = re.compile(
-    r"(?:sq\.?\s*ft\.?|sqft|square\s*feet)\s*:?\s*(\d{2,5})",
-    re.IGNORECASE,
-)
+# 2026-07-28: free-text sqft is parsed by ``_parsing.parse_area`` — the
+# single unit-aware implementation.  The two regexes that used to live here
+# (number-first ``_SQFT_PATTERN`` + label-first ``_SQFT_LABEL_PATTERN``)
+# could not see a thousands separator, so "1,118 sq ft" matched neither and
+# the label fallback bound whatever number came AFTER the token: the
+# square-metre value on a dual-unit string, the balcony area next to a
+# balcony.  See the comment block above ``parse_area``.
 # 2026-05-22 bucket-B grind: the ``(?<![\$\d,])`` lookbehind stops a
 # price number from being read as beds/baths — "$2087 BR 2" was matching
 # "2087" as bedrooms because the rent number sits right before "BR".
@@ -2666,38 +2664,6 @@ def _extract_securecafe_applicant_units(soup: BeautifulSoup, source_url: str) ->
     return units
 
 
-# Context words that precede a sqft match but indicate it's NOT the unit's
-# floor area — balconies, storage, patios, fees, etc. If any of these appear
-# within 40 characters before the sqft number, suppress the match.
-_SQFT_NOISE_CONTEXT_RE = re.compile(
-    r"balcon|patio|terrace|storage|closet|garage|amenity|amenities|locker",
-    re.IGNORECASE,
-)
-
-# Minimum realistic apartment sqft. Matches _format_area's [150, 10000] clamp.
-# Values below this are amenity descriptions, not unit sizes.
-_SQFT_MIN = 150
-
-
-def _sqft_match_is_valid(text: str, m: re.Match) -> bool:
-    """Return False when the sqft regex match is context-contaminated.
-
-    Two rejection criteria (both must be absent for the match to be valid):
-      1. The captured value is below the 150 sqft floor.
-      2. A noise context word appears in the 40 chars before the match start.
-    """
-    try:
-        val = int(m.group(1).replace(",", ""))
-    except (ValueError, AttributeError):
-        return False
-    if val < _SQFT_MIN:
-        return False
-    prefix = text[max(0, m.start() - 40) : m.start()]
-    if _SQFT_NOISE_CONTEXT_RE.search(prefix):
-        return False
-    return True
-
-
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
     """Return a unit dict when ``text`` has floor-plan structural signals.
 
@@ -2715,17 +2681,13 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
         return None
 
     # Value extraction — run the specific patterns to pull out numeric values.
-    valid_sqft_matches = [
-        m for m in _SQFT_PATTERN.finditer(text) if _sqft_match_is_valid(text, m)
-    ]
-    m_sqft = max(valid_sqft_matches, key=lambda m: int(m.group(1).replace(",", "")), default=None)
-    # 2026-05-22 bucket-B grind: label-first sqft fallback ("SqFt 833",
-    # "Square Feet: 980") — the number-first pattern above misses these.
-    sqft_label_val = ""
-    if m_sqft is None:
-        lm = _SQFT_LABEL_PATTERN.search(text)
-        if lm:
-            sqft_label_val = lm.group(1)
+    # sqft: one unit-aware parser handles number-first ("750 sq ft"),
+    # label-first ("SqFt 833") and dual-unit ("2,000 sq ft 186 m2") forms and
+    # applies the [150, 10000] bounds.  ``amenity_guard`` stays ON here — this
+    # is whole-CARD text, the only shape where a competing balcony/storage
+    # measurement realistically appears, and the guard has run on this path
+    # since 2026-05-22.
+    area_val = parse_area(text, amenity_guard=True)
 
     m_beds = _BEDS_PATTERN.search(text)
     m_baths = _BATHS_PATTERN.search(text)
@@ -2773,7 +2735,7 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
 
     beds_val = m_beds.group(1) if m_beds else ("0" if is_studio else "")
     baths_val = m_baths.group(1) if m_baths else ""
-    sqft_val = m_sqft.group(1) if m_sqft else sqft_label_val
+    sqft_val = str(area_val) if area_val is not None else ""
     unit_num_raw = m_unit.group(1) if m_unit else ""
     unit_num = unit_num_raw if _is_valid_unit_number(unit_num_raw) else ""
 
@@ -2975,7 +2937,6 @@ def _empty_unit_with_ctx(page_ctx: dict[str, Any], source: str, source_url: str)
 # unit dict OR None when the row doesn't carry per-unit data.
 _RENTCAFE_DETAIL_FIRST_RE = re.compile(r"unit\s*[#:]?\s*(\S+)", re.IGNORECASE)
 _RENTCAFE_RENT_RE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
-_RENTCAFE_SQFT_NUM_RE = re.compile(r"sq\.?\s*ft\.?\s*[:\s]*(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
 
 
 def _extract_rentcafe_option_row(
@@ -3027,17 +2988,22 @@ def _extract_rentcafe_option_row(
         except (ValueError, TypeError):
             pass
 
-    # sqft: try "Sq.ft. NNN" (number AFTER keyword — RentCafe shape) FIRST,
-    # because the row also contains "$1,115" which can fool _SQFT_PATTERN into
-    # extracting "115" as the sqft. The more specific pattern wins.
-    m_sqft = _RENTCAFE_SQFT_NUM_RE.search(text) or _SQFT_PATTERN.search(text)
-    if m_sqft:
-        try:
-            sqft = int(m_sqft.group(1).replace(",", ""))
-            if _SQFT_MIN <= sqft <= 10_000:
-                unit["sqft"] = str(sqft)
-        except (ValueError, TypeError):
-            pass
+    # sqft: the RentCafe row shape puts the number AFTER the keyword
+    # ("Sq.ft. 1,025") and also carries a rent ("$1,115").  parse_area's money
+    # lookbehind keeps "$1,115" out, and its POSITIONAL selection keeps the
+    # labelled unit area ahead of any later number-first amenity area — which
+    # is what the old ``_RENTCAFE_SQFT_NUM_RE``-first ordering was for.
+    #
+    # ``amenity_guard=False``: this row is not card text and never had the
+    # guard.  With it on, "ROBIN WITH PATIO 2 BEDROOM | 1 BATHROOM SQFT 952"
+    # loses its area to a feature word in the plan NAME.  `.option-row` itself
+    # appears on only 2 of the 4,097 pages captured by
+    # run-2026-07-27-full-0d54ca7 and neither carries an area, so that is a
+    # shape measurement, not a row measurement: scanning every row-sized text
+    # node in the corpus, the guard fires on 20 of them and is wrong on all 20.
+    area = parse_area(text, amenity_guard=False)
+    if area is not None:
+        unit["sqft"] = str(area)
 
     # availability: look for "Available Now" or a date
     if re.search(r"available\s+now|^\s*now\b", text, re.IGNORECASE):
@@ -3167,14 +3133,12 @@ def _extract_appfolio_listing_item(
     unit["market_rent_low"] = rent
     unit["market_rent_high"] = rent
     unit["rent_range"] = str(rent)
-    sqft_match = _SQFT_LABEL_PATTERN.search(text) or _SQFT_PATTERN.search(text)
-    if sqft_match is not None:
-        try:
-            sqft = int(sqft_match.group(1).replace(",", ""))
-            if _SQFT_MIN <= sqft <= 10_000:
-                unit["sqft"] = str(sqft)
-        except (ValueError, TypeError):
-            pass
+    # ``amenity_guard=False``: an AppFolio listing card is a marketing blurb,
+    # not a unit card, and this path never had the guard.  A blurb that names
+    # a patio before stating the apartment's size would otherwise lose it.
+    listing_area = parse_area(text, amenity_guard=False)
+    if listing_area is not None:
+        unit["sqft"] = str(listing_area)
     bed_bath = _APPFOLIO_BED_BATH_RE.search(text)
     if bed_bath is not None:
         unit["bedrooms"] = "0" if bed_bath.group(1).lower() == "studio" else bed_bath.group(1)
@@ -3459,9 +3423,13 @@ def extract_with_hints(
                 unit["market_rent_low"] = lo
                 unit["market_rent_high"] = hi
         if (v := _select_one_text(node, sel_sqft)):
-            m = _SQFT_PATTERN.search(v)
-            if m:
-                unit["sqft"] = m.group(1)
+            # ``amenity_guard=False``: ``v`` is the text of the one element the
+            # profile nominates as THE area field, so there is no competing
+            # measurement for the guard to protect against — only feature words
+            # ("Patio home", "with balcony") for it to trip over.
+            sel_area = parse_area(v, amenity_guard=False)
+            if sel_area is not None:
+                unit["sqft"] = str(sel_area)
         if (v := _select_one_text(node, sel_beds)):
             m = _BEDS_PATTERN.search(v)
             if m:
