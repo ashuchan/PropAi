@@ -1119,17 +1119,48 @@ def _format_rent(val: Any) -> float | None:
         return None
 
 
+#: A comma that is a THOUSANDS SEPARATOR and nothing else: preceded by a
+#: digit, followed by exactly three digits that are not themselves followed
+#: by a fourth. Deliberately narrower than a blanket ``.replace(",", "")``,
+#: which concatenates any comma-joined digits and so reads the European
+#: decimal ``"950,5"`` as 9505 sqft and the malformed ``"1,2"`` as 12.
+#: Under this pattern neither comma is stripped, both fall back to the first
+#: whole numeric token (950 / 1), and the [150, 10000] bound decides.
+_THOUSANDS_SEP_RE = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
+
+#: First whole number in the string, decimals included. A range yields its
+#: LOW bound ("1,050-1,200" → 1050), matching the long-standing behaviour of
+#: the jugnu copy this function is now the single source of truth for.
+_FIRST_NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
+
+
 def _format_area(val: Any) -> int:
     """Convert sqft to int. Clamp to [150, 10000]; -1 is the absent sentinel.
 
     Rejects values outside realistic apartment bounds (150-10000 sqft). This
     prevents bedroom counts / floor numbers / truncated strings (observed in
     the 2026-04-19 run: 9, 12, 50, 70, 100, 127-129) from leaking as sqft.
+
+    2026-07-29: ``int(float(str(val)))`` could not parse a thousands
+    separator, so every source publishing ``"1,050"`` / ``"1,250 sq ft"``
+    collapsed to ``-1`` — the ABSENT sentinel, indistinguishable from a
+    genuine absence and, since task #56, feeding a client-facing
+    ``area_absence`` label. Strip the grouping commas and take the first
+    numeric token before coercing. The [150, 10000] bound is UNCHANGED and
+    still rejects the bed-count / floor-number / truncated-"070" garbage.
+
+    The jugnu runner carried this widening alone since 2026-05-19; its copy
+    now delegates here (``scripts/runners/jugnu.py::_format_area``) so the
+    two v2 unit formatters cannot disagree about what a square footage is.
     """
     if val is None or val == -1:
         return -1
+    s = _THOUSANDS_SEP_RE.sub("", str(val))
+    m = _FIRST_NUMBER_RE.search(s)
+    if not m:
+        return -1
     try:
-        n = int(float(str(val)))
+        n = int(float(m.group(0)))
     except (ValueError, TypeError):
         return -1
     if 150 <= n <= 10_000:

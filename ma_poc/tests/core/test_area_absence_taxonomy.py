@@ -240,11 +240,17 @@ def test_property_publishes_area_reads_the_formatter_aliases() -> None:
     assert property_publishes_area([{"sqft": "742"}]) is True
     assert property_publishes_area([{"_sqft": 742}]) is True
     assert property_publishes_area([{"squareFeet": "1050"}]) is True
-    # Pre-existing ``_format_area`` behaviour, pinned here because it decides
-    # a label: a comma-grouped string does not parse, so it is NOT evidence
-    # the operator published a size — and the row that carried it is labelled
-    # NOT_CAPTURED (value_rejected_by_area_bounds), never NOT_PUBLISHED.
-    assert property_publishes_area([{"sqft": "1,050"}]) is False
+    # 2026-07-29: was pinned ``False`` because ``_format_area`` could not
+    # parse a thousands separator — ``"1,050"`` collapsed to the ABSENT
+    # sentinel and the row was labelled NOT_CAPTURED
+    # (value_rejected_by_area_bounds). That was a parse bug, not evidence
+    # about the operator: a source that ships "1,050" HAS published a size.
+    # The formatter now strips grouping commas, so this is real evidence.
+    assert property_publishes_area([{"sqft": "1,050"}]) is True
+    # Only a GENUINE thousands separator counts. "1,2" is malformed, not
+    # 12 — it must not become evidence of a published size by way of a
+    # blanket comma strip. See test_format_area_thousands_separator.
+    assert property_publishes_area([{"sqft": "1,2"}]) is False
     # Out-of-bounds values are not evidence the operator published a size.
     assert property_publishes_area([{"sqft": "0"}]) is False
     assert property_publishes_area([{"sqft": "9"}]) is False
@@ -309,3 +315,117 @@ def test_production_runner_fork_emits_the_same_labels() -> None:
         assert core["area_absence_evidence"] == evidence
         assert fork["area_absence_evidence"] == evidence
         assert core["area"] == fork["area"]
+
+
+# ── The thousands separator, as a table ──────────────────────────────────────
+#
+# ``_format_area`` coerced with ``int(float(str(val)))``, which cannot parse a
+# grouping comma: every source publishing ``"1,050 sq ft"`` collapsed to the
+# ABSENT sentinel -1 and became indistinguishable from a genuine absence. The
+# jugnu copy was widened for this on 2026-05-19 and the core copy was not, so
+# the two v2 unit formatters disagreed about what a square footage is for two
+# months — the same one-label-two-code-paths defect this task hit with
+# ``is_floor_plan_level``. The core copy now carries the parse and the jugnu
+# copy delegates to it; ``test_both_area_parsers_agree`` holds that shut.
+#
+# The must-NOT-match rows are the point of the table. The obvious fix — strip
+# EVERY comma — reads the malformed ``"1,2"`` as 12 and the European decimal
+# ``"950,5"`` as 9505 sqft. Only a comma that is preceded by a digit and
+# followed by exactly three more is a thousands separator; everything else
+# falls back to the first whole numeric token and meets the [150, 10000]
+# bound, which is unchanged.
+#
+# (raw, expected area, why)
+_AREA_PARSE_CASES: list[tuple[object, int, str]] = [
+    # ── must match: a real thousands separator, recovered ──
+    ("1,050", 1050, "the reported bug: grouped sqft was reading as ABSENT"),
+    ("1,250", 1250, "same, second magnitude"),
+    ("1,050 sq ft", 1050, "grouped + unit suffix"),
+    ("1,050 sqft", 1050, "grouped + unit suffix, no space in token"),
+    ("1,050.5", 1050, "grouped + decimal fraction"),
+    ("  1,050  ", 1050, "grouped + surrounding whitespace"),
+    ("1,050-1,200", 1050, "range → LOW bound, as the jugnu copy has always done"),
+
+    # ── must NOT match: not a thousands separator ──
+    # A blanket comma strip reads this as 12 — an in-bounds-looking number
+    # built out of a comma that never meant anything.
+    ("1,2", -1, "malformed: comma not followed by three digits"),
+    # European decimal notation. A blanket strip reads 9505 sqft — in bounds,
+    # plausible, and wrong by a factor of ten. The narrow rule leaves the
+    # comma alone and the first whole token (950) is the correct answer.
+    ("950,5", 950, "european decimal: must not concatenate to 9505"),
+    ("1,0500", -1, "four digits after the comma is not a grouping"),
+    ("12,345", -1, "genuine grouping, but 12345 sqft is out of bounds"),
+
+    # ── must NOT match: nothing numeric to find ──
+    ("Call for details.", -1, "operator-gated text carries no size"),
+    ("Studio", -1, "plan name, not a size"),
+    ("", -1, "empty string"),
+    ("   ", -1, "whitespace only"),
+    (None, -1, "absent"),
+    (-1, -1, "already the ABSENT sentinel"),
+    ("-1", -1, "the sentinel as a string"),
+
+    # ── regression: the bound and the clean forms are UNCHANGED ──
+    ("1050", 1050, "clean string int"),
+    ("1050.0", 1050, "clean string float"),
+    (1050, 1050, "clean int"),
+    (1050.0, 1050, "clean float"),
+    ("150", 150, "lower bound is inclusive"),
+    ("10000", 10000, "upper bound is inclusive"),
+    ("149", -1, "just below the bound"),
+    ("10001", -1, "just above the bound"),
+    ("070", -1, "truncated garbage still rejected"),
+    ("9", -1, "bed count still rejected"),
+    ("100", -1, "floor number still rejected"),
+    ("0", -1, "zero is not a size"),
+]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected", "why"),
+    [pytest.param(r, e, w, id=f"{r!r}->{e}") for r, e, w in _AREA_PARSE_CASES],
+)
+def test_format_area_thousands_separator(
+    raw: object, expected: int, why: str
+) -> None:
+    """A grouped square footage parses; a comma that isn't a grouping doesn't."""
+    from ma_poc.core.schema_v2 import _format_area
+
+    assert _format_area(raw) == expected, why
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected", "why"),
+    [pytest.param(r, e, w, id=f"{r!r}->{e}") for r, e, w in _AREA_PARSE_CASES],
+)
+def test_both_area_parsers_agree(raw: object, expected: int, why: str) -> None:
+    """The jugnu fork must not drift from core again.
+
+    It delegates today, so this is cheap; it fails loudly the moment somebody
+    re-forks the body — which is exactly how the two copies came to disagree
+    about the thousands separator for two months.
+    """
+    from ma_poc.core.schema_v2 import _format_area as core_area
+    from ma_poc.scripts.runners.jugnu import _format_area as fork_area
+
+    assert core_area(raw) == fork_area(raw) == expected, why
+
+
+def test_grouped_area_reaches_the_v2_wire_field() -> None:
+    """End-to-end: the parse fix must actually move ``area`` on the record,
+    and must clear the absence label that the -1 was carrying."""
+    from datetime import datetime
+
+    ts = datetime(2026, 7, 27, 12, 0, 0)
+    for fmt in (_format_v2_unit, _jugnu_format_v2_unit()):
+        row = fmt({"unit_number": "1", "sqft": "1,050"}, ts, "P1")
+        assert row["area"] == 1050
+        assert row["area_absence"] is None
+        assert row["area_absence_evidence"] is None
+
+
+def _jugnu_format_v2_unit():  # type: ignore[no-untyped-def]
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit as f
+
+    return f

@@ -4110,26 +4110,24 @@ def _format_area(val: Any) -> int:
     truncated values like "070") and gets coerced to -1. Previously any
     positive integer was accepted, which is why the 2026-04-19 run had area
     values of 9, 12, 50, 70, 100, etc. passed through as "successful".
+
+    2026-05-19: ``int(float(str(val)))`` silently discarded the very common
+    comma / unit-suffixed / range sqft forms ("1,200", "1,200 sq ft",
+    "1200 sqft", "1,200-1,400") → area=-1. This copy was widened to pull the
+    first numeric token; ``core/schema_v2._format_area`` was not, so the two
+    v2 unit formatters disagreed about what a square footage is for two
+    months — the same one-label-two-code-paths defect task #56 hit with
+    ``is_floor_plan_level``.
+
+    2026-07-29: delegate to ``schema_v2._format_area``, which now carries the
+    widening. Behaviour here is unchanged for every form this copy already
+    accepted, and the malformed ``"1,2"`` / European-decimal ``"950,5"``
+    cases improve: the delegate strips only genuine thousands separators
+    instead of every comma.
     """
-    if val is None or val == -1:
-        return -1
-    # 2026-05-19: ``int(float(str(val)))`` silently discarded the very
-    # common comma / unit-suffixed / range sqft forms ("1,200",
-    # "1,200 sq ft", "1200 sqft", "1,200-1,400") → area=-1. Pull the first
-    # numeric token first (range → low bound). The 150–10,000 sanity
-    # bound below is UNCHANGED — it still rejects bed counts / floor
-    # numbers / truncated "070" garbage (additive: clean ints identical).
-    s = str(val).replace(",", "")
-    m = _re.search(r"\d+(?:\.\d+)?", s)
-    if not m:
-        return -1
-    try:
-        n = int(float(m.group(0)))
-    except (ValueError, TypeError):
-        return -1
-    if 150 <= n <= 10_000:
-        return n
-    return -1
+    from ma_poc.core.schema_v2 import _format_area as _canon
+
+    return _canon(val)
 
 
 def _format_date_str(val: Any) -> str | None:
