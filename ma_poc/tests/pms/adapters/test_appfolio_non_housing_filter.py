@@ -50,13 +50,10 @@ from ma_poc.pms.adapters.appfolio import (
     ("Studio Loft", False),
     ("1919 14th Street NW Unit 5", False),
     ("Penthouse", False),
-    # Edge — false-positive check (real units with "garage" in description)
-    # NB: this is intentional. If an apartment listing description merely
-    # mentions a garage as an amenity, the filter still triggers — this
-    # is the safer side of the trade-off (a small loss of true positives
-    # for a large gain in removing parking/storage clutter). If false
-    # positives become a problem at scale, tighten the regex to anchor on
-    # the address line only.
+    # 2026-07-29 — the SSR call site no longer passes the card body here.
+    # The keyword regex itself is unchanged and still fires on any text it
+    # is handed; the contract is now about WHICH text it is handed. See
+    # test_ssr_card_drop_table below for the arm-level table.
 ])
 def test_keyword_classifier(text: str, expected: bool) -> None:
     assert _is_non_housing_listing(text) is expected
@@ -175,14 +172,24 @@ def test_listings_ssr_skips_parking_address() -> None:
     assert units[0]["unit_number"] in ("200", "2B", "Unit 2B")
 
 
-def test_listings_ssr_garage_in_body_is_filtered() -> None:
-    """Real apartment listings that have 'garage' in the body (e.g., as
-    an amenity description) DO get filtered. This is intentionally over-
-    cautious — see the classifier docstring."""
+def test_listings_ssr_garage_in_body_is_kept() -> None:
+    """An apartment whose BODY mentions a garage is a real apartment.
+
+    Was ``test_listings_ssr_garage_in_body_is_filtered``, which pinned the
+    opposite and carried its own exit condition: "If at scale this drops too
+    many real apartments, tighten to scan address only." Measured live
+    2026-07-29 across 65 tenants ({slug}.appfolio.com/listings, plain static
+    GET, curl_cffi impersonate=chrome, 65/65 HTTP 200): the body arm dropped
+    2,352 of 8,430 card containers, 2,094 of which carry a bed/bath blurb AND
+    rent >= $500, while the address arm dropped 1. The exit condition fired.
+
+    This assertion is strictly stronger than the one it replaces: the row must
+    survive AND its fields must come through.
+    """
     html = """
     <div data-listing-id="300" class="js-listing-card">
         <div class="js-listing-blurb-rent">$1,800</div>
-        <div class="js-listing-blurb-bed-bath">2 BR / 2 BA</div>
+        <div class="js-listing-blurb-bed-bath">2 bd / 2 ba</div>
         <div class="js-listing-square-feet">1100</div>
         <div class="js-listing-address">123 Main St Apt 5</div>
         <p>Beautiful unit with attached garage</p>
@@ -190,10 +197,103 @@ def test_listings_ssr_garage_in_body_is_filtered() -> None:
     <footer>cutoff</footer>
     """
     units = parse_appfolio_listings_ssr(html, "x")
-    # Filter triggers on 'garage' in body — intentional over-cautious
-    # behaviour. If at scale this drops too many real apartments, tighten
-    # to scan address only (see classifier docstring).
-    assert units == []
+    assert len(units) == 1
+    assert units[0]["rent_range"]
+    assert units[0]["bedrooms"] == "2"
+    assert units[0]["sqft"] == "1100"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Arm table — which text field may trigger the drop
+#
+# Every "must NOT drop" body string below is verbatim live copy captured
+# 2026-07-29 from {slug}.appfolio.com/listings by plain unauthenticated
+# static GET (curl_cffi impersonate=chrome). Tenant named per row.
+# Every "must drop" address is a real non-housing listing label.
+# ─────────────────────────────────────────────────────────────────────
+
+_KEEP = False   # expected_dropped
+_DROP = True
+
+_SSR_CARD_TABLE = [
+    # ── must NOT drop: ordinary apartments whose own copy names a
+    #    parking / storage / garage / bike amenity ───────────────────
+    ("richelsonmanagement: 'lots of storage space'", "834 S Cliffs Circle, Apt 201, Spring Lake, NC 28390",
+     "Also includes lots of storage space with multiple closets through the apartment!", _KEEP),
+    ("becovic: amenity list names a Bike Room", "7528 N Seeley Ave #B4, Chicago, IL 60645",
+     "Amenities: Fitness Center, Bike Room, BBQ Stone Patio Seating with Grill, Elevator Building", _KEEP),
+    ("wdcproperties: amenity list names Bike Storage", "1600 SE Lava Dr. - 103, Milwaukie, OR 97222",
+     "Amenities: Bike Storage, Granite Countertops, Stainless Steel Appliances, Balcony, Game Room", _KEEP),
+    ("vdbprop: amenity list names Covered Carport", "2409 Branch Creek Circle #3, Paso Robles, CA 93446",
+     "Amenities: dishwasher, Covered Carport, Gas Water Heaters, Mini Blinds, Vertical Blinds", _KEEP),
+    ("fairgrove: amenity list names Assigned Car Port", "755 Gaviota Ave - 06, Long Beach, CA 90813",
+     "Amenities: 24 Hour On-Site Laundry, Gated Community, Wall Heater, Assigned Car Port", _KEEP),
+    ("concordemgmt: 'off-street parking' in description", "6041 Cornhusker Hwy - 01, Lincoln, NE 68507",
+     "These apartments feature controlled access entry, all electric units, elevator in"
+     " building, and off-street parking.", _KEEP),
+    ("investorsmgmt: 'underground parking' in description", "505-511 36th Ave. NE, Minot, ND 58703",
+     "Badlands Apartments feature a modern interior design with great amenities like"
+     " underground parking, elevators and in-unit laundry.", _KEEP),
+    ("brunerrealty: free parking stall in description", "4320 North Towne Court, Unit 104, Windsor, WI 53598",
+     "Apartments come equipped with dishwasher, in-unit laundry, and one free off street,"
+     " underground, heated parking stall.", _KEEP),
+    ("vdbprop: amenity list is only 'Detached Garage'", "11215 North Alicante Drive # 10-306, Fresno, CA 93730",
+     "Amenities: Detached Garage Pet Policy: Cats allowed, Dogs allowed", _KEEP),
+    ("cathcartres: marketing headline names Attached Garage", "2015 Reserve Circle, Harrisonburg, VA 22801",
+     "The Blue Ridge is an 825 sq. ft. one-bedroom apartment home featuring the added"
+     " convenience of an attached garage.", _KEEP),
+    ("blackrealtymanagement: concession waives carport fee", "1620 N River Ridge Blvd, Spokane, WA 99224",
+     "FREE RENT! WAIVING ALL PET, AND CARPORT FEES! - Beautiful Studios and One-Bedrooms", _KEEP),
+    ("plain apartment, no keyword anywhere", "123 Main St Apt 5, Springfield, IL 62701",
+     "In-unit washer and dryer, quartz countertops, private balcony.", _KEEP),
+
+    # ── must drop: the listing's own ADDRESS says what it is ────────
+    ("gmholdings: live 2026-07-29 storage roster row", "2001-15 E Glenwood Ave - Storage Units, Philadelphia, PA 19134",
+     "Coming Soon Sea Container Storage Units! These secure units offer ample lighting.", _DROP),
+    ("canary pid 54745 non-resident parking", "1919 14th Street, NW - Non-Resident Parking 05, Washington, DC 20009",
+     "Assigned space.", _DROP),
+    ("parking space by address", "555 Main St - Parking Space A12, Chicago, IL 60626",
+     "Reserved outdoor space.", _DROP),
+    ("garage bay by address", "88 Elm Ave - Garage Bay 5, Portland, OR 97203",
+     "Overhead door, concrete floor.", _DROP),
+    ("storage locker by address", "12 Oak Blvd - Locker 14B, Spokane, WA 99201",
+     "Ground floor, keyed.", _DROP),
+    ("carport by address", "400 Pine St - Carport 12, Long Beach, CA 90813",
+     "Covered, assigned.", _DROP),
+]
+
+
+@pytest.mark.parametrize(
+    "label,address,body_text,expected_dropped",
+    [(r[0], r[1], r[2], r[3]) for r in _SSR_CARD_TABLE],
+    ids=[r[0] for r in _SSR_CARD_TABLE],
+)
+def test_ssr_card_drop_table(
+    label: str, address: str, body_text: str, expected_dropped: bool
+) -> None:
+    """One card per parse — the drop decision must key off the address only.
+
+    One card per HTML document on purpose: with two cards the SSR block regex
+    splices each card's tail onto the next card's head (tracked separately as
+    the SSR field-pairing bug), which would make this table ambiguous.
+    """
+    html = f"""
+    <div data-listing-id="4242" class="js-listing-card">
+        <div class="js-listing-blurb-rent">$1,800</div>
+        <div class="js-listing-blurb-bed-bath">2 bd / 2 ba</div>
+        <div class="js-listing-square-feet">Square Feet: 1,100</div>
+        <div class="js-listing-address">{address}</div>
+        <p class="js-listing-description">{body_text}</p>
+    </div>
+    <footer>cutoff</footer>
+    """
+    units = parse_appfolio_listings_ssr(html, "https://x.test/listings")
+    dropped = units == []
+    assert dropped is expected_dropped, (
+        f"{label}: address={address!r} body={body_text!r} -> "
+        f"{'dropped' if dropped else 'kept'}, expected "
+        f"{'dropped' if expected_dropped else 'kept'}"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────
