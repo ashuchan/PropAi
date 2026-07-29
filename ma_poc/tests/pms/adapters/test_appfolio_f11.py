@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import pytest
 
 from ma_poc.pms.adapters.appfolio import (
+    _LISTING_CARD_RE,
     AppFolioAdapter,
     _extract_unit_from_address,
     parse_appfolio_detail_page,
@@ -574,3 +575,123 @@ def test_legacy_anchor_split_still_parses_a_page_without_containers() -> None:
     legacy = _OFF_BY_ONE_HTML.replace("js-listing-item", "legacy-card")
     units = parse_appfolio_listings_ssr(legacy, "https://x.appfolio.com/listings")
     assert units, "fallback produced no cards at all"
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-29 (task #72, "SSR field pairing") — the SILENT TRAPDOOR under the
+# 07-28 segmentation fix.
+#
+# #72 itself is gone. Measured 2026-07-29 by re-parsing REAL bodies with this
+# tree's parser and arbitrating each row against an independent lxml-DOM
+# oracle (each js-listing-item node's OWN subtree):
+#   * the one container-shaped body in run-2026-07-27-full-0d54ca7
+#     (shard_28 / pid 17555): 69 cards, 69 judgeable, 0 carrying another
+#     unit's area;
+#   * a live cohort, plain static GET (curl_cffi impersonate=chrome, no
+#     proxy, no rotation) of 197 {slug}.appfolio.com/listings tenant slugs
+#     harvested from that run, all HTTP 200 -> 193 with listing markup,
+#     18,340 cards, 18,337 rows, 16,648 arbitrable: 0 carrying another
+#     unit's area.
+# Neutering _iter_listing_cards back to the anchor split takes that same
+# cohort to 13,765 / 16,458 (83.6%) — so the oracle is not blind.
+#
+# But the container pattern required ``class`` to appear BEFORE ``id`` in the
+# card tag. Attribute order in HTML carries no meaning. Rewriting those same
+# 193 real bodies with ONLY the order swapped produced ZERO container matches
+# on 193/193 tenants — every one silently fell through to the legacy anchor
+# split and #72 came back at 83.6%, with no test failing anywhere.
+#
+# These pin the anchor against that whole class of cosmetic markup change.
+# ---------------------------------------------------------------------------
+
+_CARD_TAG_CASES = [
+    # (tag, expected listing id or None, why)
+    ('<div class="listing-item result js-listing-item" id="listing_728">', "728",
+     "the shape all 18,340 live cards emit today"),
+    ('<div id="listing_728" class="listing-item result js-listing-item">', "728",
+     "same card, attributes swapped - this is the trapdoor"),
+    ('<DIV CLASS="JS-LISTING-ITEM" ID="LISTING_9">', "9", "uppercase tag and attributes"),
+    ('<div class="js-listing-item" data-x="1" id="listing_40501">', "40501",
+     "unrelated attribute between class and id"),
+    ('<div id="listing_7" data-x="1" class="a js-listing-item b">', "7",
+     "id first, card class mid token-list"),
+    ('<div\n  class="js-listing-item"\n  id="listing_12">', "12",
+     "attributes split across lines"),
+    ('<div class="listing-item result" id="listing_728">', None,
+     "MUST NOT: an id alone is not a card"),
+    ('<div id="listing_5">', None, "MUST NOT: id without the card class"),
+    ('<div class="js-listing-item">', None, "MUST NOT: card class without an id"),
+    ('<div class="js-listing-item" id="listing_abc">', None,
+     "MUST NOT: the listing id is numeric"),
+    ('<div class="js-listing-item" data-id="listing_5">', None,
+     "MUST NOT: data-id must not stand in for id"),
+    ('<div class="js-listing-items" id="listing_5">', None,
+     "MUST NOT: js-listing-items is a different class"),
+    ('<div class="js-listing-item-footer" id="listing_3">', None,
+     "MUST NOT: hyphen-suffixed class (\\b treats - as a boundary)"),
+    ('<div class="my-js-listing-item" id="listing_3">', None,
+     "MUST NOT: hyphen-prefixed class"),
+    ('<div class="js-listing-itemx" id="listing_3">', None,
+     "MUST NOT: letter-suffixed class"),
+    ('<div data-tpl="js-listing-item" id="listing_3">', None,
+     "MUST NOT: the token must be in class=, not any attribute"),
+    ('<a class="js-listing-item" id="listing_5">', None,
+     "MUST NOT: an anchor is not the card container"),
+]
+
+
+@pytest.mark.parametrize("tag,want,why", _CARD_TAG_CASES, ids=[c[2] for c in _CARD_TAG_CASES])
+def test_card_container_anchor_table(tag: str, want: str | None, why: str) -> None:
+    m = _LISTING_CARD_RE.search(tag + '<span class="js-listing-address">1 A St</span></div></main>')
+    got = m.group("id") if m else None
+    assert got == want, f"{why}: {tag!r} -> {got!r}, wanted {want!r}"
+
+
+def test_attribute_order_does_not_silently_reopen_the_off_by_one() -> None:
+    """The end-to-end consequence: the SAME cards with id= written before
+    class= must still keep each card's own square footage. Before this was
+    pinned, the swap produced zero container matches, the legacy anchor split
+    took over, and every row inherited its neighbour's area."""
+    swapped = _OFF_BY_ONE_HTML.replace(
+        '<div class="listing-item result js-listing-item" id="listing_',
+        '<div id="listing_',
+    )
+    # rebuild the tag as id-first, class-last
+    for lid in ("101", "102", "103"):
+        swapped = swapped.replace(
+            f'<div id="listing_{lid}">',
+            f'<div id="listing_{lid}" class="listing-item result js-listing-item">',
+        )
+    assert 'class="listing-item result js-listing-item">' in swapped
+    units = parse_appfolio_listings_ssr(swapped, "https://x.appfolio.com/listings")
+    assert len(units) == 3, f"attribute swap changed the card count: {len(units)}"
+    got = _by_address(units)
+    for addr, want in (
+        ("242 Hemlock St., Seaside, OR 97138", "1994"),
+        ("849 1st Ave - Unit A, Seaside, OR 97138", "1584"),
+        ("2130 NW Fillmore Ave., 8A, Corvallis, OR 97330", "208"),
+    ):
+        hit = [v for k, v in got.items() if k.startswith(addr[:22])]
+        assert hit, f"no row emitted for {addr!r} (got {list(got)})"
+        assert hit[0].replace(",", "") == want, (
+            f"{addr!r} reported sqft {hit[0]!r}, wanted {want} — the "
+            "attribute swap dropped the parser back onto the anchor split"
+        )
+
+
+def test_a_lookalike_class_does_not_open_a_phantom_card() -> None:
+    """``\\bjs-listing-item\\b`` also matched ``js-listing-item-footer``. An
+    unrelated element carrying id="listing_N" would have opened a card and
+    swallowed the following real card's fields."""
+    html = _OFF_BY_ONE_HTML.replace(
+        '<div class="listing-item result js-listing-item" id="listing_102">',
+        '<div class="js-listing-item-footer" id="listing_999"></div>'
+        '<div class="listing-item result js-listing-item" id="listing_102">',
+    )
+    units = parse_appfolio_listings_ssr(html, "https://x.appfolio.com/listings")
+    assert len(units) == 3, f"a lookalike class opened a phantom card: {len(units)}"
+    got = _by_address(units)
+    hit = [v for k, v in got.items() if k.startswith("849 1st Ave")]
+    assert hit and hit[0].replace(",", "") == "1584", (
+        f"the card after the lookalike lost its own area: {got}"
+    )

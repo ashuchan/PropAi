@@ -875,10 +875,47 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
 #
 # The ``area = -1`` rows were the visible tail of the same defect: a card
 # lacking a sqft span left the FOLLOWING unit with no area at all.
+#
+# 2026-07-29 — the container anchor no longer assumes ATTRIBUTE ORDER.
+#
+# The pattern above required ``class`` to appear before ``id`` inside the card
+# tag. Attribute order in an HTML tag carries no meaning, so a template that
+# emitted ``<div id="listing_728" class="... js-listing-item">`` would produce
+# ZERO container matches — and ``_iter_listing_cards`` would then fall back to
+# the legacy anchor split, which IS the off-by-one, with nothing failing and
+# no signal anywhere. A cosmetic upstream change would have silently restored
+# the whole defect.
+#
+# Measured 2026-07-29 (plain static GET, curl_cffi impersonate=chrome, 197
+# ``{slug}.appfolio.com/listings`` tenant slugs harvested from the 07-27 run,
+# all HTTP 200; 193 carry listing markup, 18,340 cards). Every one of the
+# 18,340 card tags is ``class``-first today, so this changes nothing about
+# what is parsed. Rewriting those same real bodies with ONLY the attribute
+# order swapped:
+#     containers found by the class-first pattern : 0 tenants of 193
+#     rows carrying another unit's area           : 13,765 / 16,458 (83.6%)
+# The lookahead is order-agnostic too — a boundary that stops matching is the
+# same trapdoor by another route (cards would merge instead of splitting).
+#
+# Two smaller sharpenings ride along, both verified to leave the card count on
+# those 193 bodies at exactly 18,340:
+#   * ``\s`` before ``id=`` (rather than ``\b``) stops ``data-id="listing_5"``
+#     from standing in for the real id attribute — ``\b`` matches after a
+#     hyphen, so the old pattern accepted it.
+#   * the class token is tested as a CLASS TOKEN, inside ``class="..."`` and
+#     bounded by ``(?<![\w-])``/``(?![\w-])``. ``\bjs-listing-item\b`` also
+#     matched ``js-listing-item-footer`` and ``my-js-listing-item``, because
+#     ``\b`` treats ``-`` as a boundary — an unrelated element could have
+#     opened a phantom card and swallowed the real one's fields.
+_CARD_OPEN = (
+    r'<div(?=[^>]*\bclass="[^"]*(?<![\w-])js-listing-item(?![\w-]))'
+    r'[^>]*\sid="listing_[0-9]+"[^>]*>'
+)
 _LISTING_CARD_RE = re.compile(
-    r'<div[^>]*\bjs-listing-item\b[^>]*\bid="listing_(?P<id>[0-9]+)"[^>]*>'
+    r'<div(?=[^>]*\bclass="[^"]*(?<![\w-])js-listing-item(?![\w-]))'
+    r'[^>]*\sid="listing_(?P<id>[0-9]+)"[^>]*>'
     r'(?P<body>.*?)'
-    r'(?=<div[^>]*\bjs-listing-item\b[^>]*\bid="listing_[0-9]+"|<footer|</main|\Z)',
+    r'(?=' + _CARD_OPEN + r'|<footer|</main|\Z)',
     re.IGNORECASE | re.DOTALL,
 )
 # Retained as a fallback ONLY. Any tenant that does not emit the
