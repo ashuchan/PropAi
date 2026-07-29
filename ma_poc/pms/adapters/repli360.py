@@ -84,6 +84,110 @@ _MARK_RE = re.compile(
 )
 _MONEY_RE = re.compile(r"[\d,]+")
 
+# ── Per-unit SQFT (2026-07-28) ──────────────────────────────────────────────
+# The getUnitListByFloor availability table has its own "Unit SQFT" column:
+#
+#   <tr><th>Unit Number</th><th>Unit SQFT</th>…</tr>
+#   <tr class="unitlisting …">
+#     <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+#         <b class="unitNumber">0219</b></td>
+#     <td><span class="mobile_rrac">Unit SQFT</span><b>932 SQFT</b></td>
+#     …
+#
+# Until this was read, sqft came ONLY from the plan card via
+# merge_repli360_plan_meta — and that card writes a RANGE for multi-size
+# plans ("<span>932 - 1084</span> sq.ft."), which _SQFT_META_RE (which
+# requires a span of pure digits) does not match. Every unit of such a
+# plan therefore shipped area=-1 even though its own row said "932 SQFT".
+# Measured on the 2026-07-27 reference run: 37 rows across 5 properties.
+#
+# Column ORDER is not stable across templates (Enclave at Brookside puts
+# Deposit/Special/Amenities in different positions and its Deposit cell is
+# "$300"), so the cell is located by its per-cell ``span.mobile_rrac``
+# LABEL, with a <th> header-index join as fallback. Both then require the
+# remaining cell text to be a bare number with an optional sqft unit —
+# "$1,485", "Available Now" and "-" can never be mistaken for an area.
+_SQFT_LABELS: frozenset[str] = frozenset(
+    {
+        "sqft",
+        "unitsqft",
+        "sqfeet",
+        "unitsqfeet",
+        "squarefeet",
+        "unitsquarefeet",
+        "squarefootage",
+        "unitsquarefootage",
+        "size",
+        "unitsize",
+    }
+)
+_LABEL_NORM_RE = re.compile(r"[^a-z]")
+# The cell, once its label span is removed, must be JUST a number with an
+# optional sq-ft unit. Deliberately anchored: a substring search for
+# digits would happily read "$1,485" out of the price cell.
+_UNIT_SQFT_VALUE_RE = re.compile(
+    r"^([\d,]{2,7})\s*(?:sq\.?\s*ft\.?|sqft|sq\.?\s*feet|sf)?$",
+    re.IGNORECASE,
+)
+
+# ── Per-unit BUILDING (2026-07-28) ──────────────────────────────────────────
+# ``building`` used to be the FIRST <td> of the row with the literal string
+# "Building Number" stripped off it:
+#
+#     building = tds[0].get_text(strip=True).replace("Building Number", "")
+#
+# That is true of royceattrumbull (site_id 1619, the 2026-05-17 reference
+# property), whose first column IS "Building Number". The current repli360
+# template leads with "Unit Number" and has NO building column:
+#
+#   <tr><th>Unit Number</th><th>Unit SQFT</th>…</tr>
+#   <tr class="unitlisting …">
+#     <td><span class="unitNumberlbl mobile_rrac">Unit Number</span>
+#         <b class="unitNumber">0219</b></td>
+#
+# so the strip matched nothing and the COLUMN LABEL shipped concatenated
+# with the unit number — building="Unit Number0219". Reference run
+# 2026-07-27 (run-2026-07-27-full-0d54ca7): all 30 units of Marquis at
+# Great Hills, and likewise Marquis Parkside, Marq on Burnet, Hamburg
+# Farms and Enclave at Brookside. Over the 10 captured payloads, 212 of
+# 229 rows; the other 17 are royce's and were always right.
+#
+# Located exactly like the sqft column above — per-cell ``span.mobile_rrac``
+# LABEL first, that table's ``<th>`` header index second — so a template
+# with no building column yields '' (genuinely absent) rather than a
+# label-plus-unit-number string, and a template that MOVES the column is
+# still read correctly.
+_BUILDING_LABELS: frozenset[str] = frozenset(
+    {
+        "building",
+        "buildingnumber",
+        "buildingno",
+        "buildingname",
+        "buildingid",
+        "bldg",
+        "bldgnumber",
+        "bldgno",
+        "bldgname",
+        "bldgid",
+    }
+)
+# A cell located by its header index carries no label span, but some
+# templates still repeat the label as literal text ("Building Number 6").
+# Strip that redundant prefix so the value matches the labelled path —
+# royce's own rows read "4", not "Building Number 4". The ``\b`` matters:
+# without it this eats the first four letters of a building genuinely
+# named "Bldgwood" and ships "wood".
+_BUILDING_LABEL_PREFIX_RE = re.compile(
+    r"^(?:building|bldg)\b\.?\s*(?:number|name|no\.?|id|#)?\s*[:#.\-]?\s*",
+    re.IGNORECASE,
+)
+# Placeholder cells ("-", "—", "N/A") mean the template has the column but
+# this unit has no building; that is absent, not a building called "-".
+_BUILDING_PLACEHOLDERS: frozenset[str] = frozenset(
+    {"", "-", "--", "—", "–", "n/a", "na", "none", "null", "tbd"}
+)
+_WS_RE = re.compile(r"\s+")
+
 # Plan-meta extraction (the /admin/template-render HTML carries plan
 # name, beds, baths, sqft right next to each getUnitListByFloor onclick;
 # the per-unit getUnitListByFloor response has rent + unit_number but
@@ -309,11 +413,178 @@ def parse_repli360_plan_meta(html: str) -> dict[str, dict[str, str]]:
     return out
 
 
+def _is_sqft_label(text: str) -> bool:
+    """True when *text* is a column label meaning "square feet".
+
+    Exact-set membership on the letters-only normalisation ("Unit SQFT" →
+    "unitsqft"), NOT a substring search. A substring rule is how a fee
+    regex once matched "Feet" inside "Square Feet"; matching whole labels
+    fails closed (area stays absent) instead of grabbing the wrong cell.
+    """
+    return _LABEL_NORM_RE.sub("", (text or "").lower()) in _SQFT_LABELS
+
+
+def _sqft_from_cell(cell_text: str, label_text: str = "") -> str:
+    """Return the integer sqft in one table cell, or ''.
+
+    ``label_text`` (the cell's own ``span.mobile_rrac`` label) is stripped
+    first; the remainder must be a bare number with an optional sq-ft unit
+    — "932 SQFT" → "932". "$1,485", "Available Now", "-" and a
+    "932 - 1084" range all return '' rather than a guess.
+    """
+    txt = (cell_text or "").strip()
+    if label_text:
+        txt = txt.replace(label_text, "", 1).strip()
+    m = _UNIT_SQFT_VALUE_RE.match(txt)
+    if not m:
+        return ""
+    digits = m.group(1).replace(",", "")
+    if not digits.isdigit() or not (2 <= len(digits) <= 5):
+        return ""
+    return digits
+
+
+def _header_sqft_index(tr: Any) -> int | None:
+    """Index of the "Unit SQFT" ``<th>`` in *tr*'s own table, or None.
+
+    Fallback for templates that omit the per-cell ``span.mobile_rrac``
+    labels. Column order is not stable across repli360 templates, so the
+    index is read from that table's header row rather than assumed.
+    """
+    try:
+        table = tr.find_parent("table")
+        if table is None:
+            return None
+        ths = table.find_all("th")
+        for idx, th in enumerate(ths):
+            if _is_sqft_label(th.get_text(" ", strip=True)):
+                return idx
+    except Exception:  # noqa: BLE001 — never raise from a parser
+        return None
+    return None
+
+
+def extract_unit_sqft(tr: Any) -> str:
+    """Return the per-unit sqft for one ``tr.unitlisting`` row, or ''.
+
+    Reads the row's OWN "Unit SQFT" cell — this is unit-level evidence,
+    not a plan-level inference, so it needs no provenance flag. Located by
+    the cell's label span first, by the table's ``<th>`` header index
+    second. Never raises.
+    """
+    try:
+        tds = tr.find_all("td")
+        for td in tds:
+            lbl = td.select_one("span.mobile_rrac")
+            if lbl is None:
+                continue
+            label_text = lbl.get_text(" ", strip=True)
+            if not _is_sqft_label(label_text):
+                continue
+            got = _sqft_from_cell(td.get_text(" ", strip=True), label_text)
+            if got:
+                return got
+        idx = _header_sqft_index(tr)
+        if idx is not None and 0 <= idx < len(tds):
+            td = tds[idx]
+            lbl = td.select_one("span.mobile_rrac")
+            label_text = lbl.get_text(" ", strip=True) if lbl is not None else ""
+            return _sqft_from_cell(td.get_text(" ", strip=True), label_text)
+    except Exception:  # noqa: BLE001 — never raise from a parser
+        return ""
+    return ""
+
+
+def _is_building_label(text: str) -> bool:
+    """True when *text* is a column label meaning "building".
+
+    Exact-set membership on the letters-only normalisation ("Building
+    Number" → "buildingnumber"), NOT a substring search — "Building
+    Amenities" normalises to "buildingamenities" and is correctly
+    rejected. Whole-label matching fails closed (building stays absent)
+    instead of grabbing the wrong cell.
+    """
+    return _LABEL_NORM_RE.sub("", (text or "").lower()) in _BUILDING_LABELS
+
+
+def _building_from_cell(cell_text: str, label_text: str = "") -> str:
+    """Return the building identifier in one table cell, or ''.
+
+    ``label_text`` (the cell's own ``span.mobile_rrac`` label) is removed
+    first, then any repeated literal label prefix — "Building Number 4" →
+    "4". Placeholder cells ("-", "N/A") and cells that are nothing but
+    the label return '' rather than a made-up building.
+
+    The value itself is free-form on purpose: buildings are "4", "A",
+    "North Tower". It is only length-capped so a malformed row cannot
+    ship an amenities blob as a building name.
+    """
+    txt = (cell_text or "").strip()
+    if label_text:
+        txt = txt.replace(label_text, "", 1).strip()
+    txt = _BUILDING_LABEL_PREFIX_RE.sub("", txt).strip()
+    txt = _WS_RE.sub(" ", txt)
+    if txt.lower() in _BUILDING_PLACEHOLDERS or len(txt) > 40:
+        return ""
+    return txt
+
+
+def _header_building_index(tr: Any) -> int | None:
+    """Index of the building ``<th>`` in *tr*'s own table, or None.
+
+    Fallback for templates that omit the per-cell ``span.mobile_rrac``
+    labels. Column order is not stable across repli360 templates, so the
+    index is read from that table's header row rather than assumed.
+    """
+    try:
+        table = tr.find_parent("table")
+        if table is None:
+            return None
+        for idx, th in enumerate(table.find_all("th")):
+            if _is_building_label(th.get_text(" ", strip=True)):
+                return idx
+    except Exception:  # noqa: BLE001 — never raise from a parser
+        return None
+    return None
+
+
+def extract_unit_building(tr: Any) -> str:
+    """Return the building for one ``tr.unitlisting`` row, or ''.
+
+    Reads the row's OWN building cell, located by the cell's label span
+    first and by the table's ``<th>`` header index second — never by
+    assuming the first column, which is what shipped the "Unit Number"
+    label as a building on every current-template property. Never raises.
+    """
+    try:
+        tds = tr.find_all("td")
+        for td in tds:
+            lbl = td.select_one("span.mobile_rrac")
+            if lbl is None:
+                continue
+            label_text = lbl.get_text(" ", strip=True)
+            if not _is_building_label(label_text):
+                continue
+            got = _building_from_cell(td.get_text(" ", strip=True), label_text)
+            if got:
+                return got
+        idx = _header_building_index(tr)
+        if idx is not None and 0 <= idx < len(tds):
+            td = tds[idx]
+            lbl = td.select_one("span.mobile_rrac")
+            label_text = lbl.get_text(" ", strip=True) if lbl is not None else ""
+            return _building_from_cell(td.get_text(" ", strip=True), label_text)
+    except Exception:  # noqa: BLE001 — never raise from a parser
+        return ""
+    return ""
+
+
 def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
     """Parse the ``str`` HTML from getUnitListByFloor → unit-level dicts.
 
-    Each ``<tr class="unitlisting ...">`` is one available unit:
-    building (1st td), unit number (``b.unitNumber``), deposit,
+    Each ``<tr class="unitlisting ...">`` is one available unit: unit
+    number (``b.unitNumber``), building and sqft (each located by its own
+    column LABEL — neither is at a fixed index), deposit,
     ``span.unit_price_value`` rent, availability td, and the row's
     ``data-available_date`` (already ISO ``YYYY-MM-DD``).
     """
@@ -329,12 +600,11 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
         if not unit:
             continue
         avail_date = str(tr.get("data-available_date") or "").strip()
-        tds = tr.find_all("td")
-        building = ""
-        if tds:
-            building = (
-                tds[0].get_text(strip=True).replace("Building Number", "").strip()
-            )
+        # The row's own building cell, found by its column label (2026-07-28).
+        # '' when the template has no building column — most current ones
+        # do not. Previously this read tds[0] positionally and shipped the
+        # "Unit Number" label glued to the unit number.
+        building = extract_unit_building(tr)
         rent: int | None = None
         price_el = tr.select_one("span.unit_price_value")
         if price_el is not None:
@@ -344,6 +614,10 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
                     rent = int(mm.group(0).replace(",", ""))
                 except (TypeError, ValueError):
                     rent = None
+        # The row's own "Unit SQFT" cell (2026-07-28). '' when the
+        # template has no such column — merge_repli360_plan_meta then
+        # falls back to the plan card and stamps the area as derived.
+        sqft = extract_unit_sqft(tr)
         # 2026-05-26 fix (#116 residue): getUnitListByFloor only returns
         # available units — unavailable ones are excluded at the API level.
         # Future-dated units show a US-format date ("06-05-2026") in the
@@ -357,6 +631,7 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
             make_unit_dict(
                 unit_number=unit,
                 building=building,
+                sqft=sqft,
                 rent_low=rent,
                 rent_high=rent,
                 availability_status="AVAILABLE",  # all getUnitListByFloor rows are available
@@ -368,6 +643,25 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
     return out
 
 
+_AREA_FROM_FP_CARD = "AREA_FROM_FP_CARD"
+
+
+def _stamp_area_from_plan_card(unit: dict[str, Any]) -> None:
+    """Append the ``AREA_FROM_FP_CARD`` provenance flag, once.
+
+    Uses the existing pipe-delimited ``data_quality_flag`` convention (see
+    ``pms/scraper.py::_append_quality_flag``) — no parallel mechanism.
+    """
+    flags = [
+        part.strip()
+        for part in str(unit.get("data_quality_flag") or "").split("|")
+        if part.strip()
+    ]
+    if _AREA_FROM_FP_CARD not in flags:
+        flags.append(_AREA_FROM_FP_CARD)
+    unit["data_quality_flag"] = "|".join(flags)
+
+
 def merge_repli360_plan_meta(
     units: list[dict[str, Any]], meta: dict[str, str]
 ) -> None:
@@ -377,10 +671,20 @@ def merge_repli360_plan_meta(
     only ever fills gaps. Skips silently when ``meta`` is empty.
 
     The getUnitListByFloor per-unit response carries rent + unit_number
-    + availability but NEVER sqft/beds/baths/plan_name; the template-
-    render HTML carries those on the plan card. This helper is the
-    join: one ``meta`` per floorplan, applied to all the units we got
-    back from that floorplan's getUnitListByFloor call.
+    + availability, and (since 2026-07-28) sqft when the availability
+    table has a "Unit SQFT" column; the template-render HTML carries
+    plan_name/beds/baths/sqft on the plan card. This helper is the join:
+    one ``meta`` per floorplan, applied to all the units we got back
+    from that floorplan's getUnitListByFloor call.
+
+    PROVENANCE: beds/baths/plan_name are genuine plan attributes, but an
+    *area* taken from the plan card is not read off the unit's own row —
+    so a unit that gets its sqft here is stamped
+    ``data_quality_flag="AREA_FROM_FP_CARD"``. The token deliberately
+    avoids the substring "PLAN": ``extraction/post_process.py`` and
+    ``core/schema_v2.py`` treat any flag containing "PLAN" as evidence
+    the row is a floor-plan placeholder, which would demote a real,
+    unit-anchored row.
     """
     if not meta:
         return
@@ -390,6 +694,8 @@ def merge_repli360_plan_meta(
             v = meta.get(key)
             if v and not u.get(key):
                 u[key] = v
+                if key == "sqft":
+                    _stamp_area_from_plan_card(u)
 
 
 class Repli360Adapter:
