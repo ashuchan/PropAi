@@ -141,6 +141,14 @@ def compute_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | No
 
     Returns ``None`` when fewer than 2 non-empty identifying fields are
     present. Prefix ``inferred_`` marks the ID as non-natural.
+
+    NOTE — this is a PLAN phenotype, not a unit phenotype. Every apartment on
+    a plan hashes to the same id by construction; the id is a merge-rescue for
+    rows with no anchor, not a per-apartment key. Splitting the collision back
+    apart is ``jugnu._apply_p3_inferred_id_collision_suffix``'s job, and when
+    the colliding rows differ only on rent / availability it can only split
+    them BY POSITION — see :data:`POSITIONAL_UNIT_ID_FLAG` for why no stable
+    alternative exists and how those rows declare themselves.
     """
     floor_plan = (
         _normalize_token(unit.get("floor_plan_name"))
@@ -297,6 +305,61 @@ def _has_per_unit_evidence(unit: dict[str, Any]) -> bool:
 
 #: Prefixes minted by this module when a row has no identifying anchor.
 SYNTHETIC_ID_PREFIXES: tuple[str, ...] = ("inferred_", "unkeyable_")
+
+#: ``data_quality_flag`` token stamped on a row whose ``unit_id`` was settled by
+#: POSITION rather than by anything the operator published.
+#:
+#: :func:`compute_fallback_unit_id` hashes a PLAN phenotype
+#: (``canonical_id|floor_plan|beds|baths|sqft``), so every apartment on a plan
+#: collides on one id. ``jugnu._apply_p3_inferred_id_collision_suffix`` re-splits
+#: the collision with a suffix hashed from the row's STABLE physical fields
+#: (area / building / floor). When two rows are identical on ALL of those — which
+#: they are whenever the only differences are rent, availability or available
+#: date — the split falls back to the row's ORDINAL IN THE INPUT LIST. That
+#: ordinal is a property of this run's capture order, not of the apartment, so
+#: the id does not join to the same apartment on the next run.
+#:
+#: There is no stable alternative in the data (see the docstring of
+#: ``_apply_p3_inferred_id_collision_suffix`` for the measurement). Any tiebreak
+#: over a field these rows actually differ on is a tiebreak over rent or
+#: availability, which is precisely the daily-join churn fix #33 removed. So the
+#: instability is DECLARED instead of hidden: a consumer joining on ``unit_id``
+#: must treat a row carrying this token as un-joinable across runs.
+#:
+#: The token deliberately does not start with ``PLAN_`` and does not contain
+#: ``PLAN_LEVEL`` / ``PLAN_PRESENCE`` — those substrings are what
+#: :func:`ma_poc.core.schema_v2._is_floor_plan_level`,
+#: :func:`ma_poc.core.schema_v2._has_plan_marker` and
+#: :func:`unit_has_real_anchor` key on, and a positional id says nothing about
+#: whether the row is a plan or an apartment.
+POSITIONAL_UNIT_ID_FLAG = "UNIT_ID_POSITIONAL"
+
+
+def append_data_quality_flag(unit: dict[str, Any], token: str) -> str:
+    """Append *token* to ``unit['data_quality_flag']``, idempotently.
+
+    The field is a pipe-delimited token list. Existing tokens are preserved in
+    order, empty segments are dropped, and a token already present is not
+    duplicated (so re-running a pass over already-formatted rows is a no-op).
+
+    Args:
+        unit: Row dict to mutate in place.
+        token: Flag token to add. Ignored when empty.
+
+    Returns:
+        The resulting pipe-delimited flag string.
+    """
+    parts = [
+        p.strip()
+        for p in str(unit.get("data_quality_flag") or "").split("|")
+        if p.strip()
+    ]
+    token = (token or "").strip()
+    if token and token not in parts:
+        parts.append(token)
+    joined = "|".join(parts)
+    unit["data_quality_flag"] = joined or None
+    return joined
 
 
 def _is_floorplan_surrogate(unit: dict[str, Any], candidate: str) -> bool:
