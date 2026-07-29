@@ -4,38 +4,74 @@ The orchestrator ``filter_listings_by_property_address`` is already
 test-covered. This module pins the *wiring* into the DUDA path so
 a future refactor doesn't silently re-introduce the 87b837b
 contamination (axiomproperties.com 455 units, gbatx.com 440 units).
+
+Every assertion here reads the parse tree, not the source text. These same
+claims used to be encoded as "the anchor string appears within 2000 characters
+of ``result.tier_used = ...``", which made them fail on comments and line
+wrapping — see the module docstring of ``_appfolio_source_ast`` for the
+incident that motivated the rewrite.
 """
 from __future__ import annotations
 
-import re
-from pathlib import Path
+import ast
 
-_APPFOLIO_PATH = (
-    Path(__file__).resolve().parents[3] / "pms" / "adapters" / "appfolio.py"
+from ma_poc.tests.pms.adapters._appfolio_source_ast import (
+    FILTER_FN,
+    appfolio_tree,
+    block_bindings,
+    enclosing_function,
+    enclosing_if,
+    find_filter_call,
+    find_tier_emit,
+    parent_map,
+    reads_ctx_attr,
+    str_constants,
 )
+
+DUDA_TIER = "TIER_1_API_APPFOLIO_DUDA"
+TELEMETRY_TAG = "appfolio-duda-address-filter"
 
 
 def test_duda_path_invokes_address_filter() -> None:
     """The TIER_1_API_APPFOLIO_DUDA branch must call
     filter_listings_by_property_address on duda_units before the
     final emit — same as the VANITY path."""
-    src = _APPFOLIO_PATH.read_text(encoding="utf-8")
-    # Find the DUDA-emit block
-    duda_idx = src.find('result.tier_used = "TIER_1_API_APPFOLIO_DUDA"')
-    assert duda_idx > 0, "Could not find DUDA emit block in appfolio.py"
-    # Look BACKWARDS from the emit for the filter call within a
-    # reasonable window (the filter must run before the emit).
-    window_start = max(0, duda_idx - 2000)
-    window = src[window_start:duda_idx]
-    assert "filter_listings_by_property_address" in window, (
-        "DUDA path no longer calls filter_listings_by_property_address "
-        "before the emit. This was the 87b837b contamination fix — "
-        "axiomproperties/gbatx leaked the full PMC inventory without it."
+    tree = appfolio_tree()
+    parents = parent_map(tree)
+    # `find_filter_call` raises if no call site takes `duda_units` at all.
+    call = find_filter_call("duda_units", tree)
+    emit = find_tier_emit(DUDA_TIER, tree)
+
+    assert enclosing_function(call, parents) is enclosing_function(emit, parents), (
+        f"the {FILTER_FN} call on duda_units and the {DUDA_TIER} emit are in "
+        "different functions — the emit is no longer downstream of the filter. "
+        "This was the 87b837b contamination fix — axiomproperties/gbatx leaked "
+        "the full PMC inventory without it."
     )
-    assert "appfolio-duda-address-filter" in window, (
-        "DUDA path must emit telemetry tagged "
-        "'appfolio-duda-address-filter' so run reports can quantify "
-        "the contamination filter activations."
+    assert call.lineno < emit.lineno, (
+        f"{FILTER_FN}(duda_units, …) now runs AFTER the {DUDA_TIER} emit, so "
+        "the units shipped are the unfiltered ones."
+    )
+
+
+def test_duda_filter_emits_activation_telemetry() -> None:
+    """The guarded block must report the filter firing, so run reports can
+    quantify the contamination filter activations."""
+    tree = appfolio_tree()
+    parents = parent_map(tree)
+    guard = enclosing_if(find_filter_call("duda_units", tree), parents)
+
+    appends = [
+        node
+        for node in ast.walk(guard)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "append"
+        and any(s.startswith(TELEMETRY_TAG) for s in str_constants(node))
+    ]
+    assert appends, (
+        f"the DUDA filter block no longer appends telemetry tagged "
+        f"{TELEMETRY_TAG!r}; run reports cannot quantify filter activations."
     )
 
 
@@ -44,22 +80,40 @@ def test_duda_filter_fires_unconditionally() -> None:
     IS set. The URL-level propertyGroup filter proved unreliable — 94 props
     leaked the whole PMC despite it — so the address filter is the safety net
     and must NOT be gated on ``not duda_property_group``."""
-    src = _APPFOLIO_PATH.read_text(encoding="utf-8")
-    assert not re.search(
-        r"if\s+duda_units\s+and\s+not\s+duda_property_group",
-        src,
-    ), (
-        "DUDA address filter must NOT be gated on `not duda_property_group` "
-        "— propertyGroup URL-scoping is unreliable; always run the address filter."
+    tree = appfolio_tree()
+    guard = enclosing_if(find_filter_call("duda_units", tree), parent_map(tree))
+    assert isinstance(guard.test, ast.Name) and guard.test.id == "duda_units", (
+        "the DUDA address filter must be guarded by a bare `if duda_units:` and "
+        f"nothing else — found `if {ast.unparse(guard.test)}:`. In particular it "
+        "must not be gated on `not duda_property_group`: propertyGroup "
+        "URL-scoping is unreliable, so the address filter always runs."
     )
-    assert "if duda_units:" in src, "DUDA filter must fire whenever duda_units exist"
 
 
 def test_duda_filter_passes_ctx_address_and_zip() -> None:
     """The filter signature requires (units, ctx_address, ctx_zip).
     Both must be read from the AdapterContext."""
-    src = _APPFOLIO_PATH.read_text(encoding="utf-8")
-    duda_idx = src.find('result.tier_used = "TIER_1_API_APPFOLIO_DUDA"')
-    window = src[max(0, duda_idx - 2000):duda_idx]
-    assert 'getattr(ctx, "address"' in window, "DUDA filter must read ctx.address"
-    assert 'getattr(ctx, "zip_code"' in window, "DUDA filter must read ctx.zip_code"
+    tree = appfolio_tree()
+    call = find_filter_call("duda_units", tree)
+    guard = enclosing_if(call, parent_map(tree))
+
+    assert len(call.args) >= 3, (
+        f"{FILTER_FN}(duda_units, …) passes {len(call.args)} positional args; "
+        "the address and ZIP must be passed positionally."
+    )
+    addr_arg, zip_arg = call.args[1], call.args[2]
+    assert isinstance(addr_arg, ast.Name) and isinstance(zip_arg, ast.Name), (
+        "the DUDA call site must pass named locals for address and ZIP, got "
+        f"({ast.unparse(addr_arg)}, {ast.unparse(zip_arg)})"
+    )
+
+    bound = block_bindings(guard)
+    for arg, attr in ((addr_arg, "address"), (zip_arg, "zip_code")):
+        assert arg.id in bound, (
+            f"{arg.id!r} is passed to {FILTER_FN} but is not bound inside the "
+            f"`if duda_units:` block — it cannot be shown to come from ctx.{attr}"
+        )
+        assert reads_ctx_attr(bound[arg.id], attr), (
+            f"DUDA filter must read ctx.{attr}; {arg.id} is bound from "
+            f"`{ast.unparse(bound[arg.id])}`"
+        )
