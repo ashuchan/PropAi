@@ -42,12 +42,8 @@ defect: the per-call-site ``address_field``.
 """
 from __future__ import annotations
 
-import ast
-import inspect
-
 import pytest
 
-import ma_poc.pms.adapters.appfolio as appfolio_mod
 from ma_poc.pms.adapters._appfolio_websites_duda import (
     parse_appfolio_websites_listing,
 )
@@ -62,6 +58,7 @@ from ma_poc.pms.adapters.appfolio import (
     _listing_address_of,
     filter_listings_by_property_address,
 )
+from ma_poc.tests.pms.adapters._appfolio_source_ast import filter_call_kwargs
 
 CTX_ADDR = "1234 Oak Ave"
 CTX_ZIP = "74119"
@@ -260,34 +257,17 @@ def test_duda_roster_scopes_when_the_filter_reads_unit_name() -> None:
     assert tel["dropped"] == 1
 
 
-def _filter_call_kwargs(first_arg_name: str) -> dict[str, str]:
-    """The ``address_field`` each production call site actually passes, read
-    out of the AST so a future edit cannot drift away from this test."""
-    tree = ast.parse(inspect.getsource(appfolio_mod))
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        fn = node.func
-        name = fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", "")
-        if name != "filter_listings_by_property_address":
-            continue
-        if not node.args or not isinstance(node.args[0], ast.Name):
-            continue
-        if node.args[0].id != first_arg_name:
-            continue
-        return {
-            kw.arg: ast.unparse(kw.value)
-            for kw in node.keywords
-            if kw.arg is not None
-        }
-    raise AssertionError(f"no filter call site taking {first_arg_name!r} found")
+# ``filter_call_kwargs`` — the ``address_field`` each production call site
+# actually passes, read out of the AST so a future edit cannot drift away from
+# this test — now lives in ``_appfolio_source_ast`` alongside the rest of the
+# structural call-site assertions (test_appfolio_duda_address_filter.py).
 
 
 def test_duda_call_site_names_unit_name_explicitly() -> None:
     """The DUDA path must NOT ride the default. Its rows carry a real plan
     name in ``floor_plan_name``, so ``_listing_address_of`` returns the plan
     name and never reaches the gated ``unit_name`` fallback."""
-    assert _filter_call_kwargs("duda_units").get("address_field") == "'unit_name'"
+    assert filter_call_kwargs("duda_units").get("address_field") == "'unit_name'"
 
 
 @pytest.mark.parametrize("call", ["ssr_units", "vanity_units"])
@@ -297,4 +277,4 @@ def test_ssr_and_vanity_call_sites_keep_the_gated_fallback(call: str) -> None:
     routes through the gate. Naming ``unit_name`` here would bypass the shape
     test and hand the filter whatever the address regex captured, mis-capture
     included."""
-    assert "address_field" not in _filter_call_kwargs(call)
+    assert "address_field" not in filter_call_kwargs(call)
