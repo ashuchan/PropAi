@@ -962,3 +962,355 @@ def test_money_range_table(cell: str, expected: tuple) -> None:
 
     assert _money_range(cell) == expected
     assert _money_range(cell)[0] == _money_to_int(cell)
+# ── 2026-07-28: plan-page roster scoping ────────────────────────────────────
+#
+# Live probe (plain static curl_cffi GET, 2026-07-28) of 8 Nestin properties
+# found 4 that serve the SAME whole-property roster on EVERY
+# /floorplans/{slug} page. Consuming each page as if it were that plan's
+# roster produced ``n_plan_pages × roster`` rows, every one mislabelled with
+# the page it came from — Pickwick Farms shipped 115 rows for 23 apartments
+# in run 2026-07-27-full-0d54ca7. Offline A/B over the probed pages:
+# 314 rows / 167 apartments / 145 misattributed (53.8% correct) →
+# 262 rows / 260 apartments / 0 misattributed (100% correct), 0 lost.
+
+
+def _ysi_page(heading: str, roster_json: str) -> str:
+    """A Nestin detail page whose heading names *heading* while its
+    ``ysi.unitsList`` carries the property's whole roster."""
+    return (
+        "<html><body><h1>" + heading + "</h1>"
+        '<img src="https://resource.rentcafe.com/logo.png">'
+        "<script>\n\t\tysi.unitsList = " + roster_json + ";\n</script>"
+        "</body></html>"
+    )
+
+
+# Shape copied from pickwickfarms-apartments.com/floorplans/studio (probed
+# 2026-07-28): a whole-property roster in which each entry names its OWN
+# plan, including the nested empty ``Amenities`` array.
+_YSI_ROSTER = """[
+  {"Id": 1, "UnitCode": "1513C", "Beds": 1, "Baths": 1.0, "SqFt": 700.0,
+   "MinRent": 997.0, "MaxRent": 1229.0, "Amenities": [],
+   "AvailableDate": "2026-07-03T00:00:00",
+   "FloorplanName": "1 BR, 1 Bath", "FloorplanId": 951198,
+   "isCommercial": false, "PropertyId": 53836},
+  {"Id": 2, "UnitCode": "9315-C", "Beds": 2, "Baths": 1.5, "SqFt": 950.0,
+   "MinRent": 1305.0, "MaxRent": 1500.0, "Amenities": ["Patio"],
+   "AvailableDate": "2026-08-14T00:00:00",
+   "FloorplanName": "2 BR, 1.5 Bath", "FloorplanId": 951200,
+   "isCommercial": false, "PropertyId": 53836},
+  {"Id": 3, "UnitCode": "R100", "Beds": 0, "Baths": 1.0, "SqFt": 400.0,
+   "MinRent": 900.0, "MaxRent": 900.0, "Amenities": [],
+   "AvailableDate": "2026-09-01T00:00:00",
+   "FloorplanName": "Retail", "FloorplanId": 951199,
+   "isCommercial": true, "PropertyId": 53836}
+]"""
+
+
+def test_ysi_roster_attributes_each_unit_to_its_own_plan() -> None:
+    """The page heading names the plan being VIEWED; ``ysi.unitsList`` names
+    the plan each apartment actually belongs to. The row wins."""
+    from ma_poc.pms.adapters._rentcafe_nestin import parse_ysi_units_list
+
+    units = parse_ysi_units_list(
+        _ysi_page("Studio", _YSI_ROSTER), "https://x.com/floorplans/studio"
+    )
+    by_number = {u["unit_number"]: u for u in units}
+    # Commercial space is not an apartment.
+    assert set(by_number) == {"1513C", "9315-C"}
+    # NOT "Studio" — the heading must not leak onto either row.
+    assert by_number["1513C"]["floor_plan_name"] == "1 BR, 1 Bath"
+    assert by_number["9315-C"]["floor_plan_name"] == "2 BR, 1.5 Bath"
+    assert by_number["1513C"]["market_rent_low"] == 997
+    assert by_number["1513C"]["market_rent_high"] == 1229
+    assert by_number["1513C"]["sqft"] == "700"
+    assert by_number["1513C"]["availability_date"] == "2026-07-03"
+    assert by_number["9315-C"]["bedrooms"] == "2"
+    assert by_number["9315-C"]["bathrooms"] == "1.5"
+    assert by_number["1513C"]["extraction_tier"] == "TIER_1_DOM_RENTCAFE_NESTIN"
+
+
+def test_ysi_roster_extraction_survives_nested_empty_arrays() -> None:
+    r"""Regression guard for the extraction METHOD, not the payload: the
+    roster JSON contains ``"Amenities": []``, so a non-greedy ``\[.*?\]``
+    match truncates the array after the first entry. The bracket-balanced
+    scan must return every entry."""
+    from ma_poc.pms.adapters._rentcafe_nestin import extract_ysi_units_list
+
+    rows = extract_ysi_units_list(_ysi_page("Studio", _YSI_ROSTER))
+    assert len(rows) == 3
+    assert [r["UnitCode"] for r in rows] == ["1513C", "9315-C", "R100"]
+
+
+def test_extract_ysi_units_list_absent_or_malformed_returns_empty() -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import extract_ysi_units_list
+
+    assert extract_ysi_units_list("") == []
+    assert extract_ysi_units_list("<html><body>no roster here</body></html>") == []
+    # Unterminated array — must not raise, must not return junk.
+    assert extract_ysi_units_list('<script>ysi.unitsList = [{"a":1}</script>') == []
+    # Valid JS assignment, wrong payload type.
+    assert extract_ysi_units_list("<script>ysi.unitsList = {};</script>") == []
+
+
+# Both new matchers are pinned against text they must NOT match. Three of
+# today's five repo fixes each introduced a fresh defect through an
+# over-broad regex, so these tables are half negatives by construction.
+_APPLYGA_CASES = [
+    # (markup, plan the row must be re-attributed to — or None for "leave
+    #  the row on the page heading")
+    ("<a onclick=\"applyGAClick('1 BR, 1 Bath', '1 Bed(s)', '700')\">A</a>",
+     "1 BR, 1 Bath"),
+    ("<a onclick=\"applyGAClick('A1: 1 Bed 1 Bath','1 Bed(s)','608','1099.00')\">x</a>",
+     "A1: 1 Bed 1 Bath"),
+    ("<a onclick='applyGAClick(\"2 BR, 1.5 Bath\", \"2 Bed(s)\")'>x</a>",
+     "2 BR, 1.5 Bath"),
+    ("<a onclick=\"applyGAClick(  'The Juniper' , 'x')\">x</a>", "The Juniper"),
+    ("<a onclick=\"ApplyGaClick('Studio','Studio')\">x</a>", "Studio"),
+    ("<a onclick=\"applyGAClick('440 Alfred Street - Loft D','1 Bed(s)')\">x</a>",
+     "440 Alfred Street - Loft D"),
+    # --- must NOT re-attribute ---
+    ("<a onclick=\"notApplyGAClick('Wrong Plan','x')\">x</a>", None),
+    ("<a onclick=\"xapplyGAClick('Wrong Plan','x')\">x</a>", None),
+    ("<a onclick=\"applyGATrack('Wrong Plan')\">x</a>", None),
+    ("<td>Ask the office about applyGAClick promotions</td>", None),
+    ("<a onclick=\"applyGAClick()\">x</a>", None),
+    ("<a onclick=\"applyGAClick(planVar, '1 Bed(s)')\">x</a>", None),
+    ("<a onclick=\"applyGAClick('', '1 Bed(s)')\">x</a>", None),
+    ("<tr><td>#307</td><td>$1,099</td></tr>", None),
+]
+
+
+@pytest.mark.parametrize("markup,expected", _APPLYGA_CASES)
+def test_plan_name_for_row_matcher_table(markup: str, expected: str | None) -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import _plan_name_for_row
+
+    heading = "<<page heading>>"
+    assert _plan_name_for_row(markup, heading) == (expected or heading)
+
+
+_YSI_MATCH_CASES = [
+    ('<script>ysi.unitsList = [{"UnitCode":"A"}];</script>', 1),
+    ('<script>ysi . unitsList  =  [{"UnitCode":"A"},{"UnitCode":"B"}];</script>', 2),
+    ('<script>ysi.unitsList = [{"UnitCode":"A","Amenities":[]},'
+     '{"UnitCode":"B"}];</script>', 2),
+    ('<script>ysi.unitsList = [{"UnitCode":"A","Note":"has ] bracket"},'
+     '{"UnitCode":"B"}];</script>', 2),
+    ('<script>ysi.unitsList = [{"UnitCode":"A","Note":"quote \\" inside ]"},'
+     '{"UnitCode":"B"}];</script>', 2),
+    ("<script>ysi.unitsList = [];</script>", 0),
+    # --- must NOT be read as the roster ---
+    ('<script>myysi.unitsList = [{"UnitCode":"A"}];</script>', 0),
+    ('<script>foo.ysi.unitsList = [{"UnitCode":"A"}];</script>', 0),
+    ("<script>ysi.unitsListCount = 12;</script>", 0),
+    ('<script>ysi.floorplansList = [{"Id":1}];</script>', 0),
+    ('<script>ysi.unitsList = {"UnitCode":"A"};</script>', 0),
+    ('<script>ysi.unitsList = [{"UnitCode":"A"}</script>', 0),
+    ("<p>ysi.unitsList is documented elsewhere</p>", 0),
+]
+
+
+@pytest.mark.parametrize("markup,expected_rows", _YSI_MATCH_CASES)
+def test_extract_ysi_units_list_matcher_table(markup: str, expected_rows: int) -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import extract_ysi_units_list
+
+    assert len(extract_ysi_units_list(markup)) == expected_rows
+
+
+@pytest.mark.asyncio
+async def test_recover_whole_roster_page_emits_roster_once() -> None:
+    """THE DEFECT. Three plan pages, each serving the identical whole-property
+    roster. Before: 3 × roster rows, each stamped with the page's heading.
+    After: the roster once, each apartment under its own plan."""
+    landing = (
+        '<html><img src="https://resource.rentcafe.com/l.png">'
+        '<a href="/floorplans/studio">S</a>'
+        '<a href="/floorplans/1-br">1</a>'
+        '<a href="/floorplans/2-br">2</a></html>'
+    )
+    headings = {"studio": "Studio", "1-br": "1 BR, 1 Bath", "2-br": "2 BR, 1.5 Bath"}
+    fetched: list[str] = []
+
+    def fetcher(url: str) -> _FakeResp:
+        fetched.append(url)
+        slug = url.rsplit("/", 1)[-1]
+        if slug in headings:
+            return _FakeResp(200, _ysi_page(headings[slug], _YSI_ROSTER))
+        return _FakeResp(404, "")
+
+    units, _src = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://pickwick.example.com",
+        fetcher=fetcher,  # type: ignore[arg-type]
+    )
+    # Count: the roster once, not once per plan page.
+    assert len(units) == 2, [u["unit_number"] for u in units]
+    # Attribution: each apartment under the plan the page published for it.
+    assert {(u["unit_number"], u["floor_plan_name"]) for u in units} == {
+        ("1513C", "1 BR, 1 Bath"),
+        ("9315-C", "2 BR, 1.5 Bath"),
+    }
+    # The roster is identical on every plan page, so the rest is pure cost.
+    assert len(fetched) == 1, fetched
+
+
+# Table-shape whole-roster page: no ysi.unitsList, but every row carries its
+# own ``applyGAClick('<plan>', …)`` — the marker both shapes publish.
+def _ga_table_page(heading: str) -> str:
+    return """
+    <html><body><h1>{heading}</h1>
+    <img src="https://resource.rentcafe.com/l.png">
+    <table>
+      <thead><tr><th>Apartment</th><th>Sq. Ft.</th><th>Rent</th>
+        <th>Date Available</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr>
+          <td data-label="Apartment">#307</td>
+          <td data-label="Sq. Ft.">608</td>
+          <td data-label="Rent">$1,099.00</td>
+          <td data-label="Date Available">5/20/2026</td>
+          <td><a id="307" onclick="applyGAClick('A1: 1 Bed 1 Bath', '1 Bed(s)',
+              '608', '1099.00')">Apply</a></td>
+        </tr>
+        <tr>
+          <td data-label="Apartment">#412</td>
+          <td data-label="Sq. Ft.">900</td>
+          <td data-label="Rent">$1,499.00</td>
+          <td data-label="Date Available">6/01/2026</td>
+          <td><a id="412" onclick="applyGAClick('B1: 2 Bed 1 Bath', '2 Bed(s)',
+              '900', '1499.00')">Apply</a></td>
+        </tr>
+      </tbody>
+    </table></body></html>
+    """.replace("{heading}", heading)
+
+
+def test_parse_cascade_prefers_ysi_roster_over_rendered_table() -> None:
+    """``parse_nestin_detail_page``'s contract is "the units this page is
+    evidence for". When both shapes are present the roster wins: the
+    rendered table is the client-side filter's *input state*, showing one
+    plan's apartments under every heading, while the roster states each
+    apartment's own plan and holds the ones the table omits."""
+    page = _ysi_page("Studio", _YSI_ROSTER).replace(
+        "</body>", _ga_table_page("Studio").split("<body>")[1]
+    )
+    units = parse_nestin_detail_page(page, "https://x.com/floorplans/studio", "Studio")
+    assert {(u["unit_number"], u["floor_plan_name"]) for u in units} == {
+        ("1513C", "1 BR, 1 Bath"),
+        ("9315-C", "2 BR, 1.5 Bath"),
+    }
+
+
+def test_table_row_plan_comes_from_its_own_applyga_not_the_heading() -> None:
+    """A rendered row belongs to the plan its own apply-button names, even
+    when the page heading names a different plan."""
+    units = parse_nestin_detail_page(
+        _ga_table_page("C1: 3 Bed 2 Bath"),
+        "https://x.com/floorplans/c1",
+        "C1: 3 Bed 2 Bath",
+    )
+    assert {(u["unit_number"], u["floor_plan_name"]) for u in units} == {
+        ("307", "A1: 1 Bed 1 Bath"),
+        ("412", "B1: 2 Bed 1 Bath"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_recover_dedupes_repeated_rows_across_plan_pages() -> None:
+    """Whole-roster site with no ``ysi.unitsList``: the same table is served
+    under three headings. Rows must collapse to one per apartment, each on
+    its own plan."""
+    landing = (
+        '<html><img src="https://resource.rentcafe.com/l.png">'
+        '<a href="/floorplans/a1">A1</a>'
+        '<a href="/floorplans/b1">B1</a>'
+        '<a href="/floorplans/c1">C1</a></html>'
+    )
+    headings = {
+        "a1": "A1: 1 Bed 1 Bath",
+        "b1": "B1: 2 Bed 1 Bath",
+        "c1": "C1: 3 Bed 2 Bath",
+    }
+
+    def fetcher(url: str) -> _FakeResp:
+        slug = url.rsplit("/", 1)[-1]
+        if slug in headings:
+            return _FakeResp(200, _ga_table_page(headings[slug]))
+        return _FakeResp(404, "")
+
+    units, _src = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://gateway.example.com",
+        fetcher=fetcher,  # type: ignore[arg-type]
+    )
+    assert len(units) == 2, [(u["unit_number"], u["floor_plan_name"]) for u in units]
+    assert {(u["unit_number"], u["floor_plan_name"]) for u in units} == {
+        ("307", "A1: 1 Bed 1 Bath"),
+        ("412", "B1: 2 Bed 1 Bath"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_recover_keeps_scoped_plan_pages_intact() -> None:
+    """The other half of the cohort: pages whose table IS the plan's roster
+    (row apply-button agrees with the heading). Every plan's units must
+    survive — the dedupe must not collapse across plans."""
+    landing = (
+        '<html><img src="https://resource.rentcafe.com/l.png">'
+        '<a href="/floorplans/juniper">J</a>'
+        '<a href="/floorplans/magnolia">M</a></html>'
+    )
+
+    def page(plan: str, unit: str) -> str:
+        return (
+            _ga_table_page(plan)
+            .replace("'A1: 1 Bed 1 Bath'", f"'{plan}'")
+            .replace("'B1: 2 Bed 1 Bath'", f"'{plan}'")
+            .replace(">#307<", f">#{unit}<")
+        )
+
+    def fetcher(url: str) -> _FakeResp:
+        slug = url.rsplit("/", 1)[-1]
+        if slug == "juniper":
+            return _FakeResp(200, page("The Juniper", "101"))
+        if slug == "magnolia":
+            return _FakeResp(200, page("The Magnolia", "202"))
+        return _FakeResp(404, "")
+
+    units, _src = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://southpark.example.com",
+        fetcher=fetcher,  # type: ignore[arg-type]
+    )
+    assert {(u["unit_number"], u["floor_plan_name"]) for u in units} == {
+        ("101", "The Juniper"),
+        ("412", "The Juniper"),
+        ("202", "The Magnolia"),
+        ("412", "The Magnolia"),
+    }
+
+
+def test_dedupe_keeps_same_apartment_number_under_different_plans() -> None:
+    """theresidencescitymodern.com (probed 2026-07-28) publishes apartment
+    "307" twice — once at 440 Alfred Street, once at 290 Edmund Place. They
+    are different apartments in different buildings. Deduping on the number
+    alone would delete a real unit."""
+    from ma_poc.pms.adapters._rentcafe_nestin import (
+        _dedupe_units_by_apartment_and_plan,
+    )
+
+    rows: list[dict[str, object]] = [
+        {"unit_number": "307", "floor_plan_name": "440 Alfred Street - C"},
+        {"unit_number": "307", "floor_plan_name": "290 Edmund Place - G2"},
+        {"unit_number": "307", "floor_plan_name": "440 Alfred Street - C"},
+        {"unit_number": "", "floor_plan_name": "440 Alfred Street - C"},
+        {"unit_number": "", "floor_plan_name": "290 Edmund Place - G2"},
+    ]
+    kept = _dedupe_units_by_apartment_and_plan(rows)
+    assert [(u["unit_number"], u["floor_plan_name"]) for u in kept] == [
+        ("307", "440 Alfred Street - C"),
+        ("307", "290 Edmund Place - G2"),
+        # Plan-level rows carry no apartment identity — passed through.
+        ("", "440 Alfred Street - C"),
+        ("", "290 Edmund Place - G2"),
+    ]
