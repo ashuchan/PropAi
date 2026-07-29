@@ -220,12 +220,21 @@ def build_clamp_report(
 ) -> dict[str, Any]:
     """Build and write ``clamp_report.json`` — the sanity-clamp evidence.
 
-    ``ma_poc/extraction/sanity.py`` nulls implausible beds / baths / area /
-    rent_low / rent_high into a value indistinguishable from genuine
-    operator absence. Before #69 that conversion was silent, so a run's
-    null rents and area sentinels were undecomposable. The clamp ledger
-    makes the destroyed values countable and attributable; this report is
-    where they land on disk.
+    Two clamps null implausible beds / baths / area / rent_low / rent_high
+    into a value indistinguishable from genuine operator absence:
+    ``extraction.sanity.sanity_bound`` and the V2 emit-time
+    ``core.schema_v2._format_area`` / ``_format_rent``. Before #69 both were
+    silent. The clamp ledger makes the destroyed values countable and
+    attributable; this report is where they land on disk.
+
+    **Read the totals with the right expectation.** The clamp is a SMALL
+    effect and this report is hygiene, not a lever. Measured on
+    run-2026-07-27-full-0d54ca7 (104,964 rows): only 30 of 7,752 area
+    sentinels and 167 of 7,306 null ``rent_low`` are attributable to a
+    clamp at all — 99.6% / 97.7% carry no residue of any kind and are an
+    UPSTREAM CAPTURE GAP, something never recorded rather than something
+    discarded. A near-empty ``clamp_report.json`` is the expected result,
+    not a broken pipeline.
 
     Observation-only: derived entirely from the process-wide
     :func:`ma_poc.extraction.sanity.clamp_ledger`, reads nothing from
@@ -238,12 +247,14 @@ def build_clamp_report(
     Returns:
         The report dict that was written. Shape:
         ``{run_date, generated_at, total_clamps, properties_affected,
-        by_field, by_tier, rows[], per_property{}}``. ``rows`` is one
-        entry per ``(field, tier, reason)`` sorted by descending count, so
-        "which tier produces the most clamped rents" is a filter on
-        ``rows`` — not a log grep. ``per_property`` lets a consumer ask
-        whether a specific property's area was clamped rather than
-        genuinely not published (the #56 prerequisite).
+        by_field, by_tier, by_stage, rows[], per_property{}}``. ``rows`` is
+        one entry per ``(stage, field, tier, reason)`` sorted by descending
+        count, so "which tier produces the most clamped rents" is a filter
+        on ``rows`` — not a log grep. ``by_stage`` splits the two clamps so
+        the finding above stays checkable against a future run instead of
+        being re-argued. ``per_property`` lets a consumer ask whether a
+        specific property's area was clamped rather than genuinely not
+        published (the #56 prerequisite).
     """
     from ma_poc.extraction.sanity import clamp_ledger
 
