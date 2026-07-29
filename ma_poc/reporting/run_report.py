@@ -547,11 +547,15 @@ def build(
     try:
         from ma_poc.reporting.observation_reports import (
             build_amenities_report,
+            build_clamp_report,
             build_concessions_report,
         )
 
         build_amenities_report(properties, run_dir, run_date)
         build_concessions_report(properties, run_dir, run_date)
+        # #69: sanity-clamp evidence. Without it, every value the clamp
+        # nulled is indistinguishable from genuine operator absence.
+        build_clamp_report(run_dir, run_date)
     except Exception as exc:  # noqa: BLE001 — never fail the run on a report
         log.warning("observation reports failed: %s", exc)
 

@@ -2,6 +2,11 @@
 
 Covers each bound, the "null all aliases" guarantee, idempotency,
 non-mutation, and the ABSENT sentinel preservation.
+
+#69 adds :class:`TestClampIsRecorded` — the clamp must leave EVIDENCE.
+A clamped value that is silently dropped is indistinguishable from
+genuine operator absence, which makes every null rent / area sentinel in
+a run undecomposable.
 """
 
 from __future__ import annotations
@@ -14,7 +19,24 @@ from ma_poc.extraction.canonical import (
     SQFT_KEYS,
     get_numeric,
 )
-from ma_poc.extraction.sanity import sanity_bound
+from ma_poc.extraction.sanity import (
+    REASON_ABOVE_MAX,
+    REASON_BELOW_MIN,
+    REASON_IMPLAUSIBLE_FOR_BEDS,
+    UNKNOWN_TIER,
+    clamp_ledger,
+    clamp_tier_context,
+    reset_clamp_ledger,
+    sanity_bound,
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_clamp_ledger():
+    """The ledger is a process-wide singleton — isolate every test."""
+    reset_clamp_ledger()
+    yield
+    reset_clamp_ledger()
 
 # ── Beds bounds ───────────────────────────────────────────────────────────────
 
@@ -335,3 +357,195 @@ class TestCrossFieldSqftVsBeds:
         once = sanity_bound(unit)
         twice = sanity_bound(once)
         assert once == twice
+
+
+# ── #69: a clamped value is RECORDED, not silently dropped ───────────────────
+
+#: Table-test for the clamp predicate AND its reason code. Every row is
+#: ``(field, value, expect_clamped, expect_reason)``. The must-NOT-match
+#: rows are the point: an in-range or absent value must produce ZERO
+#: ledger entries, or the ledger becomes noise nobody can aggregate.
+_CLAMP_TABLE = [
+    # ── must clamp (rent) ───────────────────────────────────────────────
+    ("rent_low", 1, True, REASON_BELOW_MIN),           # $1 rent
+    ("rent_low", 0, True, REASON_BELOW_MIN),           # $0 "call for pricing"
+    ("rent_low", 199.99, True, REASON_BELOW_MIN),      # just under the floor
+    ("rent_low", 8005551212, True, REASON_ABOVE_MAX),  # phone number as rent
+    ("rent_high", 150000, True, REASON_ABOVE_MAX),     # comma-as-decimal
+    # ── must clamp (area) ───────────────────────────────────────────────
+    ("area", 45, True, REASON_BELOW_MIN),              # gross parse failure
+    ("area", 1, True, REASON_BELOW_MIN),               # unit count as sqft
+    ("area", 149, True, REASON_BELOW_MIN),             # just under the floor
+    ("area", 1450, False, None),                       # a price-shaped sqft
+    #   ^ 1450 is INSIDE [150, 10000]: the clamp cannot see a rent read as
+    #     sqft when it lands in range. Documents the blind spot.
+    ("area", 10001, True, REASON_ABOVE_MAX),           # just over the ceiling
+    # ── must clamp (beds / baths) ───────────────────────────────────────
+    ("beds", 99, True, REASON_ABOVE_MAX),
+    ("baths", 11, True, REASON_ABOVE_MAX),
+    ("beds", -2, True, REASON_BELOW_MIN),
+    # ── must NOT clamp ──────────────────────────────────────────────────
+    ("rent_low", 200, False, None),                    # exactly the floor
+    ("rent_low", 50000, False, None),                  # exactly the ceiling
+    ("rent_low", 1495, False, None),                   # ordinary rent
+    ("area", 150, False, None),                        # exactly the floor
+    ("area", 10000, False, None),                      # exactly the ceiling
+    ("area", 750, False, None),                        # ordinary sqft
+    ("beds", 0, False, None),                          # studio
+    ("beds", 7, False, None),                          # max plan
+    ("baths", 0, False, None),                         # no separate bath
+    ("rent_low", None, False, None),                   # genuine absence
+    ("area", ABSENT, False, None),                     # ABSENT sentinel
+    ("beds", ABSENT, False, None),                     # sentinel wins over bound
+    ("rent_low", "not a number", False, None),         # uncoercible
+]
+
+
+class TestClampIsRecorded:
+    """The regression guard: a clamp must leave aggregable evidence."""
+
+    @pytest.mark.parametrize(
+        "field,value,expect_clamped,expect_reason",
+        _CLAMP_TABLE,
+        ids=[f"{f}={v!r}" for f, v, _c, _r in _CLAMP_TABLE],
+    )
+    def test_clamp_table(self, field, value, expect_clamped, expect_reason):
+        result = sanity_bound({field: value}, tier="TIER_TEST", property_id="P9")
+        ledger = clamp_ledger()
+        evidence = result.get("_sanity_clamped", [])
+
+        if not expect_clamped:
+            # Must-NOT-match: nothing nulled, nothing recorded anywhere.
+            assert evidence == [], f"{field}={value!r} recorded a phantom clamp"
+            assert ledger.total() == 0
+            return
+
+        # The value is still nulled — emitted output is unchanged.
+        assert result.get(field) is None
+        # ...but it is no longer SILENT.
+        assert len(evidence) == 1, f"{field}={value!r} left no evidence"
+        rec = evidence[0]
+        assert rec["field"] == field
+        assert rec["reason"] == expect_reason
+        assert rec["value"] == pytest.approx(float(value))
+        assert rec["tier"] == "TIER_TEST"
+        # ...and it is aggregable.
+        assert ledger.total() == 1
+        assert ledger.by_field(field)["TIER_TEST"] == 1
+        sample = ledger.rows()[0]["examples"][0]
+        assert sample["value"] == pytest.approx(float(value))
+        assert sample["property_id"] == "P9"
+        assert sample["reason"] == expect_reason
+
+    def test_cross_field_area_clamp_is_recorded(self):
+        """The sqft-too-small-for-beds pass records too, with its own reason."""
+        result = sanity_bound({"beds": 2, "area": 310}, tier="TIER_4_LLM_DOM")
+        assert result.get("area") is None
+        evidence = result["_sanity_clamped"]
+        assert [e["reason"] for e in evidence] == [REASON_IMPLAUSIBLE_FOR_BEDS]
+        assert evidence[0]["value"] == pytest.approx(310.0)
+        # Bound recorded is the per-beds floor, not the absolute range.
+        assert evidence[0]["bounds"][0] == pytest.approx(500.0)
+        assert clamp_ledger().by_field("area")["TIER_4_LLM_DOM"] == 1
+
+    def test_pre_clamp_value_survives_the_alias_wipe(self):
+        """The recorded value must outlive ``_null_all_aliases``.
+
+        This is the whole point: after the clamp, NO alias and no
+        ``<field>_raw`` twin holds the original — the ledger is the only
+        surviving copy.
+        """
+        unit = {"sqft": 45, "area": 45, "minimum_sqft": 45}
+        result = sanity_bound(unit, tier="T", property_id="P1")
+        assert get_numeric(result, SQFT_KEYS) is None
+        assert all(result[k] is None for k in ("sqft", "area", "minimum_sqft"))
+        assert clamp_ledger().rows()[0]["examples"][0]["value"] == pytest.approx(45.0)
+
+    def test_multiple_clamps_on_one_row_all_recorded(self):
+        """A row with three junk fields records three entries, not one."""
+        result = sanity_bound(
+            {"unit_id": "A1", "beds": 99, "area": 45, "rent_low": 1},
+            tier="TIER_3_DOM",
+            property_id="P2",
+        )
+        assert [e["field"] for e in result["_sanity_clamped"]] == [
+            "beds",
+            "area",
+            "rent_low",
+        ]
+        assert clamp_ledger().total() == 3
+        assert clamp_ledger().by_tier("TIER_3_DOM") == {
+            "beds": 1,
+            "area": 1,
+            "rent_low": 1,
+        }
+        # Joinable back to the row that lost the values.
+        assert clamp_ledger().to_dict()["per_property"]["P2"] == {
+            "beds:ABOVE_MAX": 1,
+            "area:BELOW_MIN": 1,
+            "rent_low:BELOW_MIN": 1,
+        }
+
+    def test_which_tier_produces_the_most_clamped_rents(self):
+        """The named aggregation question must be answerable in one call."""
+        for _ in range(3):
+            sanity_bound({"rent_low": 1}, tier="TIER_3_DOM_GENERIC")
+        sanity_bound({"rent_low": 1}, tier="TIER_1_API_SIGHTMAP")
+        sanity_bound({"area": 45}, tier="TIER_3_DOM_GENERIC")
+        assert clamp_ledger().by_field("rent_low").most_common(1) == [
+            ("TIER_3_DOM_GENERIC", 3)
+        ]
+
+    def test_ambient_tier_context_attributes_the_clamp(self):
+        with clamp_tier_context("TIER_1_API_RENTCAFE_SECURECAFE"):
+            sanity_bound({"rent_low": 1})
+        assert clamp_ledger().by_field("rent_low") == {
+            "TIER_1_API_RENTCAFE_SECURECAFE": 1
+        }
+
+    def test_explicit_tier_beats_ambient_context(self):
+        with clamp_tier_context("AMBIENT"):
+            sanity_bound({"rent_low": 1}, tier="EXPLICIT")
+        assert clamp_ledger().by_field("rent_low") == {"EXPLICIT": 1}
+
+    def test_tier_falls_back_to_the_unit_dict_then_unknown(self):
+        sanity_bound({"rent_low": 1, "extraction_tier": "TIER_2_JSONLD"})
+        sanity_bound({"rent_low": 1})
+        assert clamp_ledger().by_field("rent_low") == {
+            "TIER_2_JSONLD": 1,
+            UNKNOWN_TIER: 1,
+        }
+
+    def test_context_restored_when_body_raises(self):
+        with pytest.raises(ValueError):
+            with clamp_tier_context("X"):
+                raise ValueError("boom")
+        sanity_bound({"rent_low": 1})
+        assert clamp_ledger().by_field("rent_low") == {UNKNOWN_TIER: 1}
+
+    def test_recording_does_not_change_the_emitted_values(self):
+        """Instrumentation is observability — emitted values are identical."""
+        unit = {"beds": 2, "baths": 2, "area": 45, "rent_low": 1, "rent_high": 1495}
+        result = sanity_bound(unit)
+        emitted = {k: v for k, v in result.items() if not k.startswith("_sanity")}
+        assert emitted == {
+            "beds": 2,
+            "baths": 2,
+            "area": None,
+            "rent_low": None,
+            "rent_high": 1495,
+        }
+
+    def test_input_dict_is_still_never_mutated(self):
+        unit = {"rent_low": 1}
+        sanity_bound(unit)
+        assert unit == {"rent_low": 1}
+
+    def test_ledger_reset_clears_every_view(self):
+        sanity_bound({"rent_low": 1}, tier="T", property_id="P")
+        assert clamp_ledger().total() == 1
+        reset_clamp_ledger()
+        led = clamp_ledger()
+        assert led.total() == 0
+        assert led.rows() == []
+        assert led.to_dict()["per_property"] == {}
