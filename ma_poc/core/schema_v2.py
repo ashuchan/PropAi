@@ -316,6 +316,64 @@ def _is_floor_plan_level(
     return not unit_has_real_anchor(unit)
 
 
+def resolve_plan_row_availability(
+    status: str | None,
+    *,
+    plan_level: bool,
+    has_rent: bool,
+    has_anchor: bool,
+) -> str | None:
+    """Availability contract for plan-LEVEL rows. Non-plan rows pass through.
+
+    Product-owner decision 2026-07-29: zero-inventory plan rows ARE still
+    emitted — the client wants to know the plan exists — but they must be
+    marked *cleanly* UNAVAILABLE rather than shipping ``null`` / ``UNKNOWN``
+    / a stale ``AVAILABLE``.
+
+    ZERO-INVENTORY is defined RENT-BEARING-ly, not flag-bearingly::
+
+        plan-level row  AND  no published rent  AND  no unit anchor
+
+    All three conjuncts matter. **A plan row with a rent is not
+    zero-inventory** and is never coerced: on the 2026-07-27 run 3,113 plan
+    rows carry a real published price (a Squarespace plan row at
+    ``rent_low=2967.0``, Entrata plan cards, …). The property genuinely
+    offers that plan at that price, so forcing them to UNAVAILABLE would
+    destroy real data — that is the single worst outcome this function
+    exists to prevent, and it is why ``has_rent`` short-circuits ahead of
+    every status branch. Likewise a row that anchors ONE REAL APARTMENT
+    (``identity.unit_has_real_anchor``) is describing inventory, not a plan
+    summary, so it keeps whatever the source said.
+
+    For plan rows that are NOT zero-inventory, only ``None`` is rewritten,
+    and it is rewritten to ``UNKNOWN``, never to a substantive value.
+    Rationale: ``None`` means "this pipeline has no opinion", which for a row
+    we are publishing is not an honest answer — the row IS shipped, so the
+    field must say something. ``UNKNOWN`` is the honest thing to say when the
+    source genuinely does not state availability, and unlike AVAILABLE or
+    UNAVAILABLE it asserts nothing about the world. Coercing these
+    (445 rent-bearing + 68 dated rows on the 2026-07-27 run) to either
+    substantive value would be inventing a fact.
+
+    Args:
+        status: Already-normalised status (``_norm_status`` output) or None.
+        plan_level: Result of :func:`_is_floor_plan_level` for this row.
+        has_rent: Whether ``_format_rent`` produced a positive rent for
+            either bound. A published price is the inventory signal.
+        has_anchor: Result of ``identity.unit_has_real_anchor`` for this row.
+
+    Returns:
+        The status to publish. Never ``None`` for a plan-level row.
+    """
+    if not plan_level:
+        return status
+    if not has_rent and not has_anchor:
+        return "UNAVAILABLE"
+    if status is None:
+        return "UNKNOWN"
+    return status
+
+
 def _format_v2_unit(
     unit: dict,
     scrape_ts: datetime,
@@ -423,6 +481,27 @@ def _format_v2_unit(
     except Exception:
         floor_plan_id = None
 
+    # Zero-inventory availability contract (2026-07-29). Resolved ONCE here so
+    # the shipped ``availability_status`` and the ``available_date`` fallback
+    # below cannot disagree: a plan row we have just declared UNAVAILABLE must
+    # not simultaneously get a scrape-date "available today" stamp out of
+    # ``_resolve_available_date``'s AVAILABLE branch. Kept in lock-step with
+    # the production fork in scripts/runners/jugnu.py.
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    _plan_level = _is_floor_plan_level(unit, property_plan_level=property_plan_level)
+    _rent_lo_fmt = _format_rent(rent_lo)
+    _rent_hi_fmt = _format_rent(rent_hi)
+    _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
+    _availability_status = resolve_plan_row_availability(
+        _norm_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
+        plan_level=_plan_level,
+        has_rent=_has_rent,
+        has_anchor=unit_has_real_anchor(unit),
+    )
+
     return {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -442,9 +521,7 @@ def _format_v2_unit(
         # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.
-        "is_floor_plan_level": _is_floor_plan_level(
-            unit, property_plan_level=property_plan_level
-        ),
+        "is_floor_plan_level": _plan_level,
         # Per-unit provenance — which extraction tier produced THIS unit, so a
         # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
         # plan-level placeholder). Captured on the internal unit dict but was
@@ -452,8 +529,8 @@ def _format_v2_unit(
         "extraction_tier": (
             unit.get("extraction_tier") or unit.get("_extraction_tier") or None
         ),
-        "rent_low": _format_rent(rent_lo),
-        "rent_high": _format_rent(rent_hi),
+        "rent_low": _rent_lo_fmt,
+        "rent_high": _rent_hi_fmt,
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         # Bug 2026-05-13: most adapters emit the long-form key
         # ``availability_date`` (via ``make_unit_dict`` in
@@ -503,18 +580,13 @@ def _format_v2_unit(
                 unit, "available_date", "availability_date",
                 "internalAvailableDate", "availableDate",
                 "date_available", "dateAvailable")),
-            _norm_status(
-                unit.get("availability_status")
-                or unit.get("_availability_status")
-            ),
+            # 2026-07-29: the RESOLVED status, not a second independent
+            # _norm_status() call. A zero-inventory plan row now reads
+            # UNAVAILABLE here, so the AVAILABLE branch below cannot stamp
+            # today's scrape date onto a plan with no inventory and no price.
+            _availability_status,
             scrape_ts,
-            has_rent=(
-                (
-                    _format_rent(rent_lo) is not None
-                    or _format_rent(rent_hi) is not None
-                )
-                and uid not in (None, "", "null")
-            ),
+            has_rent=(_has_rent and uid not in (None, "", "null")),
         ),
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
@@ -530,9 +602,7 @@ def _format_v2_unit(
         # transform never mapped it -> 99.7% missing in output. Capture
         # it (same class as available_date). Raw-preserving: light
         # upper-normalize known tokens, else passthrough; None when unset.
-        "availability_status": _norm_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        "availability_status": _availability_status,
         # 2026-05-18: deposit is emitted by securecafe/onesite/others and
         # was dropped. Raw passthrough (clean later) — value has worth.
         "deposit": _raw_str(unit.get("deposit") or unit.get("_deposit")),
@@ -619,6 +689,17 @@ def _format_v2_floor_plan(
     out["unit_id"] = None
     out["unit_name"] = None
     out["is_floor_plan_level"] = True
+    # This wrapper FORCES the plan flag after the fact, so re-apply the
+    # zero-inventory contract against the forced value — otherwise a plan card
+    # the row-level predicate did not recognise would ship flagged plan-level
+    # yet keep a null / stale status. Identity has just been stripped above, so
+    # ``has_anchor`` is False by construction here.
+    out["availability_status"] = resolve_plan_row_availability(
+        out.get("availability_status"),
+        plan_level=True,
+        has_rent=(out.get("rent_low") is not None or out.get("rent_high") is not None),
+        has_anchor=False,
+    )
     flags = [
         part.strip()
         for part in str(out.get("data_quality_flag") or "").split("|")

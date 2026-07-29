@@ -176,3 +176,84 @@ def test_provenance_plan_level_counter_agrees_with_the_shipped_column() -> None:
     prop = _format_v2(result, _CSV)
     shipped = sum(1 for u in prop["units"] if u["is_floor_plan_level"])
     assert prov["data_quality"]["plan_level_units"] == shipped == 2
+
+
+# ── 2026-07-29 zero-inventory availability contract, at the PRODUCTION boundary
+# Same reason the flag itself is tested here rather than in the library copy:
+# jugnu.py carries its own fork of the unit formatter and it is the one that
+# writes properties.json. Offline replay over run-2026-07-27 (104,964 rows):
+# 1,036 plan rows move to UNAVAILABLE, 207 null->UNKNOWN, 637 manufactured
+# scrape-date stamps dropped, and 0 of the 4,033 rent-bearing plan rows are
+# forced to UNAVAILABLE.
+
+
+def test_zero_inventory_plan_row_ships_unavailable_from_production_formatter() -> None:
+    """Plan-level + no rent + no anchor -> UNAVAILABLE, no fabricated date."""
+    result = {
+        "extraction_tier_used": "TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL",
+        "units": [_row(unit_number="")],  # _row() defaults to AVAILABLE
+        "plan_summaries": [],
+    }
+    prop = _format_v2(result, _CSV)
+    unit = prop["units"][0]
+    assert unit["is_floor_plan_level"] is True
+    assert unit["availability_status"] == "UNAVAILABLE"
+    assert unit["available_date"] is None
+    # capture-first: the pre-coercion source value stays visible for forensics
+    assert unit["availability_status_raw"] == "AVAILABLE"
+
+
+def test_rent_bearing_plan_row_keeps_its_price_and_status_in_production() -> None:
+    """3,113 rows in the 2026-07-27 run are plan-level AND carry a real
+    published price. Forcing them UNAVAILABLE would destroy real data."""
+    result = {
+        "extraction_tier_used": "SYNDICATION_ONLY_SQUARESPACE_PLAN_LEVEL",
+        "units": [
+            _row(unit_number="", market_rent_low=2967.0, market_rent_high=2967.0,
+                 available_date="2026-08-15"),
+        ],
+        "plan_summaries": [],
+    }
+    unit = _format_v2(result, _CSV)["units"][0]
+    assert unit["is_floor_plan_level"] is True
+    assert unit["availability_status"] == "AVAILABLE"
+    assert unit["rent_low"] == 2967.0
+    assert unit["available_date"] == "2026-08-15"
+
+
+def test_plan_row_with_rent_but_no_status_reads_unknown_not_null() -> None:
+    """UNKNOWN asserts nothing about the world; null on a published row is not
+    an honest answer. 207 rows on the 2026-07-27 run."""
+    result = {
+        "extraction_tier_used": "TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL",
+        "units": [{"floor_plan_name": "B2", "bedrooms": "2",
+                   "unit_number": "", "market_rent_low": 1850}],
+        "plan_summaries": [],
+    }
+    unit = _format_v2(result, _CSV)["units"][0]
+    assert unit["is_floor_plan_level"] is True
+    assert unit["availability_status"] == "UNKNOWN"
+
+
+def test_real_apartments_are_untouched_by_the_contract_in_production() -> None:
+    """An anchored row inside a plan-level property keeps the source status,
+    and an ordinary property is not affected at all."""
+    result = {
+        "extraction_tier_used": "TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL",
+        "units": [
+            _row(unit_number="412", market_rent_low=1600),
+            _row(unit_number="", market_rent_low=1500),
+        ],
+        "plan_summaries": [],
+    }
+    by_id = {u["unit_id"]: u for u in _format_v2(result, _CSV)["units"]}
+    assert by_id["412"]["availability_status"] == "AVAILABLE"
+
+    ordinary = {
+        "extraction_tier_used": "TIER_1_API_SIGHTMAP",
+        "units": [_row(unit_number="101", market_rent_low=1500, sqft="700")],
+        "plan_summaries": [],
+    }
+    unit = _format_v2(ordinary, _CSV)["units"][0]
+    assert unit["is_floor_plan_level"] is False
+    assert unit["availability_status"] == "AVAILABLE"

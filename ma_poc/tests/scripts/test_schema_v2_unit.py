@@ -959,3 +959,172 @@ def test_plan_level_flag_never_un_flags_a_previously_flagged_row() -> None:
         {"is_floor_plan_level": True, "unit_number": "202", "area": 691},
     ):
         assert _is_floor_plan_level(unit) is True, unit
+
+
+# ── 2026-07-29 zero-inventory availability contract ─────────────────────────
+# Product-owner decision: zero-inventory plan rows are still EMITTED (the
+# client wants to know the plan exists) but must read cleanly UNAVAILABLE —
+# never null, never UNKNOWN. Measured on run-2026-07-27 (104,964 rows, offline
+# replay): 1,036 plan rows shipped AVAILABLE / null / UNKNOWN with no rent and
+# no unit anchor, and 637 of them additionally carried a manufactured
+# "available today" scrape-date stamp. The 5,427 rows already flagged
+# plan-level were already clean and must not move.
+#
+# The trap this guards: 3,113 plan rows in that same run carry a REAL published
+# price. The contract is RENT-BEARING, not flag-bearing — coercing those to
+# UNAVAILABLE would destroy real data and is the worst possible outcome.
+
+
+def test_zero_inventory_plan_row_is_cleanly_unavailable() -> None:
+    """No rent + no unit anchor + plan-level -> UNAVAILABLE, and no
+    manufactured availability date."""
+    for status in ("AVAILABLE", None, "UNKNOWN", ""):
+        unit = {
+            "floor_plan_name": "1 Bedroom",
+            "extraction_tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+            "availability_status": status,
+        }
+        out = _format_v2_unit(unit, _TS)
+        assert out["is_floor_plan_level"] is True, status
+        assert out["availability_status"] == "UNAVAILABLE", status
+        # The AVAILABLE branch of _resolve_available_date must no longer fire:
+        # stamping the scrape date on a plan with no inventory and no price
+        # invents a fact about the world.
+        assert out["available_date"] is None, status
+
+
+def test_rent_bearing_plan_row_is_never_coerced_to_unavailable() -> None:
+    """A plan row WITH a published price is not zero-inventory.
+
+    Real shape from the 2026-07-27 run: a Squarespace plan card at
+    ``rent_low=2967.0`` with an availability date. The property genuinely
+    offers that plan at that price.
+    """
+    out = _format_v2_unit(
+        {
+            "floor_plan_name": "The Chelsea",
+            "extraction_tier": "SYNDICATION_ONLY_SQUARESPACE_PLAN_LEVEL",
+            "availability_status": "AVAILABLE",
+            "rent_low": 2967.0,
+            "rent_high": 2967.0,
+            "available_date": "2026-08-15",
+        },
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is True
+    assert out["availability_status"] == "AVAILABLE"
+    assert out["rent_low"] == 2967.0
+    assert out["available_date"] == "2026-08-15"
+
+
+def test_rent_bearing_plan_row_with_no_status_reads_unknown_not_null() -> None:
+    """Source silent + row still published -> UNKNOWN is honest; null is not.
+
+    UNKNOWN asserts nothing about the world, unlike AVAILABLE / UNAVAILABLE.
+    207 rows on the 2026-07-27 run.
+    """
+    out = _format_v2_unit(
+        {
+            "floor_plan_name": "B2",
+            "extraction_tier": "TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL",
+            "rent_low": 1850,
+        },
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is True
+    assert out["availability_status"] == "UNKNOWN"
+
+
+def test_zero_inventory_contract_does_not_touch_real_units() -> None:
+    """A non-plan row passes through untouched, including a null status."""
+    out = _format_v2_unit(
+        {"floor_plan_name": "A1", "unit_number": "101",
+         "extraction_tier": "TIER_1_API_ENTRATA"},
+        _TS,
+    )
+    assert out["is_floor_plan_level"] is False
+    assert out["availability_status"] is None
+
+
+def test_zero_inventory_contract_keeps_a_source_published_date() -> None:
+    """Coercing the status must never delete a date the operator published."""
+    out = _format_v2_unit(
+        {
+            "floor_plan_name": "Studio",
+            "extraction_tier": "TIER_3_PLAN_TEXT",
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-01",
+        },
+        _TS,
+        property_plan_level=True,
+    )
+    assert out["availability_status"] == "UNAVAILABLE"
+    assert out["available_date"] == "2026-09-01"
+
+
+def test_already_flagged_plan_rows_do_not_regress() -> None:
+    """The 5,427 rows already flagged in run-2026-07-27 were already clean
+    (5,425 UNAVAILABLE, 2 UNKNOWN, zero nulls). Pin both shapes."""
+    zero_inv = _format_v2_unit(
+        {"data_quality_flag": "SIGHTMAP_PLAN_PRESENCE",
+         "floor_plan_name": "The Blue Elderberry", "area": 662,
+         "availability_status": "UNAVAILABLE"},
+        _TS,
+    )
+    assert zero_inv["availability_status"] == "UNAVAILABLE"
+    rent_bearing = _format_v2_unit(
+        {"data_quality_flag": "SIGHTMAP_PLAN_PRESENCE",
+         "floor_plan_name": "A1", "rent_low": 1495,
+         "availability_status": "UNKNOWN", "available_date": "2026-08-02"},
+        _TS,
+    )
+    assert rent_bearing["availability_status"] == "UNKNOWN"
+    assert rent_bearing["rent_low"] == 1495.0
+
+
+def test_floor_plan_wrapper_applies_the_zero_inventory_contract() -> None:
+    """``_format_v2_floor_plan`` forces the flag AFTER formatting, so the
+    contract has to be re-applied there or the row ships flagged-but-null."""
+    out = _format_v2_floor_plan(
+        {"floor_plan_name": "A1", "beds": 1, "baths": 1, "area": 700}, _TS, "P1"
+    )
+    assert out["is_floor_plan_level"] is True
+    assert out["availability_status"] == "UNAVAILABLE"
+    priced = _format_v2_floor_plan(
+        {"floor_plan_name": "A1", "beds": 1, "baths": 1, "area": 700,
+         "rent_low": 1500}, _TS, "P1"
+    )
+    assert priced["availability_status"] == "UNKNOWN"
+    assert priced["rent_low"] == 1500.0
+
+
+def test_resolve_plan_row_availability_table() -> None:
+    """Table test WITH must-NOT-match rows. Every row of this table was
+    observed as a real bucket in the run-2026-07-27 replay."""
+    from ma_poc.core.schema_v2 import resolve_plan_row_availability as _r
+
+    cases: list[tuple[str | None, bool, bool, bool, str | None]] = [
+        # (status, plan_level, has_rent, has_anchor, expected)
+        # -- must coerce: zero-inventory
+        ("AVAILABLE", True, False, False, "UNAVAILABLE"),
+        (None, True, False, False, "UNAVAILABLE"),
+        ("UNKNOWN", True, False, False, "UNAVAILABLE"),
+        ("UNAVAILABLE", True, False, False, "UNAVAILABLE"),
+        ("WAITLIST", True, False, False, "UNAVAILABLE"),
+        # -- must NOT coerce: rent-bearing plan rows
+        ("AVAILABLE", True, True, False, "AVAILABLE"),
+        ("UNAVAILABLE", True, True, False, "UNAVAILABLE"),
+        ("PENDING", True, True, False, "PENDING"),
+        (None, True, True, False, "UNKNOWN"),
+        # -- must NOT coerce: a row anchoring ONE REAL APARTMENT
+        ("AVAILABLE", True, False, True, "AVAILABLE"),
+        (None, True, False, True, "UNKNOWN"),
+        # -- must NOT touch: non-plan rows pass straight through
+        ("AVAILABLE", False, False, False, "AVAILABLE"),
+        (None, False, False, False, None),
+        ("LEASED", False, True, True, "LEASED"),
+        ("UNKNOWN", False, False, False, "UNKNOWN"),
+    ]
+    for status, plan, rent, anchor, want in cases:
+        got = _r(status, plan_level=plan, has_rent=rent, has_anchor=anchor)
+        assert got == want, (status, plan, rent, anchor, got, want)

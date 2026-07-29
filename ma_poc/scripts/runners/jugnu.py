@@ -2597,6 +2597,17 @@ def _format_v2_floor_plan(
     out["unit_name"] = None
     out["unit_name_raw"] = None
     out["is_floor_plan_level"] = True
+    # Re-apply the zero-inventory contract against the FORCED flag — lock-step
+    # with ``core.schema_v2._format_v2_floor_plan``. Identity is cleared just
+    # above, so ``has_anchor`` is False by construction.
+    from ma_poc.core.schema_v2 import resolve_plan_row_availability
+
+    out["availability_status"] = resolve_plan_row_availability(
+        out.get("availability_status"),
+        plan_level=True,
+        has_rent=(out.get("rent_low") is not None or out.get("rent_high") is not None),
+        has_anchor=False,
+    )
     flags = [
         part.strip()
         for part in str(out.get("data_quality_flag") or "").split("|")
@@ -2933,6 +2944,7 @@ def _format_v2_unit(
     from ma_poc.core.schema_v2 import (
         _is_floor_plan_level,
         _resolve_available_date,
+        resolve_plan_row_availability,
     )
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
@@ -3142,6 +3154,27 @@ def _format_v2_unit(
     except (TypeError, ValueError):
         concession_value = None
 
+    # Zero-inventory availability contract (2026-07-29) — resolved ONCE, before
+    # the dict literal, so ``availability_status`` and the ``available_date``
+    # scrape-date fallback below read the same truth. Lock-step with
+    # ``core.schema_v2._format_v2_unit``; see
+    # ``core.schema_v2.resolve_plan_row_availability`` for the rule and for why
+    # rent-bearing plan rows are never coerced.
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    _plan_level = _is_floor_plan_level(unit, property_plan_level=property_plan_level)
+    _rent_lo_fmt = _format_rent(rent_lo_raw)
+    _rent_hi_fmt = _format_rent(rent_hi_raw)
+    _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
+    _availability_status = resolve_plan_row_availability(
+        _norm_avail_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
+        plan_level=_plan_level,
+        has_rent=_has_rent,
+        has_anchor=unit_has_real_anchor(unit),
+    )
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -3175,11 +3208,9 @@ def _format_v2_unit(
         # ``data_quality_flag``), while 1,675 plan-shaped rows shipped
         # unflagged from tiers that declare PLAN_LEVEL/PLAN_TEXT at the
         # property level.
-        "is_floor_plan_level": _is_floor_plan_level(
-            unit, property_plan_level=property_plan_level
-        ),
-        "rent_low": _format_rent(rent_lo_raw),
-        "rent_high": _format_rent(rent_hi_raw),
+        "is_floor_plan_level": _plan_level,
+        "rent_low": _rent_lo_fmt,
+        "rent_high": _rent_hi_fmt,
         "floor": _format_floor(_raw_src["floor"]),
         "building": (
             None
@@ -3206,28 +3237,22 @@ def _format_v2_unit(
         # canonical transform applies the default; the production jugnu path
         # didn't, so it never took effect. has_rent is gated on a REAL unit
         # identity so plan-level synthetic rows don't get a fabricated stamp.
+        # 2026-07-29: fed the RESOLVED status (not a second independent
+        # _norm_avail_status call) so a zero-inventory plan row cannot be
+        # UNAVAILABLE and simultaneously carry a manufactured "available
+        # today" scrape-date stamp.
         "available_date": _resolve_available_date(
             _format_date_str(unit.get("available_date")),
-            _norm_avail_status(
-                unit.get("availability_status") or unit.get("_availability_status")
-            ),
+            _availability_status,
             scrape_ts,
-            has_rent=(
-                (
-                    _format_rent(rent_lo_raw) is not None
-                    or _format_rent(rent_hi_raw) is not None
-                )
-                and uid not in (None, "", "null")
-            ),
+            has_rent=(_has_rent and uid not in (None, "", "null")),
         ),
         # 2026-05-26: availability_status was absent from this function
         # (present in core/schema_v2.py but never synced here).  That caused
         # 93.9% of units to have a blank availability_status in the canary
         # output.  Light normalization mirrors _norm_status() in schema_v2.py:
         # uppercase known tokens; pass raw string through for everything else.
-        "availability_status": _norm_avail_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        "availability_status": _availability_status,
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
         # 2026-05-25 (canary 1ef1060 follow-up): concession + offer fields,
