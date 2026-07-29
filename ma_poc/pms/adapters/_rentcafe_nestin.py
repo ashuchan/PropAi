@@ -38,6 +38,7 @@ patchright was 403-walled.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any
@@ -111,6 +112,231 @@ _RENT_VALUE_RE = re.compile(r"\$\s?([\d,]+(?:\.\d{1,2})?)")
 # ``M-D-YYYY``. ISO-format (``YYYY-MM-DD``) is also accepted by adapters
 # downstream so we don't transform here.
 _AVAILABILITY_DATE_RE = re.compile(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b")
+
+# ── 2026-07-28: plan-page roster scoping ────────────────────────────────────
+#
+# Live probe of 9 Nestin properties (plain static curl_cffi GET, 2026-07-28)
+# found TWO server-rendering behaviours behind the identical
+# ``/floorplans/{slug}`` URL shape:
+#
+#   * **scoped** (southparkvillagenc.com, steelecrossingliving.com,
+#     hamptonmeridian.com, theresidencescitymodern.com) — the rendered unit
+#     table holds ONLY the viewed plan's apartments. Every row's
+#     ``applyGAClick`` first argument equals the page heading.
+#   * **whole-roster** (pickwickfarms-apartments.com, livethegateway.com,
+#     keelerscorner.com, thelibertyapts.com, mainstreetbellevue.com) — the
+#     server renders the SAME table on every plan page (one plan's roster;
+#     the real filtering is client-side JS that a ``fetch()``/curl GET never
+#     runs). Row ``applyGAClick`` arguments therefore DISAGREE with the
+#     heading.
+#
+# Consuming the second shape as if it were plan-scoped is what produced
+# ``n_plan_pages × roster`` rows, each mislabelled with the page it came
+# from (Pickwick Farms: 115 rows for 23 apartments in run
+# 2026-07-27-full-0d54ca7).
+#
+# Two per-row markers are published on BOTH shapes and are the fix:
+#
+#   1. ``ysi.unitsList`` — a JS array carrying the property's WHOLE roster
+#      with each unit's own ``FloorplanName``/``FloorplanId``, beds, baths,
+#      sqft, rent and available date. Present on all five whole-roster
+#      sites, absent on all four scoped ones. When present it is the
+#      authoritative roster and ONE page answers the whole property. Its
+#      per-plan tallies were checked against a DIFFERENT publication — the
+#      ``/floorplans`` index' own ``ysi.floorplansList[].AvailableCount`` —
+#      and agreed on 37/37 plans across those five properties.
+#   2. ``applyGAClick('<plan name>', …)`` inside the row's own markup — the
+#      row's true plan, whatever page it was rendered on.
+#
+# Neither is a heuristic on text: both are values the page publishes about
+# the row itself.
+
+# ``ysi.unitsList = [ … ];`` — the assignment target only. The array body is
+# read by a bracket-balanced scan (``_slice_bracketed_array``) rather than a
+# ``\[.*?\]`` regex: the JSON contains nested ``[]`` (``"Amenities": []``)
+# and a non-greedy regex truncates the roster at the first empty list.
+# The look-behind keeps ``myysi.unitsList`` / ``window.ysi.unitsList`` from
+# being read as the RentCafe global; requiring ``=`` immediately after the
+# property name keeps ``ysi.unitsListCount`` out.
+_YSI_UNITS_LIST_ASSIGN_RE = re.compile(
+    r"(?<![A-Za-z0-9_$.])ysi\s*\.\s*unitsList\s*=\s*"
+)
+
+# First argument of an ``applyGAClick(...)`` call — the plan the row belongs
+# to, as the page itself labels it. Anchored on the whole function name (the
+# look-behind rejects ``notApplyGAClick`` / ``xapplyGAClick``) and on the
+# opening quote, so it cannot pick up other onclick handlers or a bare
+# mention of the word in prose. The plan capture stops at the matching quote
+# and is newline-free — a plan name is a label, never a multi-line blob, and
+# ``[^'"]`` also means a truncated/quote-less handler yields no match rather
+# than swallowing the rest of the document.
+_APPLYGA_PLAN_RE = re.compile(
+    r"(?<![A-Za-z0-9_$])applyGAClick\s*\(\s*(['\"])(?P<plan>[^'\"\r\n]*)\1",
+    re.IGNORECASE,
+)
+
+
+def _slice_bracketed_array(text: str, start: int) -> str:
+    """Return the ``[...]`` JSON array literal beginning at *start*.
+
+    A bracket-balanced scan that respects double-quoted strings and their
+    backslash escapes, so nested arrays (``"Amenities": []``) and brackets
+    inside string values do not terminate the slice early. Returns ``""``
+    when *start* is not a ``[`` or the array never closes.
+    """
+    if start >= len(text) or text[start] != "[":
+        return ""
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return ""
+
+
+def extract_ysi_units_list(html: str) -> list[dict[str, Any]]:
+    """Return the decoded ``ysi.unitsList`` roster from *html*, or ``[]``.
+
+    ``ysi.unitsList`` is the JS array the Nestin template hands to its
+    client-side plan filter. It carries the property's WHOLE availability
+    roster — every entry tagged with its own ``FloorplanName`` /
+    ``FloorplanId`` — which is exactly the mapping a plan page's rendered
+    table loses on the whole-roster shape.
+
+    Returns ``[]`` when the assignment is absent, the array does not close,
+    or the payload is not a list of objects.
+    """
+    if not html:
+        return []
+    m = _YSI_UNITS_LIST_ASSIGN_RE.search(html)
+    if not m:
+        return []
+    literal = _slice_bracketed_array(html, m.end())
+    if not literal:
+        return []
+    try:
+        data = json.loads(literal)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _num_to_str(value: Any) -> str:
+    """Render a JSON number as a plain string (``700.0`` → ``"700"``).
+
+    Non-numeric / missing values render as ``""`` so ``make_unit_dict``
+    treats them as absent rather than as the string ``"None"``.
+    """
+    if value is None or isinstance(value, bool):
+        return ""
+    if isinstance(value, (int, float)):
+        if float(value) == int(value):
+            return str(int(value))
+        return str(value)
+    text = str(value).strip()
+    return text
+
+
+def _iso_date_prefix(value: Any) -> str:
+    """``"2026-07-03T00:00:00"`` → ``"2026-07-03"``; ``""`` when unusable."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text.split("T", 1)[0]
+
+
+def parse_ysi_units_list(
+    detail_html: str, source_url: str
+) -> list[dict[str, Any]]:
+    """Parse the ``ysi.unitsList`` roster into canonical unit dicts.
+
+    Each row is attributed to ITS OWN ``FloorplanName`` — never to the plan
+    page it was scraped from. Commercial units are dropped (``isCommercial``
+    is the template's own residential/retail split). Rows without an
+    apartment code are dropped: they carry no unit identity.
+
+    Because this array is the whole-property roster and is byte-identical on
+    every plan page, the caller must consume it from ONE page and stop —
+    see ``recover_rentcafe_nestin_per_plan``.
+    """
+    rows = extract_ysi_units_list(detail_html)
+    if not rows:
+        return []
+
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if row.get("isCommercial") is True:
+            continue
+        unit_number = _normalize_unit_number(str(row.get("UnitCode") or ""))
+        if not unit_number:
+            continue
+        plan_name = str(row.get("FloorplanName") or "").strip()
+        key = f"{unit_number}|{plan_name}"
+        if key in seen:
+            continue
+        seen.add(key)
+
+        rent_low = _money_to_int("$" + _num_to_str(row.get("MinRent")))
+        rent_high = _money_to_int("$" + _num_to_str(row.get("MaxRent")))
+        if rent_high is None:
+            rent_high = rent_low
+        beds_str = _num_to_str(row.get("Beds"))
+        beds_int = int(beds_str) if beds_str.isdigit() else None
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan_name,
+                bed_label=bed_label_from(beds_int, plan_name),
+                bedrooms=beds_str,
+                bathrooms=_num_to_str(row.get("Baths")),
+                sqft=_num_to_str(row.get("SqFt")),
+                unit_number=unit_number,
+                rent_range=format_rent_range(rent_low, rent_high),
+                rent_low=rent_low,
+                rent_high=rent_high,
+                availability_status="AVAILABLE",
+                availability_date=_iso_date_prefix(row.get("AvailableDate")),
+                source_api_url=source_url,
+                extraction_tier="TIER_1_DOM_RENTCAFE_NESTIN",
+            )
+        )
+    return units
+
+
+def _plan_name_for_row(row_html: str, fallback: str) -> str:
+    """Return the plan a rendered unit row belongs to.
+
+    The row's own ``applyGAClick('<plan name>', …)`` argument wins over the
+    page heading: on the whole-roster shape the heading names the plan being
+    *viewed* while the rows belong to a different plan entirely. Falls back
+    to *fallback* (the heading) when the row publishes no such marker —
+    the pre-2026-07-28 behaviour, which is correct on the scoped shape.
+    """
+    if not row_html:
+        return fallback
+    m = _APPLYGA_PLAN_RE.search(row_html)
+    if not m:
+        return fallback
+    plan = (m.group("plan") or "").strip()
+    return plan or fallback
 
 
 def is_nestin_template(html: str) -> bool:
@@ -302,10 +528,14 @@ def _parse_table_layout(
             date_m = _AVAILABILITY_DATE_RE.search(date_text)
             availability_date = date_m.group(1) if date_m else ""
 
+            # The row's own plan, not the page's. On the whole-roster shape
+            # these differ and the heading is wrong for every row.
+            row_plan = _plan_name_for_row(str(tr), floor_plan_name)
+
             units.append(
                 make_unit_dict(
-                    floor_plan_name=floor_plan_name,
-                    bed_label=bed_label_from(None, floor_plan_name),
+                    floor_plan_name=row_plan,
+                    bed_label=bed_label_from(None, row_plan),
                     bedrooms="",
                     bathrooms="",
                     sqft=sqft,
@@ -376,6 +606,16 @@ def _parse_card_layout(
         date_m = _AVAILABILITY_DATE_RE.search(rent_text)
         availability_date = date_m.group(1) if date_m else ""
 
+        # 2026-07-28: the table parser reads each row's own plan from its
+        # ``applyGAClick`` marker. Deliberately NOT done here. ``container``
+        # is the result of walking up to 5 parents looking for a ``$``, so
+        # it can enclose several cards — the first ``applyGAClick`` inside
+        # it may belong to a different apartment, which would trade one
+        # misattribution for another. No probed card-layout property (all 9
+        # of the 2026-07-28 probe) served a whole roster, so there is no
+        # evidence to justify the risk. Cross-page dedupe in
+        # ``recover_rentcafe_nestin_per_plan`` still bounds the row count
+        # for a card-layout site that ever does.
         seen_units.add(unit_number)
         units.append(
             make_unit_dict(
@@ -471,7 +711,10 @@ def parse_nestin_detail_page(
 ) -> list[dict[str, Any]]:
     """Parse a single ``/floorplans/{slug}`` detail page for unit rows.
 
-    Tries Layout A1 (table) first — most reliable when present.
+    Tries Layout A0 (``ysi.unitsList``) first: it is the only source on the
+    page that states, per unit, which plan the unit belongs to, and it is
+    complete where the rendered table is not.
+    Then Layout A1 (table) — most reliable of the rendered shapes.
     Falls through to Layout A3 (applyGAClick button — Stonewater-shape;
     discovered 2026-05-20 pre-canary probe) which is more structured than
     Layout A2 because the data is in well-known ``onclick`` args.
@@ -481,6 +724,9 @@ def parse_nestin_detail_page(
     Returns ``[]`` on any extraction failure (caller decides whether to
     fall back to plan-level emission).
     """
+    units = parse_ysi_units_list(detail_html, source_url)
+    if units:
+        return units
     units = _parse_table_layout(detail_html, source_url, floor_plan_name)
     if units:
         return units
@@ -687,8 +933,54 @@ async def recover_rentcafe_nestin_per_plan(
         detail_html = getattr(resp, "text", "") or ""
         if not detail_html:
             continue
+
+        # 2026-07-28 — whole-roster short-circuit. ``ysi.unitsList`` is the
+        # property's complete roster and is byte-identical on every plan
+        # page, so crawling the remaining plan pages can only re-emit the
+        # rows we already hold. Take it once and stop: this is what turns
+        # ``n_plan_pages × roster`` into ``roster``.
+        ysi_units = parse_ysi_units_list(detail_html, detail_url)
+        if ysi_units:
+            log.debug(
+                "nestin whole-roster ysi.unitsList found at %s — %d units, "
+                "skipping %d remaining plan pages",
+                detail_url, len(ysi_units), len(detail_urls) - 1,
+            )
+            return ysi_units, floorplans_url
+
         plan_name = _section_heading_for_plan(detail_html)
         units = parse_nestin_detail_page(detail_html, detail_url, plan_name)
         all_units.extend(units)
 
-    return all_units, floorplans_url
+    # 2026-07-28 — cross-page dedupe for whole-roster sites that publish no
+    # ``ysi.unitsList``. The key is (apartment, ITS OWN plan): an apartment
+    # re-served on another plan's page carries the same pair and collapses,
+    # while two genuinely different apartments that share a number across
+    # buildings keep distinct plans and both survive (verified on
+    # theresidencescitymodern.com, where "307" exists under both
+    # "440 Alfred Street - C" and "290 Edmund Place - G2").
+    return _dedupe_units_by_apartment_and_plan(all_units), floorplans_url
+
+
+def _dedupe_units_by_apartment_and_plan(
+    units: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse rows sharing an (apartment number, floor-plan name) pair.
+
+    First occurrence wins. Rows with no apartment number are passed through
+    untouched — they carry no identity to dedupe on and dropping them would
+    silently lose plan-level rows.
+    """
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for unit in units:
+        number = str(unit.get("unit_number") or "").strip()
+        if not number:
+            out.append(unit)
+            continue
+        key = f"{number}|{str(unit.get('floor_plan_name') or '').strip()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(unit)
+    return out
