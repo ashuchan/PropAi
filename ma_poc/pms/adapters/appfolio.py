@@ -565,6 +565,32 @@ class ScopeEvidence(Enum):
     WEAK_EVIDENCE = "weak_evidence"
 
 
+def _listing_address_of(unit: dict[str, Any], address_field: str) -> str:
+    """Return the street address this listing should be judged on.
+
+    2026-07-29 — MERGE-COLLISION GUARD, and the reason this indirection exists.
+    ``filter_listings_by_property_address`` defaulted to reading the address out
+    of ``floor_plan_name``, which is where the AppFolio SSR parser used to put
+    it. A separate, individually-correct fix ("a street address is not a floor
+    plan name") moved that string to ``unit_name`` and blanked
+    ``floor_plan_name``. Neither branch could see the other: the two changes
+    merge with ZERO conflicts and the contamination filter silently loses its
+    input — every account-roster row then passes, re-opening the very defect the
+    scope work closed. Caught by the combined-tree suite, not by either branch.
+
+    So: prefer the configured field, and fall back to ``unit_name`` only when
+    the configured field is empty AND the fallback is actually address-shaped.
+    The shape test matters — on a normal property ``unit_name`` is a unit number
+    like "101", and treating that as an address would make it judgeable and then
+    unmatchable, dropping real rows.
+    """
+    primary = (unit.get(address_field) or "").strip()
+    if primary:
+        return primary
+    fallback = (unit.get("unit_name") or "").strip()
+    return fallback if fallback and is_street_address(fallback) else ""
+
+
 def _listing_address_is_judgeable(listing_address: str) -> bool:
     """True when *listing_address* carries something the address filter
     can actually compare against a CSV property context.
@@ -636,7 +662,7 @@ def filter_listings_by_property_address(
     lenient = evidence is ScopeEvidence.OPERATOR_SCOPED
 
     distinct_addresses = {
-        (u.get(address_field) or "").strip() for u in units
+        _listing_address_of(u, address_field) for u in units
     }
     distinct_addresses.discard("")
     if len(distinct_addresses) <= 1 and not weak:
@@ -664,9 +690,12 @@ def filter_listings_by_property_address(
     matched: list[dict[str, Any]] = [
         u
         for u in units
-        if (lenient and not _listing_address_is_judgeable(u.get(address_field) or ""))
+        if (
+            lenient
+            and not _listing_address_is_judgeable(_listing_address_of(u, address_field))
+        )
         or _address_matches(
-            u.get(address_field) or "", ctx_address, ctx_zip, fuzzy_threshold
+            _listing_address_of(u, address_field), ctx_address, ctx_zip, fuzzy_threshold
         )
     ]
     if not matched and lenient:

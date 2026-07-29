@@ -524,8 +524,14 @@ _OFF_BY_ONE_HTML = """
 
 
 def _by_address(units: list[dict[str, str]]) -> dict[str, str]:
+    # 2026-07-29: reads ``unit_name``, not ``floor_plan_name``. The AppFolio
+    # SSR parser moved the listing ADDRESS to unit_name (an address is not a
+    # plan name) and leaves floor_plan_name empty. Keying on the empty field
+    # collapsed all three cards onto one dict entry, which made these tests
+    # fail for a reason that had nothing to do with the segmentation they
+    # exist to guard. The address is the key here — read it where it lives.
     return {
-        str(u.get("floor_plan_name") or ""): str(u.get("sqft") or "")
+        str(u.get("unit_name") or ""): str(u.get("sqft") or "")
         for u in units
     }
 

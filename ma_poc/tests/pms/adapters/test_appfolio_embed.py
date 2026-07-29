@@ -323,13 +323,22 @@ async def test_showings_anchor_still_yields_units_when_address_matches() -> None
     units = await recover_appfolio_embed(  # type: ignore[arg-type]
         page, _ctx("https://www.yourmetropolitan.com/", address="10 Creek Rd")
     )
-    assert [u["floor_plan_name"] for u in units] == ["10 Creek Rd"]
-
-    assert len(units) == 2
-    # 2026-07-28: the SSR address lands in unit_name; floor_plan_name is
-    # empty because AppFolio SSR cards publish no plan name. Asserting on
-    # unit_name still proves the fetch canonicalized to the listings index
-    # (the actual subject of this test) rather than the showings form.
+    # 2026-07-29 MERGE ARTIFACT, resolved here. Two branches edited these
+    # same lines and merged without a conflict, leaving the test asserting
+    # two incompatible things at once:
+    #   * the scope branch (fd0c7c3) replaced ``len(units) == 2`` with the
+    #     one-element list compare — an account roster reached from a
+    #     showings deep-link is scoped to the CSV address, so the foreign
+    #     "12 Creek Rd" card is DROPPED. The count is 1, and 1 is correct.
+    #   * the field branch (dd23d7c) moved the address out of
+    #     floor_plan_name into unit_name and kept the stale count of 2.
+    # Both claims survive below, read off the field that now holds the
+    # address. Verified against the code: n=1, unit_name='10 Creek Rd'.
+    assert [u["unit_name"] for u in units] == ["10 Creek Rd"]
+    assert len(units) == 1, "the foreign 12 Creek Rd card must be scoped out"
+    # AppFolio SSR cards publish no plan name, so floor_plan_name is empty.
+    # Asserting on unit_name still proves the fetch canonicalized to the
+    # listings index (the actual subject of this test), not the showings form.
     assert units[0]["unit_name"] == "10 Creek Rd"
     assert units[0]["floor_plan_name"] == ""
 
@@ -374,7 +383,10 @@ async def test_recover_via_tenant_only_login_url() -> None:
         _ctx("https://www.aptsedenprairie.com/", "10 Creek Rd"),  # type: ignore[arg-type]
     )
     assert len(units) == 1, "tenant discovered, roster scoped to this property"
-    assert units[0]["floor_plan_name"] == "10 Creek Rd"
+    # 2026-07-29: address column moved floor_plan_name -> unit_name. The
+    # claim (the surviving row is THIS property's, not the other card's)
+    # is unchanged.
+    assert units[0]["unit_name"] == "10 Creek Rd"
     assert units[0]["extraction_tier"] == "TIER_1_DOM_APPFOLIO_SSR"
 
 
@@ -398,7 +410,8 @@ async def test_recover_via_tenant_only_request_access_url() -> None:
         _ctx("https://www.rentdwp.com/", "12 Creek Rd"),  # type: ignore[arg-type]
     )
     assert len(units) == 1
-    assert units[0]["floor_plan_name"] == "12 Creek Rd"
+    # 2026-07-29: address column moved floor_plan_name -> unit_name.
+    assert units[0]["unit_name"] == "12 Creek Rd"
 
 
 @pytest.mark.asyncio
@@ -589,7 +602,10 @@ async def test_unscopeable_account_roster_emits_only_this_property() -> None:
         _ctx("https://collegeparklacey.com/", "3307 College St SE", "98503"),  # type: ignore[arg-type]
     )
     assert len(units) == 1
-    assert units[0]["floor_plan_name"].startswith("3307 COLLEGE STREET SE")
+    # 2026-07-29: address column moved floor_plan_name -> unit_name. The
+    # claim (only this property's card is admitted out of the account
+    # roster) is unchanged.
+    assert units[0]["unit_name"].startswith("3307 COLLEGE STREET SE")
 
 
 @pytest.mark.asyncio
@@ -709,7 +725,10 @@ async def test_published_index_roster_that_is_not_ours_still_demotes() -> None:
     ctx = _ctx("https://heritageamitycommons.com/", "606A Lake Dr", "19518")
     units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
     assert units == [], (
-        f"contamination reopened: {[u['floor_plan_name'] for u in units]}"
+        # unit_name, not floor_plan_name: the latter is empty on this tier
+        # since 2026-07-28, which would have made this diagnostic print a
+        # list of blanks on failure.
+        f"contamination reopened: {[u['unit_name'] for u in units]}"
     )
     notes = get_notes(ctx)
     assert [n["reason"] for n in notes] == ["filter_rejected_all_demote"]

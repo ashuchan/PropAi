@@ -34,15 +34,19 @@ This file pins:
 """
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 
 import pytest
 
+from ma_poc.pms.adapters._parsing import is_street_address
 from ma_poc.pms.adapters.appfolio import (
     AppFolioAdapter,
     ScopeEvidence,
     _listing_address_is_judgeable,
+    _listing_address_of,
     filter_listings_by_property_address,
+    parse_appfolio_listings_ssr,
 )
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.appfolio_urls import is_account_index_url, scoped_listings_url
@@ -261,6 +265,136 @@ _ROSTER = "<html><body>" + "".join([
 ]) + "</body></html>"
 
 
+def _container_card(listing_id: str, address: str) -> str:
+    """The other live AppFolio card shape: a ``js-listing-item`` DIV whose
+    id is ``listing_N``, with ``data-listing-id`` on a map-link anchor in
+    the MIDDLE of the card. Verified against the captured body for pid
+    17555 (bamliving) in run-2026-07-27-full-0d54ca7.
+    """
+    return f"""
+    <div class="listing-item result js-listing-item" id="listing_{listing_id}">
+      <div class="js-listing-blurb-rent">$1,500</div>
+      <div class="js-listing-blurb-bed-bath">2 bd / 2 ba</div>
+      <span class="js-listing-address">{address}</span>
+      <a href="#" class="js-listing-map-view-link"
+         data-listing-id="{listing_id}"></a>
+      <span class="js-listing-square-feet">Square Feet: 900</span>
+    </div>
+    """
+
+
+_CONTAINER_ROSTER = "<html><body>" + "".join([
+    _container_card("14638", "999 E Baseline Rd, 2406, Tempe, AZ 85283"),
+    _container_card("12291", "1750 S Alma School Rd, Mesa, AZ 85210"),
+    _container_card("11663", "7017 S Buffalo Dr., Las Vegas, NV 89113"),
+    _container_card("9001", "500 W Camelback Rd, 210, Phoenix, AZ 85013"),
+]) + "</body></html>"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 3b. PARSER -> FILTER CONTRACT — the invariant that silently broke.
+#
+# 2026-07-29. Two individually-correct changes collided with ZERO merge
+# conflicts and reopened the contamination defect this file exists to
+# close:
+#
+#   (A) the scope work filters the account roster on a named field,
+#       defaulting to ``floor_plan_name`` — where the SSR parser used to
+#       put the street address;
+#   (B) "a street address is not a floor plan name" moved that string to
+#       ``unit_name`` and blanked ``floor_plan_name``.
+#
+# Merged, the filter's input became the empty string on every row, so
+# every row was unjudgeable and EVERY account-roster listing passed. No
+# conflict, no failing test on either branch.
+#
+# Neither branch could catch it because every existing test of the filter
+# feeds it HAND-BUILT dicts (``_unit()`` above, which hard-codes
+# ``floor_plan_name=address``). A hand-built dict cannot disagree with the
+# parser. These tests close that gap: they run the REAL parser and assert
+# the filter can still read what it produced.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _default_address_field() -> str:
+    """The field the address filter actually reads, taken from the
+    signature rather than restated — so renaming the default here cannot
+    drift away from the production default."""
+    param = inspect.signature(
+        filter_listings_by_property_address
+    ).parameters["address_field"]
+    assert isinstance(param.default, str)
+    return param.default
+
+
+@pytest.mark.parametrize("roster", [_ROSTER, _CONTAINER_ROSTER],
+                         ids=["anchor-card", "container-card"])
+def test_ssr_parser_fills_the_field_the_address_filter_reads(roster: str) -> None:
+    """THE GUARD. Whatever field the filter is configured to read, the SSR
+    parser must actually put a street address there — on BOTH live card
+    shapes. Move the address without teaching the filter where it went and
+    this goes red immediately, instead of silently passing the whole
+    account roster through.
+    """
+    units = parse_appfolio_listings_ssr(
+        roster, "https://chamberlin.appfolio.com/listings"
+    )
+    assert len(units) == 4, f"parser lost cards: {units}"
+    field = _default_address_field()
+    for u in units:
+        seen = _listing_address_of(u, field)
+        assert seen, (
+            f"the address filter reads {field!r} and got NOTHING for {u!r}. "
+            "Every row is now unjudgeable and the whole account roster "
+            "ships as one property — this is the collision, not a typo."
+        )
+        assert is_street_address(seen), (
+            f"{seen!r} is not address-shaped; the filter cannot scope on it"
+        )
+
+
+@pytest.mark.parametrize("roster", [_ROSTER, _CONTAINER_ROSTER],
+                         ids=["anchor-card", "container-card"])
+def test_filter_scopes_a_roster_that_came_from_the_real_parser(roster: str) -> None:
+    """Same invariant, stated as the outcome that matters: a four-property
+    account roster fed straight from the parser into the filter must come
+    out as this property's ONE row. This is the assertion that would have
+    failed on the merged tree before the fix (it returned all four).
+    """
+    units = parse_appfolio_listings_ssr(
+        roster, "https://chamberlin.appfolio.com/listings"
+    )
+    filtered, tel = filter_listings_by_property_address(
+        units, ctx_address="500 W Camelback Rd", ctx_zip="85013"
+    )
+    assert len(filtered) == 1, (
+        f"account roster not scoped: kept {[u['unit_name'] for u in filtered]}"
+    )
+    assert "85013" in filtered[0]["unit_name"]
+    assert tel["filter_activated"] is True
+    assert tel["dropped"] == 3
+
+
+def test_address_fallback_does_not_mistake_a_unit_number_for_an_address() -> None:
+    """The other half of the guard. ``_listing_address_of`` falls back to
+    ``unit_name`` only when it is address-SHAPED. On a normal multifamily
+    property unit_name is a bare unit number; treating "101" as an address
+    would make the row judgeable and then unmatchable, and the filter would
+    drop real inventory.
+    """
+    for bare in ("101", "A1", "2B", ""):
+        assert _listing_address_of(
+            {"floor_plan_name": "", "unit_name": bare}, "floor_plan_name"
+        ) == "", f"{bare!r} must not be judged as a street address"
+    # ...and the configured field always wins when it is populated (the
+    # DUDA path genuinely maps ``full_address`` -> ``floor_plan_name``).
+    assert _listing_address_of(
+        {"floor_plan_name": "500 W Camelback Rd, Phoenix, AZ 85013",
+         "unit_name": "210"},
+        "floor_plan_name",
+    ) == "500 W Camelback Rd, Phoenix, AZ 85013"
+
+
 @pytest.mark.asyncio
 async def test_account_roster_is_scoped_to_the_property() -> None:
     """THE DEFECT. pid 260505 shape: the body is an account-wide roster
@@ -275,7 +409,11 @@ async def test_account_roster_is_scoped_to_the_property() -> None:
     result = await AppFolioAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_DOM_APPFOLIO_SSR"
     assert len(result.units) == 1
-    assert "85013" in result.units[0]["floor_plan_name"]
+    # 2026-07-29: the SSR parser now writes the listing address to
+    # ``unit_name`` (it is an address, not a plan name). The behavioural
+    # claim is unchanged — the surviving row must be the 85013 one, not
+    # Tempe/Mesa/Las Vegas — only the column it is read from moved.
+    assert "85013" in result.units[0]["unit_name"]
     assert any("appfolio-ssr-address-filter" in e
                and "evidence=published_index" in e
                for e in result.errors)
@@ -367,4 +505,7 @@ async def test_empty_scoped_refetch_falls_back_never_zeroes(
                address="500 W Camelback Rd", zip_code="85013")
     result = await AppFolioAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert len(result.units) == 1
-    assert "85013" in result.units[0]["floor_plan_name"]
+    # See above — address column moved to ``unit_name``; the claim (the
+    # fallback filter kept THIS property's row, not the other three) is
+    # asserted unchanged.
+    assert "85013" in result.units[0]["unit_name"]
