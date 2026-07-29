@@ -85,6 +85,30 @@ _PLATFORM_LABELS: dict[str, str] = {
 }
 
 
+def v2_tier_used(scrape_result: Any) -> str | None:
+    """The producing tier label on a scrape result, or ``None``.
+
+    Reads ``_extract_result.tier_used`` — the same field
+    ``run_report.py`` / ``slo_watcher.py`` key their tier distribution off,
+    and the same one ``_extract_result_summary`` projects into
+    ``properties.json`` — accepting either the dataclass or the already-
+    projected dict, because both shapes reach the v2 formatters.
+
+    Sole consumer today is clamp attribution (:func:`clamp_tier_context`),
+    which is observability: a ``None`` here costs a ``"UNKNOWN"`` tier on a
+    clamp record and nothing else. Never raises.
+    """
+    try:
+        er = scrape_result.get("_extract_result") if isinstance(scrape_result, dict) else None
+        if er is None:
+            return None
+        tier = er.get("tier_used") if isinstance(er, dict) else getattr(er, "tier_used", None)
+        text = str(tier).strip() if tier is not None else ""
+        return text or None
+    except Exception:  # pragma: no cover — defensive; attribution is optional
+        return None
+
+
 def build_v2_property(
     row: dict,
     ident: Any,
@@ -131,6 +155,31 @@ def build_v2_property(
     concessions_text = scrape_result.get("concessions_text") or md.get("concessions") or None
     concessions_json = normalize_concession(concessions_text)
 
+    # Rows are formatted BEFORE the property dict is built so the whole
+    # per-row emit can sit inside ``clamp_tier_context``: the producing tier
+    # is a property-level fact and ``_format_area`` / ``_format_rent`` are
+    # pure value functions with no way to learn it. Without this every
+    # formatter clamp attributes to "UNKNOWN" and the ledger cannot answer
+    # "which tier produces the most clamped rents" — the one question #69
+    # exists to answer. Kept in lock-step with the fork in
+    # ``scripts/runners/jugnu.py::_format_v2``.
+    from ma_poc.extraction.sanity import clamp_tier_context
+
+    with clamp_tier_context(v2_tier_used(scrape_result)):
+        _v2_units = [
+            _format_v2_unit(
+                u,
+                scrape_ts,
+                str(_safe_int(csv_id) or ""),
+                property_plan_level=property_is_plan_level(scrape_result),
+                # Whether THIS property published a real square footage to us
+                # anywhere in this scrape — the sibling evidence that makes a
+                # missing area our failure rather than the operator's silence.
+                property_has_area=property_publishes_area(target_units),
+            )
+            for u in target_units
+        ]
+
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
         "apartment_id": _safe_int(csv_id),
@@ -176,19 +225,7 @@ def build_v2_property(
         # the per-row flag: adapters that record plan-ness on
         # ``AdapterResult.tier_used`` (rather than on every row) would
         # otherwise ship unflagged plan rows.
-        "units": [
-            _format_v2_unit(
-                u,
-                scrape_ts,
-                str(_safe_int(csv_id) or ""),
-                property_plan_level=property_is_plan_level(scrape_result),
-                # Whether THIS property published a real square footage to us
-                # anywhere in this scrape — the sibling evidence that makes a
-                # missing area our failure rather than the operator's silence.
-                property_has_area=property_publishes_area(target_units),
-            )
-            for u in target_units
-        ],
+        "units": _v2_units,
         # Public plan cards are preserved separately from physical apartments.
         # A plan may advertise rent and area but must never ship as a unit.
         "floor_plans": [
@@ -756,7 +793,18 @@ def _format_v2_unit(
     # Area + the reason it is absent. The numeric ``-1`` contract is
     # UNCHANGED; ``area_absence`` is an additive label that says which of the
     # four situations the -1 stands for. See ``classify_area_absence``.
-    area_out = _format_area(sqft)
+    # ``record_as=`` is what makes this the EMIT call rather than a probe:
+    # it is the only ``_format_area`` call for this row whose clamp should
+    # reach the ledger. Kept in lock-step with the fork in
+    # ``scripts/runners/jugnu.py`` — a formatter that stops passing it goes
+    # back to discarding the value silently, which is the whole #69 defect.
+    _clamp_unit_anchor = str(uid) if uid not in (None, "", "null") else None
+    area_out = _format_area(
+        sqft,
+        record_as="area",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
     area_absence, area_absence_evidence = classify_area_absence(
         unit,
         formatted_area=area_out,
@@ -773,8 +821,18 @@ def _format_v2_unit(
     from ma_poc.core.identity import unit_has_real_anchor
 
     _plan_level = _is_floor_plan_level(unit, property_plan_level=property_plan_level)
-    _rent_lo_fmt = _format_rent(rent_lo)
-    _rent_hi_fmt = _format_rent(rent_hi)
+    _rent_lo_fmt = _format_rent(
+        rent_lo,
+        record_as="rent_low",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
+    _rent_hi_fmt = _format_rent(
+        rent_hi,
+        record_as="rent_high",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
     _availability_status = resolve_plan_row_availability(
         _norm_status(
@@ -1105,18 +1163,100 @@ def _format_zip_5(val: Any) -> str | None:
     return None
 
 
-def _format_rent(val: Any) -> float | None:
-    """Clean rent value: strip currency symbols, commas. Must be > 1 or None."""
+#: Bounds the V2 formatter clamps against, recorded verbatim on each clamp
+#: so a reader of ``clamp_report.json`` sees what the value was tested
+#: against rather than having to find this file. The rent low bound is
+#: EXCLUSIVE (``> 1``) and the upper bound is open.
+_FORMATTER_RENT_BOUNDS: tuple[float, float] = (1.0, float("inf"))
+_FORMATTER_AREA_BOUNDS: tuple[float, float] = (150.0, 10_000.0)
+
+
+def _note_formatter_clamp(
+    field_label: str | None,
+    *,
+    reason: str,
+    value: float,
+    bounds: tuple[float, float],
+    property_id: str | None,
+    unit_id: str | None,
+) -> None:
+    """Record one emit-time clamp on the sanity clamp ledger, or do nothing.
+
+    OPT-IN by design: ``field_label`` is ``None`` for every read-only probe
+    call of ``_format_area`` / ``_format_rent`` (notably
+    :func:`property_publishes_area`, which runs ``_format_area`` over every
+    row of a property purely to decide a property-level fact). Recording
+    unconditionally would double-count each of those rows.
+
+    Never raises, and never touches the returned value — this function's
+    only job is to stop the evidence being thrown away silently.
+    """
+    if not field_label:
+        return
+    try:
+        from ma_poc.extraction.sanity import record_formatter_clamp
+
+        record_formatter_clamp(
+            field_label=field_label,
+            reason=reason,
+            value=value,
+            bounds=bounds,
+            property_id=property_id,
+            unit_id=unit_id,
+        )
+    except Exception:  # pragma: no cover — an emit must never fail on telemetry
+        return
+
+
+def _format_rent(
+    val: Any,
+    *,
+    record_as: str | None = None,
+    property_id: str | None = None,
+    unit_id: str | None = None,
+) -> float | None:
+    """Clean rent value: strip currency symbols, commas. Must be > 1 or None.
+
+    2026-07-29 (#69): when the ``> 1`` bound is what rejected an
+    ALREADY-PARSED number — a published ``"$0"``, the 167 such rows in
+    run-2026-07-27-full-0d54ca7 — the pre-clamp value is recorded on the
+    clamp ledger. A value that never parsed at all is NOT recorded: that is
+    a parse gap, not a clamp, and conflating them is how "couldn't look"
+    becomes "nothing there".
+
+    Args:
+        val: Raw rent in any producer shape.
+        record_as: Emitted field name (``rent_low`` / ``rent_high``) to
+            attribute a clamp to. ``None`` (the default) makes this call a
+            silent probe — see :func:`_note_formatter_clamp`.
+        property_id: Canonical property id, for the per-property index.
+        unit_id: Best-effort row anchor.
+
+    Returns:
+        The rent, or ``None``. UNCHANGED by the instrumentation.
+    """
     if val is None:
         return None
-    if isinstance(val, (int, float)):
-        return float(val) if val > 1 else None
-    s = str(val).strip().replace("$", "").replace(",", "").strip()
-    try:
-        n = float(s)
-        return n if n > 1 else None
-    except (ValueError, TypeError):
-        return None
+    n: float | None = None
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        n = float(val)
+    else:
+        s = str(val).strip().replace("$", "").replace(",", "").strip()
+        try:
+            n = float(s)
+        except (ValueError, TypeError):
+            return None
+    if n > 1:
+        return n
+    _note_formatter_clamp(
+        record_as,
+        reason="BELOW_MIN",
+        value=n,
+        bounds=_FORMATTER_RENT_BOUNDS,
+        property_id=property_id,
+        unit_id=unit_id,
+    )
+    return None
 
 
 #: A comma that is a THOUSANDS SEPARATOR and nothing else: preceded by a
@@ -1134,7 +1274,13 @@ _THOUSANDS_SEP_RE = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
 _FIRST_NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 
 
-def _format_area(val: Any) -> int:
+def _format_area(
+    val: Any,
+    *,
+    record_as: str | None = None,
+    property_id: str | None = None,
+    unit_id: str | None = None,
+) -> int:
     """Convert sqft to int. Clamp to [150, 10000]; -1 is the absent sentinel.
 
     Rejects values outside realistic apartment bounds (150-10000 sqft). This
@@ -1152,6 +1298,25 @@ def _format_area(val: Any) -> int:
     The jugnu runner carried this widening alone since 2026-05-19; its copy
     now delegates here (``scripts/runners/jugnu.py::_format_area``) so the
     two v2 unit formatters cannot disagree about what a square footage is.
+
+    2026-07-29 (#69): when the [150, 10000] bound is what rejected an
+    ALREADY-PARSED number, the pre-clamp value is recorded on the clamp
+    ledger. This is the whole decomposable slice of the run's area
+    sentinels — 30 of 7,752; the other 7,722 have no residue at all and are
+    an upstream capture gap, not a discard. A value that never parsed is
+    NOT recorded: that is a parse gap, not a clamp.
+
+    Args:
+        val: Raw square footage in any producer shape.
+        record_as: Emitted field name (``area``) to attribute a clamp to.
+            ``None`` (the default) makes this call a silent probe — see
+            :func:`_note_formatter_clamp`, and note that
+            :func:`property_publishes_area` deliberately relies on it.
+        property_id: Canonical property id, for the per-property index.
+        unit_id: Best-effort row anchor.
+
+    Returns:
+        The sqft, or ``-1``. UNCHANGED by the instrumentation.
     """
     if val is None or val == -1:
         return -1
@@ -1165,6 +1330,14 @@ def _format_area(val: Any) -> int:
         return -1
     if 150 <= n <= 10_000:
         return n
+    _note_formatter_clamp(
+        record_as,
+        reason="BELOW_MIN" if n < 150 else "ABOVE_MAX",
+        value=float(n),
+        bounds=_FORMATTER_AREA_BOUNDS,
+        property_id=property_id,
+        unit_id=unit_id,
+    )
     return -1
 
 

@@ -34,9 +34,26 @@ Observability (2026-07-28, task #69)
 ------------------------------------
 Every clamp used to be SILENT. A $1 rent, a phone number read as rent, an
 ``area=45`` — each was nulled into a value byte-identical to genuine
-operator absence, so the run's ~7.3K null rents and ~7.8K area sentinels
-were undecomposable and no value-plausibility audit could see outside the
-bands BY CONSTRUCTION.
+operator absence, so a clamped value and a value nobody ever published
+were the same null.
+
+**Corrected premise (2026-07-29, measured — do not re-assert the original).**
+The clamp is NOT why the run has ~7.3K null rents and ~7.8K area sentinels.
+Direct read of the shipped artifacts of run-2026-07-27-full-0d54ca7 (4,982
+properties / 104,964 rows — full denominator, not a replay):
+
+  * 7,752 area sentinels: 7,722 (99.61%) carry NO raw residue of any kind
+    and are UNDECOMPOSABLE; 30 (0.39%) are provably clamp-nulled.
+  * 7,306 null ``rent_low``: 7,139 (97.71%) carry no residue; 167 (2.29%)
+    are provably clamp-nulled.
+  * **Every** attributable row belongs to the V2 FORMATTER clamp
+    (:func:`ma_poc.core.schema_v2._format_area` / ``_format_rent``). This
+    module's clamp leaves literally zero trace in the emitted output.
+
+The real problem is an UPSTREAM CAPTURE GAP — nothing was ever recorded —
+not a downstream discard. So this instrumentation is HYGIENE: it makes the
+small attributable slice auditable rather than inferred. It is not a lever,
+and re-opening it expecting one will waste the effort.
 
 ``sanity_bound`` now RECORDS every clamp it fires:
 
@@ -47,9 +64,16 @@ bands BY CONSTRUCTION.
     ``_sanity_dropped`` marker has the same fate — 0 occurrences across
     the 104,964 rows of run-2026-07-27-full-0d54ca7).
   * per-run — a process-wide :class:`ClampLedger` keyed by
-    ``(field, tier, reason)`` plus a per-property index, so
+    ``(stage, field, tier, reason)`` plus a per-property index, so
     "which tier produces the most clamped rents" is one call
     (:meth:`ClampLedger.by_field`).
+
+The V2 formatter's own clamp — the one that owns 100% of the attributable
+slice above — records into the SAME ledger via
+:func:`record_formatter_clamp`, under ``stage="v2_formatter"``. Both
+clamps therefore aggregate together in ``by_field`` / ``by_tier`` while
+``by_stage`` keeps them tellable apart, which is what keeps the corrected
+premise checkable against a future run instead of re-argued.
 
 The ``<field>_raw`` twins do NOT already hold the pre-clamp value for a
 sanity clamp: ``ma_poc/scripts/runners/jugnu.py`` snapshots ``_raw_src``
@@ -57,8 +81,9 @@ from the unit dict at FORMAT time, which is downstream of the adapter's
 ``post_process`` → ``sanity_bound``, by which point every alias of the
 clamped field is already ``None``. (The formatter's own later clamp —
 ``_format_area``'s [150, 10000] → -1 — does survive into ``area_raw``;
-that is why 29 of the run's 7,752 area sentinels still carry a numeric
-``area_raw`` below 150.)
+that residue is exactly the 30 decomposable area rows counted above, and
+is why the formatter slice could be measured at all while this module's
+could not.)
 
 **Nothing about the emitted values changes.** The bounds are untouched;
 this module only stops throwing away the evidence.
@@ -144,6 +169,23 @@ REASON_IMPLAUSIBLE_FOR_BEDS: Final[str] = "IMPLAUSIBLE_FOR_BEDS"
 #: Tier label used when nothing in scope identified the producing tier.
 UNKNOWN_TIER: Final[str] = "UNKNOWN"
 
+
+# ── Clamp evidence: which clamp fired ────────────────────────────────────────
+#
+# There are TWO clamps in the pipeline and they are not interchangeable.
+# Measured on run-2026-07-27-full-0d54ca7, 100% of the decomposable absences
+# came from the formatter and 0% left any trace here — so a ledger that
+# could not tell them apart would let that finding quietly rot.
+
+#: This module: ``sanity_bound``'s [150,10000] sqft / [200,50000] rent /
+#: beds / baths bounds plus the cross-field sqft-vs-beds pass.
+STAGE_SANITY_BOUND: Final[str] = "sanity_bound"
+
+#: ``core.schema_v2._format_area`` / ``_format_rent`` — the V2 emit-time
+#: clamp, shared by both unit formatters (``core.schema_v2._format_v2_unit``
+#: and the production fork in ``scripts/runners/jugnu.py``).
+STAGE_V2_FORMATTER: Final[str] = "v2_formatter"
+
 #: Aliases carrying the producing tier on a raw adapter unit dict, in
 #: precedence order. Checked case-insensitively.
 _TIER_KEYS: Final[tuple[str, ...]] = (
@@ -213,6 +255,9 @@ class ClampSample:
             ``IMPLAUSIBLE_FOR_BEDS`` this is ``(floor_for_beds, inf)``.
         property_id: Canonical property id when the caller supplied one.
         unit_id: Best-effort unit anchor, for joining back to a row.
+        stage: Which clamp fired — :data:`STAGE_SANITY_BOUND` or
+            :data:`STAGE_V2_FORMATTER`. Defaults to the former so every
+            pre-existing construction keeps its meaning.
     """
 
     field: str
@@ -222,6 +267,7 @@ class ClampSample:
     bounds: tuple[float, float]
     property_id: str | None = None
     unit_id: str | None = None
+    stage: str = STAGE_SANITY_BOUND
 
     def to_dict(self) -> dict[str, Any]:
         """Strict-JSON-safe dict form.
@@ -232,6 +278,7 @@ class ClampSample:
         every non-Python consumer rejects.
         """
         return {
+            "stage": self.stage,
             "field": self.field,
             "tier": self.tier,
             "reason": self.reason,
@@ -249,24 +296,32 @@ class ClampLedger:
     The point of the whole task: a clamped value must be countable and
     attributable, not merely absent. Three views, all exact counts:
 
-      * ``counts``      — ``Counter`` keyed by ``(field, tier, reason)``.
+      * ``counts``      — ``Counter`` keyed by ``(stage, field, tier, reason)``.
       * ``per_property``— ``{property_id: Counter[(field, reason)]}``, so
         a downstream consumer (task #56's area-absence labels) can ask
         "was THIS property's area clamped, or genuinely not published?"
+        Deliberately stage-blind: the consumer's question is "was it
+        clamped", not "by which of our two clamps".
       * ``examples``    — up to :data:`_EXAMPLES_PER_KEY` :class:`ClampSample`
         per key, each carrying the pre-clamp value.
+
+    ``stage`` joined the key on 2026-07-29. ``by_field`` / ``by_tier`` /
+    ``total`` / ``per_property`` aggregate ACROSS stages and so are
+    unchanged for every existing caller; ``by_stage`` is the new axis that
+    keeps "the formatter owns the whole attributable slice" a measurement
+    a future run can contradict, rather than a claim in a commit message.
     """
 
-    counts: Counter[tuple[str, str, str]] = _dc_field(default_factory=Counter)
+    counts: Counter[tuple[str, str, str, str]] = _dc_field(default_factory=Counter)
     per_property: dict[str, Counter[tuple[str, str]]] = _dc_field(default_factory=dict)
-    examples: dict[tuple[str, str, str], list[ClampSample]] = _dc_field(
+    examples: dict[tuple[str, str, str, str], list[ClampSample]] = _dc_field(
         default_factory=dict
     )
     _lock: threading.Lock = _dc_field(default_factory=threading.Lock, repr=False)
 
     def record(self, sample: ClampSample) -> None:
         """Add *sample*. Thread-safe; counts are exact, examples capped."""
-        key = (sample.field, sample.tier, sample.reason)
+        key = (sample.stage, sample.field, sample.tier, sample.reason)
         with self._lock:
             self.counts[key] += 1
             bucket = self.examples.setdefault(key, [])
@@ -285,11 +340,13 @@ class ClampLedger:
         """Tier → count for one field, most-clamped tier first.
 
         This is the query the task names: ``by_field("rent_low")`` answers
-        "which tier produces the most clamped rents".
+        "which tier produces the most clamped rents". Sums over BOTH
+        clamps — a clamped rent is a clamped rent wherever it was thrown
+        away; use :meth:`by_stage` to split them.
         """
         with self._lock:
             out: Counter[str] = Counter()
-            for (fld, tier, _reason), n in self.counts.items():
+            for (_stage, fld, tier, _reason), n in self.counts.items():
                 if fld == field_label:
                     out[tier] += n
             return out
@@ -298,16 +355,29 @@ class ClampLedger:
         """Field → count for one tier, most-clamped field first."""
         with self._lock:
             out: Counter[str] = Counter()
-            for (fld, tr, _reason), n in self.counts.items():
+            for (_stage, fld, tr, _reason), n in self.counts.items():
                 if tr == tier:
+                    out[fld] += n
+            return out
+
+    def by_stage(self, stage_label: str) -> Counter[str]:
+        """Field → count for one clamp stage, most-clamped field first.
+
+        ``by_stage("v2_formatter")`` vs ``by_stage("sanity_bound")`` is the
+        check that keeps #69's corrected premise honest on a live run.
+        """
+        with self._lock:
+            out: Counter[str] = Counter()
+            for (stg, fld, _tier, _reason), n in self.counts.items():
+                if stg == stage_label:
                     out[fld] += n
             return out
 
     def rows(self) -> list[dict[str, Any]]:
         """Flat, sorted, JSON-safe rows — the aggregable export.
 
-        One row per ``(field, tier, reason)``, descending by count, each
-        carrying its capped example list.
+        One row per ``(stage, field, tier, reason)``, descending by count,
+        each carrying its capped example list.
         """
         with self._lock:
             items = sorted(
@@ -315,6 +385,7 @@ class ClampLedger:
             )
             return [
                 {
+                    "stage": stage,
                     "field": fld,
                     "tier": tier,
                     "reason": reason,
@@ -322,7 +393,7 @@ class ClampLedger:
                     "examples": [s.to_dict() for s in self.examples.get(key, [])],
                 }
                 for key, n in items
-                for fld, tier, reason in (key,)
+                for stage, fld, tier, reason in (key,)
             ]
 
     def to_dict(self) -> dict[str, Any]:
@@ -335,15 +406,20 @@ class ClampLedger:
             }
             by_field: Counter[str] = Counter()
             by_tier: Counter[str] = Counter()
-            for (fld, tier, _reason), n in self.counts.items():
+            by_stage: Counter[str] = Counter()
+            for (stage, fld, tier, _reason), n in self.counts.items():
                 by_field[fld] += n
                 by_tier[tier] += n
+                by_stage[stage] += n
             total = sum(self.counts.values())
         return {
             "total_clamps": total,
             "properties_affected": len(per_property),
             "by_field": dict(by_field.most_common()),
             "by_tier": dict(by_tier.most_common()),
+            # Which of the two clamps did the discarding. Exact counts, not
+            # sampled from ``rows[].examples`` (which are capped).
+            "by_stage": dict(by_stage.most_common()),
             "rows": rows,
             "per_property": per_property,
         }
@@ -367,6 +443,72 @@ def clamp_ledger() -> ClampLedger:
 def reset_clamp_ledger() -> None:
     """Clear the process-wide ledger (test / per-run isolation helper)."""
     _LEDGER.reset()
+
+
+def record_formatter_clamp(
+    *,
+    field_label: str,
+    reason: str,
+    value: float,
+    bounds: tuple[float, float],
+    property_id: str | None = None,
+    unit_id: str | None = None,
+    tier: str | None = None,
+) -> None:
+    """Record one V2-FORMATTER clamp on the process-wide ledger.
+
+    The sibling of :func:`_record_clamp` for the clamp that has no unit
+    dict to annotate: ``core.schema_v2._format_area`` / ``_format_rent``
+    are pure ``value -> value`` functions reached from two formatters. They
+    own 100% of the decomposable absences in run-2026-07-27-full-0d54ca7
+    (30 area / 167 ``rent_low``), so leaving them uninstrumented left the
+    only measurable clamp the unmeasured one.
+
+    Recorded under :data:`STAGE_V2_FORMATTER`, into the same counters as
+    ``sanity_bound`` — ``by_field("rent_low")`` answers "which tier
+    produces the most clamped rents" across both.
+
+    Call ONLY from a site that emits the value. The formatters are also
+    used as read-only probes (``schema_v2.property_publishes_area`` runs
+    ``_format_area`` over every row of a property just to decide a
+    property-level fact); recording there would double-count every clamp.
+    That is why the formatters record on OPT-IN and not by default.
+
+    Args:
+        field_label: Emitted field name — ``area`` / ``rent_low`` /
+            ``rent_high``. Must match the ``sanity_bound`` labels so the
+            two stages aggregate rather than fork.
+        reason: :data:`REASON_BELOW_MIN` or :data:`REASON_ABOVE_MAX`.
+        value: The pre-clamp number the formatter parsed and then refused.
+        bounds: ``(low, high)`` it was tested against; ``inf`` for open.
+        property_id: Canonical property id, for the per-property index.
+        unit_id: Best-effort row anchor.
+        tier: Explicit producing tier. Falls back to the ambient
+            :func:`clamp_tier_context`, then :data:`UNKNOWN_TIER`.
+
+    Never raises — observability must not be able to fail an emit.
+    """
+    try:
+        numeric = float(value)
+        if _finite_or_none(numeric) is None:
+            # A NaN / ±inf "pre-clamp value" is not evidence of anything and
+            # would land in clamp_report.json as a literal every non-Python
+            # JSON reader rejects. Drop the record rather than the strictness.
+            return
+        _LEDGER.record(
+            ClampSample(
+                field=field_label,
+                tier=_resolve_tier({}, tier),
+                reason=reason,
+                value=numeric,
+                bounds=bounds,
+                property_id=str(property_id) if property_id else None,
+                unit_id=str(unit_id)[:64] if unit_id else None,
+                stage=STAGE_V2_FORMATTER,
+            )
+        )
+    except Exception:  # pragma: no cover — defensive; an emit must not fail here
+        return
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

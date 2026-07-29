@@ -2542,6 +2542,33 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     _prop_plan_level = _property_is_plan_level(result)
     _prop_has_area = _property_publishes_area(units)
 
+    # Rows are formatted BEFORE the property dict so the whole per-row emit
+    # sits inside ``clamp_tier_context``: the producing tier is a
+    # property-level fact and ``_format_area`` / ``_format_rent`` are pure
+    # value functions with no way to learn it. Without this every formatter
+    # clamp attributes to "UNKNOWN" and the ledger cannot answer "which tier
+    # produces the most clamped rents". Lock-step with
+    # ``core.schema_v2.build_v2_property``.
+    from ma_poc.core.schema_v2 import v2_tier_used
+    from ma_poc.extraction.sanity import clamp_tier_context
+
+    with clamp_tier_context(v2_tier_used(result)):
+        _v2_units = _emit_v2_units_for_property(
+            [
+                _format_v2_unit(
+                    u,
+                    scrape_ts,
+                    _v2_property_id_for_unit(meta, apartment_id),
+                    property_plan_level=_prop_plan_level,
+                    # Whether THIS property published a real square footage to
+                    # us anywhere in this scrape — the sibling evidence that
+                    # makes a missing area our failure, not operator silence.
+                    property_has_area=_prop_has_area,
+                )
+                for u in units
+            ]
+        )
+
     prop: dict[str, Any] = {
         "apartment_id": apartment_id,
         "proj_name": _pick(
@@ -2566,21 +2593,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         # the empty-exit plan path (:2308) and every ``*_NO_RESPONSE_PLAN_LEVEL``
         # / ``*_SHAPE_REJECTED_PLAN_LEVEL`` route — leave the rows carrying the
         # plain adapter tier, so the row-only predicate never saw the marker.
-        "units": _emit_v2_units_for_property(
-            [
-                _format_v2_unit(
-                    u,
-                    scrape_ts,
-                    _v2_property_id_for_unit(meta, apartment_id),
-                    property_plan_level=_prop_plan_level,
-                    # Whether THIS property published a real square footage to
-                    # us anywhere in this scrape — the sibling evidence that
-                    # makes a missing area our failure, not operator silence.
-                    property_has_area=_prop_has_area,
-                )
-                for u in units
-            ]
-        ),
+        "units": _v2_units,
         # A floor-plan card is useful public evidence but never an apartment.
         # The dedicated formatter removes any fallback ``inferred_*`` ID.
         "floor_plans": [
@@ -3244,7 +3257,18 @@ def _format_v2_unit(
     # UNCHANGED; ``area_absence`` is an additive label naming which of the four
     # situations the -1 stands for. Delegated to the single choke point in
     # core/schema_v2 so this production fork cannot drift from it.
-    area_out = _format_area(sqft)
+    # ``record_as=`` marks this as the EMIT call — the only ``_format_area``
+    # call for this row whose clamp belongs on the ledger. Lock-step with
+    # ``core.schema_v2._format_v2_unit``; ``test_clamp_formatter_parity``
+    # fails if either fork stops passing it, because a formatter that stops
+    # recording is back to discarding the value silently.
+    _clamp_unit_anchor = str(uid) if uid not in (None, "", "null") else None
+    area_out = _format_area(
+        sqft,
+        record_as="area",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
     area_absence, area_absence_evidence = classify_area_absence(
         unit,
         formatted_area=area_out,
@@ -3261,8 +3285,18 @@ def _format_v2_unit(
     from ma_poc.core.identity import unit_has_real_anchor
 
     _plan_level = _is_floor_plan_level(unit, property_plan_level=property_plan_level)
-    _rent_lo_fmt = _format_rent(rent_lo_raw)
-    _rent_hi_fmt = _format_rent(rent_hi_raw)
+    _rent_lo_fmt = _format_rent(
+        rent_lo_raw,
+        record_as="rent_low",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
+    _rent_hi_fmt = _format_rent(
+        rent_hi_raw,
+        record_as="rent_high",
+        property_id=property_id,
+        unit_id=_clamp_unit_anchor,
+    )
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
     _availability_status = resolve_plan_row_availability(
         _norm_avail_status(
@@ -4071,16 +4105,68 @@ def _norm_avail_status(val: Any) -> str | None:
     return "UNKNOWN"
 
 
-def _format_rent(val: Any) -> float | None:
-    """Clean rent value. Must be > 1 or None."""
+def _format_rent(
+    val: Any,
+    *,
+    record_as: str | None = None,
+    property_id: str | None = None,
+    unit_id: str | None = None,
+) -> float | None:
+    """Clean rent value. Must be > 1 or None.
+
+    NOT a delegate to ``core.schema_v2._format_rent``: this copy has a
+    ``parse_rent_range`` fallback the canonical one does not, so unifying
+    them would change what is emitted — out of scope for #69, which is
+    observability only. The instrumentation is therefore mirrored rather
+    than shared, and ``test_clamp_formatter_parity`` pins that both copies
+    record, so the mirror cannot silently rot the way ``_format_area``'s
+    widening did for two months.
+
+    2026-07-29 (#69): a value the ``> 1`` bound rejected AFTER parsing is
+    recorded on the clamp ledger. All 167 decomposable ``rent_low`` nulls
+    in run-2026-07-27-full-0d54ca7 came through here (every one a published
+    ``"$0"``, TIER_1_5_EMBEDDED). A value that never parsed is NOT recorded
+    — that is a parse gap, not a clamp.
+
+    Args:
+        val: Raw rent in any producer shape.
+        record_as: Emitted field name (``rent_low`` / ``rent_high``) to
+            attribute a clamp to. ``None`` makes the call a silent probe.
+        property_id: Canonical property id, for the per-property index.
+        unit_id: Best-effort row anchor.
+
+    Returns:
+        The rent, or ``None``. UNCHANGED by the instrumentation.
+    """
+    from ma_poc.core.schema_v2 import (
+        _FORMATTER_RENT_BOUNDS,
+        _note_formatter_clamp,
+    )
+
+    def _clamped(n: float) -> None:
+        _note_formatter_clamp(
+            record_as,
+            reason="BELOW_MIN",
+            value=n,
+            bounds=_FORMATTER_RENT_BOUNDS,
+            property_id=property_id,
+            unit_id=unit_id,
+        )
+
     if val is None:
         return None
-    if isinstance(val, (int, float)):
-        return float(val) if val > 1 else None
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        if val > 1:
+            return float(val)
+        _clamped(float(val))
+        return None
     s = str(val).strip().replace("$", "").replace(",", "")
     try:
         n = float(s)
-        return n if n > 1 else None
+        if n > 1:
+            return n
+        _clamped(n)
+        return None
     except (ValueError, TypeError):
         # 2026-05-19: the bare float() above silently discarded valid but
         # noisy single-value rents the adapters emit ("$1450/mo",
@@ -4097,12 +4183,23 @@ def _format_rent(val: Any) -> float | None:
             lo, _hi = parse_rent_range(str(val))
             if lo is not None and lo > 1:
                 return float(lo)
+            # The money parser DID find a number and the ``> 1`` bound is
+            # what refused it — a clamp, same as the fast path above. A
+            # ``lo is None`` here is a parse gap and stays unrecorded.
+            if lo is not None:
+                _clamped(float(lo))
         except Exception:
             pass
         return None
 
 
-def _format_area(val: Any) -> int:
+def _format_area(
+    val: Any,
+    *,
+    record_as: str | None = None,
+    property_id: str | None = None,
+    unit_id: str | None = None,
+) -> int:
     """Convert sqft to int. Keeps -1 as the "absent" sentinel.
 
     Sanity bounds: a real apartment floor-plan area is between 150 and 10,000
@@ -4124,10 +4221,17 @@ def _format_area(val: Any) -> int:
     accepted, and the malformed ``"1,2"`` / European-decimal ``"950,5"``
     cases improve: the delegate strips only genuine thousands separators
     instead of every comma.
+
+    2026-07-29 (#69): the clamp-recording kwargs are passed straight
+    through, so this fork records identically without owning a second copy
+    of the rule. ``record_as=None`` (the default) keeps every probe caller
+    silent — see ``core.schema_v2._note_formatter_clamp``.
     """
     from ma_poc.core.schema_v2 import _format_area as _canon
 
-    return _canon(val)
+    return _canon(
+        val, record_as=record_as, property_id=property_id, unit_id=unit_id
+    )
 
 
 def _format_date_str(val: Any) -> str | None:
