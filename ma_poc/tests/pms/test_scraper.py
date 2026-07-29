@@ -763,3 +763,88 @@ def test_bug5_rich_hop_handles_str_body() -> None:
 
     payload = '{"@type":"FloorPlan"}' + ("x" * 60_000)
     assert _link_hop_is_rich(_StubFetch(payload)) is True
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-28 defect ``ssr-scope-and-filter``, attribution half.
+#
+# ``recover_appfolio_embed`` and ``AppFolioAdapter.extract``'s SSR branch both
+# ship the tier string ``TIER_1_DOM_APPFOLIO_SSR``. The ONLY thing separating
+# them in the output is the ``universal_recovery:<winner>`` entry on
+# ``_fallback_chain`` — and that entry was written at exactly one call site,
+# the scraper's step-8b misroute net. ``wix_nopms`` / ``squarespace_nopms``
+# run the SAME recovery chain inline (see their ``extract``) and throw the
+# winner away, so in run 0d54ca7 six of the 115 embed-path AppFolio
+# properties carried no marker at all and read as main-adapter results.
+# That is how one defect got sized at 5 properties and at 118.
+#
+# ``mark_attempted`` already stamps ``ctx._embed_recovery_winner`` on EVERY
+# route. These tests pin that the scraper surfaces it centrally, so no call
+# site can forget, and that it never tags a genuine main-adapter result.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_embed_recovery_winner_is_surfaced_from_any_route() -> None:
+    """A syndication adapter that runs the recovery chain inline (and
+    discards the winner locally) still gets attributed."""
+    page = _make_page(content="<html>wix site</html>")
+
+    async def _extract(_page: Any, ctx: AdapterContext) -> AdapterResult:
+        # What ``_universal_recovery.mark_attempted`` does.
+        ctx._embed_recovery_winner = "appfolio_embed"  # type: ignore[attr-defined]
+        return _make_adapter_result(
+            units=[{"unit_number": "1", "asking_rent": "1500"}],
+            tier="TIER_1_DOM_APPFOLIO_SSR",
+        )
+
+    adapter = AsyncMock()
+    adapter.pms_name = "wix_nopms"
+    adapter.extract = AsyncMock(side_effect=_extract)
+
+    with (
+        patch("ma_poc.pms.scraper.detect_pms",
+              return_value=_make_detection("wix_nopms")),
+        patch("ma_poc.pms.scraper.resolve_target",
+              return_value=_make_resolved(pms="wix_nopms")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=adapter),
+        patch("ma_poc.pms.scraper.confirm_detection",
+              side_effect=lambda det, _r: det),
+    ):
+        result = await scrape("https://example.com/", page=page)
+
+    assert "universal_recovery:appfolio_embed" in result["_fallback_chain"], (
+        "an embed-path result must be distinguishable from a main-adapter "
+        "result carrying the identical tier label"
+    )
+
+
+@pytest.mark.asyncio
+async def test_main_adapter_result_gets_no_recovery_marker() -> None:
+    """The counterpart: a genuine main-adapter SSR result must NOT be
+    labelled as an embed recovery. Without this the marker would be
+    useless — it has to separate the two, not tag everything."""
+    page = _make_page(content="<html>appfolio</html>")
+    adapter = AsyncMock()
+    adapter.pms_name = "appfolio"
+    adapter.extract = AsyncMock(
+        return_value=_make_adapter_result(
+            units=[{"unit_number": "1", "asking_rent": "1500"}],
+            tier="TIER_1_DOM_APPFOLIO_SSR",
+        )
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.detect_pms",
+              return_value=_make_detection("appfolio")),
+        patch("ma_poc.pms.scraper.resolve_target",
+              return_value=_make_resolved(pms="appfolio")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=adapter),
+        patch("ma_poc.pms.scraper.confirm_detection",
+              side_effect=lambda det, _r: det),
+    ):
+        result = await scrape("https://example.com/", page=page)
+
+    assert not any(
+        e.startswith("universal_recovery:") for e in result["_fallback_chain"]
+    )

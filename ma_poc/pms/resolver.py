@@ -13,6 +13,11 @@ from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
 
 from ma_poc.pms.adapters.registry import all_adapters
+from ma_poc.pms.appfolio_urls import (
+    is_appfolio_tenant_url,
+    is_listings_index_url,
+    is_scoped_listings_url,
+)
 from ma_poc.pms.detector import DetectedPMS, detect_pms
 
 if TYPE_CHECKING:
@@ -316,6 +321,32 @@ def _url_is_known_portal(url: str) -> bool:
     return False
 
 
+def is_tenant_only_appfolio_url(url: str) -> bool:
+    """True when *url* is on an AppFolio tenant subdomain but is NOT that
+    tenant's listings index.
+
+    Such a URL — a resident-portal sign-in, a pay-rent button, an owner
+    portal, an SSO auth endpoint, a per-unit application/tour/detail deep
+    link, or the bare tenant root — identifies the MANAGEMENT COMPANY. It is
+    not a hop target: following it lands on a login wall at best, and (before
+    2026-07-28) ``normalize_appfolio_url`` turned it into that company's
+    entire account roster at worst.
+
+    Note this is *not* the same question ``is_blacklisted_path`` answers.
+    That blacklist is about reCAPTCHA-guarded CTAs; this is about whether a
+    URL speaks for the property or only for the account. ``/connect/users/
+    sign_in`` is not on the blacklist and never should be — it is a perfectly
+    fetchable page, it just isn't this property's inventory.
+    """
+    if not is_appfolio_tenant_url(url):
+        return False
+    # A URL carrying ``filters[property_list]`` names a property, so it is not
+    # tenant-only evidence even when its path is not the listings index —
+    # ``normalize_appfolio_url`` will point it at /listings with the scope
+    # intact.
+    return not (is_listings_index_url(url) or is_scoped_listings_url(url))
+
+
 def _url_matches_pms_fingerprints(url: str) -> bool:
     """Back-compat alias for callers that only want adapter-fingerprint matches
     (Step 1 short-circuit and Step 5 redirect-detection rely on this stricter
@@ -358,19 +389,45 @@ def _candidate_dedup_key(href: str) -> str:
 
 
 def normalize_appfolio_url(url: str) -> str:
-    """F11: when *url*'s host is `*.appfolio.com`, point at /listings.
+    """Clean an AppFolio **listings index** URL. Never synthesise one.
 
-    The bare-tenant root (e.g. https://richelsonmanagement.appfolio.com/)
-    redirects to /users/oauth/login on most tenants — the L1 fetcher
-    treats that 302 as "no useful body" and the property looks blocked.
-    /listings is the public SSR data page on every tenant we've sampled
-    (becovic, pillarrei, blackrealtymanagement, plentyofplaces,
-    richelsonmanagement).
+    2026-07-28 — this function used to do
+    ``base = f"{scheme}://{netloc}/listings"`` for *any* ``*.appfolio.com``
+    URL whose path wasn't already ``/listings``. An AppFolio tenant subdomain
+    identifies the MANAGEMENT COMPANY, not the property, so that rewrite
+    silently upgraded "this property's site links to a tenant somewhere" into
+    "this property's inventory is the whole of that tenant's account".
+
+    Measured on run 2026-07-27-full-0d54ca7 (run-recorded ``scrape_url`` in
+    ``events.jsonl``, all 4,982 properties): 242 properties were scraped at an
+    unscoped ``{tenant}.appfolio.com/listings`` account roster and only 10 at a
+    property-scoped URL. 127 of the 242 still carried the ``a=cw`` parameter
+    that only ever appears on AppFolio's
+    ``/connect/users/sign_in?a=cw&utm_source=apmsites_v3&utm_campaign=pay_rent_button``
+    pay-rent button — the rewrite drops ``utm_*`` but keeps ``a``, so ``a=cw``
+    on a ``/listings`` URL is this function's own fingerprint. 27 rosters fed
+    more than one property: ``olympicmanagement.appfolio.com`` was scraped as 8
+    different properties across Lacey/Lakewood/Olympia/Poulsbo/Sumner/Federal
+    Way and 7 of them received the identical 294 units;
+    ``terracemgmt.appfolio.com`` shipped the same 214 units as properties in
+    Chicopee MA, Columbus OH and New Haven CT.
+
+    The rule now lives in :mod:`ma_poc.pms.appfolio_urls` and is shared with
+    the detector. Only a listings INDEX is an inventory surface; a portal/auth
+    path, an owner portal, a per-unit deep link and the bare tenant root are
+    all tenant-only evidence and are returned UNCHANGED. Declining to rewrite
+    is not declining AppFolio: ``AppFolioAdapter`` still discovers the tenant
+    slug from the property's own body (``find_appfolio_slug`` reads exactly
+    these ``/connect`` links) and fetches the tenant listings through the
+    vanity path, which applies ``filter_listings_by_property_address``. That
+    is the address-scoped route — 2 mismatched rows in 754 (0.27%) — instead
+    of the unfiltered SSR route this rewrite fed.
 
     Pass-through:
       - URLs already on /listings or any deeper /listings/<id> path.
       - URLs whose host doesn't end in appfolio.com.
       - The static AppFolio marketing site (www.appfolio.com).
+      - Tenant-only paths (see above) — no ``/listings`` is manufactured.
 
     Pablogroup-style offboarded tenants will still 302 to
     appfolio.com/page-not-found-sub from /listings; the adapter handles
@@ -410,6 +467,27 @@ def normalize_appfolio_url(url: str) -> str:
     # path=="/listings". A startswith("/listings?") would be dead code.
     path = parsed.path or "/"
     is_listings_path = path == "/listings" or path.startswith("/listings/")
+
+    # Tenant-only evidence: return UNCHANGED rather than manufacturing an
+    # account-wide roster URL. The bare tenant root, ``/connect/...``,
+    # ``/apply``, ``/oportal/...`` and AppFolio's ``account.appfolio.com`` SSO
+    # paths all land here.
+    #
+    # ``is_listings_path`` is deliberately the looser ``/listings`` prefix
+    # rather than the shared
+    # :func:`~ma_poc.pms.appfolio_urls.is_listings_index_url`: a per-unit
+    # ``/listings/detail/<uuid>`` is not an inventory surface either, but it is
+    # a URL the caller chose and the historic behaviour is to hand it back
+    # untouched — same output either way, kept explicit rather than accidental.
+    #
+    # The scope carve-out is NOT a loophole. ``filters[property_list]=<name>``
+    # is AppFolio's server-side property filter: a URL carrying it names a
+    # PROPERTY, which is exactly the evidence a bare tenant URL lacks. Only the
+    # unscoped synthesis is withdrawn. In run 2026-07-27-full-0d54ca7, 242 of
+    # the 252 properties scraped at a ``/listings`` URL had no scope at all, so
+    # this carve-out is narrow by measurement, not by hope.
+    if not (is_listings_path or is_scoped_listings_url(url)):
+        return url
 
     # 2026-05-13: strip only KNOWN referral-noise params; preserve everything
     # else (including the AppFolio-specific `filters[property_list]=`,
@@ -455,7 +533,10 @@ def normalize_appfolio_url(url: str) -> str:
             return f"{parsed.scheme}://{parsed.netloc}{path}?{kept_qs}"
         return f"{parsed.scheme}://{parsed.netloc}{path}"
 
-    # Bare-tenant root or other path → /listings with kept params preserved.
+    # Only reachable via the scope carve-out above: a non-/listings path that
+    # nonetheless carries ``filters[property_list]``. Point it at /listings so
+    # the filter reaches the endpoint that honours it. The result is
+    # property-scoped, never an account roster.
     base = f"{parsed.scheme}://{parsed.netloc}/listings"
     return f"{base}?{kept_qs}" if kept_qs else base
 
@@ -537,6 +618,16 @@ async def resolve_target(
             # (/tour, /apply, /contact, /book) — these reCAPTCHA on most PMSes.
             if is_blacklisted_path(href):
                 continue
+            # 2026-07-28 — an AppFolio tenant URL that is not that tenant's
+            # listings index identifies the management company, not this
+            # property. ``appfolio.com`` is in ``_LEASING_PORTAL_DOMAINS``, so
+            # every footer "Pay Rent" / "Resident Login" anchor was admitted
+            # here at priority 75 and won pass 3a ahead of the property's own
+            # floor-plans page. Withdraw it as a hop target: AppFolio is still
+            # reached, through ``AppFolioAdapter``'s address-filtered vanity
+            # path, from the property's own body.
+            if is_tenant_only_appfolio_url(href):
+                continue
             # Dedup by canonical (netloc + path) key.
             key = _candidate_dedup_key(href)
             if key in seen_keys:
@@ -617,6 +708,13 @@ async def resolve_target(
 
         for src in iframe_srcs:
             src_lower = src.lower()
+            # Same rule as candidate admission above: a tenant-only AppFolio
+            # iframe (an embedded resident-portal login, a per-unit tour form)
+            # is not this property's inventory surface. A scoped or bare
+            # ``/listings`` iframe — the shape brooksidejohnsoncreek.com ships —
+            # still passes.
+            if is_tenant_only_appfolio_url(src):
+                continue
             if any(domain in src_lower for domain in _LEASING_PORTAL_DOMAINS):
                 detection = detect_pms(src)
                 normalized = normalize_appfolio_url(src)

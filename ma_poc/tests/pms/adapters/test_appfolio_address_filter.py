@@ -32,6 +32,7 @@ from __future__ import annotations
 import pytest
 
 from ma_poc.pms.adapters.appfolio import (
+    ScopeEvidence,
     _address_matches,
     _normalize_street,
     filter_listings_by_property_address,
@@ -362,3 +363,197 @@ def test_filter_telemetry_shape_keys_present() -> None:
     assert isinstance(tel["kept"], int)
     assert isinstance(tel["dropped"], int)
     assert isinstance(tel["reason"], str)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-07-28 — two data-losing defects in the matcher, found while
+# scoping the AppFolio-embed recovery against the 2026-07-27 run corpus,
+# plus the ``ScopeEvidence.WEAK_EVIDENCE`` grade that recovery needs.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_five_digit_house_number_is_not_mistaken_for_the_zip() -> None:
+    """``_extract_zip`` took the FIRST five-digit token in the listing
+    address. On a five-digit-numbered street that is the HOUSE NUMBER:
+
+        "12224 NE 8th St., 210, Bellevue, WA 98005"  →  "12224"
+
+    which never equals the property's real ZIP, so every such listing was
+    rejected as somebody else's. Real casualties in the reference run:
+    pid 24251 (Milano, 12224 NE 8th St) and pid 26515 (The Court at
+    Northgate, 11300 3rd Ave NE).
+    """
+    assert _address_matches(
+        listing_address="12224 NE 8th St., 210, Bellevue, WA 98005",
+        ctx_address="12224 NE 8th St",
+        ctx_zip="98005",
+        fuzzy_threshold=85,
+    )
+    assert _address_matches(
+        listing_address="11300 3rd Ave. NE, 225, Seattle, WA 98125",
+        ctx_address="11300 3rd Ave NE",
+        ctx_zip="98125",
+        fuzzy_threshold=85,
+    )
+
+
+def test_same_street_same_zip_neighbouring_building_is_this_property() -> None:
+    """A community is not always one street number. The Lofts (pid 299097,
+    CSV ``14912 Mallett Rd``, Biloxi MS 39532) lists 13 of its 29 units at
+    ``15080 Mallett Rd``; Conway Club (pid 19154, ``1900 S Conway Rd``)
+    also lists 1908 and 1910 S Conway Rd. The exact-house-number rule
+    threw those away — data loss, by the filter meant to prevent it.
+    """
+    assert _address_matches(
+        listing_address="15080 Mallett Rd, I202, Biloxi, MS 39532",
+        ctx_address="14912 Mallett Rd",
+        ctx_zip="39532",
+        fuzzy_threshold=85,
+    )
+    assert _address_matches(
+        listing_address="1910 S. CONWAY ROAD APT 144, ORLANDO, FL 32812",
+        ctx_address="1900 S Conway Rd",
+        ctx_zip="32812",
+        fuzzy_threshold=85,
+    )
+
+
+def test_same_zip_different_street_still_rejected() -> None:
+    """The relaxation above is street-scoped, not ZIP-scoped. Chasewood
+    (pid 1912, CSV 3420 S Coulter, Amarillo TX) must still reject its
+    account's Lubbock listings, and Academy Place must still reject
+    Denison Parkway.
+    """
+    assert not _address_matches(
+        listing_address="6107 66th St, Lubbock, TX 79424",
+        ctx_address="3420 S Coulter",
+        ctx_zip="79424",
+        fuzzy_threshold=85,
+    )
+    assert not _address_matches(
+        listing_address="176 Denison Parkway East, APT 338, Corning, NY 14830",
+        ctx_address="11 W 3rd St",
+        ctx_zip="14830",
+        fuzzy_threshold=85,
+    )
+
+
+def test_same_street_relaxation_requires_both_zips() -> None:
+    """No ZIP on one side = nothing to bound the street match with, so a
+    differing house number stays a reject. "Could not look" is not "match".
+    """
+    assert not _address_matches(
+        listing_address="15080 Mallett Rd, I202, Biloxi, MS",
+        ctx_address="14912 Mallett Rd",
+        ctx_zip="",
+        fuzzy_threshold=85,
+    )
+
+
+def test_weak_evidence_validates_a_single_address_response() -> None:
+    """Default mode waves a single-address response through — load-bearing
+    for single-property PMCs on the vanity path. ``ScopeEvidence.WEAK_EVIDENCE`` does not:
+    a 2-row roster at ONE street that is not this property is exactly the
+    shape of pid 237787 (Heritage Amity Commons, CSV Douglassville PA;
+    roster all "1 Applewood Drive, Perkasie, PA 18944").
+    """
+    units = [
+        _unit("1 Applewood Drive, Perkasie, PA 18944", "u1"),
+        _unit("1 Applewood Drive, Perkasie, PA 18944", "u2"),
+    ]
+    kept_default, tel_default = filter_listings_by_property_address(
+        units, ctx_address="606A Lake Dr", ctx_zip="19518"
+    )
+    assert len(kept_default) == 2
+    assert tel_default["reason"] == "single_address_in_response"
+
+    kept_strict, tel_strict = filter_listings_by_property_address(
+        units, ctx_address="606A Lake Dr", ctx_zip="19518", evidence=ScopeEvidence.WEAK_EVIDENCE
+    )
+    assert kept_strict == []
+    assert tel_strict["reason"] == "filter_rejected_all_demote"
+    assert tel_strict["unscopeable"] is True
+
+
+def test_weak_evidence_refuses_a_roster_it_cannot_check() -> None:
+    """With neither a ctx address nor a ctx ZIP there is nothing to verify
+    an account roster against. Default mode passes it through; strict mode
+    refuses it and says so.
+    """
+    units = [
+        _unit("10309-92ND SW, 07, TACOMA, WA 98498", "u1"),
+        _unit("3307 COLLEGE STREET SE, A101, LACEY, WA 98503", "u2"),
+    ]
+    kept_default, tel_default = filter_listings_by_property_address(
+        units, ctx_address="", ctx_zip=""
+    )
+    assert len(kept_default) == 2
+    assert tel_default["reason"] == "no_ctx_address_or_zip"
+
+    kept_strict, tel_strict = filter_listings_by_property_address(
+        units, ctx_address="", ctx_zip="", evidence=ScopeEvidence.WEAK_EVIDENCE
+    )
+    assert kept_strict == []
+    assert tel_strict["reason"] == "no_ctx_address_or_zip_demote"
+    assert tel_strict["unscopeable"] is True
+
+
+def test_weak_evidence_keeps_a_single_property_accounts_whole_roster() -> None:
+    """MUST NOT BREAK — the roster really is theirs (pid 261381: 65 units,
+    all 614 CENTRAL PKWY). Strict mode validates rather than waves through,
+    and validation says yes.
+    """
+    units = [
+        _unit("614 CENTRAL PKWY, 101, CINCINNATI, OH 45202", "u1"),
+        _unit("614 CENTRAL PKWY, 205, CINCINNATI, OH 45202", "u2"),
+    ]
+    kept, tel = filter_listings_by_property_address(
+        units, ctx_address="614 Central Pkwy", ctx_zip="45202", evidence=ScopeEvidence.WEAK_EVIDENCE
+    )
+    assert len(kept) == 2
+    assert tel["reason"] == "address_filter_applied"
+
+
+def test_street_is_not_always_the_first_comma_segment() -> None:
+    """AppFolio operators sometimes prefix the community name, and ship both
+    shapes in ONE roster (pid 44905 Oakpoint, CSV 5018 Marconi Ave,
+    Carmichael CA 95608):
+
+        "Oakpoint Apartments, 5018 Marconi Avenue #115, Carmichael, CA 95608"
+        "River Oaks Apartments, 700 Bogue Rd. #69, Yuba City, CA 95991"
+
+    Comparing only segment 0 pits "Oakpoint Apartments" against
+    "5018 Marconi Ave" and rejects all 22 rows — including the 5 that ARE
+    Oakpoint's. Read the later segments, and the 5 stay while the 16 in Yuba
+    City still go.
+    """
+    assert _address_matches(
+        listing_address="Oakpoint Apartments, 5018 Marconi Avenue #115, Carmichael, CA 95608",
+        ctx_address="5018 Marconi Ave",
+        ctx_zip="95608",
+        fuzzy_threshold=85,
+    )
+    assert not _address_matches(
+        listing_address="River Oaks Apartments, 700 Bogue Rd. #69, Yuba City, CA 95991",
+        ctx_address="5018 Marconi Ave",
+        ctx_zip="95608",
+        fuzzy_threshold=85,
+    )
+
+
+def test_city_and_state_segments_are_not_treated_as_streets() -> None:
+    """Widening to later segments must not widen to the city/state/ZIP tail —
+    only segments that start with a house number qualify. pid 269983 (J Street
+    Lofts, 3460 J St, Philadelphia PA 19134) must still reject its account's
+    Venango St and Frankford Ave listings, which share its city AND its ZIP.
+    """
+    for addr in (
+        "1810 E Venango St - 405, Philadelphia, PA 19134",
+        "3701 Frankford Ave  - 305, Philadelphia, PA 19134",
+    ):
+        assert not _address_matches(
+            listing_address=addr,
+            ctx_address="3460 J St",
+            ctx_zip="19134",
+            fuzzy_threshold=85,
+        )

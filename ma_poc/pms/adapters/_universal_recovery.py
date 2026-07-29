@@ -49,6 +49,7 @@ log = logging.getLogger(__name__)
 
 _RECOVERY_FLAG_ATTR = "_embed_recovery_attempted"
 _RECOVERY_BLOCKS_ATTR = "_embed_recovery_blocks"
+_RECOVERY_NOTES_ATTR = "_embed_recovery_notes"
 
 # HTTP status codes that indicate the response was intercepted by a bot-wall
 # (DataDome, Akamai, Cloudflare, IIS bot-protection) rather than a genuine
@@ -102,6 +103,47 @@ def mark_blocked(
         existing.append({"recovery": recovery, "url": url, "status": int(status)})
     except Exception:  # pragma: no cover — defensive
         pass
+
+
+def note_recovery(
+    ctx: AdapterContext, recovery: str, reason: str, detail: str = ""
+) -> None:
+    """Record WHY a recovery declined to emit the rows it had in hand.
+
+    A recovery that finds a data surface and then refuses it (2026-07-28:
+    AppFolio account rosters that could not be scoped to the property) must
+    not look identical to one that found nothing — otherwise "we declined to
+    guess" is indistinguishable from "there is nothing here", which is the
+    failure mode that produced the contamination in the first place. The
+    scraper appends these to ``fallback_chain`` so triage can see the
+    property is unresolved on purpose.
+    """
+    if not recovery or not reason:
+        return
+    try:
+        existing = getattr(ctx, _RECOVERY_NOTES_ATTR, None)
+        if not isinstance(existing, list):
+            existing = []
+            setattr(ctx, _RECOVERY_NOTES_ATTR, existing)
+        existing.append(
+            {"recovery": recovery, "reason": reason, "detail": detail}
+        )
+        log.info(
+            "recovery declined recovery=%s reason=%s detail=%s",
+            recovery,
+            reason,
+            detail,
+        )
+    except Exception:  # pragma: no cover — defensive
+        pass
+
+
+def get_notes(ctx: AdapterContext) -> list[dict[str, object]]:
+    """Return the decline notes recorded on *ctx* during the recovery chain."""
+    notes = getattr(ctx, _RECOVERY_NOTES_ATTR, None)
+    if not isinstance(notes, list):
+        return []
+    return list(notes)
 
 
 def get_blocks(ctx: AdapterContext) -> list[dict[str, object]]:

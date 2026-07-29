@@ -2918,6 +2918,9 @@ async def scrape(
                 get_blocks as _ur_get_blocks,
             )
             from ma_poc.pms.adapters._universal_recovery import (
+                get_notes as _ur_get_notes,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
                 recover_universal_embed as _ur_recover,
             )
 
@@ -2980,6 +2983,26 @@ async def scrape(
                     fallback_chain.append(
                         f"universal_recovery_blocked:{_rec}:{_st}"
                     )
+
+            # Decline telemetry (2026-07-28): a recovery that REACHED a data
+            # surface and refused it — an AppFolio account roster it could not
+            # scope to this property — must be visibly unresolved, not quietly
+            # empty. Without this the property is indistinguishable from one
+            # where no embed exists at all.
+            _seen_notes: set[tuple[str, str]] = set()
+            for _n in _ur_get_notes(ctx):
+                _rec = str(_n.get("recovery") or "")
+                _why = str(_n.get("reason") or "")
+                if not _rec or not _why or (_rec, _why) in _seen_notes:
+                    continue
+                _seen_notes.add((_rec, _why))
+                fallback_chain.append(
+                    f"universal_recovery_declined:{_rec}:{_why}"
+                )
+                adapter_result.errors.append(
+                    f"universal-recovery-declined: {_rec} reason={_why} "
+                    f"{_n.get('detail') or ''}".rstrip()
+                )
         except Exception as exc:
             adapter_result.errors.append(f"universal-recovery-error: {exc}")
 
@@ -3141,6 +3164,23 @@ async def scrape(
 
     if adapter_result.winning_url:
         result["_winning_page_url"] = adapter_result.winning_url
+    # 2026-07-28 (defect ``ssr-scope-and-filter``, attribution half): several
+    # universal-recovery winners emit a tier label that the MAIN adapter also
+    # emits — ``recover_appfolio_embed`` and ``AppFolioAdapter.extract``'s SSR
+    # branch both ship ``TIER_1_DOM_APPFOLIO_SSR``. The chain entry written at
+    # the step-8b call site above is the only thing that tells them apart, and
+    # the syndication adapters (``wix_nopms`` / ``squarespace_nopms``) run the
+    # SAME chain inline and discard the winner — so 6 of the 115 embed-path
+    # AppFolio properties in run 0d54ca7 carried NO marker and read as
+    # main-adapter results. That mis-attribution is why this defect was sized
+    # at 5 properties one way and 118 the other. ``mark_attempted`` already
+    # records the winner on ctx for every route; surface it centrally, once,
+    # so no call site can forget.
+    _emb_winner = str(getattr(ctx, "_embed_recovery_winner", "") or "")
+    if _emb_winner and not any(
+        e.startswith("universal_recovery:") for e in fallback_chain
+    ):
+        fallback_chain.append(f"universal_recovery:{_emb_winner}")
     result["_fallback_chain"] = fallback_chain
     # Surface per-sub-tier attempts for the report. GenericAdapter attaches
     # these as ``_tier_attempts``; PMS-specific adapters don't currently, so

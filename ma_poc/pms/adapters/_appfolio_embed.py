@@ -27,7 +27,18 @@ import re
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
-from ma_poc.pms.adapters.appfolio import parse_appfolio_listings_ssr
+from ma_poc.pms.adapters.appfolio import (
+    ScopeEvidence,
+    filter_listings_by_property_address,
+    find_appfolio_property_group,
+    parse_appfolio_listings_ssr,
+)
+from ma_poc.pms.appfolio_urls import (
+    is_listings_index_url,
+    is_scoped_listings_url,
+    property_list_scope,
+    scoped_listings_url,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -62,9 +73,39 @@ _APPFOLIO_LISTINGS_HOST_RE = re.compile(
 def _to_appfolio_listings_root(url: str) -> str:
     """Strip any path after ``/listings`` (e.g. ``/showings/new``) so we
     fetch the listings SSR index, not a request-a-tour form.
+
+    2026-07-28: the property-list filter survives the strip. Everything else
+    in the query string (cache-buster, ``theme_color``, ``order_by``) is
+    cosmetic and still dropped.
+
+    2026-07-28 — the shape rule itself is NOT restated here. Whether a URL is
+    an operator-published index lives in one place,
+    :func:`ma_poc.pms.appfolio_urls.is_listings_index_url`; this function only
+    canonicalises. Three copies of that rule is how the AppFolio scope
+    predicates drifted apart in the first place.
     """
     m = _APPFOLIO_LISTINGS_HOST_RE.match(url)
-    return m.group(0) if m else url
+    if not m:
+        return url
+    root = m.group(0)
+    scope = property_list_scope(url)
+    return f"{root}?filters%5Bproperty_list%5D={scope}" if scope else root
+
+
+# 2026-07-28 — sub-paths to read the ``propertyGroup`` off when the ENTRY body
+# doesn't carry it. Measured over the 32 cohort properties whose scoped surface
+# was found by hand: 11 on the captured entry page, 15 on /availability, 5 on
+# /floor-plans, 1 on /available-units. The pipeline only ever looked at the
+# entry body, which is the whole reason ``find_appfolio_property_group()`` kept
+# returning None and the recovery kept falling through to the account roster.
+# Deliberately short — this probe fires at page=None (curl_cffi, ~1 req/s) and
+# only for properties that already showed an AppFolio tenant reference.
+_APPFOLIO_GROUP_SUBPATHS: tuple[str, ...] = (
+    "/availability",
+    "/floor-plans",
+    "/listings",
+    "/available-units",
+)
 
 # Sub-paths a marketing shell uses for the page that embeds the AppFolio
 # widget. Ordered by observed frequency in the 2026-05-19 probe. Kept tight
@@ -203,6 +244,82 @@ async def _fetch(page: Page, url: str) -> str:
     return body
 
 
+def _property_group_in(html: str) -> str:
+    """Read the AppFolio widget's per-property ``propertyGroup`` out of *html*.
+
+    Covers both shapes seen in the cohort: the plain ``Appfolio.Listing({
+    hostUrl: ..., propertyGroup: 'COLLEGE PARK' })`` embed JS, and the
+    base64-encoded widget config that AppFolio Websites (Duda) pages carry.
+    """
+    if not html:
+        return ""
+    group = find_appfolio_property_group(html)
+    if group and group.strip():
+        return group.strip()
+    try:
+        from ma_poc.pms.adapters._appfolio_websites_duda import (
+            extract_appfolio_websites_property_group,
+        )
+
+        duda_group = extract_appfolio_websites_property_group(html)
+    except Exception:  # pragma: no cover — defensive
+        duda_group = None
+    return duda_group.strip() if duda_group and duda_group.strip() else ""
+
+
+async def _discover_property_group(
+    page: Page,
+    ctx: AdapterContext,
+    entry_body: str,
+    already_fetched: dict[str, str] | None = None,
+) -> tuple[str, str]:
+    """Find the property's ``propertyGroup`` scope. Returns ``(group, source)``.
+
+    Looks in the entry body first (free), then in any sub-page body the iframe
+    probe already pulled down (also free), and only then spends a request on
+    the short sub-path list where the group actually lives on real sites.
+    Returns ``("", "")`` when the property publishes no per-property scope.
+    """
+    group = _property_group_in(entry_body)
+    if group:
+        return group, "entry_body"
+
+    seen = already_fetched or {}
+    for url, html in seen.items():
+        group = _property_group_in(html)
+        if group:
+            return group, url
+
+    origin = _origin(page, ctx)
+    if not origin:
+        return "", ""
+
+    # 2026-07-28 (QC finding D): this probe was origin-level, so when the
+    # property lives at a SUB-PATH of a shared management-company site it walked
+    # the PMC's own pages instead of the property's. Danish Village is
+    # ``postroadmgmt.com/available-properties/``; probing
+    # ``postroadmgmt.com/availability`` reads whatever scope the PMC declares
+    # there — some other property's. A group discovered off a page this property
+    # does not own is worse than no group: it silently scopes the roster to the
+    # wrong listing set, and the result looks like a clean scoped answer.
+    # 30 of the 115 cohort properties sit at such a sub-path, so probe THEIR
+    # directory instead of the root. Same request count either way.
+    base = (getattr(ctx, "base_url", "") or "").split("?")[0].split("#")[0]
+    root = base.rstrip("/") if urlparse(base).path.strip("/") else origin
+
+    for path in _APPFOLIO_GROUP_SUBPATHS:
+        url = root + path
+        if url in seen:
+            continue
+        html = await _fetch(page, url)
+        if not html:
+            continue
+        group = _property_group_in(html)
+        if group:
+            return group, url
+    return "", ""
+
+
 async def recover_appfolio_embed(
     page: Page,
     ctx: AdapterContext,
@@ -212,6 +329,32 @@ async def recover_appfolio_embed(
     Returns SSR-parsed unit dicts, or ``[]`` when no AppFolio embed is
     discoverable (so a genuine no-PMS Wix/Squarespace site is unaffected).
     Never raises.
+
+    2026-07-28 — SCOPE OR DECLINE. A ``*.appfolio.com`` reference identifies
+    the MANAGEMENT COMPANY, not the property: on collegeparklacey.com the sole
+    breadcrumb is a ``/connect/users/sign_in`` resident-portal link, and this
+    function used to answer it with olympicmanagement's entire 294-unit
+    account roster — the same roster it also handed to six other Washington
+    communities. Ground truth for that property is 4 listings. The evidence is
+    still good (it does find the right tenant); what was missing was any check
+    that the roster belongs here. Order of preference now:
+
+      1. a ``filters[property_list]`` scope already on the discovered URL, or a
+         ``propertyGroup`` read off the entry body / the availability sub-page
+         — AppFolio filters those server-side, so the answer is authoritative
+         and is returned verbatim (INCLUDING an empty one: "no vacancies" is a
+         real answer, not a reason to widen the query);
+      2. otherwise the roster is admitted only through the same address filter
+         the VANITY path already applies, at the evidence grade the discovery
+         actually earned. A ``/listings`` INDEX the operator put on the
+         property's OWN page is ``ScopeEvidence.PUBLISHED_INDEX`` — filtered
+         exactly as VANITY filters one. A URL synthesized from a bare tenant
+         reference (a ``/connect/users/sign_in`` link, a per-unit deep link)
+         never claimed to be a listings surface at all, so it is
+         ``ScopeEvidence.WEAK_EVIDENCE``: no free pass for a single-address
+         roster and no free pass when ctx has no address to check against;
+      3. otherwise nothing is emitted and the reason is recorded on ctx, so
+         the property lands visibly unresolved instead of quietly wrong.
     """
     evaluate = getattr(page, "evaluate", None)
     # NOTE: no longer a hard page-gate. Under the production page=None dispatch,
@@ -219,6 +362,8 @@ async def recover_appfolio_embed(
     # the sub-path probes fall back to curl_cffi (via _fetch_with_status). Task
     # #37 Track 1. The live-page path is unchanged when a page is present.
     from ma_poc.pms.adapters._probe import body_html_from_ctx
+
+    entry_body = body_html_from_ctx(ctx)
 
     # 1. Cheap path — AppFolio iframe already on the page (live) or in the body.
     iframe_urls: list[str] = []
@@ -229,15 +374,16 @@ async def recover_appfolio_embed(
                 iframe_urls = [u for u in live if isinstance(u, str) and u]
         except Exception as exc:
             log.debug("AppFolio-embed live scan failed err=%s", exc)
-    else:
-        body = body_html_from_ctx(ctx)
-        if body:
-            iframe_urls = list(dict.fromkeys(_APPFOLIO_IFRAME_RE.findall(body)))
+    elif entry_body:
+        iframe_urls = list(dict.fromkeys(_APPFOLIO_IFRAME_RE.findall(entry_body)))
 
     # 2. Probe the well-known sub-paths; pull the iframe src out of each.
     #    PAGE-ONLY: the in-session probe is cheap, but at page=None it would fire
     #    a blanket curl_cffi GET on every 0-unit property (cost/latency). At
     #    page=None we rely on the body scan (step 1) + tenant body scan (2.5).
+    #    Bodies are kept so the propertyGroup scan below can read them without
+    #    paying for the same GET twice.
+    probed_bodies: dict[str, str] = {}
     if not iframe_urls and callable(evaluate):
         origin = _origin(page, ctx)
         if origin:
@@ -245,6 +391,7 @@ async def recover_appfolio_embed(
                 html = await _fetch(page, origin + path)
                 if not html:
                     continue
+                probed_bodies[origin + path] = html
                 m = _APPFOLIO_IFRAME_RE.search(html)
                 if m:
                     iframe_urls = [m.group(0)]
@@ -256,7 +403,31 @@ async def recover_appfolio_embed(
     # ``{tenant}.appfolio.com/listings`` URL from the host. Covers
     # SYNDICATION_ONLY_WIX shells whose only AppFolio breadcrumb is a
     # /connect/users/sign_in or /request_access anchor. Dedup by URL.
-    if not iframe_urls:
+    #
+    # 2026-07-28: these URLs are SYNTHESIZED — nothing on the page said "the
+    # listings live here", only "this property is managed by this AppFolio
+    # account". Remembered so step 3 can hold them to a stricter admission bar
+    # than a listings widget the operator actually embedded.
+    #
+    # 2026-07-28 (QC): a per-unit deep link under ``/listings/`` is the same
+    # grade of evidence as a sign_in anchor, so it lands here too. Roots are
+    # partitioned BEFORE this step runs, because step 2.5 appends synthesized
+    # ``{tenant}/listings`` URLs that are index-SHAPED but not index-SOURCED.
+    strong_roots: set[str] = set()
+    tenant_only_urls: set[str] = set()
+    for _u in iframe_urls:
+        _root = _to_appfolio_listings_root(_u)
+        if not _root:
+            continue
+        if is_listings_index_url(_u):
+            strong_roots.add(_root)
+        else:
+            tenant_only_urls.add(_root)
+    # A root the operator DID publish as an index outranks a deep link that
+    # happens to canonicalize to the same place.
+    tenant_only_urls -= strong_roots
+
+    if not strong_roots:
         tenants: list[str] | None = None
         if callable(evaluate):
             try:
@@ -267,10 +438,11 @@ async def recover_appfolio_embed(
                 tenants = None
         else:
             # page=None: harvest any *.appfolio.com/* reference from the body.
-            body = body_html_from_ctx(ctx)
             tenants = re.findall(
-                r"https?://[a-z0-9][a-z0-9-]*\.appfolio\.com/[^\s\"'<>]*", body, re.I
-            ) if body else None
+                r"https?://[a-z0-9][a-z0-9-]*\.appfolio\.com/[^\s\"'<>]*",
+                entry_body,
+                re.I,
+            ) if entry_body else None
         if isinstance(tenants, list):
             seen: set[str] = set()
             for u in tenants:
@@ -280,21 +452,105 @@ async def recover_appfolio_embed(
                 if listings and listings not in seen:
                     seen.add(listings)
                     iframe_urls.append(listings)
+                    tenant_only_urls.add(listings)
+
+    from ma_poc.pms.adapters._universal_recovery import (
+        is_bot_block,
+        mark_blocked,
+        note_recovery,
+    )
+
+    if not iframe_urls:
+        return []
+
+    # 2.75. SCOPE THE CANDIDATES. Canonicalization keeps a filter the page
+    # already carried; when none did, go looking for the propertyGroup (entry
+    # body, then the availability/floor-plan sub-pages where it usually lives)
+    # and build the scoped URL ourselves. A single scoped candidate makes every
+    # account-wide candidate redundant — and dangerous — so they are dropped.
+    candidates = [_to_appfolio_listings_root(u) for u in iframe_urls]
+    candidates = list(dict.fromkeys(c for c in candidates if c))
+    # A scope is only ever taken from something the OPERATOR published — the
+    # widget URL's own filter, or a propertyGroup in their embed JS. Both are
+    # the property's own declaration, so an empty response to either is the
+    # property's real answer (Cherry Tree: "No vacancies found matching your
+    # search criteria") and must not reopen the account-wide query.
+    #
+    # 2026-07-28 (QC): the one property that WAS scoped by a guess — 46582,
+    # 1109/1121 S. Paige St, Wichita KS, which lost 5 real listings to a
+    # manufactured "no availability" — was reading AppFolio's commented-out
+    # ``//propertyGroup: 'My Group Name'`` template line. That is fixed at the
+    # source in ``find_appfolio_property_group``: the placeholder is no longer
+    # a scope, so no scope is synthesized and the roster falls through to the
+    # address filter here. No fall-through path is needed, and adding one would
+    # hand every genuinely-empty scoped property back its account roster.
+    scoped = [c for c in candidates if is_scoped_listings_url(c)]
+    group_source = "discovered_url"
+    if not scoped:
+        group, group_source = await _discover_property_group(
+            page, ctx, entry_body, probed_bodies
+        )
+        if group:
+            scoped = list(
+                dict.fromkeys(scoped_listings_url(c, group) for c in candidates)
+            )
+    if scoped:
+        candidates = scoped
 
     # 3. Fetch the AppFolio listings page itself and run the existing SSR
-    #    parser. First non-empty wins. A 401/403/429/503 here is recorded
-    #    as a bot-block (the production stack — residential proxy +
-    #    Camoufox + cookie-mint reuse — may flip the same probe to a hit).
-    from ma_poc.pms.adapters._universal_recovery import is_bot_block, mark_blocked
-
-    for src in iframe_urls:
-        src = _to_appfolio_listings_root(src)
+    #    parser. A 401/403/429/503 here is recorded as a bot-block (the
+    #    production stack — residential proxy + Camoufox + cookie-mint reuse —
+    #    may flip the same probe to a hit).
+    declined: tuple[str, str] | None = None
+    for src in candidates:
         status, html = await _fetch_with_status(page, src)
         if is_bot_block(status):
             mark_blocked(ctx, "appfolio_embed", src, status)
         if not html:
             continue
         units = parse_appfolio_listings_ssr(html, src)
-        if units:
+
+        if is_scoped_listings_url(src):
+            # Server-side scoped: authoritative either way. An empty response
+            # from a scoped URL is Cherry Tree's real answer ("No vacancies
+            # found matching your search criteria"), so it must NOT reopen the
+            # account-wide query.
+            if not units:
+                note_recovery(
+                    ctx,
+                    "appfolio_embed",
+                    "scoped_no_availability",
+                    f"{src} (scope from {group_source})",
+                )
             return units
+
+        if not units:
+            continue
+
+        # Unscoped roster: admit only what verifiably belongs here, at the
+        # grade the discovery earned. A synthesized tenant URL never claimed to
+        # be this property's listings surface, so its pass-throughs are
+        # removed; an index the operator published keeps them.
+        evidence = (
+            ScopeEvidence.WEAK_EVIDENCE
+            if src in tenant_only_urls
+            else ScopeEvidence.PUBLISHED_INDEX
+        )
+        kept, tel = filter_listings_by_property_address(
+            units,
+            getattr(ctx, "address", "") or "",
+            getattr(ctx, "zip_code", "") or "",
+            evidence=evidence,
+        )
+        if kept:
+            return kept
+        declined = (
+            str(tel.get("reason") or "unscopeable"),
+            f"{src} dropped={len(units)} evidence={evidence.value} "
+            f"ctx_addr={getattr(ctx, 'address', '')!r} "
+            f"ctx_zip={getattr(ctx, 'zip_code', '')!r}",
+        )
+
+    if declined is not None:
+        note_recovery(ctx, "appfolio_embed", declined[0], declined[1])
     return []

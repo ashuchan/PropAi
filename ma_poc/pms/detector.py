@@ -45,6 +45,7 @@ from ma_poc.config.feature_flags import (
     enable_onsite_apply_adapter,
     enable_venterra_adapter,
 )
+from ma_poc.pms.appfolio_urls import is_listings_index_url
 
 PmsName = Literal[
     "rentcafe",
@@ -340,6 +341,45 @@ _APPFOLIO_TENANT_PATH_RE = re.compile(
     r"([a-z0-9][a-z0-9-]*)\.appfolio\.com/(?:listings|connect|apply)",
     re.IGNORECASE,
 )
+
+# 2026-07-28 — the regex above answers "is AppFolio the leasing backend", and
+# that answer is still yes for every path it matches. What it does NOT answer
+# is "does this page point at a published inventory surface". ``/connect`` is
+# the resident portal (the footer "Pay Rent" / "Resident Login" button that
+# AppFolio's own site template ships on every page), ``/apply`` is an
+# application link, and ``/listings/showings/new`` etc. are per-unit actions —
+# all of them identify the management-company ACCOUNT. Only the listings index
+# is an inventory surface, and that question is answered in exactly one place:
+# :func:`ma_poc.pms.appfolio_urls.is_listings_index_url`.
+#
+# Scheme-agnostic because a body carries the reference in several shapes:
+# ``https://t.appfolio.com/listings``, protocol-relative ``//t.appfolio.com/
+# listings``, JSON-escaped ``https:\/\/t.appfolio.com\/listings``, and bare
+# ``t.appfolio.com/listings`` inside an embed config. Matches are canonicalised
+# to ``https://<match>`` before being handed to the shared predicate so the
+# rule itself is never restated here.
+_APPFOLIO_TENANT_REF_RE = re.compile(
+    r"(?<![a-z0-9.-])([a-z0-9][a-z0-9-]*)\.appfolio\.com(?:/[^\s\"'<>\\)]*)?",
+    re.IGNORECASE,
+)
+
+
+def _appfolio_body_has_listings_index(h: str) -> bool:
+    """True when *h* references an AppFolio tenant's listings INDEX.
+
+    ``h`` is the lower-cased page body. Slash-escaping is normalised first
+    (same trick as :func:`_detect_sightmap_embed`) so a JSON-embedded URL is
+    graded like a plain one.
+    """
+    if ".appfolio.com" not in h:
+        return False
+    h_norm = h.replace("\\/", "/")
+    for m in _APPFOLIO_TENANT_REF_RE.finditer(h_norm):
+        if is_listings_index_url(f"https://{m.group(0)}"):
+            return True
+    return False
+
+
 _AVALONBAY_SLUG_RE = re.compile(r"avaloncommunities\.com/[a-z]{2}/[^/]+/([a-z0-9-]+)", re.IGNORECASE)
 
 
@@ -850,10 +890,43 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # tier and lost ~300 units each. Bare ``appfolio.com`` /
     # ``www.appfolio.com`` (the marketing domain, not a tenant instance)
     # stays a pass-3 weak 0.80 marker.
+    #
+    # 2026-07-28 — this branch now GRADES its evidence, and the grade is
+    # visible in ``evidence`` so the two feeders and any later audit speak the
+    # same language as
+    # :func:`ma_poc.pms.appfolio_urls.is_listings_index_url`. A listings INDEX
+    # reference is the operator saying "this page's inventory is served from
+    # there"; a ``/connect`` resident-portal button, an ``/apply`` link or a
+    # per-unit ``/listings/...`` deep link says only "this management company
+    # uses AppFolio".
+    #
+    # The CONFIDENCE deliberately does NOT move, and that is a measured
+    # decision, not an omission. Demoting the tenant-only branch to 0.85 was
+    # implemented and swept over all 4,097 saved landing bodies of run
+    # 2026-07-27-full-0d54ca7: 25 properties changed winning PMS
+    # (appfolio → apts247 ×17, spherexx ×2, resman ×2, knock ×2, g5, and
+    # wix_floor_plans) and 215 dropped 0.92 → 0.85 without changing PMS. Six of
+    # the 25 already ran on the competing adapter in the real run, so the live
+    # cost is 19 properties re-routed OFF ``AppFolioAdapter``. Eighteen of
+    # those 19 are currently served by the adapter's ADDRESS-FILTERED vanity /
+    # API paths (Watermill Park 4 units, Highland Park 3, The Current 65,
+    # McClaren West End 37, Legacy Ridge 16, …) — 182 correctly scoped rows
+    # that would be gambled on whether apts247 / knock / resman / g5 return
+    # anything, which cannot be established offline. The only one of the 19
+    # carrying a roster leak is Williams Gateway (pid 76334, 210 rows from
+    # ``chamberlin.appfolio.com``), and that leak is closed by the
+    # ``normalize_appfolio_url`` fix instead, at no coverage cost. The
+    # 2026-05-22 cohort this branch was written for (watermillpark /
+    # highlandpark on ``investorsmgmt``) sits squarely in the 18.
+    #
+    # So: tenant-only evidence is labelled, not demoted. AppFolio remains the
+    # right ROUTE — the adapter's address filter is what makes it safe — and
+    # the "this property's inventory lives here" upgrade is blocked in the
+    # resolver, which is where it was actually being performed.
     _appfolio_tenant_slugs = {
         s for s in _APPFOLIO_TENANT_PATH_RE.findall(h) if s and s != "www"
     }
-    if _appfolio_tenant_slugs:
+    if _appfolio_tenant_slugs and _appfolio_body_has_listings_index(h):
         yield (
             "appfolio",
             0.92,
@@ -862,6 +935,18 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                 f"({sorted(_appfolio_tenant_slugs)[0]}.appfolio.com/"
                 "{listings,connect,apply} — definitive leasing backend, "
                 "outranks co-resident marketing widgets)"
+            ],
+        )
+    elif _appfolio_tenant_slugs:
+        yield (
+            "appfolio",
+            0.92,
+            [
+                "AppFolio tenant-only marker in HTML "
+                f"({sorted(_appfolio_tenant_slugs)[0]}.appfolio.com — "
+                "resident-portal/application/per-unit path only, no listings "
+                "index: identifies the management account, NOT this property's "
+                "inventory surface; scope via the adapter's address filter)"
             ],
         )
     elif ".appfolio.com/listings" in h:

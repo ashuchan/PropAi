@@ -68,10 +68,24 @@ _OFFBOARDED_PAGE_TITLE_VARIANT = """
 
 
 @pytest.mark.parametrize("inp,expected", [
-    # Bare tenant root → /listings
-    ("https://richelsonmanagement.appfolio.com/", "https://richelsonmanagement.appfolio.com/listings"),
-    ("https://becovic.appfolio.com", "https://becovic.appfolio.com/listings"),
-    ("https://becovic.appfolio.com/some/random/path", "https://becovic.appfolio.com/listings"),
+    # 2026-07-28 — the three "bare tenant root / arbitrary path → /listings"
+    # rows below were INVERTED. They encoded the assumption that one AppFolio
+    # tenant subdomain is one property. It is not: hayloftpropmgmt manages
+    # 100+ buildings (documented in normalize_appfolio_url since 2026-05-13),
+    # and run 2026-07-27-full-0d54ca7 measured 242 properties scraped at an
+    # unscoped ``{tenant}.appfolio.com/listings`` account roster, 27 rosters
+    # feeding more than one property, 11,761 rows. Without
+    # ``filters[property_list]`` nothing in these URLs names a property, so no
+    # ``/listings`` is manufactured. See
+    # tests/pms/test_appfolio_tenant_only_urls.py for the full rule.
+    ("https://richelsonmanagement.appfolio.com/", "https://richelsonmanagement.appfolio.com/"),
+    ("https://becovic.appfolio.com", "https://becovic.appfolio.com"),
+    ("https://becovic.appfolio.com/some/random/path", "https://becovic.appfolio.com/some/random/path"),
+    # A tenant URL that DOES name a property is still pointed at /listings.
+    (
+        "https://becovic.appfolio.com/?filters%5Bproperty_list%5D=FOO",
+        "https://becovic.appfolio.com/listings?filters%5Bproperty_list%5D=FOO",
+    ),
     # Already on /listings — pass through unchanged
     ("https://becovic.appfolio.com/listings", "https://becovic.appfolio.com/listings"),
     ("https://becovic.appfolio.com/listings/", "https://becovic.appfolio.com/listings/"),  # trailing slash
@@ -83,8 +97,10 @@ _OFFBOARDED_PAGE_TITLE_VARIANT = """
     # Non-AppFolio host — never touched
     ("https://marketstationapartmentsnc.com/", "https://marketstationapartmentsnc.com/"),
     ("https://marketstationapartmentsnc.com/apartments/floorplans/", "https://marketstationapartmentsnc.com/apartments/floorplans/"),
-    # Mixed-case host — normalized via .lower() comparison
-    ("https://BECOVIC.AppFolio.COM/", "https://BECOVIC.AppFolio.COM/listings"),
+    # Mixed-case host — host comparison is still case-insensitive; the URL is
+    # a bare tenant root so it is returned untouched (see the note above).
+    ("https://BECOVIC.AppFolio.COM/", "https://BECOVIC.AppFolio.COM/"),
+    ("https://BECOVIC.AppFolio.COM/LISTINGS", "https://BECOVIC.AppFolio.COM/LISTINGS"),
     # Empty / malformed inputs — passed through
     ("", ""),
     # Bare apex appfolio.com (no subdomain) — pass through (not a tenant)

@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._appfolio_websites_duda import (
@@ -50,6 +51,11 @@ from ma_poc.pms.adapters._parsing import (
     resolve_scattered_site_ids,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.appfolio_urls import (
+    APPFOLIO_RESERVED_SLUGS,
+    is_account_index_url,
+    scoped_listings_url,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -115,9 +121,10 @@ _DETAIL_TAG_RE = re.compile(r"<[^>]+>")
 _APPFOLIO_SLUG_RE = re.compile(
     r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE
 )
-_APPFOLIO_SKIP_SLUGS = frozenset({
-    "www", "app", "support", "secure", "tenant", "tenants", "owner", "owners", "demo",
-})
+# One list, defined in ``ma_poc.pms.appfolio_urls`` so the URL grader and the
+# slug discovery below cannot drift apart. Alias kept — it is the name this
+# module and its tests have used since 2026-04-30.
+_APPFOLIO_SKIP_SLUGS = APPFOLIO_RESERVED_SLUGS
 
 
 # 2026-05-25 (canary 1ef1060 regr#11 follow-up): also recognise the
@@ -189,6 +196,36 @@ _APPFOLIO_PROPERTY_GROUP_RE = re.compile(
     r"propertyGroup\s*:\s*['\"]([^'\"]+)['\"]",
 )
 
+# The placeholder values in AppFolio's own copy-paste embed snippet. A scope
+# read out of the template is worse than no scope: it builds a
+# filters[property_list] that matches no server-side list, the widget returns
+# zero, and the zero is indistinguishable from "no vacancies".
+_PROPERTY_GROUP_PLACEHOLDERS = frozenset(
+    {
+        "my group name",
+        "your group name",
+        "group name",
+        "property group",
+        "propertygroup",
+    }
+)
+
+
+def _commented_out(html: str, pos: int) -> bool:
+    """True when the match at *pos* sits behind a ``//`` line comment.
+
+    Scheme separators are not comments, so ``://`` is skipped — without that
+    check an embed whose ``hostUrl`` carries a full ``https://`` URL on the
+    same line would have its real propertyGroup discarded.
+    """
+    prefix = html[html.rfind("\n", 0, pos) + 1 : pos]
+    idx = prefix.find("//")
+    while idx != -1:
+        if idx == 0 or prefix[idx - 1] != ":":
+            return True
+        idx = prefix.find("//", idx + 2)
+    return False
+
 
 def find_appfolio_property_group(html: str) -> str | None:
     """Return the ``propertyGroup`` filter from the AppFolio embed JS, or
@@ -199,11 +236,24 @@ def find_appfolio_property_group(html: str) -> str | None:
     present, it MUST be applied to the /listings URL via
     ``filters[property_list]={value}`` or the adapter will pull ALL
     properties under the PMC's account (cross-property contamination).
+
+    2026-07-28 (QC): the snippet AppFolio hands operators ships the scope line
+    COMMENTED OUT with a placeholder — ``//propertyGroup: 'My Group Name',`` —
+    and Danish Village (pid 46582) serves it verbatim. Reading it built
+    ``filters[property_list]=My%20Group%20Name``, which matches no server-side
+    list, so the widget returned zero and the property was recorded as having
+    no availability. Both guards below are independent on purpose.
     """
     if not html or "propertyGroup" not in html:
         return None
-    m = _APPFOLIO_PROPERTY_GROUP_RE.search(html)
-    return m.group(1) if m else None
+    for m in _APPFOLIO_PROPERTY_GROUP_RE.finditer(html):
+        if _commented_out(html, m.start()):
+            continue
+        group = m.group(1).strip()
+        if not group or group.lower() in _PROPERTY_GROUP_PLACEHOLDERS:
+            continue
+        return group
+    return None
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -311,10 +361,24 @@ def _normalize_street(s: str) -> str:
     return s
 
 
-def _extract_zip(s: str) -> str:
-    """Return the 5-digit ZIP from a string (strips +4 suffix), or ''."""
+def _extract_zip(s: str, *, prefer_last: bool = False) -> str:
+    """Return the 5-digit ZIP from a string (strips +4 suffix), or ''.
+
+    ``prefer_last=True`` for full listing addresses. A five-digit HOUSE NUMBER
+    is indistinguishable from a ZIP by shape, and it comes first:
+
+        "12224 NE 8th St., 210, Bellevue, WA 98005"  → first match ``12224``
+
+    which then never equals the property's real ZIP, so every listing on a
+    five-digit-numbered street was rejected as belonging to someone else. US
+    addresses put the ZIP last, so the last match is the right one. Bare ZIP
+    fields (``ctx.zip_code``) have exactly one match either way.
+    """
     if not s:
         return ""
+    if prefer_last:
+        matches = _APPFOLIO_ZIP_RE.findall(s)
+        return matches[-1] if matches else ""
     m = _APPFOLIO_ZIP_RE.search(s)
     return m.group(1) if m else ""
 
@@ -325,6 +389,34 @@ def _extract_house_number(s: str) -> str:
         return ""
     m = _APPFOLIO_HOUSE_NUM_RE.search(s)
     return m.group(1) if m else ""
+
+
+def _strip_leading_house_number(normalized_street: str) -> str:
+    """Drop the leading house number from an already-normalized street."""
+    return re.sub(r"^\d+[a-z]?\s+", "", normalized_street).strip()
+
+
+def _street_candidates(listing_address: str) -> list[str]:
+    """Comma-segments of *listing_address* that could be the street.
+
+    Usually the street is the first segment. It is not when the operator
+    prefixes the community name — AppFolio ships both shapes in one roster:
+
+        "Oakpoint Apartments, 5018 Marconi Avenue #115, Carmichael, CA 95608"
+        "River Oaks Apartments, 700 Bogue Rd. #69, Yuba City, CA 95991"
+
+    Reading only segment 0 compares "Oakpoint Apartments" to "5018 Marconi
+    Ave" and rejects the property's OWN five units along with the sixteen
+    that belong to Yuba City. Later segments qualify only when they start
+    with a house number, which keeps city/state/ZIP and bare unit suffixes
+    ("A101") out of the comparison.
+    """
+    segments = [s.strip() for s in listing_address.split(",")]
+    candidates = [segments[0]] if segments else []
+    candidates += [
+        s for s in segments[1:] if s and _APPFOLIO_HOUSE_NUM_RE.search(s)
+    ]
+    return [c for c in candidates if c]
 
 
 def _address_matches(
@@ -338,41 +430,146 @@ def _address_matches(
     Match rules (strict):
       - ZIP exact match (after stripping +4 suffix). If ctx_zip is empty,
         this check is skipped (street-only fallback).
-      - Street fuzzy match via rapidfuzz token_set_ratio ≥ threshold,
-        comparing the listing's street portion (before first comma) to
-        ctx_address. If both have leading house numbers, they must match
-        exactly (rapidfuzz is too lenient on differing numbers).
+      - Street fuzzy match via rapidfuzz token_set_ratio ≥ threshold against
+        any comma-segment of the listing that could be a street (see
+        ``_street_candidates``). If both sides have leading house numbers they
+        must match exactly (rapidfuzz is too lenient on differing numbers) —
+        unless the listing is on the same street in the same ZIP, which makes
+        it a neighbouring building of the same community.
     """
     if not listing_address:
         return False
 
     if ctx_zip:
         zip_target = _extract_zip(ctx_zip)
-        zip_listing = _extract_zip(listing_address)
+        zip_listing = _extract_zip(listing_address, prefer_last=True)
         if zip_target and zip_listing and zip_target != zip_listing:
             return False
 
-    if ctx_address:
-        # Take the street portion of the listing (before the first comma),
-        # so city/state/zip noise doesn't dilute the fuzzy score.
-        listing_street = listing_address.split(",")[0].strip()
-        # House number must match exactly when both sides supply one —
-        # otherwise "11 W 3rd St" and "171 E First St" can score >85
-        # under token_set_ratio (small token sets, lots of overlap).
-        hn_target = _extract_house_number(ctx_address)
-        hn_listing = _extract_house_number(listing_street)
-        if hn_target and hn_listing and hn_target != hn_listing:
-            return False
-        from rapidfuzz import fuzz
-        norm_target = _normalize_street(ctx_address)
-        norm_listing = _normalize_street(listing_street)
-        if not norm_target or not norm_listing:
-            return False
-        score = fuzz.token_set_ratio(norm_target, norm_listing)
-        if score < fuzzy_threshold:
-            return False
+    if not ctx_address:
+        return True
+    # Take the street portion of the listing, so city/state/zip noise doesn't
+    # dilute the fuzzy score. Any comma-segment that could be a street counts.
+    return any(
+        _street_matches(seg, listing_address, ctx_address, ctx_zip, fuzzy_threshold)
+        for seg in _street_candidates(listing_address)
+    )
 
-    return True
+
+def _street_matches(
+    listing_street: str,
+    listing_address: str,
+    ctx_address: str,
+    ctx_zip: str,
+    fuzzy_threshold: int,
+) -> bool:
+    """One street-segment of a listing address vs the property's address."""
+    from rapidfuzz import fuzz
+
+    # House number must match exactly when both sides supply one — otherwise
+    # "11 W 3rd St" and "171 E First St" can score >85 under token_set_ratio
+    # (small token sets, lots of overlap).
+    hn_target = _extract_house_number(ctx_address)
+    hn_listing = _extract_house_number(listing_street)
+    norm_target = _normalize_street(ctx_address)
+    norm_listing = _normalize_street(listing_street)
+    if not norm_target or not norm_listing:
+        return False
+
+    if hn_target and hn_listing and hn_target != hn_listing:
+        # 2026-07-28 — a community is not always one street number.
+        # The Lofts (pid 299097, CSV 14912 Mallett Rd, Biloxi MS 39532) lists
+        # half its units at 15080 Mallett Rd; Conway Club (pid 19154, 1900 S
+        # Conway Rd) also lists 1908 and 1910 S Conway Rd. Rejecting on the
+        # house number alone threw those away — the very data loss this filter
+        # exists to prevent. A DIFFERENT number on the SAME street name in the
+        # SAME ZIP is a neighbouring building of the same property; a different
+        # street is not, which is what still rejects Chasewood's Lubbock
+        # listings (CSV: Amarillo) and Heritage Amity's Perkasie roster (CSV:
+        # Douglassville). Both ZIPs must be present — an unverifiable guess
+        # stays a reject.
+        zip_t = _extract_zip(ctx_zip)
+        zip_l = _extract_zip(listing_address, prefer_last=True)
+        if not (zip_t and zip_l and zip_t == zip_l):
+            return False
+        street_t = _strip_leading_house_number(norm_target)
+        street_l = _strip_leading_house_number(norm_listing)
+        if not street_t or not street_l:
+            return False
+        return bool(fuzz.token_set_ratio(street_t, street_l) >= fuzzy_threshold)
+
+    return bool(fuzz.token_set_ratio(norm_target, norm_listing) >= fuzzy_threshold)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-07-28 — ONE strictness contract for the address filter.
+#
+# Three code paths reached this filter holding three different grades of
+# evidence, and two of them independently added a boolean named
+# ``strict_scope`` with OPPOSITE defaults and OPPOSITE meanings for the same
+# value. Merged naively, the AppFolio-embed recovery's strict-is-True call
+# would have stopped meaning "tightened" and started meaning "baseline",
+# silently reopening the two pass-throughs it exists to close. A boolean
+# cannot carry three states; that is the whole bug. Hence an enum, and hence
+# the deliberate absence of any parameter named ``strict_scope`` — a stale
+# caller must raise ``TypeError`` rather than quietly flip behaviour.
+# ─────────────────────────────────────────────────────────────────────
+
+
+class ScopeEvidence(Enum):
+    """How much the caller actually knows about whose listings these are.
+
+    ``OPERATOR_SCOPED``
+        The operator scoped the surface themselves — a
+        ``filters[property_list]`` in the URL they published, a
+        ``propertyGroup`` in their embed JS, or their own per-property
+        marketing page with the cards SSR'd into it. Live-verified
+        2026-07-28: ``yourmetropolitan.com/properties/tareyton-estates/``
+        serves 2 cards and ``/properties/bala/`` 2 different ones, out of one
+        AppFolio account. Most trustworthy grade: rows whose address our
+        parser could not read are KEPT (dropping them would manufacture an
+        absence out of a parse gap), and a reject-everything outcome returns
+        the ORIGINAL rows rather than zeroing the property.
+
+    ``PUBLISHED_INDEX``
+        An account-wide roster reached from an index the operator DID publish
+        — a ``{tenant}.appfolio.com/listings`` widget on the property's own
+        page, or the vanity/DUDA path's own fetch. The historical
+        pass-throughs apply: a single-address response is a single property,
+        and a ctx with no address and no ZIP cannot be filtered. Nothing
+        matching is still the 2026-07-18 demote (emit nothing).
+
+    ``WEAK_EVIDENCE``
+        An account-wide roster reached from something that identifies only
+        the TENANT: a ``/connect/users/sign_in`` link, a per-unit
+        application / showing / detail deep link, a bare tenant root, or a
+        URL we synthesized ourselves. Nothing here claimed to be this
+        property's listings surface, so the pass-throughs are removed — a
+        2-row roster at one street that is NOT this property is exactly the
+        shape of pids 237787 / 5346 / 38167 / 50129, and a roster with
+        nothing to check it against is not data.
+    """
+
+    OPERATOR_SCOPED = "operator_scoped"
+    PUBLISHED_INDEX = "published_index"
+    WEAK_EVIDENCE = "weak_evidence"
+
+
+def _listing_address_is_judgeable(listing_address: str) -> bool:
+    """True when *listing_address* carries something the address filter
+    can actually compare against a CSV property context.
+
+    A listing card whose address span the SSR parser could not read falls
+    back to the literal ``AppFolio listing 8925`` — that string has no
+    ZIP and no leading house number, so ``_address_matches`` can only ever
+    return False for it. Rejecting such a row is a parse gap being
+    reported as a mismatch, which is why ``OPERATOR_SCOPED`` keeps it.
+    """
+    if not listing_address:
+        return False
+    if _APPFOLIO_ZIP_RE.search(listing_address):
+        return True
+    return bool(_APPFOLIO_HOUSE_NUM_RE.search(listing_address))
 
 
 def filter_listings_by_property_address(
@@ -382,6 +579,7 @@ def filter_listings_by_property_address(
     *,
     fuzzy_threshold: int = 85,
     address_field: str = "floor_plan_name",
+    evidence: ScopeEvidence = ScopeEvidence.PUBLISHED_INDEX,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Filter AppFolio vanity-path units down to those matching ctx address.
 
@@ -402,6 +600,13 @@ def filter_listings_by_property_address(
         the contamination it was trying to fix; defer to validation
         downstream to flag the address mismatch.
 
+    The matrix above is the ``PUBLISHED_INDEX`` grade — the historical
+    behaviour, byte for byte, and the default. ``evidence`` selects the other
+    two grades; see :class:`ScopeEvidence` for what each one is and why.
+    There is deliberately no ``strict_scope`` parameter: that name carried two
+    contradictory meanings across the branches this function reconciles, so a
+    stale caller raises ``TypeError`` instead of silently flipping.
+
     Returns ``(filtered_units, telemetry_dict)`` so the caller can log
     activation + drop counts in ``AdapterResult.errors`` for the run
     report.
@@ -417,16 +622,28 @@ def filter_listings_by_property_address(
         telemetry["reason"] = "no_units_to_filter"
         return units, telemetry
 
+    weak = evidence is ScopeEvidence.WEAK_EVIDENCE
+    lenient = evidence is ScopeEvidence.OPERATOR_SCOPED
+
     distinct_addresses = {
         (u.get(address_field) or "").strip() for u in units
     }
     distinct_addresses.discard("")
-    if len(distinct_addresses) <= 1:
+    if len(distinct_addresses) <= 1 and not weak:
         # Single-address response = a single property; nothing to scope.
         telemetry["reason"] = "single_address_in_response"
         return units, telemetry
 
     if not ctx_address and not ctx_zip:
+        if weak:
+            # An unscopeable roster with nothing to check it against is not
+            # data. "Could not look" is never "it is ours".
+            telemetry["filter_activated"] = True
+            telemetry["kept"] = 0
+            telemetry["dropped"] = len(units)
+            telemetry["reason"] = "no_ctx_address_or_zip_demote"
+            telemetry["unscopeable"] = True
+            return [], telemetry
         # No CSV context to scope by — can't distinguish a legit scattered
         # single-property from a PMC dump, so leave it (rare: CSV row with no
         # address column). The 94-prop contamination cohort all HAVE a ctx
@@ -437,8 +654,21 @@ def filter_listings_by_property_address(
     matched: list[dict[str, Any]] = [
         u
         for u in units
-        if _address_matches(u.get(address_field) or "", ctx_address, ctx_zip, fuzzy_threshold)
+        if (lenient and not _listing_address_is_judgeable(u.get(address_field) or ""))
+        or _address_matches(
+            u.get(address_field) or "", ctx_address, ctx_zip, fuzzy_threshold
+        )
     ]
+    if not matched and lenient:
+        # Every row judgeable, none matched, on a surface the operator scoped
+        # themselves. The honest read is "our CSV address disagrees with the
+        # operator", not "this property has no units". Keep the rows and let
+        # downstream validation flag the mismatch; never invent a zero.
+        telemetry["filter_activated"] = True
+        telemetry["kept"] = len(units)
+        telemetry["dropped"] = 0
+        telemetry["reason"] = "filter_rejected_all_lenient_keep"
+        return units, telemetry
     if not matched:
         # 2026-07-18 contamination fix: the response is MULTI-address (a
         # whole-PMC scattered dump) and NONE matched the target property's
@@ -459,6 +689,40 @@ def filter_listings_by_property_address(
     telemetry["dropped"] = len(units) - len(matched)
     telemetry["reason"] = "address_filter_applied"
     return matched, telemetry
+
+
+async def _fetch_appfolio_listings_html(url: str, result: Any) -> str:
+    """Plain unauthenticated GET of an AppFolio listings URL.
+
+    Returns the response body on HTTP 200, ``""`` on any other status or
+    on any transport error — callers treat ``""`` as "could not look",
+    never as "nothing there". Errors are appended to *result* so the run
+    report can tell a failed scope refetch apart from a scope that
+    legitimately returned nothing. Mirrors the vanity path's fetch.
+    """
+    try:
+        import httpx
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,*/*;q=0.8",
+        }
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            r = await c.get(url, headers=headers)
+        if r.status_code != 200:
+            result.errors.append(
+                f"appfolio-scope-fetch-status: url={url} status={r.status_code}"
+            )
+            return ""
+        return str(r.text or "")
+    except Exception as exc:
+        result.errors.append(
+            f"appfolio-scope-fetch-error: url={url} {type(exc).__name__}"
+        )
+        return ""
 
 
 def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
@@ -968,11 +1232,85 @@ class AppFolioAdapter:
             return result
 
         if page_html and "data-listing-id=" in page_html:
-            ssr_units = parse_appfolio_listings_ssr(page_html, getattr(ctx, "base_url", ""))
+            # 2026-07-28 (defect ``ssr-scope-and-filter``): this branch used
+            # to parse every card in the body and return, with no scope of
+            # any kind — no propertyGroup lookup, no
+            # ``filters[property_list]``, no address filter — even though
+            # ``ctx.address``/``ctx.zip_code`` are populated here and
+            # ``find_appfolio_property_group`` / the address filter live in
+            # this same module. Measured on run 0d54ca7 (100/100 shards):
+            # 93.6% of TIER_1_DOM_APPFOLIO_SSR's address-bearing rows sat at
+            # a ZIP other than the property's.
+            #
+            # Ladder, mirroring the vanity path: prefer the SERVER-side
+            # scope, fall back to the post-hoc address filter, and grade the
+            # filter's strictness on whether the body is an account-wide
+            # roster (``PUBLISHED_INDEX`` — the operator published the index,
+            # but it is the whole account) or a surface the operator scoped
+            # themselves (``OPERATOR_SCOPED``).
+            ssr_source_url = ""
+            _ssr_fr = getattr(ctx, "fetch_result", None)
+            if _ssr_fr is not None:
+                ssr_source_url = getattr(_ssr_fr, "final_url", "") or ""
+            if not ssr_source_url:
+                ssr_source_url = getattr(ctx, "base_url", "") or ""
+
+            ssr_account_index = is_account_index_url(ssr_source_url)
+            ssr_html = page_html
+            # Unchanged for every non-account-index body: the parser still
+            # receives ``ctx.base_url`` as the row's ``source_api_url``.
+            ssr_parse_url = getattr(ctx, "base_url", "") or ""
+
+            if ssr_account_index:
+                ssr_group = find_appfolio_property_group(page_html)
+                if ssr_group:
+                    scoped_url = scoped_listings_url(ssr_source_url, ssr_group)
+                    scoped_html = await _fetch_appfolio_listings_html(
+                        scoped_url, result
+                    )
+                    # A scoped refetch that comes back empty is NOT evidence
+                    # of absence (a stale group name matches no server-side
+                    # list). Fall through to the address filter on the body
+                    # we already have.
+                    if scoped_html and "data-listing-id=" in scoped_html:
+                        ssr_html = scoped_html
+                        ssr_parse_url = scoped_url
+                        ssr_account_index = False
+                        result.errors.append(
+                            "appfolio-ssr-server-scope: "
+                            f"property_group={ssr_group!r} url={scoped_url}"
+                        )
+
+            ssr_units = parse_appfolio_listings_ssr(ssr_html, ssr_parse_url)
+            if ssr_units:
+                ssr_ctx_address = getattr(ctx, "address", "") or ""
+                ssr_ctx_zip = getattr(ctx, "zip_code", "") or ""
+                ssr_evidence = (
+                    ScopeEvidence.PUBLISHED_INDEX
+                    if ssr_account_index
+                    else ScopeEvidence.OPERATOR_SCOPED
+                )
+                ssr_units, ssr_tel = filter_listings_by_property_address(
+                    ssr_units,
+                    ssr_ctx_address,
+                    ssr_ctx_zip,
+                    evidence=ssr_evidence,
+                )
+                if ssr_tel.get("filter_activated"):
+                    result.errors.append(
+                        "appfolio-ssr-address-filter: "
+                        f"evidence={ssr_evidence.value} "
+                        f"reason={ssr_tel['reason']} "
+                        f"kept={ssr_tel['kept']} dropped={ssr_tel['dropped']} "
+                        f"ctx_addr={ssr_ctx_address!r} "
+                        f"ctx_zip={ssr_ctx_zip!r}"
+                    )
             if ssr_units:
                 result.units = ssr_units
                 result.tier_used = "TIER_1_DOM_APPFOLIO_SSR"
-                result.winning_url = getattr(ctx, "base_url", "") or None
+                result.winning_url = (
+                    ssr_parse_url or getattr(ctx, "base_url", "") or None
+                )
                 result.confidence = min(0.95, 0.7 + 0.05 * len(ssr_units))
                 return result
 

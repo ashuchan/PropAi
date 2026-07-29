@@ -445,11 +445,27 @@ def test_normalize_appfolio_url_bare_root_to_listings_keeps_filter() -> None:
 
 
 def test_normalize_appfolio_url_bare_root_no_filter() -> None:
-    """Bare tenant root with no filter → canonical /listings (no query)."""
+    """Bare tenant root with NO property filter → returned unchanged.
+
+    Inverted 2026-07-28. This case used to assert
+    ``richelsonmanagement.appfolio.com/`` → ``/listings``, which encoded the
+    assumption that one AppFolio tenant is one property. The docstring of the
+    function it tests has disproved that since 2026-05-13 (hayloftpropmgmt
+    manages 100+ buildings), and run 2026-07-27-full-0d54ca7 measured the
+    consequence: 242 properties scraped at an unscoped account roster,
+    27 rosters serving more than one property, 11,761 rows.
+
+    A tenant subdomain names the management company. Without
+    ``filters[property_list]`` (see the sibling test, which still passes
+    unchanged) there is nothing in the URL that names a property, so the
+    rewrite is refused. Coverage cost on that run: zero — no property in the
+    4,982 has a ``*.appfolio.com`` seed website, so this branch had no live
+    population via the seed path at all.
+    """
     from ma_poc.pms.resolver import normalize_appfolio_url
 
     out = normalize_appfolio_url("https://richelsonmanagement.appfolio.com/")
-    assert out == "https://richelsonmanagement.appfolio.com/listings"
+    assert out == "https://richelsonmanagement.appfolio.com/"
 
 
 def test_normalize_appfolio_url_passes_through_non_appfolio() -> None:
@@ -499,6 +515,18 @@ async def test_resolver_dedupes_duplicate_floor_plan_links() -> None:
     """Identical /floor-plans/ links (header / footer / button) shouldn't eat
     the cap. Reproduces hazelwoodhomesmd.com pattern: many duplicates of the
     same internal floor-plans link + one portal link.
+
+    2026-07-28 — the assertion changed, the coverage did not. This test's
+    subject is dedup; the "which candidate wins" assertion rode along and
+    happened to pin the defect. The portal link here is
+    ``schwebpartners.appfolio.com/connect/users/sign_in`` — a resident-portal
+    sign-in that identifies the management COMPANY. Letting it win pass 3a
+    meant ``normalize_appfolio_url`` turned it into schwebpartners' whole
+    account roster, in front of the property's own floor-plans page. The run
+    measured 242 properties resolved that way. So the AppFolio anchor is no
+    longer a hop target and the deduped floor-plans link wins — which still
+    proves the dedup worked, because without it the five duplicates would have
+    filled the cap and left pass 3b nothing to return.
     """
     links = [
         {"href": "https://example.com/floor-plans/", "text": "Floor Plans"},
@@ -514,9 +542,9 @@ async def test_resolver_dedupes_duplicate_floor_plan_links() -> None:
     page = _make_mock_page(links=links, url="https://example.com/")
     detection = detect_pms("https://example.com/")
     result = await resolve_target(page, "https://example.com/", detection)
-    # The AppFolio portal candidate should win (Pass 3a runs before Pass 3b).
     assert result.method == "cta_link"
-    assert "appfolio.com" in result.resolved_url
+    assert "appfolio.com" not in result.resolved_url
+    assert result.resolved_url == "https://example.com/floor-plans/"
 
 
 @pytest.mark.asyncio

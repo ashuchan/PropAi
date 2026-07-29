@@ -202,3 +202,54 @@ def test_url_construction_encodes_special_chars(pg: str, expected_in_url: str) -
     from urllib.parse import quote
     encoded = quote(pg)
     assert expected_in_url in encoded
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-07-28 (QC finding B) — the snippet AppFolio hands operators ships
+# the scope line COMMENTED OUT, carrying a placeholder:
+#     Appfolio.Listing({ hostUrl: 'postroadmgmt.appfolio.com',
+#                        //propertyGroup: 'My Group Name',
+# Reading it built filters[property_list]=My%20Group%20Name, which matches
+# no server-side list. The widget returned zero, and the zero was recorded
+# as "no availability" — property 46582 (1109/1121 S. Paige St, Wichita KS)
+# was the one property in the 2026-07-27 run scoped entirely by this
+# template line, and it lost 5 real listings to it.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_commented_out_property_group_is_not_a_scope() -> None:
+    """The exact shape served by property 46582's page."""
+    html = (
+        "<script>Appfolio.Listing({\n"
+        "  hostUrl: 'postroadmgmt.appfolio.com',\n"
+        "  //propertyGroup: 'My Group Name',\n"
+        "});</script>"
+    )
+    assert find_appfolio_property_group(html) is None
+
+
+def test_commented_out_real_value_is_not_a_scope() -> None:
+    """A commented line is dead config even when the value looks plausible."""
+    assert find_appfolio_property_group("  //propertyGroup: 'COLLEGE PARK',") is None
+
+
+def test_uncommented_placeholder_is_not_a_scope() -> None:
+    """Second, independent guard: the template value is never a real scope
+    even when an operator uncomments the line without editing it."""
+    assert find_appfolio_property_group("propertyGroup: 'My Group Name'") is None
+
+
+def test_scheme_slashes_are_not_a_comment() -> None:
+    """``://`` must not be mistaken for a line comment — otherwise an embed
+    whose hostUrl carries a full URL loses its real scope."""
+    html = "Appfolio.Listing({hostUrl: 'https://dlpcapital.appfolio.com', propertyGroup: 'PM - PROSPER Azalea City'})"
+    assert find_appfolio_property_group(html) == "PM - PROSPER Azalea City"
+
+
+def test_real_group_after_commented_template_wins() -> None:
+    """Operators commonly leave the template comment above their real line."""
+    html = (
+        "  //propertyGroup: 'My Group Name',\n"
+        "  propertyGroup: 'BROOKSIDE',\n"
+    )
+    assert find_appfolio_property_group(html) == "BROOKSIDE"

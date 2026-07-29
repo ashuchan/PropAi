@@ -67,6 +67,9 @@ class _FakePage:
         self._live = live
         self._tenants = tenants or []
         self._responses = responses
+        #: every URL the recovery actually fetched — lets a test assert that an
+        #: account-wide roster was NOT requested, not merely not returned.
+        self.fetched: list[str] = []
 
     async def evaluate(self, _js: str, *args: object) -> object:
         if not args:
@@ -74,16 +77,19 @@ class _FakePage:
                 return list(self._tenants)
             return list(self._live)
         url = str(args[0])
+        self.fetched.append(url)
         return self._responses.get(url, "")
 
 
-def _ctx(base_url: str) -> AdapterContext:
+def _ctx(base_url: str, address: str = "", zip_code: str = "") -> AdapterContext:
     return AdapterContext(
         base_url=base_url,
         detected=detect_pms(base_url),
         profile=None,
         expected_total_units=None,
         property_id="P_TEST",
+        address=address,
+        zip_code=zip_code,
     )
 
 
@@ -277,6 +283,13 @@ async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> N
     ``/listings[^\\s"'<>]*`` regex captures the whole URL — the recovery
     must canonicalize to ``{tenant}.appfolio.com/listings`` before fetching
     so we hit the data-bearing index, not the form.
+
+    2026-07-28 (QC): canonicalizing the anchor is still required, but reaching
+    the index off a per-unit deep link is NOT evidence that the account roster
+    is this property's inventory — a showings/tour form is exactly as weak as a
+    ``/connect/users/sign_in`` link. So the fetch must still go to the index,
+    and the roster must then clear the strict address bar. With no address to
+    check against, an unscopeable roster is not data.
     """
     showings = "https://yourmetropolitan.appfolio.com/listings/showings/new?listable_uid=abc123&source=Website"
     canonical = "https://yourmetropolitan.appfolio.com/listings"
@@ -286,8 +299,31 @@ async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> N
         responses={canonical: _APPFOLIO_SSR},  # fetch must canonicalize to here
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.yourmetropolitan.com/"))  # type: ignore[arg-type]
-    assert len(units) == 2
-    assert units[0]["floor_plan_name"] == "10 Creek Rd"
+    # Canonicalization still happened: the form URL was never requested.
+    assert canonical in page.fetched
+    assert showings not in page.fetched
+    # ...but weak evidence + no address to corroborate = decline, not ship.
+    assert units == []
+
+
+@pytest.mark.asyncio
+async def test_showings_anchor_still_yields_units_when_address_matches() -> None:
+    """The strict bar must not turn into a blanket refusal: the same deep-link
+    anchor still reaches the index and still emits THIS property's listing when
+    the CSV address corroborates it. Guards against 'fixed' meaning 'emits
+    nothing'.
+    """
+    showings = "https://yourmetropolitan.appfolio.com/listings/showings/new?listable_uid=abc123"
+    canonical = "https://yourmetropolitan.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.yourmetropolitan.com/properties/bala/",
+        live=[showings],
+        responses={canonical: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(  # type: ignore[arg-type]
+        page, _ctx("https://www.yourmetropolitan.com/", address="10 Creek Rd")
+    )
+    assert [u["floor_plan_name"] for u in units] == ["10 Creek Rd"]
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -308,7 +344,15 @@ async def test_recover_via_tenant_only_login_url() -> None:
     (tenant subdomain, auth path). Pre-fix recovery missed it because
     no /listings URL was present anywhere. The tenant fallback should
     extract 'bendermanagement' from the auth URL and fetch the canonical
-    https://bendermanagement.appfolio.com/listings."""
+    https://bendermanagement.appfolio.com/listings.
+
+    2026-07-28 — the tenant-discovery half of this is unchanged and still
+    asserted: the sign_in link IS legitimate evidence of which AppFolio
+    account manages this property. What is now also asserted is the half
+    that was missing, and whose absence shipped 11,033 rows of other
+    people's inventory: the fetched roster is an ACCOUNT roster, so only
+    the listings that match this property's own address are emitted.
+    """
     login_url = "https://bendermanagement.appfolio.com/connect/users/sign_in"
     canonical = "https://bendermanagement.appfolio.com/listings"
     page = _FakePage(
@@ -318,15 +362,21 @@ async def test_recover_via_tenant_only_login_url() -> None:
         responses={canonical: _APPFOLIO_SSR},
     )
     units = await recover_appfolio_embed(
-        page, _ctx("https://www.aptsedenprairie.com/")  # type: ignore[arg-type]
+        page,
+        _ctx("https://www.aptsedenprairie.com/", "10 Creek Rd"),  # type: ignore[arg-type]
     )
-    assert len(units) == 2, "expected 2 units parsed from the canonical /listings page"
+    assert len(units) == 1, "tenant discovered, roster scoped to this property"
+    assert units[0]["floor_plan_name"] == "10 Creek Rd"
     assert units[0]["extraction_tier"] == "TIER_1_DOM_APPFOLIO_SSR"
 
 
 @pytest.mark.asyncio
 async def test_recover_via_tenant_only_request_access_url() -> None:
-    """Same fallback fires on /connect/users/request_access (rentdwp pattern)."""
+    """Same fallback fires on /connect/users/request_access (rentdwp pattern).
+
+    Same 2026-07-28 addition as above: tenant discovery still works off the
+    auth URL; the account roster it reaches is scoped to the CSV address.
+    """
     req_url = "https://dougwettonproperties.appfolio.com/connect/users/request_access"
     canonical = "https://dougwettonproperties.appfolio.com/listings"
     page = _FakePage(
@@ -336,9 +386,11 @@ async def test_recover_via_tenant_only_request_access_url() -> None:
         responses={canonical: _APPFOLIO_SSR},
     )
     units = await recover_appfolio_embed(
-        page, _ctx("https://www.rentdwp.com/")  # type: ignore[arg-type]
+        page,
+        _ctx("https://www.rentdwp.com/", "12 Creek Rd"),  # type: ignore[arg-type]
     )
-    assert len(units) == 2
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"] == "12 Creek Rd"
 
 
 @pytest.mark.asyncio
@@ -355,3 +407,331 @@ async def test_tenant_fallback_does_not_fire_when_no_appfolio_on_page() -> None:
         page, _ctx("https://www.plainshell.com/")  # type: ignore[arg-type]
     )
     assert units == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-07-28 — SCOPE OR DECLINE.
+#
+# Reference run 2026-07-27-full-0d54ca7: 115 properties / 11,033 rows
+# (10.5% of the run) came out of this function, and every one of them was
+# an unscoped MANAGEMENT-COMPANY roster. Seven Washington communities each
+# emitted the same 294-unit olympicmanagement roster; College Park (Lacey
+# WA) shipped "10309-92ND SW, 07, TACOMA, WA 98498" at $1,725 as its own
+# unit, verdict SUCCESS. Live ground truth for College Park is 4 listings.
+#
+# The discriminator is not the sign_in link (that correctly identifies the
+# tenant) — it is whether the roster was SCOPED.
+# ─────────────────────────────────────────────────────────────────────
+
+# Account roster: three listings, two of them a different property in the
+# same AppFolio account. Shape copied from the real
+# olympicmanagement.appfolio.com/listings response.
+_ACCOUNT_ROSTER_SSR = """
+<html><body>
+<article class="js-listing-item" data-listing-id="7218">
+  <div class="js-listing-blurb-rent">$1,725</div>
+  <div class="js-listing-blurb-bed-bath">2 bd / 1 ba</div>
+  <div class="js-listing-square-feet">Square Feet: 989</div>
+  <div class="js-listing-address"><span>10309-92ND SW, 07, TACOMA, WA 98498</span></div>
+</article>
+<article class="js-listing-item" data-listing-id="7219">
+  <div class="js-listing-blurb-rent">$1,540</div>
+  <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
+  <div class="js-listing-square-feet">Square Feet: 700</div>
+  <div class="js-listing-address"><span>9805 PACIFIC AVE, 12, SUMNER, WA 98390</span></div>
+</article>
+<article class="js-listing-item" data-listing-id="7300">
+  <div class="js-listing-blurb-rent">$1,395</div>
+  <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
+  <div class="js-listing-square-feet">Square Feet: 650</div>
+  <div class="js-listing-address"><span>3307 COLLEGE STREET SE, A101, LACEY, WA 98503</span></div>
+</article>
+</body></html>
+"""
+
+# AppFolio's real empty-scope response — Cherry Tree's honest answer.
+_NO_VACANCIES_SSR = (
+    "<html><body><div class='js-listing-list'>"
+    "No vacancies found matching your search criteria."
+    "</div></body></html>"
+)
+
+_SIGN_IN = "https://olympicmanagement.appfolio.com/connect/users/sign_in"
+_ACCOUNT_URL = "https://olympicmanagement.appfolio.com/listings"
+_SCOPED_URL = (
+    "https://olympicmanagement.appfolio.com/listings"
+    "?filters%5Bproperty_list%5D=COLLEGE%20PARK"
+)
+
+
+def _embed_js(host: str, group: str) -> str:
+    return (
+        "<html><body><script>Appfolio.Listing({"
+        f"hostUrl: '{host}', propertyGroup: '{group}', defaultOrder: 'rent_asc'"
+        "});</script></body></html>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_scoped_widget_url_keeps_its_property_list_filter() -> None:
+    """brooksidejohnsoncreek.com (pid 19955) embeds the widget URL already
+    carrying ``filters[property_list]=brookside``. ``_to_appfolio_listings_root``
+    stripped the whole query string, so the run fetched illumepm's 78-card
+    ACCOUNT roster and emitted 70 units for a 3-unit Milwaukie property.
+    The scope must survive canonicalization, and the account URL must never
+    be fetched.
+    """
+    scoped_src = (
+        "https://illumepm.appfolio.com/listings?1785172489213"
+        "&filters%5Bproperty_list%5D=brookside&theme_color=%2361C7C9"
+        "&filters%5Border_by%5D=rent_asc"
+    )
+    scoped_canon = (
+        "https://illumepm.appfolio.com/listings?filters%5Bproperty_list%5D=brookside"
+    )
+    page = _FakePage(
+        url="https://brooksidejohnsoncreek.com/",
+        live=[scoped_src],
+        responses={scoped_canon: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page,
+        _ctx("https://brooksidejohnsoncreek.com/", "3000 SE Brookside Dr", "97222"),  # type: ignore[arg-type]
+    )
+    assert len(units) == 2, "scoped URL was fetched (only it has a response)"
+    assert units[0]["source_api_url"] == scoped_canon
+    assert "https://illumepm.appfolio.com/listings" not in page.fetched, (
+        "the unscoped account roster must never be fetched once a scope exists"
+    )
+
+
+@pytest.mark.asyncio
+async def test_property_group_is_read_off_the_availability_subpage() -> None:
+    """collegeparklacey.com's entry body has ONLY the sign_in link — the
+    ``propertyGroup: 'COLLEGE PARK'`` lives one hop away. Of the 32 cohort
+    properties whose scope was found by hand, 21 had it on a sub-page and
+    only 11 on the entry page; the pipeline never looked past the entry
+    body, which is why ``find_appfolio_property_group()`` kept returning
+    None and the account roster kept winning.
+    """
+    page = _FakePage(
+        url="https://collegeparklacey.com/",
+        live=[],
+        tenants=[_SIGN_IN],
+        responses={
+            "https://collegeparklacey.com/availability": _embed_js(
+                "olympicmanagement.appfolio.com", "COLLEGE PARK"
+            ),
+            _SCOPED_URL: _APPFOLIO_SSR,
+            _ACCOUNT_URL: _ACCOUNT_ROSTER_SSR,
+        },
+    )
+    units = await recover_appfolio_embed(
+        page,
+        _ctx("https://collegeparklacey.com/", "3307 College St SE", "98503"),  # type: ignore[arg-type]
+    )
+    assert len(units) == 2
+    assert _SCOPED_URL in page.fetched
+    assert _ACCOUNT_URL not in page.fetched
+
+
+@pytest.mark.asyncio
+async def test_scoped_response_with_no_listings_is_a_real_answer() -> None:
+    """Cherry Tree's scoped query returns "No vacancies found matching your
+    search criteria" — that is SUCCESS_NO_AVAILABILITY, not permission to
+    re-ask the account-wide question. The run answered it with 294 units.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_notes
+
+    page = _FakePage(
+        url="https://cherrytreetacoma.com/",
+        live=[],
+        tenants=[_SIGN_IN],
+        responses={
+            "https://cherrytreetacoma.com/availability": _embed_js(
+                "olympicmanagement.appfolio.com", "CHERRY TREE"
+            ),
+            "https://olympicmanagement.appfolio.com/listings"
+            "?filters%5Bproperty_list%5D=CHERRY%20TREE": _NO_VACANCIES_SSR,
+            _ACCOUNT_URL: _ACCOUNT_ROSTER_SSR,
+        },
+    )
+    ctx = _ctx("https://cherrytreetacoma.com/", "8801 S Hosmer St", "98444")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    assert _ACCOUNT_URL not in page.fetched, (
+        "an empty scoped answer must not reopen the account-wide query"
+    )
+    assert [n["reason"] for n in get_notes(ctx)] == ["scoped_no_availability"]
+
+
+@pytest.mark.asyncio
+async def test_unscopeable_account_roster_emits_only_this_property() -> None:
+    """No propertyGroup anywhere — the roster is admitted only through the
+    address filter, exactly as the VANITY path already does it.
+    """
+    page = _FakePage(
+        url="https://collegeparklacey.com/",
+        live=[],
+        tenants=[_SIGN_IN],
+        responses={_ACCOUNT_URL: _ACCOUNT_ROSTER_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page,
+        _ctx("https://collegeparklacey.com/", "3307 College St SE", "98503"),  # type: ignore[arg-type]
+    )
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"].startswith("3307 COLLEGE STREET SE")
+
+
+@pytest.mark.asyncio
+async def test_account_roster_that_is_not_ours_emits_nothing_and_says_why() -> None:
+    """pid 237787 (Heritage Amity Commons, Douglassville PA) emitted 5 units
+    that were all in Perkasie PA, 40 miles away. Nothing in that roster is
+    this property's, so nothing is emitted — and the property must land
+    VISIBLY unresolved, not silently empty.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_notes
+
+    page = _FakePage(
+        url="https://heritageamitycommons.com/",
+        live=[],
+        tenants=["https://heritagepropertyrentals.appfolio.com/connect/users/sign_in"],
+        responses={
+            "https://heritagepropertyrentals.appfolio.com/listings": _ACCOUNT_ROSTER_SSR
+        },
+    )
+    ctx = _ctx("https://heritageamitycommons.com/", "606A Lake Dr", "19518")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    notes = get_notes(ctx)
+    assert [n["reason"] for n in notes] == ["filter_rejected_all_demote"]
+    assert notes[0]["recovery"] == "appfolio_embed"
+
+
+@pytest.mark.asyncio
+async def test_account_roster_declined_when_ctx_has_no_address_to_check() -> None:
+    """A synthesized tenant URL plus no CSV address is nothing to verify
+    against. "Could not look" is not "it is ours" — decline and record it.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_notes
+
+    page = _FakePage(
+        url="https://collegeparklacey.com/",
+        live=[],
+        tenants=[_SIGN_IN],
+        responses={_ACCOUNT_URL: _ACCOUNT_ROSTER_SSR},
+    )
+    ctx = _ctx("https://collegeparklacey.com/")  # no address, no zip
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    assert [n["reason"] for n in get_notes(ctx)] == ["no_ctx_address_or_zip_demote"]
+
+
+@pytest.mark.asyncio
+async def test_single_property_account_still_recovers_in_full() -> None:
+    """MUST NOT BREAK. 34 properties / 296 rows in the reference run reached
+    their roster off nothing but a portal link, and the roster really was
+    theirs (pid 261381: 65 units, all 614 CENTRAL PKWY). A single-property
+    AppFolio account must still come back whole.
+    """
+    roster = """
+    <html><body>
+    <article class="js-listing-item" data-listing-id="9001">
+      <div class="js-listing-blurb-rent">$1,100</div>
+      <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 600</div>
+      <div class="js-listing-address"><span>614 CENTRAL PKWY, 101, CINCINNATI, OH 45202</span></div>
+    </article>
+    <article class="js-listing-item" data-listing-id="9002">
+      <div class="js-listing-blurb-rent">$1,250</div>
+      <div class="js-listing-blurb-bed-bath">2 bd / 1 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 820</div>
+      <div class="js-listing-address"><span>614 CENTRAL PKWY, 205, CINCINNATI, OH 45202</span></div>
+    </article>
+    </body></html>
+    """
+    page = _FakePage(
+        url="https://614central.com/",
+        live=[],
+        tenants=["https://onesixfourteen.appfolio.com/connect/users/sign_in"],
+        responses={"https://onesixfourteen.appfolio.com/listings": roster},
+    )
+    units = await recover_appfolio_embed(
+        page,
+        _ctx("https://614central.com/", "614 Central Pkwy", "45202"),  # type: ignore[arg-type]
+    )
+    assert len(units) == 2, "the whole roster is this property's inventory"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-07-28 (reconciliation) — the PUBLISHED-INDEX grade must not drift
+# into the OPERATOR_SCOPED one.
+#
+# This is the silent flip that a naive merge of the embed-scope branch and
+# the SSR-scope branch produced: both added a boolean named ``strict_scope``
+# with opposite defaults and opposite meanings, so this caller — which
+# passes the NON-strict value because a published widget index is not weak
+# evidence — silently inherited "never return empty" and shipped a foreign
+# account roster. Reproduced on a scratch worktree at ba68279 + both
+# branches (commit 6c8cfa7):
+#
+#   AssertionError: contamination reopened:
+#     ['10309-92ND SW, 07, TACOMA, WA 98498', '9805 PACIFIC AVE, 12, SUMNER, WA 98390']
+#
+# Nothing on either branch caught it. It is caught here.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_published_index_roster_that_is_not_ours_still_demotes() -> None:
+    """A ``/listings`` INDEX the operator embedded on the property's own page
+    is PUBLISHED_INDEX, not OPERATOR_SCOPED: the roster it returns is still
+    the whole account. Nothing in it matches this property, so the 2026-07-18
+    demote applies — emit nothing, and say why.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_notes
+
+    index = "https://heritagepropertyrentals.appfolio.com/listings"
+    page = _FakePage(
+        url="https://heritageamitycommons.com/",
+        live=[index],
+        responses={index: _ACCOUNT_ROSTER_SSR},
+    )
+    ctx = _ctx("https://heritageamitycommons.com/", "606A Lake Dr", "19518")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == [], (
+        f"contamination reopened: {[u['floor_plan_name'] for u in units]}"
+    )
+    notes = get_notes(ctx)
+    assert [n["reason"] for n in notes] == ["filter_rejected_all_demote"]
+    assert "evidence=published_index" in str(notes[0]["detail"])
+
+
+@pytest.mark.asyncio
+async def test_published_index_keeps_its_single_address_passthrough() -> None:
+    """...and PUBLISHED_INDEX is NOT the weak grade either. A single-address
+    roster reached from an index the operator published is a single-property
+    account and still passes through — that pass-through is load-bearing for
+    the 34 properties / 296 rows that legitimately recover this way.
+    """
+    roster = """
+    <html><body>
+    <article class="js-listing-item" data-listing-id="9001">
+      <div class="js-listing-blurb-rent">$1,100</div>
+      <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 600</div>
+      <div class="js-listing-address"><span>614 CENTRAL PKWY, 101, CINCINNATI, OH 45202</span></div>
+    </article>
+    </body></html>
+    """
+    index = "https://onesixfourteen.appfolio.com/listings"
+    page = _FakePage(
+        url="https://614central.com/", live=[index], responses={index: roster}
+    )
+    # ctx address deliberately DISAGREES; the pass-through is what is pinned.
+    units = await recover_appfolio_embed(
+        page,
+        _ctx("https://614central.com/", "1 Nowhere St", "99999"),  # type: ignore[arg-type]
+    )
+    assert len(units) == 1
