@@ -369,10 +369,86 @@ class RealPageOllAdapter:
             )
             result.confidence = min(0.90, 0.7 + 0.05 * len(all_units))
         else:
+            # 2026-07-30 (#85) — CWS GetUnits fallback. The LeaseLabs /
+            # ``.floorplan-block`` .aspx theme is DETECTED realpage_oll but
+            # exposes no OLL/units API in the captured responses; its unit
+            # roster is served by the property-hosted CWS ``GetUnits`` proxy
+            # (same static JSON endpoint + parser as realpage_cws). Additive:
+            # only when the OLL API path found nothing, so it can never remove
+            # rows. Live-verified 2026-07-30 on Sierra Verde (15 units) and
+            # Meadowcrest (19).
+            gu = await self._try_cws_getunits(ctx)
+            if gu is not None:
+                return gu
             result.confidence = 0.0
             result.errors.append("No RealPage OLL data found in captured API responses")
 
         return result
+
+    async def _try_cws_getunits(self, ctx: AdapterContext) -> AdapterResult | None:
+        """Property-hosted CWS ``GetUnits`` proxy fallback (#85).
+
+        Reuses realpage_cws's endpoint builder + JSON parser. The probe runs
+        off the event loop (``asyncio.to_thread``). Returns unit-level rows on
+        success, or ``None`` to leave the empty-result path intact (flag off,
+        no base URL, fetch error, non-JSON, or zero available units). Never
+        raises.
+        """
+        try:
+            from ma_poc.config.feature_flags import enable_cws_getunits
+
+            if not enable_cws_getunits():
+                return None
+            from ma_poc.pms.adapters.realpage_cws import (
+                cws_getunits_url,
+                parse_realpage_cws_getunits,
+            )
+
+            base = ""
+            fr = getattr(ctx, "fetch_result", None)
+            if fr is not None:
+                base = str(getattr(fr, "final_url", "") or "")
+            base = base or (getattr(ctx, "base_url", "") or "")
+            url = cws_getunits_url(base)
+            if not url:
+                return None
+
+            import asyncio
+
+            from ma_poc.pms.adapters._probe import probe_get
+
+            r = await asyncio.to_thread(probe_get, url, timeout=20, unlocker=False)
+            body = getattr(r, "text", "") or ""
+            rows = parse_realpage_cws_getunits(body, url)
+            if not rows:
+                return None
+
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(rows, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted <= 0:
+                return None
+            result = AdapterResult(tier_used="TIER_1_API_REALPAGE_CWS_UNITS")
+            result.units = pp.admitted
+            result.plan_summaries = pp.plan_summaries
+            result.winning_url = url
+            result.confidence = min(0.95, 0.7 + 0.05 * pp.n_admitted)
+            result.api_responses.append(
+                {
+                    "url": url,
+                    "status": getattr(r, "status_code", 200),
+                    "body": "<cws-getunits>",
+                    "via": "cws_getunits_oll_fallback",
+                }
+            )
+            return result
+        except Exception as exc:  # noqa: BLE001 — never break the adapter
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "realpage_oll cws-getunits fallback failed: %s", exc
+            )
+            return None
 
     def matches_response_body(self, body: Any) -> bool:
         """Body-shape check for ``detector.confirm_detection``.
