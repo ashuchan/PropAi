@@ -515,3 +515,29 @@ async def test_empty_scoped_refetch_falls_back_never_zeroes(
     # fallback filter kept THIS property's row, not the other three) is
     # asserted unchanged.
     assert "85013" in result.units[0]["unit_name"]
+
+
+def test_blank_ssr_shell_is_dimensionless_so_extract_falls_through() -> None:
+    """#91 Lever B: a marketing-shell blank AppFolio widget (js-listing cards
+    with no address/beds/sqft) parses to DIMENSIONLESS placeholder rows. The
+    extract SSR branch now requires >=1 unit with a physical dimension before it
+    short-circuits (TIER_1_DOM_APPFOLIO_SSR); on an all-dimensionless shell it
+    falls through to the vanity/account-listings path, which resolves the real
+    property-scoped units (Tareyton 3 / Bala 8, live-verified 2026-07-30 —
+    both were shipping the 2-card blank shell -> generic plan skeleton before).
+
+    Pins the guard's premise: the blank shell carries no dimension, so
+    ``any(has_dimension(...))`` is False and the short-circuit is skipped."""
+    from ma_poc.validation.unit_validity import has_dimension
+
+    blank_shell = (
+        '<li class="js-listing" data-listing-id="1"></li>'
+        '<li class="js-listing" data-listing-id="2"></li>'
+    )
+    units = parse_appfolio_listings_ssr(
+        blank_shell, "https://yourmetropolitan.appfolio.com/listings"
+    )
+    # Placeholder rows parse, but none carries a physical dimension -> the
+    # short-circuit guard is False, so extract falls through.
+    assert units, "expected the blank shell to parse to placeholder rows"
+    assert not any(has_dimension(u) for u in units)

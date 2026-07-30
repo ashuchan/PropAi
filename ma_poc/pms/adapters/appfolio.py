@@ -1521,7 +1521,19 @@ class AppFolioAdapter:
                         f"ctx_addr={ssr_ctx_address!r} "
                         f"ctx_zip={ssr_ctx_zip!r}"
                     )
-            if ssr_units:
+            # #91 Lever B: only short-circuit on the SSR path when it produced a
+            # REAL unit (>=1 physical dimension). A marketing-shell property
+            # (yourmetropolitan.com/properties/{prop}/) SSRs a blank 2-card
+            # AppFolio widget — parse_appfolio_listings_ssr returns dimensionless
+            # placeholder rows that fail validity downstream, yet these used to
+            # short-circuit here (TIER_1_DOM_APPFOLIO_SSR) BEFORE the vanity /
+            # account-listings path that DOES resolve the units. Falling through
+            # lets that path fetch {tenant}.appfolio.com/listings + address-scope
+            # (Tareyton: 3 units, 338/343/310 Barclay Ct, ZIP 19047). No loss:
+            # dimensionless rows are worthless (0 admitted downstream).
+            from ma_poc.validation.unit_validity import has_dimension
+
+            if ssr_units and any(has_dimension(_u) for _u in ssr_units):
                 result.units = ssr_units
                 result.tier_used = "TIER_1_DOM_APPFOLIO_SSR"
                 result.winning_url = (
