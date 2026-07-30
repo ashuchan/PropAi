@@ -2654,6 +2654,28 @@ class EntrataAdapter:
                     pp_ssr_index_bodies.append((_conv_url, _conv_html))
                     break
 
+            # Step 3b (2026-07-30, #91 Lever A): the per-plan
+            # ``/floorplans/<state>/<property>/<slug>-<fpid>-<phase>/`` links are
+            # often ONLY in the RENDERED landing DOM — the static body is a SPA
+            # shell, and the anchors are plain ``<a href="/floorplans/...">`` with
+            # no fp-card / fp-name-link class, so Steps 1-3 never added them to
+            # ``pp_ssr_index_bodies``. When a live page is available AND no static
+            # body already exposed plan links, harvest the rendered content so the
+            # drill below can discover them. Additive: no-op when the page has no
+            # such links. Verified: brownstonetx.com (4 plans, 2-digit fpids →
+            # unit 423, 1/1, 610sf) and drexelridge.com (unit 204, 1/1, 906sf).
+            if page is not None and not any(
+                find_entrata_pp_plan_links(_b, base) for _, _b in pp_ssr_index_bodies
+            ):
+                try:
+                    _rendered_dom = await page.content()
+                except Exception:
+                    _rendered_dom = ""
+                if _rendered_dom and find_entrata_pp_plan_links(_rendered_dom, base):
+                    pp_ssr_index_bodies.append(
+                        (str(getattr(fr, "final_url", "") or base), _rendered_dom)
+                    )
+
             # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
             # Templates A/B/C above produce plan-level rows with
             # ``unit_number=""``; downstream the runner synthesises

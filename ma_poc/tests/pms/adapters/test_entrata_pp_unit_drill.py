@@ -21,9 +21,14 @@ fallback hash path (``core/identity.compute_fallback_unit_id`` —
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
+from ma_poc.pms.adapters import entrata as entrata_mod
 from ma_poc.pms.adapters.entrata import (
+    EntrataAdapter,
     find_entrata_pp_plan_links,
     parse_entrata_pp_unit_cards,
 )
@@ -314,6 +319,86 @@ def test_find_pp_plan_links_ignores_non_plan_hrefs() -> None:
     assert links == [
         "https://example.prospectportal.com/floorplans/x/y/real-100-1/"
     ]
+
+
+@pytest.mark.asyncio
+async def test_rendered_landing_plan_links_drilled(monkeypatch: Any) -> None:
+    """#91 Lever A (Step-3b): the per-plan /floorplans/{plan}/ links live ONLY
+    in the RENDERED DOM — plain ``<a href="/floorplans/...">`` anchors, 2-digit
+    fpids, no fp-card/fp-name-link class (brownstonetx.com shape). The static
+    body is a SPA shell, so Steps 1-3 add nothing to pp_ssr_index_bodies. The
+    Step-3b hook harvests ``page.content()`` so the drill discovers + crawls the
+    plan links — flipping the property plan-level -> unit-level."""
+    unit_card_body = _foxlake_html()  # real per-plan unit-cards
+
+    rendered = (
+        "<html><body>"
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/1-bedroom-1-bath-a1-53-1/">A1</a>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/2-bedroom-2-bath-b1-52-1/">B1</a>'
+        "</body></html>"
+    )
+
+    async def _fake_fetch(url: str, *, unlocker: bool = True) -> str:
+        return unit_card_body if "/floorplans/" in url else ""
+
+    async def _no_probe(self: Any, page: Any, ctx: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(entrata_mod, "_entrata_static_fetch", _fake_fetch)
+    monkeypatch.setattr(EntrataAdapter, "_probe_known_endpoints", _no_probe)
+
+    class _Page:
+        async def content(self) -> str:
+            return rendered
+
+    ctx = SimpleNamespace(
+        _api_responses=[],
+        base_url="https://www.brownstonetx.com/",
+        property_id="218853",
+        address="",
+        zip_code="",
+        fetch_result=SimpleNamespace(
+            final_url="https://www.brownstonetx.com/",
+            body="<html><body><div id='root'></div></body></html>",  # SPA shell
+        ),
+    )
+    result = await EntrataAdapter().extract(cast(Any, _Page()), cast(Any, ctx))
+    assert result.units, f"expected drilled units, got errors={result.errors}"
+    assert result.tier_used == "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_rendered_harvest_skipped_when_static_body_has_links(monkeypatch: Any) -> None:
+    """The Step-3b render harvest must NOT fire when a static index body already
+    exposes plan links — page.content() should not even be consulted (avoids a
+    redundant render read and keeps existing PP-SSR behaviour unchanged)."""
+    idx = _foxlake_idx_html()  # static index WITH fp-name-link plan links
+    consulted = {"content": False}
+
+    async def _fake_fetch(url: str, *, unlocker: bool = True) -> str:
+        return _foxlake_html() if "/floorplans/" in url else ""
+
+    async def _no_probe(self: Any, page: Any, ctx: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(entrata_mod, "_entrata_static_fetch", _fake_fetch)
+    monkeypatch.setattr(EntrataAdapter, "_probe_known_endpoints", _no_probe)
+
+    class _Page:
+        async def content(self) -> str:
+            consulted["content"] = True
+            return "<html></html>"
+
+    ctx = SimpleNamespace(
+        _api_responses=[], base_url="https://foxlake.prospectportal.com/",
+        property_id="1", address="", zip_code="",
+        fetch_result=SimpleNamespace(
+            final_url="https://foxlake.prospectportal.com/", body=idx,
+        ),
+    )
+    result = await EntrataAdapter().extract(cast(Any, _Page()), cast(Any, ctx))
+    assert result.units
+    assert consulted["content"] is False, "rendered content read despite static links"
 
 
 def test_find_pp_plan_links_two_digit_fpid_brownstone() -> None:
