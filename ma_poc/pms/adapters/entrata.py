@@ -2162,6 +2162,37 @@ async def _entrata_static_fetch(
     return (r.text or "") if r.status_code == 200 else ""
 
 
+async def _entrata_fetch_ssr(
+    url: str, *, headers: dict[str, str] | None = None
+) -> str:
+    """Fetch a server-rendered ProspectPortal page for CODE-ONLY recovery,
+    DIRECT first and escalating to the Web Unlocker only when direct is empty.
+
+    These ``/{city}/{slug}/conventional/`` (and origin landing) pages are plain
+    server-rendered HTML that a direct curl reaches reliably. The Web Unlocker,
+    by contrast, intermittently returns an EMPTY body for them — live-verified
+    2026-07-30: Apollo Ridge's ``/conventional/`` came back 193 KB with the full
+    ``unitsData`` roster DIRECT, but 0 bytes through the unlocker. Since the
+    prior code-only fetches defaulted to ``unlocker=True``, the roster was one
+    static GET away yet the property shipped ``ENTRATA_NO_RESPONSE``.
+
+    DIRECT-first also matches the standing fetch strategy (static-direct before
+    proxied/unlocker) and the p1fix run's own ``proxied=False`` main fetch for
+    this cohort. The unlocker fallback preserves recovery for genuinely
+    bot-walled hosts where direct returns nothing.
+    """
+    try:
+        html = await _entrata_static_fetch(url, unlocker=False, headers=headers)
+    except Exception:
+        html = ""
+    if html:
+        return html
+    try:
+        return await _entrata_static_fetch(url, unlocker=True, headers=headers)
+    except Exception:
+        return ""
+
+
 # Verbatim ``view_unit_spaces`` XHR URL embedded in a PP grid's primary-action
 # buttons (data-url / href). Anchored on the endpoint token; the surrounding
 # non-delimiter run captures the full (possibly &amp;- or \/-escaped) URL.
@@ -2523,6 +2554,47 @@ class EntrataAdapter:
             if isinstance(fr_body_check, bytes):
                 fr_body_check = fr_body_check.decode("utf-8", "replace")
 
+            # 2026-07-30 (Lead 3 RCA) — discover the conventional index from
+            # the RAW ORIGIN, not just the captured body.
+            #
+            # ``fr_body_check`` is ``fetch_result.body``. When the render tier
+            # SUCCEEDS-BUT-EMPTY (page loaded, no unit XHR fired — the norm for
+            # these server-rendered PP themes), that body is the Playwright
+            # DOM, whose SPA nav has STRIPPED the server-rendered
+            # ``/{city}/{slug}/conventional/`` anchor. The captured body then
+            # yields no conventional index, the modern ``unitsData`` roster is
+            # never fetched, and a property whose full roster is one static GET
+            # away ships FAILED_NO_DATA. Live-verified 2026-07-30 on 6 xhr=0
+            # render-empty props (Apollo Ridge, Rise Bedford Lake, The Abigail,
+            # Rise at the Preserve, Parkway, Valley at Mill Creek): the rendered
+            # body carried no conventional href; the raw curl shell of the
+            # origin carried the canonical one, and that page carried the whole
+            # roster (``unitsData`` or ``fp-name-link`` + ``view_unit_spaces``).
+            #
+            # Re-fetch the origin ONCE, lazily, and consult it wherever
+            # discovery on the captured body comes up empty. Mirrors the pid
+            # re-fetch in the prospectportal block below (same failure shape:
+            # the config the SPA stripped survives in the static shell). At most
+            # one extra GET per property, and only when the captured body has no
+            # conventional href — never fires when the fetch already handed us
+            # the static shell (bot-blocked → curl bypass) or a #91 render body.
+            _landing_disc: list[str | None] = [None]
+
+            async def _conventional_index_urls(captured: object) -> list[str]:
+                hits = _find_pp_conventional_index(
+                    captured if isinstance(captured, str) else "", base
+                )
+                if hits:
+                    return hits
+                if _landing_disc[0] is None:
+                    try:
+                        _landing_disc[0] = (
+                            await _entrata_fetch_ssr(base + "/") or ""
+                        )
+                    except Exception:
+                        _landing_disc[0] = ""
+                return _find_pp_conventional_index(_landing_disc[0] or "", base)
+
             # Step 1: parse the captured body in case the homepage
             # already IS the SSR grid (some PP vanity hosts redirect
             # ``/`` → ``/{city}/{slug}/conventional/``).
@@ -2738,24 +2810,36 @@ class EntrataAdapter:
             # conventional index yields 19 plan links whose detail pages
             # carry real apartments (4032 Renovated $1,863).
             if not pp_ssr_index_bodies:
-                for _conv_url in _find_pp_conventional_index(
-                    fr_body_check if isinstance(fr_body_check, str) else "", base
+                for _conv_url in (
+                    await _conventional_index_urls(fr_body_check)
                 )[:2]:
                     try:
-                        _conv_html = await _entrata_static_fetch(_conv_url)
+                        _conv_html = await _entrata_fetch_ssr(_conv_url)
                     except Exception:
                         continue
                     if not _conv_html:
                         continue
-                    if (
-                        "fp-card" not in _conv_html
-                        and "fp-group-item" not in _conv_html
-                        and "fp-name-link" not in _conv_html
-                    ):
-                        continue
-                    pp_ssr_units.extend(
-                        parse_entrata_prospectportal_html(_conv_html, _conv_url)
+                    _conv_fp = (
+                        "fp-card" in _conv_html
+                        or "fp-group-item" in _conv_html
+                        or "fp-name-link" in _conv_html
                     )
+                    # 2026-07-30 (Lead 3): retain MODERN (``unitsData``)
+                    # bodies too. The modern PP theme renders its
+                    # ``/{city}/{slug}/conventional/`` roster as an escaped
+                    # ``var unitsData`` blob with NONE of the fp-* markers, so
+                    # the old fp-only filter fetched the right page and threw it
+                    # away — leaving the modern block (below) with no body to
+                    # parse. Keeping it feeds both the modern block and the
+                    # view_unit_spaces drill; only the fp-* form parses here.
+                    if not _conv_fp and "unitsData" not in _conv_html:
+                        continue
+                    if _conv_fp:
+                        pp_ssr_units.extend(
+                            parse_entrata_prospectportal_html(
+                                _conv_html, _conv_url
+                            )
+                        )
                     pp_ssr_index_bodies.append((_conv_url, _conv_html))
                     break
 
@@ -2900,12 +2984,11 @@ class EntrataAdapter:
                 # index href from the landing page and fetch it once. The modern
                 # listing lacks fp-card/fp-name-link, so Steps 1/3 discarded it.
                 if not any("unitsData" in _b for _, _b in _mud_bodies):
-                    for _mu_conv in _find_pp_conventional_index(
-                        fr_body_check if isinstance(fr_body_check, str) else "",
-                        base,
+                    for _mu_conv in (
+                        await _conventional_index_urls(fr_body_check)
                     )[:2]:
                         try:
-                            _mu_html = await _entrata_static_fetch(_mu_conv)
+                            _mu_html = await _entrata_fetch_ssr(_mu_conv)
                         except Exception:
                             continue
                         if _mu_html and "unitsData" in _mu_html:
