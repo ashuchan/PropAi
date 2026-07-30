@@ -2769,17 +2769,31 @@ class EntrataAdapter:
             # drill below can discover them. Additive: no-op when the page has no
             # such links. Verified: brownstonetx.com (4 plans, 2-digit fpids →
             # unit 423, 1/1, 610sf) and drexelridge.com (unit 204, 1/1, 906sf).
-            if page is not None and not any(
+            if not any(
                 find_entrata_pp_plan_links(_b, base) for _, _b in pp_ssr_index_bodies
             ):
-                try:
-                    _rendered_dom = await page.content()
-                except Exception:
-                    _rendered_dom = ""
-                if _rendered_dom and find_entrata_pp_plan_links(_rendered_dom, base):
-                    pp_ssr_index_bodies.append(
-                        (str(getattr(fr, "final_url", "") or base), _rendered_dom)
-                    )
+                _dom_sources: list[str] = []
+                if page is not None:
+                    try:
+                        _pc = await page.content()
+                    except Exception:
+                        _pc = ""
+                    if _pc:
+                        _dom_sources.append(_pc)
+                # The #42/#45 render lever (jugnu.py) re-runs extraction with the
+                # RENDERED DOM in fetch_result.body and page=None (ENABLE_ENTRATA_
+                # PLAN_RENDER / ENABLE_PLAN_UNIT_RENDER), so the rendered
+                # /floorplans/ links arrive via fr_body_check, NOT page.content().
+                # Static bodies carry no such links (0 for Brownstone/Drexel), so
+                # this only fires post-render — additive.
+                if isinstance(fr_body_check, str) and fr_body_check:
+                    _dom_sources.append(fr_body_check)
+                for _dom in _dom_sources:
+                    if find_entrata_pp_plan_links(_dom, base):
+                        pp_ssr_index_bodies.append(
+                            (str(getattr(fr, "final_url", "") or base), _dom)
+                        )
+                        break
 
             # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
             # Templates A/B/C above produce plan-level rows with

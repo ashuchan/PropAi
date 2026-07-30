@@ -368,6 +368,44 @@ async def test_rendered_landing_plan_links_drilled(monkeypatch: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_render_lever_body_plan_links_drilled(monkeypatch: Any) -> None:
+    """#91-A1b: the #42/#45 render lever (jugnu.py) re-runs extraction with the
+    RENDERED DOM in fetch_result.body and page=None. Step-3b must harvest the
+    plan links from fr_body_check (page.content() is None here), else the drill
+    never fires. This is the production path that recovers Brownstone/Drexel —
+    their STATIC body has 0 /floorplans/ links; they appear only post-render."""
+    unit_card_body = _foxlake_html()
+
+    rendered_body = (
+        "<html><body>"
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/1-bedroom-1-bath-a1-53-1/">A1</a>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/2-bedroom-2-bath-b1-52-1/">B1</a>'
+        "</body></html>"
+    )
+
+    async def _fake_fetch(url: str, *, unlocker: bool = True) -> str:
+        return unit_card_body if "/floorplans/" in url else ""
+
+    async def _no_probe(self: Any, page: Any, ctx: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(entrata_mod, "_entrata_static_fetch", _fake_fetch)
+    monkeypatch.setattr(EntrataAdapter, "_probe_known_endpoints", _no_probe)
+
+    ctx = SimpleNamespace(
+        _api_responses=[], base_url="https://www.brownstonetx.com/",
+        property_id="218853", address="", zip_code="",
+        fetch_result=SimpleNamespace(
+            final_url="https://www.brownstonetx.com/", body=rendered_body,
+        ),
+    )
+    # page=None — exactly the #42/#45 render-lever re-run shape.
+    result = await EntrataAdapter().extract(None, cast(Any, ctx))
+    assert result.units, f"expected drilled units, got errors={result.errors}"
+    assert result.tier_used == "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
+
+
+@pytest.mark.asyncio
 async def test_rendered_harvest_skipped_when_static_body_has_links(monkeypatch: Any) -> None:
     """The Step-3b render harvest must NOT fire when a static index body already
     exposes plan links — page.content() should not even be consulted (avoids a
