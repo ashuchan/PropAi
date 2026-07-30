@@ -352,3 +352,124 @@ async def test_t3_full_roster_is_accepted_and_keeps_the_leased_plans(
     surviving = {str(u.get("floor_plan_name") or "") for u in result.units}
     assert leased <= surviving, f"fully-leased plans dropped: {leased - surviving}"
     assert {str(p["floorplanName"]) for p in plans} <= surviving
+
+
+# ── #80 — the DIRECT-only FAST availableunits path (opt-in, default OFF) ──────
+
+
+class _KwSpy:
+    """Like ``_ProbeSpy`` but also records each call's kwargs.
+
+    The #80 fast path's load-bearing property is that it passes
+    ``unlocker=False`` (so ``probe_get`` cannot escalate to the timeout+95 Web
+    Unlocker) — the ONLY thing that distinguishes the bounded DIRECT probe from
+    the full ladder in a test env where neither proxy nor unlocker key is set.
+    """
+
+    def __init__(self, routes: dict[str, str] | None = None) -> None:
+        self.routes = routes or {}
+        self.calls: list[str] = []
+        self.kwcalls: list[tuple[str, dict[str, Any]]] = []
+
+    def __call__(self, url: str, *_a: Any, **kw: Any) -> _Response:
+        self.calls.append(url)
+        self.kwcalls.append((url, kw))
+        for needle, body in self.routes.items():
+            if needle in url:
+                return _Response(200, body)
+        return _Response(404, "")
+
+
+def test_fast_flag_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pending canary yield measurement, the fast path is opt-in (see the flag
+    docstring). ``delenv`` pins the code default, not the ambient env."""
+    monkeypatch.delenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", raising=False)
+    from ma_poc.config.feature_flags import enable_rentcafe_availunits_fast
+
+    assert enable_rentcafe_availunits_fast() is False
+    monkeypatch.setenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", "true")
+    assert enable_rentcafe_availunits_fast() is True
+
+
+@pytest.mark.asyncio
+async def test_both_flags_off_never_probes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The T1 contract must hold with BOTH flags at their default: no probe.
+
+    This is what keeps the fast flag's default-off honest — if it ever flips on,
+    this goes red rather than silently adding a fetch to every plan-level prop.
+    """
+    monkeypatch.delenv("ENABLE_RENTCAFE_PLAN_SECURECAFE_DRILL", raising=False)
+    monkeypatch.delenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", raising=False)
+    spy = _KwSpy()
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", spy)
+
+    ctx, plans = _plan_only_ctx()
+    result = await RentCafeAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert spy.calls == [], f"probe attempted with both flags off: {spy.calls}"
+    assert result.tier_used == "TIER_1_API_RENTCAFE"
+    assert len(result.units) == len(plans) == 10
+
+
+@pytest.mark.asyncio
+async def test_fast_path_is_direct_only_no_escalation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fast flag ON, drill OFF, availableunits is a CF-shell (200, no rows):
+    the catalogue survives and the availableunits fetch used ``unlocker=False``
+    — the fast path must never pay the escalation the full drill would."""
+    monkeypatch.delenv("ENABLE_RENTCAFE_PLAN_SECURECAFE_DRILL", raising=False)
+    monkeypatch.setenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", "true")
+    spy = _KwSpy(routes={"availableunits.aspx": "<html>cf challenge — no rows</html>"})
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", spy)
+
+    ctx, plans = _plan_only_ctx()
+    result = await RentCafeAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    au = [(u, kw) for u, kw in spy.kwcalls if "availableunits.aspx" in u]
+    assert au, "fast path should attempt availableunits when the flag is on"
+    assert all(kw.get("unlocker") is False for _, kw in au), au
+    # CF-shell yields no rows → catalogue kept untouched.
+    assert result.tier_used == "TIER_1_API_RENTCAFE"
+    assert len(result.units) == len(plans) == 10
+
+
+@pytest.mark.asyncio
+async def test_fast_path_accepts_full_roster_and_keeps_leased_plans(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fast path reaches unit-level AND reuses the merge guard: a full
+    roster is accepted, the fully-leased plans the portal omits are retained,
+    and the availableunits fetch stayed DIRECT (``unlocker=False``). Mirrors the
+    full-drill accept test, proving the fast path shares its data safety."""
+    monkeypatch.delenv("ENABLE_RENTCAFE_PLAN_SECURECAFE_DRILL", raising=False)
+    monkeypatch.setenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", "true")
+
+    ctx, plans = _plan_only_ctx()
+    leased = {"1M", "1Z", "2J"}
+    for p in plans:
+        if str(p["floorplanName"]) in leased:
+            p["availableUnitsCount"] = "0"
+            p["unitsCount"] = "0"
+    roster: list[tuple[str, str, str, str]] = []
+    bb: dict[str, tuple[int, float]] = {}
+    for p in plans:
+        name = str(p["floorplanName"])
+        bb[name] = (int(p["beds"]), float(p["baths"]))
+        for i in range(int(p["availableUnitsCount"])):
+            roster.append((name, f"{p['floorplanId']}-{i}", "787", "1349"))
+    assert len(roster) == 12
+
+    spy = _KwSpy(routes={"availableunits.aspx": _availableunits_html(roster, bb)})
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", spy)
+
+    result = await RentCafeAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_1_API_RENTCAFE_SECURECAFE_FROM_PLAN"
+    assert not [e for e in result.errors if "securecafe_from_plan" in e]
+    au = [kw for u, kw in spy.kwcalls if "availableunits.aspx" in u]
+    assert au and all(kw.get("unlocker") is False for kw in au), "fast path escalated"
+    unit_numbers = {str(u.get("unit_number") or "") for u in result.units} - {""}
+    assert len(unit_numbers) == 12, f"roster collapsed to {len(unit_numbers)}"
+    surviving = {str(u.get("floor_plan_name") or "") for u in result.units}
+    assert leased <= surviving, f"merge guard dropped leased plans: {leased - surviving}"

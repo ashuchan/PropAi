@@ -39,7 +39,10 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from ma_poc.config.feature_flags import enable_rentcafe_plan_securecafe_drill
+from ma_poc.config.feature_flags import (
+    enable_rentcafe_availunits_fast,
+    enable_rentcafe_plan_securecafe_drill,
+)
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
@@ -607,8 +610,18 @@ class RentCafeAdapter:
                 _has_unit_level = any(
                     str(u.get("unit_number") or "").strip() for u in pp.admitted
                 )
-                if not _has_unit_level and enable_rentcafe_plan_securecafe_drill():
-                    sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
+                # #80: the FAST availableunits path (opt-in, default-OFF pending
+                # canary yield measurement) fires here too. When the full drill
+                # is enabled it takes precedence (it reaches the CF-walled subset
+                # the DIRECT-only fast path cannot); when only the fast flag is
+                # on, run DIRECT-only. Either way the SAME swap_verdict + merge
+                # guard below governs acceptance.
+                _full_drill = enable_rentcafe_plan_securecafe_drill()
+                _fast = enable_rentcafe_availunits_fast()
+                if not _has_unit_level and (_full_drill or _fast):
+                    sc_units = await _try_rentcafe_securecafe_probe(
+                        ctx, result, fast_direct_only=_fast and not _full_drill
+                    )
                     if sc_units:
                         sc_pp = post_process(
                             sc_units,
@@ -1614,12 +1627,20 @@ def parse_rentcafe_ysi_unitslist(html: str, source_url: str) -> list[dict[str, A
 
 
 async def _try_rentcafe_securecafe_probe(
-    ctx: AdapterContext, result: AdapterResult
+    ctx: AdapterContext, result: AdapterResult, fast_direct_only: bool = False
 ) -> list[dict[str, Any]]:
     """SHAPE_REJECTED fallback: follow the securecafe online-leasing portal
     and parse ``availableunits.aspx`` for true unit-level inventory.
 
     Returns parsed unit dicts on success, ``[]`` on any failure.
+
+    ``fast_direct_only`` (#80): the bounded, cost-safe variant used by the
+    plan-level site behind ``enable_rentcafe_availunits_fast``. It runs ONLY the
+    Attempt-1 DIRECT leg with ``unlocker=False`` (no internal ``timeout+95``
+    escalation), no proxied leg, no Web-Unlocker leg, and caps candidate bases
+    at 2. Worst case ~25-50s instead of the full ladder's ~1,365-1,535s. Reach
+    is limited to the non-CF-walled subset; the caller's merge guard makes the
+    fall-through safe.
     """
     html = ""
     fr = getattr(ctx, "fetch_result", None)
@@ -1689,13 +1710,20 @@ async def _try_rentcafe_securecafe_probe(
     page_html = ""
     import os as _os
     proxy_available = bool(_os.environ.get("PROBE_PROXY_URL", "").strip())
-    for candidate_base in bases[:3]:
+    # #80 fast path: cap bases at 2 and run only the DIRECT leg (below).
+    for candidate_base in bases[: (2 if fast_direct_only else 3)]:
         candidate_au = f"{candidate_base}/availableunits.aspx"
         body_text = ""
-        # Attempt 1: DIRECT (no proxy).
+        # Attempt 1: DIRECT (no proxy). fast_direct_only also passes
+        # unlocker=False so probe_get cannot silently escalate to the
+        # timeout+95 Web-Unlocker leg — that internal escalation is exactly
+        # the wall-clock hazard the fast path exists to avoid.
         try:
+            _direct_kw: dict[str, Any] = {"proxies": {}, "verify": True}
+            if fast_direct_only:
+                _direct_kw["unlocker"] = False
             r = await asyncio.to_thread(
-                probe_get, candidate_au, timeout=25, proxies={}, verify=True
+                probe_get, candidate_au, timeout=25, **_direct_kw
             )
             if r.status_code == 200:
                 body_text = r.text or ""
@@ -1708,7 +1736,7 @@ async def _try_rentcafe_securecafe_probe(
         # proxy is configured). Some Yardi tenants explicitly block GCP
         # ranges on the SC subdomain — the residential proxy is the only
         # path for those.
-        if "AvailUnitRow" not in body_text and proxy_available:
+        if "AvailUnitRow" not in body_text and proxy_available and not fast_direct_only:
             try:
                 r = await asyncio.to_thread(probe_get, candidate_au, timeout=25)
                 if r.status_code == 200:
@@ -1725,7 +1753,9 @@ async def _try_rentcafe_securecafe_probe(
         # AvailUnitRow. Escalate explicitly whenever rows are still missing and
         # a Web Unlocker token is set — independent of PROBE_PROXY_URL and of
         # _looks_blocked. No-op (returns empty) when WEB_UNLOCKER_KEY is unset.
-        if "AvailUnitRow" not in body_text:
+        # Skipped on the #80 fast path — the unlocker leg is the wall-clock
+        # hazard the fast path exists to avoid.
+        if "AvailUnitRow" not in body_text and not fast_direct_only:
             try:
                 from ma_poc.pms.adapters._probe import (
                     web_unlocker_get,

@@ -709,3 +709,41 @@ def enable_rentcafe_plan_securecafe_drill() -> bool:
         os.environ.get("ENABLE_RENTCAFE_PLAN_SECURECAFE_DRILL", "false").lower()
         == "true"
     )
+
+
+def enable_rentcafe_availunits_fast() -> bool:
+    """RentCafe plan-only → SecureCafe ``availableunits`` FAST path (#80).
+
+    Same site-(b) branch that ``enable_rentcafe_plan_securecafe_drill`` guards,
+    but a bounded, cost-safe variant: a SINGLE DIRECT ``availableunits.aspx``
+    fetch (``unlocker=False``, ``proxies={}``, ≤2 candidate bases) — no proxied
+    leg, no Web-Unlocker escalation. That is what makes it default-ON where the
+    full drill stays OFF: the full drill's ~1,365-1,535s worst case comes
+    entirely from the proxied + unlocker ladder (see
+    ``enable_rentcafe_plan_securecafe_drill``'s hazard-2 note); a lone DIRECT
+    call is ~25-50s and never triggers the internal ``timeout+95`` unlocker
+    escalation.
+
+    Data safety is IDENTICAL to the full drill — the same
+    ``_securecafe_swap_verdict`` + ``_merge_portal_over_catalogue`` guard runs on
+    the result, so a fully-leased plan is never dropped. The only difference is
+    REACH: DIRECT-only lands the subset whose ``availableunits`` is not
+    CF-walled (live-verified 2026-07-30: Gull Prairie 67 units DIRECT; Stonepost
+    was a 200 CF-challenge shell with no rows, Adiamo/Franklin exposed no base
+    code-only). It no-ops (falls back to the plan-level catalogue) for the rest,
+    so ``lost==0``.
+
+    Default OFF, and deliberately so despite the bounded cost. Two reasons:
+    (1) the re-verified code-only yield is modest — ~1/11 of the probed
+    plan-level rentcafe props (Gull Prairie) — so paying a DIRECT ``availableunits``
+    fetch on 100% of rentcafe plan-level properties to convert ~9% is a
+    cost/benefit that must be sized on a canary FIRST; and (2) the existing
+    ``test_securecafe_from_plan.py`` T1 contract is "drill flag off ⇒ no probe",
+    and flipping this default-on silently changes that observable behaviour.
+    Enable on the canary (``ENABLE_RENTCAFE_AVAILUNITS_FAST=true``) to measure
+    yield + wall clock, then decide the production default. When BOTH flags are
+    on, the full drill takes precedence (it reaches the CF-walled subset too).
+    """
+    return (
+        os.environ.get("ENABLE_RENTCAFE_AVAILUNITS_FAST", "false").lower() == "true"
+    )
