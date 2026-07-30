@@ -231,6 +231,18 @@ async def recover_universal_embed(
                     tier = t
             return sm_units, tier, "sightmap_subpage"
 
+        # Rently recovery (2026-07-30, #89): a property whose own site
+        # redirects to ``u{ID}.rently.com`` (scattered single-family / BTR)
+        # detects as generic/plan-text with no data. Extract the managerID
+        # from the resolved host / body and fetch the searchQuery JSON
+        # endpoint code-only. Address = scattered-site identity (#29).
+        from ma_poc.pms.adapters.rently import recover_rently
+
+        rently_units = await recover_rently(ctx)
+        if rently_units:
+            mark_attempted(ctx, "rently")
+            return rently_units, "TIER_1_API_RENTLY", "rently"
+
         # G5 recovery (2026-05-24): closes the TIER_1_API generic /
         # Knock-misroute sub-cohort where the property has a g5-cl-*
         # URN in its body but the detector picked a different PMS
