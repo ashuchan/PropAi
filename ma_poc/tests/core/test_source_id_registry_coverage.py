@@ -515,6 +515,8 @@ _ADMISSION_EVIDENCE: dict[str, str] = {
     "venterra_unit_code": "fixtures 19/19 and 20/20",
     "realpage_oll_unit_id": "fixture 4/4 (UnitId= off the per-unit application URL)",
     "securecafe_apartment_id": "fixtures 7/7 and 18/18",
+    "rently_full_address": "fixture 5/5 (Jodeco searchQuery) — scattered-site street "
+    "address, unique + permanent per home (#29); rot unmeasured (address does not change)",
 }
 
 #: UNIT_VOLATILE: unique within a property, but MEASURED to rotate across runs.
@@ -523,6 +525,10 @@ _VOLATILE_EVIDENCE: dict[str, str] = {
     "appfolio_listing_id": "9,561 rows / 153 props @ 0.9997 (07-12) BUT rot 44/303 = 14.52%",
     "entrata_uid": "2,843 rows / 190 props @ 0.9996 (07-12) BUT rot 50/1,985 = 2.52%",
     "udr_unitid": "420 rows / 17 props @ 1.000 (07-12) BUT rot 7/281 = 2.49%",
+    "rently_id": "fixture 5/5 (Jodeco) — per-home Rently listing id; rotation UNMEASURED "
+    "so kept volatile (rently_full_address is the stable anchor)",
+    "unit_id_engrain": "fixtures 24/24 (Lunaire) + 33 (Steeplechase) — Engrain per-unit id; "
+    "rotation UNMEASURED so volatile (modern rows anchor on unit_number)",
 }
 
 

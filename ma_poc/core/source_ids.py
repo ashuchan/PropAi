@@ -241,7 +241,14 @@ class SourceIdScope(StrEnum):
 # ---------------------------------------------------------------------------
 
 SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
-    # ── UNIT_STABLE (11) — unique AND cross-run stable ───────────────────
+    # ── UNIT_STABLE (12) — unique AND cross-run stable ───────────────────
+    # rently.py:120 — scattered-site (single-family / BTR) home: the street
+    # ADDRESS is the permanent, unique per-home identity (#29 scattered-site
+    # principle, same as AppFolio scattered listings). Without this the Rently
+    # searchQuery homes classified plan-level (unit_has_real_anchor=False) and
+    # shipped as collapsed floor-plans despite recover_rently winning
+    # (Jodeco Landing: 5 homes -> SUCCESS_PLAN_LEVEL). Live-verified 2026-07-30.
+    "rently_full_address": SourceIdScope.UNIT_STABLE,
     "sightmap_unit_id": SourceIdScope.UNIT_STABLE,
     "apts247_unit_id": SourceIdScope.UNIT_STABLE,
     "spherexx_unit_id": SourceIdScope.UNIT_STABLE,
@@ -253,12 +260,20 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     "venterra_unit_code": SourceIdScope.UNIT_STABLE,
     "realpage_oll_unit_id": SourceIdScope.UNIT_STABLE,
     "securecafe_apartment_id": SourceIdScope.UNIT_STABLE,
-    # ── UNIT_VOLATILE (3) — unique, but MEASURED to rotate across runs ───
+    # ── UNIT_VOLATILE (5) — unique, but MEASURED/ASSUMED to rotate ───────
     # Evidence in the ROTATION MEASUREMENT block above. In verdict's
     # classify view (uniqueness is enough); NOT in identity's minting view.
     "appfolio_listing_id": SourceIdScope.UNIT_VOLATILE,  # 14.52%
     "entrata_uid": SourceIdScope.UNIT_VOLATILE,  # 2.52%
     "udr_unitid": SourceIdScope.UNIT_VOLATILE,  # 2.49%
+    # rently.py:118 — per-home Rently listing id. Unique per home (classify
+    # evidence), but cross-run rotation UNMEASURED, so kept out of the minting
+    # view; rently_full_address (UNIT_STABLE above) is the daily-join anchor.
+    "rently_id": SourceIdScope.UNIT_VOLATILE,
+    # entrata.py:486 — Engrain per-unit id from the modern unitsData roster.
+    # Unique per apartment (classify evidence); rotation UNMEASURED, and the
+    # modern rows already anchor on unit_number, so classify-only.
+    "unit_id_engrain": SourceIdScope.UNIT_VOLATILE,
     # ── UNIT_PENDING (4) — in NEITHER derived view ──────────────────────
     # appfolio.py:818. Stronger than merely unmeasured: never non-empty in
     # ANY of the three artifact sets (228,708 units), so it is currently
@@ -384,6 +399,10 @@ PER_UNIT_IDENTITY_KEYS: Final[tuple[str, ...]] = (
     "venterra_unit_code",
     "realpage_oll_unit_id",
     "securecafe_apartment_id",
+    # scattered-site (Rently single-family/BTR): the street address is the
+    # permanent per-home daily-join anchor (#29). Listed last — a row carrying
+    # a first-party unit id above should still prefer it.
+    "rently_full_address",
 )
 
 #: UNIT_STABLE u UNIT_VOLATILE. Uniqueness-within-property is enough here.
