@@ -1245,13 +1245,32 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                 0.93,
                 ["RentCafe SecureCafe public UnitID + FloorPlanID inventory link"],
             )
-            return
-        yield (
-            "rentcafe",
-            0.90,
-            ["RentCafe securecafe(net) portal marker in HTML "
-             "(<sub>.securecafe[net].com/{online,resident}leasing)"],
-        )
+            # NO `return` here. This function is a GENERATOR: `return` does not
+            # merely end this rule, it ENDS ITERATION and deletes every later
+            # candidate. Measured on this file: 29 of the 58 yields — exactly
+            # half — sit after this point, spanning 21 vendors including
+            # appfolio, entrata, resman, sightmap, realpage_cws, rentmanager and
+            # crucially generic_plan_text, the last-resort plan-level rescue.
+            #
+            # The consumers rank by confidence (``_best_html_marker`` picks the
+            # max; detect_pms_candidates sorts by -confidence), so the 0.93
+            # above already outranks a co-resident Knock widget without
+            # suppressing anything — which is all the original comment wanted.
+            # No suppressed candidate exceeds 0.93 (max is 0.92), so the winner
+            # was never affected; what the `return` destroyed was the Path-B
+            # RETRY LIST, whose entire purpose is to hold the alternatives when
+            # the first pick extracts nothing.
+            #
+            # The damage was invisible: a truncated candidate list is reported
+            # as "no candidates", i.e. absence of evidence, rather than
+            # "candidates exhausted".
+        else:
+            yield (
+                "rentcafe",
+                0.90,
+                ["RentCafe securecafe(net) portal marker in HTML "
+                 "(<sub>.securecafe[net].com/{online,resident}leasing)"],
+            )
 
     # ResMan — public availability portal at <client>.myresman.com/Portal/
     # Applicants/Availability?a=&p=, linked from the marketing /floorplans/
