@@ -517,6 +517,37 @@ async def test_empty_scoped_refetch_falls_back_never_zeroes(
     assert "85013" in result.units[0]["unit_name"]
 
 
+def test_container_cards_pair_sqft_to_own_card_no_off_by_one() -> None:
+    """#72 hardening: each container card's sqft must pair to ITS OWN unit, never
+    a neighbour's. The historical off-by-one (a unit inheriting the adjacent
+    card's sqft — illumepm 22/76 rows) is structurally impossible with the
+    container-anchored _LISTING_CARD_RE segmentation, but the existing
+    _CONTAINER_ROSTER gives every card the SAME 900 sqft, so it could not catch a
+    segmentation regression. This gives each card a DISTINCT sqft and asserts
+    per-card pairing, so a future split that leaks a neighbour's value fails."""
+    def _card(lid: str, address: str, sqft: int, rent: str) -> str:
+        return (
+            f'<div class="listing-item result js-listing-item" id="listing_{lid}">'
+            f'<div class="js-listing-blurb-rent">${rent}</div>'
+            f'<div class="js-listing-blurb-bed-bath">2 bd / 2 ba</div>'
+            f'<span class="js-listing-address">{address}</span>'
+            f'<a href="#" class="js-listing-map-view-link" data-listing-id="{lid}"></a>'
+            f'<span class="js-listing-square-feet">Square Feet: {sqft}</span>'
+            "</div>"
+        )
+
+    html = "<html><body>" + "".join([
+        _card("1", "338 Barclay Court, Langhorne, PA 19047", 1080, "2,325"),
+        _card("2", "343 Barclay Court, Langhorne, PA 19047", 1298, "2,580"),
+        _card("3", "310 Barclay Court, Langhorne, PA 19047", 1120, "2,510"),
+    ]) + "</body></html>"
+    rows = parse_appfolio_listings_ssr(html, "https://x.appfolio.com/listings")
+    by_addr = {str(r.get("unit_name", "")).split(",")[0]: str(r.get("sqft")) for r in rows}
+    assert by_addr.get("338 Barclay Court") == "1080", by_addr
+    assert by_addr.get("343 Barclay Court") == "1298", by_addr
+    assert by_addr.get("310 Barclay Court") == "1120", by_addr
+
+
 def test_blank_ssr_shell_is_dimensionless_so_extract_falls_through() -> None:
     """#91 Lever B: a marketing-shell blank AppFolio widget (js-listing cards
     with no address/beds/sqft) parses to DIMENSIONLESS placeholder rows. The
