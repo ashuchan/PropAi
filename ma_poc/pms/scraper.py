@@ -636,6 +636,26 @@ def promote_verified_unit_rows(
     # diagnostic flags, so deduplicate by public plan identity rather than by
     # whole-dict equality.
     def _plan_key(row: dict[str, Any]) -> tuple[str, ...]:
+        """Identity of a plan row for the merge below. Collisions DESTROY a row.
+
+        The attribute half delegates to :func:`_hop_plan_identity` so there is
+        ONE implementation of "which published plan is this". The previous
+        inline version read ``floor_plan_id`` and ``asking_rent``/``rent_low``,
+        and ``_parsing.make_unit_dict`` writes NONE of those three — it writes
+        ``market_rent_low`` and no floor-plan id at all. So two of its seven
+        slots were constant ``""`` for every adapter-built row, and the key
+        degenerated to (name, beds, baths, area).
+
+        That is not theoretical. Rosewood Commons (canonical_id 257324) publishes
+        two ``2 Bedroom / 2 Bath`` offers, identical on beds/baths/area, at
+        $1,695 and $1,640. They collided, and the $1,640 offer was destroyed —
+        a real advertised price silently dropped from the output.
+
+        ``floor_plan_id`` and the plan-scoped ``source_ids`` are kept as
+        ADDITIONAL discriminators: when a source does supply them they are
+        stronger evidence than attributes, and when it does not they are
+        uniformly empty and cost nothing.
+        """
         source_ids = row.get("source_ids")
         plan_sources: tuple[tuple[str, str], ...] = ()
         if isinstance(source_ids, dict):
@@ -648,11 +668,7 @@ def promote_verified_unit_rows(
             )
         return (
             str(row.get("floor_plan_id") or ""),
-            str(row.get("floor_plan_name") or row.get("floorplan_name") or ""),
-            str(row.get("beds") or row.get("bedrooms") or ""),
-            str(row.get("baths") or row.get("bathrooms") or ""),
-            str(row.get("area") or row.get("sqft") or ""),
-            str(row.get("asking_rent") or row.get("rent_low") or ""),
+            *_hop_plan_identity(row),
             repr(plan_sources),
         )
 

@@ -203,3 +203,50 @@ class TestAttachHopPlans:
             p.get("floor_plan_name") for p in result["plan_summaries"] if isinstance(p, dict)
         ]
         assert "A1" in names
+
+
+class TestPromoteDoesNotCollapseDistinctOffers:
+    """The plan-merge de-dup must not destroy a differently-priced offer.
+
+    ``promote_verified_unit_rows`` merges plan rows keyed on its inner
+    ``_plan_key``, and a collision DELETES a row. That key used to read
+    ``floor_plan_id`` and ``asking_rent`` / ``rent_low`` — none of which
+    ``make_unit_dict`` writes (it writes ``market_rent_low`` and no plan id) —
+    so two of its seven slots were a constant empty string and the key
+    effectively became (name, beds, baths, area).
+
+    Measured on live output, not invented: Rosewood Commons (257324) publishes
+    two ``2 Bedroom / 2 Bath`` offers at $1,695 and $1,640, identical on
+    beds/baths/area. Pre-fix the run shipped ONE of them. A real advertised
+    price was being deleted with no missing-data signal.
+    """
+
+    def test_two_offers_differing_only_in_rent_both_survive(self) -> None:
+        """Rosewood's exact shape, built through the real adapter helper."""
+        from ma_poc.pms.adapters._parsing import make_unit_dict
+        from ma_poc.pms.adapters.base import AdapterResult
+        from ma_poc.pms.scraper import promote_verified_unit_rows
+
+        rows = [
+            make_unit_dict(
+                floor_plan_name="2 Bedroom / 2 Bath",
+                bedrooms=2,
+                bathrooms=2,
+                rent_low=rent,
+                rent_high=rent,
+            )
+            for rent in (1695, 1640)
+        ]
+        adapter_result = AdapterResult(units=list(rows))
+        adapter_result.tier_used = "TIER_1_DOM_GENERIC_PLAN_TEXT"
+
+        promote_verified_unit_rows(adapter_result, property_id="257324")
+
+        rents = sorted(
+            p.get("market_rent_low") for p in adapter_result.plan_summaries
+        )
+        assert rents == [1640, 1695], (
+            f"expected both published offers to survive, got {rents}. A collision "
+            "in _plan_key deleted one — check that every slot of the key reads "
+            "the field names make_unit_dict actually writes."
+        )
