@@ -169,6 +169,22 @@ def test_slug_none_when_no_appfolio_anywhere() -> None:
     assert find_appfolio_slug(html) is None
 
 
+def test_slug_skips_account_oauth_host_picks_real_tenant() -> None:
+    """2026-07-30: ``account.appfolio.com`` is AppFolio's OAuth/account host,
+    not a tenant. Frontera at Pioneer Meadows (leasefrontera.com) links to it
+    (``/realms/foliospace/protocol/openid-connect``) FOUR times BEFORE its real
+    ``frontera.appfolio.com`` tenant, so the first-match slug discovery returned
+    'account' and fetched the wrong host -> APPFOLIO_EMPTY. The skip-list must
+    drop 'account' and fall through to the real tenant."""
+    html = (
+        '<a href="https://account.appfolio.com/realms/foliospace/protocol/'
+        'openid-connect/auth">Sign in</a>'
+        '<a href="https://account.appfolio.com/realms/foliospace">x</a>'
+        '<a href="https://frontera.appfolio.com/connect/users/sign_in">Apply</a>'
+    )
+    assert find_appfolio_slug(html) == "frontera"
+
+
 # ─────────────────────────────────────────────────────────────────────
 # URL construction — verify the propertyGroup filter is properly
 # URL-encoded into the listings URL. (Tests the integration logic

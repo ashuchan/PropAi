@@ -77,7 +77,17 @@ __all__ = [
 # which the slug-discovery path has used since 2026-05; kept here because this
 # module must not import the adapter (the adapter imports this).
 APPFOLIO_RESERVED_SLUGS = frozenset(
-    {"www", "app", "support", "secure", "tenant", "tenants", "owner", "owners", "demo"}
+    {
+        "www", "app", "support", "secure", "tenant", "tenants", "owner",
+        "owners", "demo",
+        # 2026-07-30: ``account.appfolio.com`` is AppFolio's centralized OAuth /
+        # account host (``/realms/foliospace/protocol/openid-connect``), never a
+        # property tenant. Frontera at Pioneer Meadows (leasefrontera.com) links
+        # to it FOUR times before its real ``frontera.appfolio.com`` tenant, so
+        # find_appfolio_slug returned "account", fetched the wrong host, and the
+        # property shipped TIER_1_API_APPFOLIO_EMPTY_PLAN_LEVEL.
+        "account", "accounts",
+    }
 )
 
 # Both the percent-encoded (``%5B``/``%5D``) and literal (``[``/``]``) bracket
