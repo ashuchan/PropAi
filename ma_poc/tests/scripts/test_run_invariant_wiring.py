@@ -121,14 +121,25 @@ class TestIdenticalPayloadWiring:
         assert set(found[0]["details"]["property_ids"]) == {"278139", "77994"}
         assert found[0]["details"]["n_rows"] == 4
 
-    def test_a_clean_run_writes_nothing(self, tmp_path: Path) -> None:
-        """No noise on the happy path, or the file becomes unreadable."""
+    def test_a_clean_run_raises_no_warning(self, tmp_path: Path) -> None:
+        """No noise on the happy path, or the file becomes unreadable.
+
+        CONTRACT CHANGED 2026-07-30. This previously asserted a clean run writes
+        NOTHING. That was the defect: an empty issues.jsonl from a 50-property
+        shard is indistinguishable from a clean 4,982-property run, and a
+        per-shard check is 98% blind (1 of 22 known collision groups). So a
+        clean run now writes exactly one INFO `RUN_INVARIANTS_SCOPE` record
+        stating the population compared. What must stay absent is any WARNING —
+        that is the "no noise" property this test was actually protecting.
+        """
         run_dir = tmp_path / "runs" / "2026-07-29"
         run_dir.mkdir(parents=True)
         _emit_run_invariant_issues(
             [_prop("1", _rows(4)), _prop("2", _rows(9)[5:])], run_dir
         )
-        assert _issues(run_dir) == []
+        issues = _issues(run_dir)
+        assert [i for i in issues if i["severity"] == "WARNING"] == []
+        assert [i["code"] for i in issues] == ["RUN_INVARIANTS_SCOPE"]
 
 
 class TestPriorRunDiscovery:

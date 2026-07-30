@@ -3971,6 +3971,27 @@ def _emit_run_invariant_issues(
     phases of one community can legitimately share a roster), so this raises a
     WARNING for a human and leaves the data alone. Never raises — QC must not
     cost us a run that already succeeded.
+
+    SCOPE — read this before trusting a quiet result. This function sees only
+    the properties THIS PROCESS emitted. Production shards a run across many
+    Cloud Run tasks (100 shards x ~50 properties on the 4,982-property run), and
+    each task has its own filesystem, so:
+
+    * The cross-property check compares ~50 properties, not 4,982. Replaying the
+      22 known collision groups from run-2026-07-27-full-0d54ca7 against that
+      run's real shard assignment, a per-shard check catches 1 of 22 groups and
+      surfaces 76 of 3,869 duplicate rows — it is 98% blind. Sharding acts as a
+      hash, so two colliding properties co-locate with probability ~1/n_shards.
+    * The cross-run check has no baseline at all: only ``PROFILE_GCS_PREFIX`` is
+      synced down, never prior ``runs/``, so ``_find_prior_run_properties``
+      returns None on every shard task and envelope drift never runs.
+
+    Hence the ``RUN_INVARIANTS_SCOPE`` record emitted unconditionally below. The
+    danger is not the narrow scope itself — it is a reader seeing an empty
+    issues.jsonl and concluding the run was clean. Stating the population
+    compared, and which halves actually ran, makes absence of findings
+    interpretable instead of reassuring. For real coverage run
+    ``ma_poc/scripts/checks/run_invariants.py`` over the assembled run.
     """
     if run_dir is None or not properties:
         return
@@ -3981,6 +4002,7 @@ def _emit_run_invariant_issues(
             find_identical_payload_groups,
         )
 
+        n_compared = len(properties)
         groups = find_identical_payload_groups(properties)
         for group in groups:
             _append_issue_to_run(
@@ -4000,6 +4022,9 @@ def _emit_run_invariant_issues(
                         "n_rows": group.n_rows,
                         "detected_pms": group.detected_pms,
                         "differing_detection": group.is_suspicious,
+                        # Carried per-finding as well as in the scope record: a
+                        # consumer that filters by code sees only these lines.
+                        "n_properties_compared": n_compared,
                     },
                 ),
             )
@@ -4013,8 +4038,38 @@ def _emit_run_invariant_issues(
         prior = _find_prior_run_properties(run_dir)
         if prior is None:
             log.info("run invariants: no prior run found, envelope drift not checked")
+            _append_issue_to_run(
+                run_dir,
+                _IE(
+                    severity="INFO",
+                    code="RUN_INVARIANTS_SCOPE",
+                    message=(
+                        f"cross-property check compared {n_compared} properties "
+                        f"({len(groups)} group(s) found); envelope drift NOT checked "
+                        f"— no prior run available to this process"
+                    ),
+                    details={
+                        "n_properties_compared": n_compared,
+                        "identical_payload_groups_found": len(groups),
+                        "identical_payload_checked": True,
+                        "envelope_drift_checked": False,
+                        "envelope_drift_skip_reason": "no_prior_run_found",
+                        "envelope_drift_findings": 0,
+                        # Factual, not a completeness claim: this process cannot
+                        # see whether it is one shard of many. A reader compares
+                        # n_properties_compared against the expected run size.
+                        "scope": "single_process",
+                        "full_run_check": (
+                            "python -m ma_poc.scripts.checks.run_invariants "
+                            "--run-dir <assembled-run-dir>"
+                        ),
+                    },
+                ),
+            )
             return
+        n_drift = 0
         for drift in find_envelope_drift(properties, prior):
+            n_drift += 1
             _append_issue_to_run(
                 run_dir,
                 _IE(
@@ -4024,9 +4079,38 @@ def _emit_run_invariant_issues(
                         f"{drift.property_name}: " + "; ".join(drift.findings)
                     ),
                     canonical_id=drift.property_id,
-                    details={"findings": drift.findings},
+                    details={
+                        "findings": drift.findings,
+                        "n_properties_compared": n_compared,
+                    },
                 ),
             )
+        _append_issue_to_run(
+            run_dir,
+            _IE(
+                severity="INFO",
+                code="RUN_INVARIANTS_SCOPE",
+                message=(
+                    f"cross-property check compared {n_compared} properties "
+                    f"({len(groups)} group(s) found); envelope drift compared "
+                    f"against {len(prior)} prior-run properties "
+                    f"({n_drift} finding(s))"
+                ),
+                details={
+                    "n_properties_compared": n_compared,
+                    "identical_payload_groups_found": len(groups),
+                    "identical_payload_checked": True,
+                    "envelope_drift_checked": True,
+                    "envelope_drift_findings": n_drift,
+                    "n_prior_properties": len(prior),
+                    "scope": "single_process",
+                    "full_run_check": (
+                        "python -m ma_poc.scripts.checks.run_invariants "
+                        "--run-dir <assembled-run-dir>"
+                    ),
+                },
+            ),
+        )
     except Exception as exc:  # pragma: no cover - QC must never break a run
         log.warning("run invariants failed: %s", exc, exc_info=True)
 
