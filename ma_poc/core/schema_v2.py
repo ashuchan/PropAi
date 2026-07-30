@@ -682,6 +682,136 @@ def enforce_zero_inventory_contract(units: Any) -> int:
     return changed
 
 
+# ── Plan-level unavailability tagging (2026-07-30) ────────────────────────────
+#
+# A property that ships plan-level is NOT uniformly "a floor-plan brochure".
+# Hand-verification of the 2026-07-30 SUCCESS_PLAN_LEVEL cohort found three
+# distinct *positive* unavailability signals a plan-level page carries, each of
+# which the pipeline was flattening to a generic (often defaulted-AVAILABLE)
+# plan row:
+#
+#   * a **waitlist** — plans exist and are priced, but every unit is spoken for
+#     (Gallery Park: "Wait List" buttons, "from $1,299"). The price is real; the
+#     availability is not AVAILABLE.
+#   * an operator **no-availability** notice — the leasing widget itself says it
+#     has nothing (78 West / AppFolio: "We currently have no available
+#     properties for rent").
+#   * **contact-for-availability** — the plan is shown but the operator withholds
+#     bookable inventory behind a call (Rosewood: "Contact for availability").
+#
+# These are property-level signals read from the page body. The plan-level flag
+# (:func:`_is_floor_plan_level`) already marks the FLOOR_PLAN_ONLY baseline; this
+# adds the sub-classification on top so a consumer can tell "correctly plan-level
+# because the property has no bookable units right now" from "we failed to reach
+# the units". The reason is detected once per property (where the body is in
+# scope) and applied to the formatted plan rows at the write boundary, mirroring
+# :func:`enforce_zero_inventory_contract`.
+
+#: data_quality_flag reason -> availability_status the row should carry. The
+#: status is only ever made MORE restrictive (see :func:`apply_plan_unavailability_tag`),
+#: never less, so a per-plan UNAVAILABLE is never softened by a page-level notice.
+PLAN_UNAVAIL_STATUS: dict[str, str] = {
+    "PLAN_NO_AVAILABILITY": "UNAVAILABLE",
+    "PLAN_WAITLIST": "WAITLIST",
+    "PLAN_CONTACT_FOR_AVAILABILITY": "UNKNOWN",
+}
+
+#: How un-available each status is. Used to gate the override so a page notice
+#: can only push a row toward less-available, never toward more-available.
+_AVAIL_RANK: dict[str, int] = {
+    "AVAILABLE": 0,
+    "": 0,
+    "UNKNOWN": 1,
+    "WAITLIST": 2,
+    "WAITLISTED": 2,
+    "UNAVAILABLE": 3,
+    "LEASED": 3,
+}
+
+_WAITLIST_RE = re.compile(r"\bwait[\s\-]?list", re.IGNORECASE)
+_NO_AVAILABILITY_RE = re.compile(
+    r"(?:currently\s+have\s+)?no\s+(?:available|current)\s+"
+    r"(?:propert|unit|apartment|home|availabilit|listing)"
+    r"|no\s+availabilit(?:y|ies)\s+(?:at\s+this\s+time|right\s+now|currently)"
+    r"|check\s+back\s+(?:soon|later)\s+for\s+availabilit",
+    re.IGNORECASE,
+)
+# "Contact/Call ... for/to-check ... availability" — deliberately tight so the
+# ubiquitous "Contact Us" nav link and the "prices and availability subject to
+# change" disclaimer do NOT trip it.
+_CONTACT_AVAIL_RE = re.compile(
+    r"(?:contact|call)\s+(?:us\s+|our\s+[a-z ]{0,20}?\s+|the\s+[a-z ]{0,20}?\s+)?"
+    r"(?:for|to\s+(?:check|confirm|inquire(?:\s+about)?|learn(?:\s+about)?|see|get))\s+"
+    r"(?:(?:current|pricing|rates?|price)\s+(?:and\s+|&\s+)?){0,2}availab",
+    re.IGNORECASE,
+)
+
+
+def classify_plan_unavailability_signal(html: str | None) -> str | None:
+    """Return the plan-level unavailability reason a page body carries, or None.
+
+    Only ever called for a property that already shipped plan-level (no
+    unit-level rows), so a positive signal is very likely the true availability
+    state rather than incidental amenity text. Returns one of the
+    ``PLAN_*`` reason strings, in precedence order
+
+        NO_AVAILABILITY  >  WAITLIST  >  CONTACT_FOR_AVAILABILITY
+
+    — a page that says it has nothing available is a stronger truth than a
+    per-plan waitlist, which is stronger than a soft "call us". The absence of
+    any signal returns None and leaves the property as the plain FLOOR_PLAN_ONLY
+    baseline the plan-level flag already conveys.
+    """
+    if not html or not isinstance(html, str):
+        return None
+    if _NO_AVAILABILITY_RE.search(html):
+        return "PLAN_NO_AVAILABILITY"
+    if _WAITLIST_RE.search(html):
+        return "PLAN_WAITLIST"
+    if _CONTACT_AVAIL_RE.search(html):
+        return "PLAN_CONTACT_FOR_AVAILABILITY"
+    return None
+
+
+def apply_plan_unavailability_tag(units: Any, reason: str | None) -> int:
+    """Stamp a plan-level unavailability *reason* onto already-formatted rows.
+
+    Post-format pass at the write boundary (like
+    :func:`enforce_zero_inventory_contract`). For every FLOOR-PLAN-LEVEL row it:
+
+    * appends ``reason`` to ``data_quality_flag`` (idempotent), and
+    * sets ``availability_status`` to the reason's mapped status **only when
+      that is strictly more restrictive** than what the row already says — so a
+      row a source already marked UNAVAILABLE is never softened to WAITLIST, and
+      a soft "contact us" (UNKNOWN) never overwrites a substantive status.
+
+    The published rent is left untouched: a waitlisted plan still advertised
+    "from $1,299" keeps that price as the operator's published figure. Only
+    plan-level rows are touched — a real per-unit row (``is_floor_plan_level``
+    falsey) is never coerced by a page-level notice. Never raises.
+
+    Returns the number of rows whose ``availability_status`` changed.
+    """
+    if not reason or not isinstance(units, list):
+        return 0
+    target = PLAN_UNAVAIL_STATUS.get(reason)
+    changed = 0
+    for row in units:
+        if not isinstance(row, dict) or not row.get("is_floor_plan_level"):
+            continue
+        flags = [f for f in str(row.get("data_quality_flag") or "").split("|") if f]
+        if reason not in flags:
+            flags.append(reason)
+            row["data_quality_flag"] = "|".join(flags)
+        if target is None:
+            continue
+        current = str(row.get("availability_status") or "").upper()
+        if _AVAIL_RANK.get(target, 0) > _AVAIL_RANK.get(current, 0):
+            row["availability_status"] = target
+            changed += 1
+    return changed
+
+
 def _format_v2_unit(
     unit: dict,
     scrape_ts: datetime,

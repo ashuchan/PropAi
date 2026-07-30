@@ -2041,6 +2041,23 @@ async def _process_property(
                 if isinstance(_pc_body, bytes)
                 else (_pc_body or "")
             )
+            # 2026-07-30 — plan-level unavailability tag. This property reached
+            # no unit-level rows; if its page carries a positive "no bookable
+            # inventory" signal (waitlist / operator no-availability notice /
+            # contact-for-availability) record the reason so the write boundary
+            # can stamp the plan rows — see
+            # ``core.schema_v2.apply_plan_unavailability_tag``. Detected here
+            # because this is the one place the page body is in scope. Never-fail.
+            try:
+                from ma_poc.core.schema_v2 import (
+                    classify_plan_unavailability_signal,
+                )
+
+                _pu_reason = classify_plan_unavailability_signal(_pc_html)
+                if _pu_reason:
+                    meta["plan_unavailability_reason"] = _pu_reason
+            except Exception:
+                pass
             _pc = assess_publish_ceiling(
                 units=result.get("units"),
                 plan_summaries=_pc_plans,
@@ -4705,11 +4722,24 @@ def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) 
     # what upstream. Withdraw-only and idempotent, so re-running it over rows
     # merged in from a previous partial run changes nothing.
     try:
-        from ma_poc.core.schema_v2 import enforce_zero_inventory_contract
+        from ma_poc.core.schema_v2 import (
+            apply_plan_unavailability_tag,
+            enforce_zero_inventory_contract,
+        )
 
         for _prop in properties or ():
             if isinstance(_prop, dict):
                 enforce_zero_inventory_contract(_prop.get("units"))
+                # 2026-07-30 — stamp the plan-level unavailability reason
+                # (waitlist / no-availability / contact-for-availability)
+                # detected from the page body during processing onto the
+                # formatted plan rows. Runs AFTER enforce_zero_inventory_contract
+                # so a page-level notice can only make a row more restrictive,
+                # never soften a rent-restored plan row back off UNAVAILABLE.
+                apply_plan_unavailability_tag(
+                    _prop.get("units"),
+                    (_prop.get("_meta") or {}).get("plan_unavailability_reason"),
+                )
     except Exception as exc:  # pragma: no cover — never block a write
         log.warning("zero-inventory re-assert at write boundary failed: %s", exc)
     try:
