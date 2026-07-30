@@ -507,6 +507,111 @@ def parse_entrata_modern_units_data(html: str, url: str) -> list[dict[str, Any]]
     return units
 
 
+_JSONLD_BLOCK_RE = re.compile(
+    r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.DOTALL | re.IGNORECASE,
+)
+_STARTING_AT_RE = re.compile(r"\$\s?([\d,]+(?:\.\d+)?)")
+
+
+def _jsonld_nodes(html: str) -> list[dict[str, Any]]:
+    """Every JSON-LD node in *html*, flattening ``@graph``. Never raises."""
+    out: list[dict[str, Any]] = []
+    for block in _JSONLD_BLOCK_RE.findall(html or ""):
+        try:
+            data = json.loads(block)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("@graph"), list):
+            out.extend(x for x in data["@graph"] if isinstance(x, dict))
+        elif isinstance(data, dict):
+            out.append(data)
+        elif isinstance(data, list):
+            out.extend(x for x in data if isinstance(x, dict))
+    return out
+
+
+def _ld_type_is(node: dict[str, Any], wanted: str) -> bool:
+    ty = node.get("@type")
+    if isinstance(ty, str):
+        return ty == wanted
+    if isinstance(ty, list):
+        return wanted in ty
+    return False
+
+
+def _ld_num(value: Any) -> str:
+    """Format a JSON-LD number string ("0.0", "1.0", "472.0") as "0"/"1"/"472"."""
+    if value in (None, ""):
+        return ""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return str(value).strip()
+    return str(int(f)) if f == int(f) else str(f)
+
+
+def parse_entrata_floorplan_html_jsonld(html: str, url: str) -> list[dict[str, str]]:
+    """Parse a ProspectPortal ``/floor-plan/<type>/<design>.html`` page's JSON-LD.
+
+    These per-plan pages (Broadway / Chase / Ravel; #91 Lever A template 2)
+    embed a schema.org ``FloorPlan`` node (beds/baths/sqft) plus an ``ItemList``
+    of ``Apartment`` items — one per available unit, each carrying its unit
+    number (``name``) and rent inside ``floorSize.description`` ("Unit #X,
+    Starting at $Y"). Returns one unit-level row per Apartment, or ``[]`` when
+    the page carries no such JSON-LD. Never raises.
+    """
+    if not html or "FloorPlan" not in html:
+        return []
+    nodes = _jsonld_nodes(html)
+    if not nodes:
+        return []
+    fp = next((n for n in nodes if _ld_type_is(n, "FloorPlan")), {})
+    beds = _ld_num(fp.get("numberOfBedrooms"))
+    baths = _ld_num(fp.get("numberOfBathroomsTotal"))
+    _fp_size = fp.get("floorSize") if isinstance(fp.get("floorSize"), dict) else {}
+    plan_sqft = _ld_num(_fp_size.get("value"))
+    plan_name = str(fp.get("name") or "").strip()
+
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for n in nodes:
+        if not _ld_type_is(n, "ItemList"):
+            continue
+        for el in n.get("itemListElement") or []:
+            item = el.get("item") if isinstance(el, dict) else None
+            if not isinstance(item, dict) or not _ld_type_is(item, "Apartment"):
+                continue
+            unit_no = str(item.get("name") or "").strip()
+            if not unit_no or unit_no in seen:
+                continue
+            seen.add(unit_no)
+            fs = item.get("floorSize") if isinstance(item.get("floorSize"), dict) else {}
+            m = _STARTING_AT_RE.search(str(fs.get("description") or ""))
+            rent: int | None = None
+            if m:
+                try:
+                    rent = int(round(float(m.group(1).replace(",", ""))))
+                except (TypeError, ValueError):
+                    rent = None
+            rows.append(
+                make_unit_dict(
+                    floor_plan_name=plan_name,
+                    bedrooms=beds,
+                    bathrooms=baths,
+                    sqft=_ld_num(fs.get("value")) or plan_sqft,
+                    unit_number=unit_no,
+                    rent_low=rent,
+                    rent_high=rent,
+                    availability_status="AVAILABLE",
+                    availability_date="",
+                    source_api_url=url,
+                    extraction_tier="TIER_2_JSONLD_ENTRATA_FP",
+                )
+            )
+    return rows
+
+
 # --- Entrata ProspectPortal `check_availability` surface (2026-05-18) ---
 # Validated via DevTools on springriver.prospectportal.com. The
 # marketing shell links to <sub>.prospectportal.com; the real unit
@@ -2814,6 +2919,45 @@ class EntrataAdapter:
                     )
                     if pp_unit_card_rows:
                         break
+
+            # Step 6 (2026-07-30, #91 Lever A template 2): ProspectPortal per-plan
+            # ``/floor-plan/<type>/<design>.html`` pages embed schema.org JSON-LD
+            # (a FloorPlan node + an ItemList of Apartment items) — unit-level
+            # rent+sqft, one page per design. Unlike the SPA /floorplans/ grid,
+            # these links live in the STATIC landing HTML, so discovery is
+            # code-only. Fires only when every path above found nothing.
+            # Verified: Ravel (3 units), Chase (1), Broadway. Sequential + capped
+            # to respect the shared-host rate limiter.
+            if not pp_unit_card_rows:
+                from ma_poc.validation.unit_validity import has_dimension
+
+                _fp_html_srcs = [_b for _, _b in pp_ssr_index_bodies]
+                if isinstance(fr_body_check, str) and fr_body_check:
+                    _fp_html_srcs.append(fr_body_check)
+                _fp_html_links: list[str] = []
+                _seen_fp: set[str] = set()
+                for _src in _fp_html_srcs:
+                    for _m in re.findall(
+                        r'href="([^"]*?/floor-plan/[^"]*?\.html)"', _src
+                    ):
+                        _u = (
+                            _m
+                            if _m.startswith("http")
+                            else base.rstrip("/") + "/" + _m.lstrip("/")
+                        )
+                        if _u not in _seen_fp:
+                            _seen_fp.add(_u)
+                            _fp_html_links.append(_u)
+                for _fp_url in _fp_html_links[:25]:
+                    try:
+                        _fp_h = await _entrata_static_fetch(_fp_url)
+                    except Exception:
+                        continue
+                    pp_unit_card_rows.extend(
+                        _r
+                        for _r in parse_entrata_floorplan_html_jsonld(_fp_h, _fp_url)
+                        if has_dimension(_r)
+                    )
 
             if pp_unit_card_rows:
                 pp_ssr_units = pp_unit_card_rows
