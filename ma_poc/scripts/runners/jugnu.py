@@ -1042,6 +1042,7 @@ async def run_jugnu(
     # the success-rate SLO honest when _meta.verdict is dropped by a
     # downstream serialisation step (Bug A v0.2).
     slo_violations = slo_check(cost_rollup, merged_properties, run_dir=run_dir)
+    _emit_run_invariant_issues(merged_properties, run_dir)
     report = build_run_report(merged_properties, run_dir, today, cost_rollup, slo_violations)
 
     # Cleanup
@@ -3915,6 +3916,119 @@ def _write_property_report(
         )
     except Exception as exc:
         log.warning("property report generation failed for %s: %s", canonical_id, exc)
+
+
+def _find_prior_run_properties(run_dir: Path) -> list[dict[str, Any]] | None:
+    """Load the previous run's ``properties.json``, or None if there isn't one.
+
+    Runs live at ``{schema_root}/runs/{run_date}``, so the previous run is the
+    lexicographically-greatest sibling before this one that actually has a
+    non-empty properties.json. Dates are ISO-prefixed, so lexical order is
+    chronological.
+
+    Returns None rather than raising for every ordinary reason — first run ever,
+    a sharded layout where this shard has no sibling, an unreadable file. A
+    cross-run check that cannot find its baseline must degrade to "not checked",
+    never to a false finding.
+    """
+    try:
+        runs_root = run_dir.parent
+        if not runs_root.is_dir():
+            return None
+        candidates = sorted(
+            (d for d in runs_root.iterdir() if d.is_dir() and d.name < run_dir.name),
+            reverse=True,
+        )
+        for prior in candidates:
+            path = prior / "properties.json"
+            if not path.is_file():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, list) and data:
+                log.info("run invariants: prior baseline = %s", prior.name)
+                return data
+    except Exception as exc:
+        log.debug("prior-run discovery failed: %s", exc)
+    return None
+
+
+def _emit_run_invariant_issues(
+    properties: list[dict[str, Any]], run_dir: Path | None
+) -> None:
+    """Run the whole-run invariants and record what they find.
+
+    These two checks need the entire run in hand, which is why they live here
+    and not in the per-property path:
+
+    * identical published payloads across DIFFERENT properties — a company-wide
+      roster attributed to each of its properties. Measured on
+      run-2026-07-27-full-0d54ca7: 22 groups, 56 properties, 5,640 rows.
+    * a property's published rent/area envelope collapsing versus the previous
+      run — silent distortion, e.g. a rent ceiling $480 below what the operator
+      advertises, with no missing-data signal at all.
+
+    Both REPORT and never mutate: not every collision is a defect (sibling
+    phases of one community can legitimately share a roster), so this raises a
+    WARNING for a human and leaves the data alone. Never raises — QC must not
+    cost us a run that already succeeded.
+    """
+    if run_dir is None or not properties:
+        return
+    try:
+        from ma_poc.data_provider.dtos import IssueEntry as _IE
+        from ma_poc.validation.run_invariants import (
+            find_envelope_drift,
+            find_identical_payload_groups,
+        )
+
+        groups = find_identical_payload_groups(properties)
+        for group in groups:
+            _append_issue_to_run(
+                run_dir,
+                _IE(
+                    severity="WARNING",
+                    code="CROSS_PROPERTY_IDENTICAL_PAYLOAD",
+                    message=(
+                        f"{len(group.property_ids)} properties publish an identical "
+                        f"{group.n_rows}-row payload"
+                        + (" with DIFFERING detection" if group.is_suspicious else "")
+                    ),
+                    canonical_id=group.property_ids[0],
+                    details={
+                        "property_ids": group.property_ids,
+                        "property_names": group.property_names,
+                        "n_rows": group.n_rows,
+                        "detected_pms": group.detected_pms,
+                        "differing_detection": group.is_suspicious,
+                    },
+                ),
+            )
+        if groups:
+            log.warning(
+                "run invariants: %d identical-payload group(s) across %d properties",
+                len(groups),
+                sum(len(g.property_ids) for g in groups),
+            )
+
+        prior = _find_prior_run_properties(run_dir)
+        if prior is None:
+            log.info("run invariants: no prior run found, envelope drift not checked")
+            return
+        for drift in find_envelope_drift(properties, prior):
+            _append_issue_to_run(
+                run_dir,
+                _IE(
+                    severity="WARNING",
+                    code="PUBLISHED_ENVELOPE_DRIFT",
+                    message=(
+                        f"{drift.property_name}: " + "; ".join(drift.findings)
+                    ),
+                    canonical_id=drift.property_id,
+                    details={"findings": drift.findings},
+                ),
+            )
+    except Exception as exc:  # pragma: no cover - QC must never break a run
+        log.warning("run invariants failed: %s", exc, exc_info=True)
 
 
 def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
