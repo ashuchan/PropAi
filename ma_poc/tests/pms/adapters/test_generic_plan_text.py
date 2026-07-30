@@ -106,6 +106,13 @@ def test_parse_colonial_court() -> None:
     # Cheapest plan is $1450 (1 Bath Townhome range)
     rents = sorted(r["market_rent_low"] for r in rows)
     assert rents[0] == 1450
+    # #91 BUG2 (2026-07-30): plan-text rows carry NO availability signal, so
+    # they must be UNKNOWN, never a false AVAILABLE — this body literally says
+    # "NO APARTMENTS AVAILABLE AT THIS TIME". A false AVAILABLE also fabricates
+    # an available_date via the schema_v2 scrape-date fallback (Henry/Frontera).
+    assert all(r["availability_status"] == "UNKNOWN" for r in rows), [
+        r["availability_status"] for r in rows
+    ]
 
 
 def test_parse_stargatewest() -> None:

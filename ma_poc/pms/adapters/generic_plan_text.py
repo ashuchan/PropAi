@@ -402,7 +402,7 @@ def _parse_realpage_unit_blobs(body: str, url: str) -> list[dict]:
                 rent_low=rent_low,
                 rent_high=rent_high,
                 rent_range=format_rent_range(rent_low, rent_high),
-                availability_status="AVAILABLE",
+                availability_status="UNKNOWN",
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_REALPAGE_BLOB",
             )
@@ -538,7 +538,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                 rent_low=rent,
                 rent_high=rent,
                 rent_range=format_rent_range(rent, rent),
-                availability_status="AVAILABLE",
+                availability_status="UNKNOWN",
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
             )
@@ -639,7 +639,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                 rent_low=rent_low,
                 rent_high=rent_high,
                 rent_range=format_rent_range(rent_low, rent_high),
-                availability_status="AVAILABLE",
+                availability_status="UNKNOWN",
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
             )
@@ -693,7 +693,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                         rent_low=rent_low,
                         rent_high=rent_high,
                         rent_range=format_rent_range(rent_low, rent_high),
-                        availability_status="AVAILABLE",
+                        availability_status="UNKNOWN",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                     )
@@ -750,7 +750,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent_low,
                     rent_high=rent_high,
                     rent_range=format_rent_range(rent_low, rent_high),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                 )
@@ -792,7 +792,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent,
                     rent_high=rent,
                     rent_range=format_rent_range(rent, rent),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                 )
@@ -832,7 +832,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=low,
                     rent_high=high,
                     rent_range=format_rent_range(low, high),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                 )
@@ -865,7 +865,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent,
                     rent_high=rent,
                     rent_range=format_rent_range(rent, rent),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                 )
@@ -898,7 +898,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent,
                     rent_high=rent,
                     rent_range=format_rent_range(rent, rent),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_UNIT_STREET",
                 )
@@ -942,7 +942,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent,
                     rent_high=rent,
                     rent_range=format_rent_range(rent, rent),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                 )
@@ -979,7 +979,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                         rent_low=low,
                         rent_high=high,
                         rent_range=format_rent_range(low, high),
-                        availability_status="AVAILABLE",
+                        availability_status="UNKNOWN",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
                     )
@@ -1017,7 +1017,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=rent_low,
                     rent_high=rent_high if rent_high else rent_low,
                     rent_range=format_rent_range(rent_low, rent_high or rent_low),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_WIX_LABELED_BLOCK",
                 )
@@ -1057,7 +1057,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     sqft=sqft_str,
                     rent_low=rent_low,
                     rent_range=format_rent_range(rent_low, rent_low),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_WIX_SECTION_PLAN",
                 )
@@ -1089,7 +1089,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=low,
                     rent_high=low,
                     rent_range=format_rent_range(low, low),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_LABELED_PRICE",
                     data_gaps=["sqft", "beds"],
@@ -1129,7 +1129,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                         rent_low=low,
                         rent_high=low,
                         rent_range=format_rent_range(low, low),
-                        availability_status="AVAILABLE",
+                        availability_status="UNKNOWN",
                         source_api_url=url,
                         extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_FROM_PRICE",
                         data_gaps=["sqft", "beds"],
@@ -1161,7 +1161,7 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
                     rent_low=low,
                     rent_high=high,
                     rent_range=format_rent_range(low, high),
-                    availability_status="AVAILABLE",
+                    availability_status="UNKNOWN",
                     source_api_url=url,
                     extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT_JSONLD_PRICERANGE",
                     # Document the gaps so downstream verdict marks
