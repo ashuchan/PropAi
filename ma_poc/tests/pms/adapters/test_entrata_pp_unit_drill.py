@@ -316,6 +316,31 @@ def test_find_pp_plan_links_ignores_non_plan_hrefs() -> None:
     ]
 
 
+def test_find_pp_plan_links_two_digit_fpid_brownstone() -> None:
+    """2026-07-30: Brownstone (brownstonetx.com) numbers all its plans with
+    2-digit fpids (a1-53-1, b1-52-1, a2-54-1, c1-55-1). The old \\d{3,9} floor
+    rejected the WHOLE property -> SUCCESS_PLAN_LEVEL despite real /floorplans/
+    unit-cards one hop deeper (unit 423, 1/1, 610sf). \\d{2,9} recovers them.
+
+    The four real detail URLs, verbatim from the rendered brownstonetx.com
+    landing DOM (the discovery source; the static /floorplans/ index is a SPA)."""
+    html = (
+        '<html><body>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/1-bedroom-1-bath-a1-53-1/">A1</a>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/2-bedroom-2-bath-b1-52-1/">B1</a>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/1-bedroom-1-bath-a2-54-1/">A2</a>'
+        '<a href="/floorplans/uvalde-TX/brownstone-apartments/3-bedroom-2-bath-c1-55-1/">C1</a>'
+        # still-rejected non-plan hrefs — the relax must not widen the net.
+        '<a href="/floorplans/">grid</a>'
+        '<a href="/apply/">apply</a>'
+        '</body></html>'
+    )
+    links = find_entrata_pp_plan_links(html, "https://www.brownstonetx.com")
+    assert len(links) == 4, links
+    assert all("/floorplans/uvalde-TX/brownstone-apartments/" in u for u in links)
+    assert not any(u.endswith("/floorplans/") or "/apply/" in u for u in links)
+
+
 def test_find_pp_plan_links_strips_query_and_fragment() -> None:
     """Plan URLs occasionally come with ``?move_in=...`` or ``#section``
     suffixes that PP's deep-link JS adds. Canonicalise so the drill

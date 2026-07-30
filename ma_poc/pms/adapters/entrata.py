@@ -1282,8 +1282,14 @@ _PP_UNIT_CARD_SQFT_RE = re.compile(
 )
 # Plan-slug-fpid extraction from the per-plan URL:
 # .../floorplans/<location>/<property>/<plan-slug>-<fpid>-<phase>/
+# fpid is \d{2,9}: some Entrata properties number floor plans with 2-digit ids
+# (2026-07-30, Brownstone brownstonetx.com: a1-53-1, b1-52-1, a2-54-1, c1-55-1 —
+# all 4 plans have 2-digit fpids, so \d{3,9} rejected the WHOLE property). The
+# {slug}-{fpid}-{phase} structure across two path segments stays specific enough
+# that a 2-digit middle token doesn't false-match apply/portal/grid hrefs (see
+# test_find_pp_plan_links_ignores_non_plan_hrefs).
 _PP_PLAN_URL_RE = re.compile(
-    r"/floorplans/[^/]+/[^/]+/([a-z0-9][a-z0-9-]*?)-(\d{3,9})-(\d+)/?",
+    r"/floorplans/[^/]+/[^/]+/([a-z0-9][a-z0-9-]*?)-(\d{2,9})-(\d+)/?",
     re.IGNORECASE,
 )
 # 2026-05-25 chip #98 follow-up — Aria at Ella URL variant:
