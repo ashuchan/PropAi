@@ -1164,6 +1164,37 @@ def _result_tier(result: dict[str, Any]) -> str:
     return tier or str(result.get("extraction_tier_used") or "")
 
 
+def _extracted_row_count(result: dict[str, Any]) -> int:
+    """How many rows this scrape actually extracted, across BOTH channels.
+
+    ``promote_verified_unit_rows`` admits a row into ``units`` only when it
+    carries a native apartment anchor, and moves every unanchored plan row to
+    ``result["plan_summaries"]``. A plan-only property therefore arrives with
+    ``units == []`` and its data intact in the other channel.
+
+    Anything asking "did this extraction succeed / how much did we get" must
+    count both. This is NOT a change of meaning: before f46a490 every adapter
+    wired ``result.units = pp.admitted``, and ``PostProcessResult.admitted``
+    returns ``units + plan_summaries`` — so this helper reproduces exactly the
+    quantity that ``len(result["units"])`` used to yield. The channel split
+    changed where the rows live, not how many there are.
+
+    Deliberately one function rather than the same expression inlined at each
+    call site: the plan channel has now silently broken the verdict layer, the
+    link-hop merge, the plan de-dup key and the profile learner, each because a
+    separate consumer kept reading ``len(units)`` alone.
+
+    Args:
+        result: A scrape result dict.
+
+    Returns:
+        Count of admitted unit rows plus admitted plan-summary rows.
+    """
+    units = result.get("units") or []
+    plans = result.get("plan_summaries") or []
+    return len(units) + len(plans)
+
+
 async def _encore_plan_render_units(
     task: Any,
     entry_html: str,
@@ -1249,7 +1280,15 @@ def _emit_route_shadow(
         from ma_poc.services.route_policy import compute_signals, route
 
         units = result.get("units") or []
-        sig = compute_signals(fetch_result, None, profile, units_extracted=len(units))
+        # Both channels, same reason as the profile learner: a plan-only
+        # property extracted fine and must not be signalled to the router as a
+        # zero. Harmless today (this observer never acts and is flag-gated off),
+        # but its entire purpose is deciding whether to let the router act in
+        # Phase 3 — so it must not be trained on a signal that reads a
+        # successful plan-only extraction as nothing.
+        sig = compute_signals(
+            fetch_result, None, profile, units_extracted=_extracted_row_count(result)
+        )
         dec = route(sig, profile)
         rec = {
             "property_id": getattr(task, "property_id", "?"),
@@ -1793,7 +1832,30 @@ async def _process_property(
             from services.drift_detector import apply_drift_demotion, detect_drift
             from services.profile_updater import update_profile_after_extraction
 
-            units_extracted = len(result.get("units") or [])
+            # Count BOTH channels. `update_profile_after_extraction` treats
+            # `units_extracted > 0` as the success signal: it increments
+            # total_successes and consecutive_successes, resets
+            # consecutive_failures, and records `last_success_tier` /
+            # `preferred_tier` — i.e. THE WINNING ROUTE. At zero it does none of
+            # that, and `detect_drift` then compares against
+            # `confidence.last_unit_count` and demotes on
+            # `units_extracted < expected * 0.7`.
+            #
+            # So a plan-only property that extracted perfectly well was booked
+            # as an extraction FAILURE: its winning route discarded and its
+            # profile maturity demoted. Because that damage lands in PERSISTED
+            # state, the next run could no longer go straight to the page that
+            # worked, re-discovered (or failed), and was demoted again — the
+            # self-reinforcing loop recorded in
+            # project_timeout_rca_event_loop_2026-07-25, which this project has
+            # already paid for once.
+            #
+            # Sized at ~505 SightMap properties in the 2026-07-25 5k canary (see
+            # the cohort note at the plan-flag choke point). Note this is
+            # invisible to a single cold canary by construction: the harm is to
+            # state carried BETWEEN runs, so it needs two consecutive warm runs
+            # against the same profile prefix to observe.
+            units_extracted = _extracted_row_count(result)
             profile = update_profile_after_extraction(
                 profile,
                 result,
