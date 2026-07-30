@@ -78,6 +78,44 @@ class TestTheRunnerActuallyCallsIt:
         ), "invariants must be emitted before build_run_report"
 
 
+class TestRetryMergeInvokesTheInvariants:
+    """The retry-merge path assembles the FINAL merged ``properties.json`` from
+    shards (canary + full runs go through it). The per-shard in-process check is
+    ~98% blind — sharding scatters colliding properties into different tasks — so
+    the whole-run invariants must ALSO run here, over the full merged set, or the
+    assembled output ships without the cross-property check. Structural guard: a
+    mutation that drops the call site must fail a test.
+    """
+
+    @staticmethod
+    def _merge_src() -> str:
+        from ma_poc.scripts.runners import jugnu_retry_merge as _m
+
+        return Path(inspect.getsourcefile(_m) or "").read_text(encoding="utf-8")
+
+    def test_retry_merge_calls_emit_run_invariant_issues(self) -> None:
+        called = {
+            n.func.id
+            for n in ast.walk(ast.parse(self._merge_src()))
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        }
+        assert "_emit_run_invariant_issues" in called, (
+            "jugnu_retry_merge no longer runs the whole-run invariants over the "
+            "merged set — the assembled properties.json ships without the "
+            "cross-property check the per-shard path is 98% blind to."
+        )
+
+    def test_it_runs_before_the_report_is_rebuilt(self) -> None:
+        lines = {
+            n.func.id: n.lineno
+            for n in ast.walk(ast.parse(self._merge_src()))
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        }
+        assert lines.get("_emit_run_invariant_issues", 10**9) < lines.get(
+            "build_run_report", 0
+        ), "invariants must run over the merged set before the report is rebuilt"
+
+
 def _prop(pid: str, rows: list[dict[str, Any]], *, name: str = "P") -> dict[str, Any]:
     return {
         "apartment_id": pid,

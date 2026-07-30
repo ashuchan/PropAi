@@ -247,6 +247,21 @@ def main() -> int:
         return 1
     log.info("Wrote %d properties to %s", len(merged), props_path)
 
+    # 2026-07-30 (#86): run the whole-run cross-property invariants over the FULL
+    # assembled set. The per-shard path (``jugnu._emit_run_invariant_issues`` at
+    # the end of each shard task) is ~98% blind: sharding hashes colliding
+    # properties into different tasks, so identical-payload groups co-locate with
+    # probability ~1/n_shards. Only HERE, over the merged run, does
+    # ``find_identical_payload_groups`` see every property at once. Report-only +
+    # swallow-all — it runs AFTER the merge write above and can never block or
+    # corrupt it (the same safety contract the per-shard call carries).
+    try:
+        from ma_poc.scripts.runners.jugnu import _emit_run_invariant_issues
+
+        _emit_run_invariant_issues(merged, output_run_dir)
+    except Exception as exc:  # pragma: no cover — never block a merge
+        log.warning("run-invariant check on merged set failed: %s", exc)
+
     # Regenerate the run report from the merged set.
     try:
         from ma_poc.observability.cost_ledger import CostLedger
