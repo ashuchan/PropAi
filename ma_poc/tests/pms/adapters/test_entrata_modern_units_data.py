@@ -125,3 +125,46 @@ class TestDegradesSafely:
         assert parse_entrata_modern_units_data(
             "<script>var unitsData = '[1,2,3]';</script>", "x"
         ) == []
+
+
+class TestGuardFiltersDimensionlessRows:
+    """#90 guard: the adapter admits a modern row into the unit-level channel
+    only when it carries a physical dimension. A ``unitsData`` blob whose units
+    have rent but NO beds/baths/sqft must not supersede — and thereby ORPHAN —
+    the property's plan-level baseline (a modern /conventional/ property has no
+    downstream /floorplans/ path to re-derive the plan rows, so the loss would
+    be plan->FAILED, not plan->plan). The parser stays a pure mapper; the gate
+    the adapter applies is ``has_dimension``, exercised directly here.
+    """
+
+    _DIMLESS = (
+        "<script>var unitsData = '"
+        '{"1":[{"unit_number":"101","bedroom":null,"bathroom":null,'
+        '"sqft":null,"sqft_unit":null,"min_advertised_base_rent":1500,'
+        '"floorplan_name":"Loft"}]}'
+        "';</script>"
+    )
+    _DIMENSIONED = (
+        "<script>var unitsData = '"
+        '{"1":[{"unit_number":"102","bedroom":2,"bathroom":2,"sqft":900,'
+        '"min_advertised_base_rent":1600,"floorplan_name":"Two Bed"}]}'
+        "';</script>"
+    )
+
+    def test_parser_still_emits_the_dimensionless_row(self) -> None:
+        # The parser is a pure mapper — it does NOT filter; the adapter does.
+        assert len(parse_entrata_modern_units_data(self._DIMLESS, "x")) == 1
+
+    def test_dimensionless_row_fails_has_dimension(self) -> None:
+        from ma_poc.validation.unit_validity import has_dimension
+
+        row = parse_entrata_modern_units_data(self._DIMLESS, "x")[0]
+        # Guard drops it -> pp_unit_card_rows stays empty -> plan baseline kept.
+        assert has_dimension(row) is False
+
+    def test_dimensioned_row_passes_has_dimension(self) -> None:
+        from ma_poc.validation.unit_validity import has_dimension
+
+        row = parse_entrata_modern_units_data(self._DIMENSIONED, "x")[0]
+        # Real rosters carry explicit dims -> flow through the guard untouched.
+        assert has_dimension(row) is True

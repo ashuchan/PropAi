@@ -2764,11 +2764,25 @@ class EntrataAdapter:
                         if _mu_html and "unitsData" in _mu_html:
                             _mud_bodies.append((_mu_conv, _mu_html))
                             break
+                from ma_poc.validation.unit_validity import has_dimension
+
                 for _mu_url, _mb in _mud_bodies:
                     if "unitsData" not in _mb:
                         continue
+                    # #90 guard (2026-07-30): admit only modern rows that carry
+                    # a physical dimension. unitsData units always carry explicit
+                    # beds/baths/sqft, so this is a no-op on real rosters — but a
+                    # pathological dimensionless blob would otherwise REPLACE
+                    # pp_ssr_units below and, failing post_process, orphan the
+                    # plan-level baseline the property already had. Unlike the
+                    # per-plan-drill sources, a modern (/conventional/) property's
+                    # downstream WP (/floorplans/) + prospectportal paths target a
+                    # different URL shape, so nothing re-derives the plan rows —
+                    # the loss would be plan->FAILED, not plan->plan.
                     pp_unit_card_rows.extend(
-                        parse_entrata_modern_units_data(_mb, _mu_url)
+                        _r
+                        for _r in parse_entrata_modern_units_data(_mb, _mu_url)
+                        if has_dimension(_r)
                     )
                     if pp_unit_card_rows:
                         break
