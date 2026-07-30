@@ -552,6 +552,63 @@ def promote_verified_unit_rows(
     with clamp_tier_context(adapter_result.tier_used):
         processed = post_process(adapter_result.units, property_id=property_id)
     admitted = processed.admitted
+
+    # Say out loud what this gate refused.
+    #
+    # `post_process` populates `PostProcessResult.rejected` explicitly "for
+    # observability" and two docstrings promised an
+    # `EventKind.UNIT_VALIDITY_REJECTED`, but the enum member did not exist and
+    # nothing here read the field — so every row this chokepoint deleted
+    # vanished with no count, no log and no event. Adapters that never called
+    # post_process themselves (knock, essex, plan_text, realpage_oll,
+    # touchtour, ...) meet it for the first time HERE, at the final emit, which
+    # is the worst possible place to drop data silently.
+    #
+    # Measured on run-2026-07-27: 74 rows across 25 properties, every one
+    # failing NO_BEDS+NO_BATHS+NO_SQFT, and 65 of them carrying a real unit
+    # number AND a real published rent (knock 53, rentmanager 12). Those are
+    # real apartments — the site publishes their beds/baths on the PARENT floor
+    # plan and we simply never inherited it. Fixing that inheritance is tracked
+    # separately; this block exists so the number can never again grow from 74
+    # to 74,000 unnoticed.
+    if processed.rejected:
+        try:
+            # Local import, matching the four other emit sites in this module.
+            from ma_poc.observability.events import EventKind, emit
+
+            _rej_reasons: dict[str, int] = {}
+            for _row, _why in processed.rejected:
+                for _reason in _why or ("UNSPECIFIED",):
+                    _rej_reasons[str(_reason)] = _rej_reasons.get(str(_reason), 0) + 1
+            log.info(
+                "post_process rejected %d/%d rows for %s (tier=%s): %s",
+                len(processed.rejected),
+                len(adapter_result.units or []),
+                property_id,
+                adapter_result.tier_used,
+                _rej_reasons,
+            )
+            emit(
+                EventKind.UNIT_VALIDITY_REJECTED,
+                property_id or "unknown",
+                tier=str(adapter_result.tier_used or ""),
+                n_rejected=len(processed.rejected),
+                n_input=len(adapter_result.units or []),
+                reasons=_rej_reasons,
+                # Whether the refused rows carried a real apartment number is
+                # the difference between "thin junk correctly dropped" and
+                # "unit-level gold deleted". Read unit_number, NOT unit_id:
+                # identity has not run yet at this point in the pipeline, so
+                # unit_id is still None on every row here.
+                n_with_unit_number=sum(
+                    1
+                    for _row, _ in processed.rejected
+                    if str((_row or {}).get("unit_number") or "").strip()
+                ),
+            )
+        except Exception:  # pragma: no cover - telemetry must never break emit
+            log.warning("reject telemetry failed for %s", property_id, exc_info=True)
+
     if not admitted:
         return 0
 

@@ -56,6 +56,12 @@ class EventKind(StrEnum):
     # Validation (L4)
     RECORD_ACCEPTED = "validate.record_accepted"
     RECORD_REJECTED = "validate.record_rejected"
+    #: A row `post_process` refused at the emit chokepoint. Two docstrings
+    #: (validation/unit_validity.py, extraction/post_process.py) have promised
+    #: this event for a while; the member never existed, so
+    #: `PostProcessResult.rejected` was populated and then dropped with no
+    #: count, no log and no event anywhere in the pipeline.
+    UNIT_VALIDITY_REJECTED = "validate.unit_validity_rejected"
     RECORD_FLAGGED = "validate.record_flagged"
     IDENTITY_FALLBACK = "validate.identity_fallback"
     NEXT_TIER_REQUESTED = "validate.next_tier_requested"
