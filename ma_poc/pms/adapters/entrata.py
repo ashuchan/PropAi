@@ -399,6 +399,114 @@ def parse_entrata_available_units(
     return units
 
 
+# --- Entrata modern "prospect portal" theme — `var unitsData` roster (2026-07-30) ---
+# The modern Entrata theme (classes pricing-card / fee-transparency-wrapper /
+# unit-cell) does NOT use the .fp-card / .unit-card / jd-fp DOM the parsers above
+# recognise. Instead the ``/{city}/{property-slug}/conventional/`` LISTING page
+# embeds the ENTIRE property roster as a single JS string:
+#     <script>var unitsData = '{ "<floorplan_id>": [ {unit...}, ... ], ... }';</script>
+# It is an escaped-JSON object keyed by floorplan_id → array of available units.
+# ONE fetch yields every floorplan and every available unit (no per-plan drill
+# needed for identity/rent/availability). Live-verified 2026-07-30 on Manor Homes
+# (12 units), Rise Bedford Lake (7), Steeplechase (14) — all 200 OK direct, no proxy.
+#
+# RENT — use the per-unit ADVERTISED BASE (min/max_advertised_base_rent, ints).
+# ``min_rent``/``max_rent`` is the plan-level "from" range; ``min_rent_unit`` is
+# the FEE-INCLUSIVE total on fee-transparency properties (Steeplechase base 1150
+# vs unit 1350). Taking the base dodges the #65 gross-as-rent inversion.
+# IDENTITY — ``unit_id_engrain`` equals the visible unit number as a string
+# (incl. alphanumerics like "1818PS"); ``unit_id`` is Entrata's stable int.
+_ENTRATA_UNITS_DATA_RE = re.compile(r"var\s+unitsData\s*=\s*'(.*?)'\s*;", re.DOTALL)
+
+
+def _units_data_int(value: Any) -> int | None:
+    """Coerce a unitsData rent field (int or decimal string) to int, or None."""
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        return int(round(float(str(value).replace(",", ""))))
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_entrata_modern_units_data(html: str, url: str) -> list[dict[str, Any]]:
+    """Parse the modern Entrata theme's embedded ``var unitsData`` roster.
+
+    Returns one unit-level row per available unit across every floorplan, or
+    ``[]`` when the blob is absent or unparseable. Never raises.
+    """
+    if not html or "unitsData" not in html:
+        return []
+    m = _ENTRATA_UNITS_DATA_RE.search(html)
+    if not m:
+        return []
+    # The blob is a single-quoted JS string holding escaped JSON: unescape the
+    # slash and quote escapes, then json.loads. Empirically sufficient on the
+    # live corpus; guarded so a shape change degrades to zero rows, never a raise.
+    blob = m.group(1).replace("\\/", "/").replace('\\"', '"').replace("\\'", "'")
+    try:
+        data = json.loads(blob)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for _fpid, arr in data.items():
+        if not isinstance(arr, list):
+            continue
+        for u in arr:
+            if not isinstance(u, dict):
+                continue
+            unit_no = str(
+                u.get("unit_number") or u.get("marketing_unit_number") or ""
+            ).strip()
+            engrain = str(u.get("unit_id_engrain") or "").strip()
+            key = unit_no or engrain or str(u.get("unit_id") or "")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            # BASE rent (per-unit); fall back to the plan-level "from" range
+            # (min_rent/max_rent) only when the base fields are absent.
+            rent_low = _units_data_int(u.get("min_advertised_base_rent"))
+            rent_high = _units_data_int(u.get("max_advertised_base_rent"))
+            if rent_low is None and rent_high is None:
+                rent_low = _units_data_int(u.get("min_rent"))
+                rent_high = _units_data_int(u.get("max_rent"))
+            # sqft: ``sqft`` is often null on the listing but ``sqft_unit`` carries it.
+            sqft_val = u.get("sqft")
+            if sqft_val in (None, "", 0, "0"):
+                sqft_val = u.get("sqft_unit")
+            sqft = str(sqft_val) if sqft_val not in (None, "") else ""
+            source_ids: dict[str, Any] = {}
+            if u.get("unit_id") not in (None, ""):
+                source_ids["entrata_uid"] = str(u.get("unit_id"))
+            if engrain:
+                source_ids["unit_id_engrain"] = engrain
+            if _fpid not in (None, ""):
+                source_ids["entrata_fpid"] = str(_fpid)
+            bedroom = u.get("bedroom")
+            bathroom = u.get("bathroom")
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=str(u.get("floorplan_name") or "").strip(),
+                    bedrooms=str(bedroom) if bedroom not in (None, "") else "",
+                    bathrooms=str(bathroom) if bathroom not in (None, "") else "",
+                    sqft=sqft,
+                    unit_number=unit_no or engrain,
+                    rent_low=rent_low,
+                    rent_high=rent_high if rent_high is not None else rent_low,
+                    availability_status="AVAILABLE",
+                    availability_date=_iso_date(str(u.get("available_on") or "")),
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_ENTRATA_MODERN",
+                    source_ids=source_ids or None,
+                )
+            )
+    return units
+
+
 # --- Entrata ProspectPortal `check_availability` surface (2026-05-18) ---
 # Validated via DevTools on springriver.prospectportal.com. The
 # marketing shell links to <sub>.prospectportal.com; the real unit
@@ -2623,6 +2731,48 @@ class EntrataAdapter:
                         parse_entrata_pp_jd_fp_cards(_jb, _jdfp_url)
                     )
 
+            # 2026-07-30 — MODERN prospect-portal theme (`var unitsData`).
+            # Classes pricing-card / fee-transparency-wrapper / unit-cell; the
+            # ``/{city}/{slug}/conventional/`` listing embeds the whole roster as
+            # an escaped-JSON ``var unitsData = '{...}'`` object that none of the
+            # DOM paths above recognise, so these properties ship plan-level.
+            # Additive: fires only when every DOM drill found nothing. ONE fetch
+            # covers identity + base rent + availability for every unit (no
+            # per-plan fan-out). See parse_entrata_modern_units_data.
+            if not pp_unit_card_rows:
+                _mud_bodies: list[tuple[str, str]] = list(pp_ssr_index_bodies)
+                if (
+                    isinstance(fr_body_check, str)
+                    and fr_body_check
+                    and "unitsData" in fr_body_check
+                ):
+                    _mud_bodies.append(
+                        (str(getattr(fr, "final_url", "") or base), fr_body_check)
+                    )
+                # No collected body carries the blob → harvest the /conventional/
+                # index href from the landing page and fetch it once. The modern
+                # listing lacks fp-card/fp-name-link, so Steps 1/3 discarded it.
+                if not any("unitsData" in _b for _, _b in _mud_bodies):
+                    for _mu_conv in _find_pp_conventional_index(
+                        fr_body_check if isinstance(fr_body_check, str) else "",
+                        base,
+                    )[:2]:
+                        try:
+                            _mu_html = await _entrata_static_fetch(_mu_conv)
+                        except Exception:
+                            continue
+                        if _mu_html and "unitsData" in _mu_html:
+                            _mud_bodies.append((_mu_conv, _mu_html))
+                            break
+                for _mu_url, _mb in _mud_bodies:
+                    if "unitsData" not in _mb:
+                        continue
+                    pp_unit_card_rows.extend(
+                        parse_entrata_modern_units_data(_mb, _mu_url)
+                    )
+                    if pp_unit_card_rows:
+                        break
+
             if pp_unit_card_rows:
                 pp_ssr_units = pp_unit_card_rows
 
@@ -2639,8 +2789,18 @@ class EntrataAdapter:
                     # When the drill fired, attribute the winning URL to
                     # the first per-plan page we hit so downstream tier
                     # attribution / debug traces point at the right page.
-                    if pp_unit_card_rows and seen_plan_urls:
-                        result.winning_url = next(iter(seen_plan_urls))
+                    if pp_unit_card_rows:
+                        # Any pp_unit_card_rows source (per-plan drill,
+                        # view_unit_spaces, jd-fp, or the modern unitsData
+                        # roster) produces unit-level rows — credit the
+                        # unit-level tier, not just the drill. winning_url
+                        # points at the per-plan page when the drill fired,
+                        # else the conventional/candidate index we parsed.
+                        result.winning_url = (
+                            next(iter(seen_plan_urls))
+                            if seen_plan_urls
+                            else (deep_candidates[0] if deep_candidates else base)
+                        )
                         result.tier_used = (
                             "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
                         )
