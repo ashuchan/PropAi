@@ -513,10 +513,14 @@ def test_bug4_pass3_handles_offers_nested_in_brand() -> None:
 
 
 def test_extract_units_from_dom_handles_prisma_units_row() -> None:
-    """Verified live 2026-05-20 against Greenwood Village (Corsa
-    Management). The ``tr.prisma-units-row`` contains rent + sqft +
-    beds in cells; the row's combined text passes the existing
-    structural-signal gate."""
+    """goprisma (Corsa Management) prisma-units-table → UNIT-LEVEL (#93).
+
+    Verified live 2026-05-20 against Greenwood Village. The ``first_tr_units``
+    row is a plan SUMMARY (one per floor plan, no apartment) and is excluded;
+    ``unit_details`` rows carry ``data-_id`` (the goprisma unit PK) and
+    ``data-unoitId`` (the unit label) and become the real units. The full
+    5-unit roster is pinned against the saved fixture in test_prisma_units.py.
+    """
     from ma_poc.pms.adapters._html_extract import extract_units_from_dom
 
     html = """<html><body>
@@ -529,18 +533,28 @@ def test_extract_units_from_dom_handles_prisma_units_row() -> None:
           <td><div class="unit_space">560 sqft</div></td>
           <td class="prisma-units-data">$1,450 - 1,500</td>
         </tr>
-        <tr class="prisma-units-row">
-          <td>plan image</td>
+        <tr class="prisma-units-row unit_details" data-_id="pk-001" data-unoitId="N207-1">
+          <td>unit</td>
+          <td class="prisma-units-row-autoi">1BR -3RM</td>
+          <td class="prisma-units-row-autoi">1BA</td>
+          <td><div class="unit_space">560 sqft</div></td>
+          <td class="prisma-units-data">$1,450</td>
+        </tr>
+        <tr class="prisma-units-row unit_details" data-_id="pk-002" data-unoitId="L16-2">
+          <td>unit</td>
           <td class="prisma-units-row-autoi">2BR -5RM</td>
           <td class="prisma-units-row-autoi">2BA</td>
           <td><div class="unit_space">880 sqft</div></td>
-          <td class="prisma-units-data">$2,100 - 2,250</td>
+          <td class="prisma-units-data">$2,100</td>
         </tr>
       </tbody>
     </table>
     </body></html>"""
     units, hit_mode = extract_units_from_dom(html, "https://example.com/")
+    # first_tr_units summary excluded; the two unit_details rows become units.
     assert len(units) == 2, f"expected 2 units, got {len(units)}"
+    assert {u.get("unit_id") for u in units} == {"pk-001", "pk-002"}
+    assert {u.get("unit_number") for u in units} == {"N207-1", "L16-2"}
     rents = sorted(u["market_rent_low"] for u in units if u.get("market_rent_low"))
     assert rents == [1450, 2100], f"unexpected rents: {rents}"
 

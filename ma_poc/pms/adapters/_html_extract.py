@@ -3152,6 +3152,83 @@ def _extract_appfolio_listing_item(
     return unit
 
 
+_PRISMA_RENT_RE = re.compile(r"\$\s*([\d,]+)")
+_PRISMA_SQFT_RE = re.compile(r"(\d[\d,]*)\s*Sq\s*\.?\s*Ft", re.IGNORECASE)
+_PRISMA_BEDS_RE = re.compile(r"(\d+)\s*BR\b", re.IGNORECASE)
+_PRISMA_BATHS_RE = re.compile(r"(\d+)\s*BA\b", re.IGNORECASE)
+_PRISMA_DATE_RE = re.compile(r"(\d{1,2}/\d{1,2}/\d{2,4})")
+
+
+def _extract_prisma_unit(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """goprisma (Corsa Management) per-unit availability row → UNIT-LEVEL.
+
+    ``tr.prisma-units-row`` rows come in two shapes: ``first_tr_units``
+    plan-SUMMARY rows (no apartment) and ``unit_details`` rows (one real
+    apartment carrying ``data-_id`` = the goprisma unit PK and ``data-unoitId``
+    = the unit label, e.g. "L16-2"). The generic path reads NEITHER id, so the
+    tab-duplicated rows (the "All" tab + per-type tabs each re-render every
+    unit) collapse by rent/sqft fingerprint to a few broken rows and mint a
+    phantom ``unit_number="Number"`` from the "Unit Number" label. Reading the
+    real ids lets the DOM loop's ``unit_id``-first dedup key on ``data-_id`` and
+    recover the true roster (Greenwood Village: 5 units L16-2/L33-2/N207-1/…).
+    """
+    try:
+        classes = node.get("class") or []
+    except Exception:
+        return None
+    # first_tr_units are plan summaries (one per floor plan, no apartment).
+    if "first_tr_units" in classes:
+        return None
+    uid = str(node.get("data-_id") or "").strip()
+    # BS4 lowercases attribute names: data-unoitId -> data-unoitid.
+    unum = str(node.get("data-unoitid") or "").strip()
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        text = ""
+    unit = _empty_unit_with_ctx(
+        page_ctx, source="dom:prisma-units-row", source_url=source_url
+    )
+    if uid:
+        unit["unit_id"] = uid
+    if unum and _is_valid_unit_number(unum):
+        unit["unit_number"] = unum
+    m = _PRISMA_RENT_RE.search(text)
+    if m:
+        try:
+            r = int(m.group(1).replace(",", ""))
+            if _RENT_LO_BOUND <= r <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = r
+                unit["market_rent_high"] = r
+                unit["rent_range"] = str(r)
+        except (ValueError, TypeError):
+            pass
+    ms = _PRISMA_SQFT_RE.search(text)
+    if ms:
+        unit["sqft"] = ms.group(1).replace(",", "")
+    mb = _PRISMA_BEDS_RE.search(text)
+    if mb:
+        unit["beds"] = mb.group(1)
+    mba = _PRISMA_BATHS_RE.search(text)
+    if mba:
+        unit["baths"] = mba.group(1)
+    if re.search(r"available\s+now", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+        unit["availability_status"] = "AVAILABLE"
+    else:
+        md = _PRISMA_DATE_RE.search(text)
+        if md:
+            unit["availability_date"] = md.group(1)
+            unit["availability_status"] = "AVAILABLE"
+    # A real prisma unit row anchors an apartment (data-_id) or quotes a rent;
+    # anything else is chrome and is dropped.
+    if not (unit.get("unit_id") or unit.get("market_rent_low")):
+        return None
+    return unit
+
+
 # Selectors mapped to specialised extractors. When the DOM container loop
 # matches one of these selectors, the matching extractor is used INSTEAD of
 # `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
@@ -3165,6 +3242,8 @@ _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
     (".option-row", _extract_rentcafe_option_row),
     # Brook-at-Columbia (RentCafe variant where the card structure differs).
     ("#availApts .card", _extract_brook_availapts_card),
+    # goprisma (Corsa Management) per-unit table row — unit-level via data-_id.
+    ("tr.prisma-units-row", _extract_prisma_unit),
 )
 _COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 
