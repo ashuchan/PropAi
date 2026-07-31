@@ -585,6 +585,78 @@ def resolve_plan_row_availability(
     return status
 
 
+def _row_has_availability_date(unit: dict[str, Any]) -> bool:
+    """True when the raw row carries a parseable availability date.
+
+    A concrete availability date is positive inventory evidence — the operator
+    is stating WHEN the unit can be moved into. Read across the same field
+    spellings the ``available_date`` formatter reads (see ``_format_v2_unit``)
+    so the two never disagree about whether a date exists.
+    """
+    return (
+        _format_date(
+            _first(
+                unit,
+                "available_date",
+                "availability_date",
+                "internalAvailableDate",
+                "availableDate",
+                "date_available",
+                "dateAvailable",
+            )
+        )
+        is not None
+    )
+
+
+def withdraw_unsupported_available(
+    status: str | None,
+    *,
+    has_rent: bool,
+    has_anchor: bool,
+    has_date: bool,
+) -> str | None:
+    """Withdraw a bare ``AVAILABLE`` that no field supports → ``UNKNOWN``.
+
+    Companion to :func:`resolve_plan_row_availability`, for the rows that one
+    does NOT reach. That contract governs plan-LEVEL rows; this governs the
+    inverse blind spot: a row the plan predicate did NOT flag
+    (``is_floor_plan_level`` False) that nonetheless asserts ``AVAILABLE`` while
+    carrying zero inventory evidence — no published rent, no real unit anchor,
+    and no availability date.
+
+    Such a row is a placeholder the source shipped with a default "available"
+    status. Measured 2026-07-31 on the fresh-250 cohort: 37 rows across 10
+    properties, 9 of them SecureCafe plan-catalogue rows whose online-leasing
+    portal held zero available units — the site itself reads "get notified" /
+    "contact for availability". With nothing behind it, ``AVAILABLE`` asserts a
+    bookable apartment we have no evidence for. ``UNKNOWN`` is the honest label:
+    like the plan contract it never invents a substantive value, and it is
+    deliberately NOT ``UNAVAILABLE`` (we have no evidence of that either). Any
+    ONE of the three signals leaves the status untouched, so a real available
+    unit with a price, a number, or a date is never withdrawn.
+
+    Filed as #91 "BUG2 availability default AVAILABLE->UNKNOWN" and the #75
+    residual. Coercing to UNKNOWN here also stops ``_resolve_available_date``
+    from stamping a fabricated "available today" date on the same row, since its
+    AVAILABLE branch keys on this resolved status.
+
+    Args:
+        status: The status after :func:`resolve_plan_row_availability`.
+        has_rent: Whether ``_format_rent`` produced a positive bound.
+        has_anchor: Result of ``identity.unit_has_real_anchor`` for the row.
+        has_date: Result of :func:`_row_has_availability_date` for the row.
+
+    Returns:
+        ``UNKNOWN`` for an evidence-free ``AVAILABLE``; the input otherwise.
+    """
+    if status != "AVAILABLE":
+        return status
+    if has_rent or has_anchor or has_date:
+        return status
+    return "UNKNOWN"
+
+
 def enforce_zero_inventory_contract(units: Any) -> int:
     """Re-assert the contract on ALREADY-FORMATTED rows, at the write boundary.
 
@@ -964,13 +1036,25 @@ def _format_v2_unit(
         unit_id=_clamp_unit_anchor,
     )
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
+    _has_anchor = unit_has_real_anchor(unit)
     _availability_status = resolve_plan_row_availability(
         _norm_status(
             unit.get("availability_status") or unit.get("_availability_status")
         ),
         plan_level=_plan_level,
         has_rent=_has_rent,
-        has_anchor=unit_has_real_anchor(unit),
+        has_anchor=_has_anchor,
+    )
+    # Inverse of the plan contract above: a row the plan predicate did NOT flag
+    # can still ship a bare AVAILABLE with nothing behind it (SecureCafe
+    # plan-catalogue placeholders whose online-leasing portal is empty).
+    # Withdraw it to UNKNOWN when no rent, no anchor and no date support it.
+    # See ``withdraw_unsupported_available``. Lock-step with the jugnu fork.
+    _availability_status = withdraw_unsupported_available(
+        _availability_status,
+        has_rent=_has_rent,
+        has_anchor=_has_anchor,
+        has_date=_row_has_availability_date(unit),
     )
 
     return {

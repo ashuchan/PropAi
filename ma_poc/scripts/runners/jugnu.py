@@ -3175,8 +3175,10 @@ def _format_v2_unit(
     from ma_poc.core.schema_v2 import (
         _is_floor_plan_level,
         _resolve_available_date,
+        _row_has_availability_date,
         classify_area_absence,
         resolve_plan_row_availability,
+        withdraw_unsupported_available,
     )
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
@@ -3431,13 +3433,26 @@ def _format_v2_unit(
         unit_id=_clamp_unit_anchor,
     )
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
+    _has_anchor = unit_has_real_anchor(unit)
     _availability_status = resolve_plan_row_availability(
         _norm_avail_status(
             unit.get("availability_status") or unit.get("_availability_status")
         ),
         plan_level=_plan_level,
         has_rent=_has_rent,
-        has_anchor=unit_has_real_anchor(unit),
+        has_anchor=_has_anchor,
+    )
+    # Inverse of the plan contract above: a row the plan predicate did NOT flag
+    # can still ship a bare AVAILABLE with nothing behind it (SecureCafe
+    # plan-catalogue placeholders whose online-leasing portal is empty).
+    # Withdraw it to UNKNOWN when no rent, no anchor and no date support it.
+    # Lock-step with ``core.schema_v2._format_v2_unit``; see
+    # ``core.schema_v2.withdraw_unsupported_available``.
+    _availability_status = withdraw_unsupported_available(
+        _availability_status,
+        has_rent=_has_rent,
+        has_anchor=_has_anchor,
+        has_date=_row_has_availability_date(unit),
     )
 
     out: dict[str, Any] = {
