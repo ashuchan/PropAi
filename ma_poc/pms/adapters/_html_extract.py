@@ -44,6 +44,7 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
 from ma_poc.pms.adapters._parsing import (
     SQFT_RE,
     clean_unit_number,
+    has_field_label_contamination,
     parse_area,
 )
 from ma_poc.pms.signal_engine.floor_plan_signals import (
@@ -3323,6 +3324,34 @@ _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
 _COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 
 
+def _drop_field_label_contaminated_rows(
+    units: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """DOM-quality gate (2026-07-31 data-audit #3-tail).
+
+    A generic-DOM cascade that mis-associates the page's label:value pairs
+    captures LABEL text as a field VALUE — ``floor_plan_name="APT SQFT: 689 SF"``,
+    ``unit_number="Baths: 1"`` (Gild + The Belmont, repli360 routed to generic
+    TIER_3_DOM: 21 rows). A real extraction never names a plan/unit that way, so
+    such a row is a mis-parse, not a unit. Drop it; when the whole extraction is
+    contaminated (Gild 7/7, Belmont 14/14) the caller gets ``[]`` and the
+    property honestly falls through to a more reliable tier instead of shipping
+    garbage "units". The ``\\s*\\d`` in the label regex keeps legitimate
+    CWS names like ``"Two Bedroom, One Bath: A"``.
+    """
+    if not units:
+        return units
+    return [
+        u
+        for u in units
+        if not (
+            has_field_label_contamination(u.get("floor_plan_name"))
+            or has_field_label_contamination(u.get("unit_number"))
+            or has_field_label_contamination(u.get("unit_id"))
+        )
+    ]
+
+
 def extract_units_from_dom(
     html: str,
     source_url: str,
@@ -3338,11 +3367,25 @@ def extract_units_from_dom(
     ``container``, that selector is tried FIRST. On miss, falls back to the
     default cascade.
 
+    A DOM-quality gate (``_drop_field_label_contaminated_rows``) filters the
+    result of every path so a mis-parse that captured label text as field values
+    is dropped rather than shipped as a unit.
+
     Returns (units, hit_mode) where hit_mode is one of:
       "hints"   — profile hint selectors fired
       "default" — default cascade fired
       "none"    — no units extracted
     """
+    units, mode = _extract_units_from_dom_impl(html, source_url, hints)
+    kept = _drop_field_label_contaminated_rows(units)
+    return (kept, mode) if kept else ([], "none")
+
+
+def _extract_units_from_dom_impl(
+    html: str,
+    source_url: str,
+    hints: Any | None = None,
+) -> tuple[list[dict[str, Any]], str]:
     if not html:
         return [], "none"
 

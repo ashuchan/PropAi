@@ -914,12 +914,25 @@ def _format_v2_unit(
     fp_name = _first(unit, "_floor_plan", "floor_plan_name",
                      "floorplan_name", "floorPlanName", "floorplanName",
                      "fp_name", "floorplan", "plan_name")
+    # Name hygiene (2026-07-31 data-audit #4/#5): strip a trailing concession %
+    # ("A1 80%" -> "A1") and null a bare-number name (a leaked sqft / code).
+    # Applied before inference + floor_plan_id so both use the clean value.
+    from ma_poc.pms.adapters._parsing import clean_floor_plan_name
+
+    fp_name = clean_floor_plan_name(fp_name)
     sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet",
                   "square_feet", "size", "sq_ft")
 
     # unit_id alias (adapters emit unit_number / camelCase / uid)
     uid = _first(unit, "unit_id", "unit_number", "_unit_number",
                  "unitNumber", "unitId", "uid", "apartment_number")
+    # #3-tail: scrub a unit_id that is a scraped field label ("856c8776-Baths: 1")
+    # — a generic-DOM mis-parse. None lets identity synthesise an honest
+    # inferred_ id rather than shipping a corrupt "real" anchor.
+    from ma_poc.pms.adapters._parsing import has_field_label_contamination
+
+    if has_field_label_contamination(uid):
+        uid = None
 
     # Bed/bath fallback inference from the floor-plan name. Mirrors the
     # Jugnu transform so both pipelines fill the same gaps.
@@ -983,6 +996,21 @@ def _format_v2_unit(
 
     norm_beds = _normalize_beds(beds_raw)
     norm_baths = _normalize_baths(baths_raw)
+    # Cross-field baths sanity (2026-07-31 data-audit defect #1). The absolute
+    # 0–10 bound in ``_normalize_baths`` cannot catch a bath count that is
+    # impossible *relative to the bed count*: regentsparkchicago.com's RentCafe
+    # feed ships its ``2bn09`` plan units with ``Baths=9`` — a source data-entry
+    # error faithfully propagated (a 2-bed cannot have 9 baths). Drop such values
+    # to ``None`` (honest "missing") instead of emitting an impossible number.
+    # ``> beds + 2`` never clamps a legitimate N-bed/N-bath layout; the ``>= 4``
+    # floor protects a small unit's real 2–2.5-bath count.
+    if (
+        norm_baths is not None
+        and norm_beds is not None
+        and norm_baths >= 4
+        and norm_baths > norm_beds + 2
+    ):
+        norm_baths = None
     try:
         from ma_poc.pms.adapters._parsing import compute_floor_plan_id
 
@@ -1356,7 +1384,13 @@ def _normalize_baths(val: Any) -> float | None:
         n = float(str(val).strip())
         # Round to nearest 0.5
         n = round(n * 2) / 2
-        return max(0.0, min(n, 10.0))
+        n = max(0.0, min(n, 10.0))
+        # 2026-07-31 data-audit defect #2: 0 baths is never a real dwelling —
+        # every apartment has >=1 (partial) bath. A source ``0`` is a
+        # "not provided" placeholder, NOT a confirmed count (unlike beds, where
+        # 0 == studio). Return None so downstream reads it as missing rather than
+        # an impossible "0 baths" (261 rows in the 5k, e.g. studios showing 0 ba).
+        return n if n > 0 else None
     except (ValueError, TypeError):
         return None
 

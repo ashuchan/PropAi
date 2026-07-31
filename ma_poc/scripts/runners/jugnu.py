@@ -3237,6 +3237,15 @@ def _format_v2_unit(
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
     fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
+    # Name hygiene (2026-07-31 data-audit #4/#5) — lock-step with schema_v2:
+    # strip a trailing concession % ("A1 80%" -> "A1") and null a bare-number
+    # name (leaked sqft / code). Runs before the junk / fpn==uid checks below.
+    try:
+        from ma_poc.pms.adapters._parsing import clean_floor_plan_name
+
+        fp_name = clean_floor_plan_name(fp_name)
+    except Exception:
+        pass
     sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
 
     # unit_id alias: prefer an explicit unit_id but fall back to unit_number
@@ -3247,11 +3256,20 @@ def _format_v2_unit(
     # or a stop-word unit number, scrub them here before the v2 record
     # ships downstream.
     try:
-        from ma_poc.pms.adapters._parsing import is_junk_floor_plan, is_junk_unit_number
+        from ma_poc.pms.adapters._parsing import (
+            has_field_label_contamination,
+            is_junk_floor_plan,
+            is_junk_unit_number,
+        )
 
         if is_junk_floor_plan(fp_name):
             fp_name = None
         if is_junk_unit_number(uid):
+            uid = None
+        # #3-tail: scrub a unit_id that is a scraped field label
+        # ("856c8776-Baths: 1") — a generic-DOM mis-parse. None → identity
+        # synthesises an honest inferred_ id. Lock-step with schema_v2.
+        if has_field_label_contamination(uid):
             uid = None
     except Exception:
         pass
@@ -3303,6 +3321,18 @@ def _format_v2_unit(
 
     norm_beds = _normalize_beds(beds_raw)
     norm_baths = _normalize_baths(baths_raw)
+    # Cross-field baths sanity (2026-07-31 data-audit defect #1) — lock-step with
+    # core/schema_v2.py::_format_v2_unit. The absolute 0–10 bound can't catch a
+    # bath count impossible *relative to the bed count* (regentsparkchicago.com's
+    # RentCafe feed ships ``2bn09`` units with Baths=9). Drop to None rather than
+    # emit an impossible value; ``>= 4`` protects a small unit's real 2–2.5 baths.
+    if (
+        norm_baths is not None
+        and norm_beds is not None
+        and norm_baths >= 4
+        and norm_baths > norm_beds + 2
+    ):
+        norm_baths = None
 
     # Phase 3: stamp a deterministic floor_plan_id so analytics can
     # collapse unit-level rows back to plan-level rows. Computed from
@@ -4380,8 +4410,11 @@ def _normalize_baths(val: Any) -> float | None:
     if val is None or val == "":
         return None
     try:
-        n = float(str(val).strip())
-        return max(0.0, min(round(n * 2) / 2, 10.0))
+        n = max(0.0, min(round(float(str(val).strip()) * 2) / 2, 10.0))
+        # 2026-07-31 data-audit defect #2 — lock-step with core/schema_v2.py:
+        # 0 baths is never real (every apartment has >=1); a source 0 is a
+        # "not provided" placeholder → None, not an impossible confirmed count.
+        return n if n > 0 else None
     except (ValueError, TypeError):
         return None
 

@@ -843,6 +843,66 @@ def _looks_empty_plan_name(name: Any) -> bool:
     return name.strip().lower() in _EMPTY_PLAN_NAME_TOKENS
 
 
+# Trailing lease/concession percentage welded onto a plan code by a plain
+# ``get_text()`` — ``"A1 80%"`` / ``"A1LL-80%"`` / ``"A3  60%"``.
+_PLAN_NAME_TRAILING_PCT_RE = re.compile(r"\s*-?\s*\d{1,3}\s*%\s*$")
+
+# A ``Label: <number>`` field label captured as a VALUE by a generic-DOM
+# mis-parse — e.g. ``unit_id="856c8776-Baths: 1"`` /
+# ``floor_plan_name="APT SQFT: 689 SF"`` (Gild, gildchicago.com, repli360 routed
+# to generic TIER_3_DOM). The value is corrupt: a scraped label, not an
+# identifier or name.
+#
+# The trailing ``\s*\d`` is load-bearing: it distinguishes a mis-parsed label
+# (``Bath: 1``, always label-then-NUMBER) from a LEGITIMATE plan name that
+# merely contains the word (RealPage CWS's ``"Two Bedroom, One Bath: A"`` /
+# ``"One Bath: Penthouse"`` — a plan variant named by a letter/word, NOT a
+# contamination). Requiring a digit after the colon keeps those 15 real names.
+_FIELD_LABEL_CONTAM_RE = re.compile(
+    r"\b(?:baths?|beds?|sq\s?ft|square\s?feet|rent|price|deposit)\s*:\s*\d",
+    re.IGNORECASE,
+)
+
+
+def has_field_label_contamination(val: Any) -> bool:
+    """True when a field label (``Baths:``, ``SQFT:``, …) leaked into *val*.
+
+    2026-07-31 data-audit #3-tail: a generic-DOM cascade captured label text as
+    the ``unit_id`` / ``floor_plan_name`` value on 2 props (21 rows). Such a
+    value must not ship as an identifier or a plan name.
+    """
+    return bool(val) and bool(_FIELD_LABEL_CONTAM_RE.search(str(val)))
+
+
+def clean_floor_plan_name(name: Any) -> str | None:
+    """Hygiene for ``floor_plan_name`` (2026-07-31 data-audit defects #4/#5).
+
+    #4 — strip a trailing lease/concession percentage that a plain
+    ``get_text()`` welded onto the plan code (``"A1 80%"`` -> ``"A1"``,
+    ``"A1LL-80%"`` -> ``"A1LL"``). 97 rows across Knock / SightMap / Repli360 /
+    SecureCafe / FortressTech.
+
+    #5 — a purely-numeric name is never a real plan NAME: it is a leaked square
+    footage (82 of 210 rows have ``name == area``) or an internal numeric code,
+    neither of which conveys floor-plan information and both of which risk being
+    read as a measurement. Return ``None`` so the field is honestly empty; the
+    deterministic ``floor_plan_id`` (from beds/baths) still groups the units.
+    """
+    if name is None:
+        return None
+    s = str(name).strip()
+    if not s:
+        return None
+    s = _PLAN_NAME_TRAILING_PCT_RE.sub("", s).strip()
+    if not s:
+        return None
+    if re.fullmatch(r"[\d.,\s]+", s):  # bare number → not a plan name
+        return None
+    if has_field_label_contamination(s):  # #3-tail: "APT SQFT: 689 SF" → None
+        return None
+    return s
+
+
 def _titleize_slug(slug: str, *, trim_trailing_id: bool = True) -> str:
     """Convert ``"1-bed-1-bath-1992"`` -> ``"1 Bed 1 Bath"``.
 

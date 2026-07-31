@@ -10,9 +10,42 @@ from ma_poc.core.schema_v2 import (
     _format_v2_floor_plan,
     _format_v2_unit,
     _normalize_amenities,
+    _normalize_baths,
 )
 
+
+def test_baths_zero_is_missing_not_confirmed() -> None:
+    """Data-audit defect #2: 0 baths is never a real dwelling — a source ``0`` is
+    a 'not provided' placeholder → None, not a confirmed count (unlike beds=0
+    studio). Real bath counts pass through unchanged."""
+    assert _normalize_baths(0) is None
+    assert _normalize_baths("0") is None
+    assert _normalize_baths(0.0) is None
+    assert _normalize_baths(None) is None
+    assert _normalize_baths(1) == 1.0
+    assert _normalize_baths(2.5) == 2.5
+
 _TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=UTC)
+
+
+def test_baths_cross_field_sanity_clamp() -> None:
+    """Data-audit defect #1: a bath count impossible relative to beds (a source
+    data-entry error, e.g. regentsparkchicago.com's ``2bn09`` units shipping
+    Baths=9) drops to None. Legitimate N-bed/N-bath layouts are never touched."""
+    # impossible (beds known >=1) → clamped to None. Studios normalise beds to
+    # None (carried via the label), so a bed-aware clamp intentionally can't fire
+    # there — we never guess against an unknown bed count.
+    for beds, baths in [(2, 9), (1, 4), (3, 6)]:
+        out = _format_v2_unit(
+            {"unit_number": "u", "beds": beds, "baths": baths, "rent_low": 2000}, _TS
+        )
+        assert out["baths"] is None, f"{beds}bd/{baths}ba should clamp"
+    # legitimate → preserved
+    for beds, baths in [(5, 5), (4, 4), (2, 2.5), (1, 2), (0, 1)]:
+        out = _format_v2_unit(
+            {"unit_number": "u", "beds": beds, "baths": baths, "rent_low": 2000}, _TS
+        )
+        assert out["baths"] == float(baths), f"{beds}bd/{baths}ba must be preserved"
 
 
 def test_h16_v2_unit_schema_includes_new_keys() -> None:

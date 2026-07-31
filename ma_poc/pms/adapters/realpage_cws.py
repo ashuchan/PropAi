@@ -177,14 +177,35 @@ def _cws_avail_date(raw: Any) -> str:
     return head if re.fullmatch(r"\d{4}-\d{2}-\d{2}", head) else ""
 
 
+def _cws_avail_status(lease_status: Any) -> str:
+    """Map a CWS ``leaseStatus`` to AVAILABLE / UNAVAILABLE.
+
+    The ``&available=true`` query param does NOT actually filter the roster.
+    Live-verified 2026-07-31 on thewildsapts.com: 402 units = 41 ``AVAILABLE_READY``
+    (each with a real ``internalAvailableDate``) + **361 ``LEASED``** (occupied, no
+    date) — all previously mis-stamped AVAILABLE (a 402-available stabilized
+    property). Vocabulary across 17 probed CWS properties / 1,121 units is exactly
+    {``AVAILABLE_READY``, ``LEASED``}. Rule: an ``AVAILABLE``-prefixed status is
+    on-market; anything else (LEASED / OCCUPIED / NOTICE / MODEL / …) is occupied.
+    A missing/blank status preserves the prior AVAILABLE default so payloads that
+    predate the field never regress.
+    """
+    s = str(lease_status or "").strip().upper()
+    if not s:
+        return "AVAILABLE"
+    return "AVAILABLE" if s.startswith("AVAILABLE") else "UNAVAILABLE"
+
+
 def parse_realpage_cws_getunits(body: str, url: str) -> list[dict[str, Any]]:
     """Parse a CWS ``GetUnits`` JSON body into unit-level dicts.
 
     Body shape: ``{"units": [{unitNumber, rent, squareFeet, numberOfBeds,
     numberOfBaths, floorplanName, floorNumber, buildingName,
     internalAvailableDate, leaseStatus, id, floorplanId, partnerPropertyId,
-    ...}]}``. All returned units are treated AVAILABLE (the endpoint is called
-    with ``available=true``). Returns ``[]`` on non-JSON / no units. Never raises.
+    ...}]}``. Per-unit availability is read from ``leaseStatus`` via
+    ``_cws_avail_status`` — the ``available=true`` param does NOT filter the roster,
+    so LEASED units leak in and must be marked UNAVAILABLE. Returns ``[]`` on
+    non-JSON / no units. Never raises.
     """
     try:
         data = json.loads(body)
@@ -239,7 +260,7 @@ def parse_realpage_cws_getunits(body: str, url: str) -> list[dict[str, Any]]:
                 building=building,
                 rent_low=int(rent) if isinstance(rent, (int, float)) else None,
                 rent_high=int(rent) if isinstance(rent, (int, float)) else None,
-                availability_status="AVAILABLE",
+                availability_status=_cws_avail_status(u.get("leaseStatus")),
                 availability_date=_cws_avail_date(u.get("internalAvailableDate")),
                 source_api_url=url,
                 extraction_tier="TIER_1_API_REALPAGE_CWS_UNITS",

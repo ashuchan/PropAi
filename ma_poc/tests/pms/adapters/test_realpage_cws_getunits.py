@@ -9,6 +9,7 @@ Fixtures are REAL ``available=true`` GetUnits bodies captured 2026-07-19:
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.realpage_cws import (
     RealPageCwsAdapter,
     _cws_avail_date,
+    _cws_avail_status,
     cws_getunits_url,
     parse_realpage_cws_getunits,
 )
@@ -54,6 +56,43 @@ def test_parse_capitalplace_4_units() -> None:
     rows = parse_realpage_cws_getunits(_body("capitalplace_avail"), "u")
     assert len(rows) == 4
     assert all(r["availability_status"] == "AVAILABLE" for r in rows)
+
+
+def test_cws_avail_status_maps_lease_status() -> None:
+    # ``&available=true`` does NOT filter the roster — LEASED units leak in.
+    # Live-verified on thewildsapts.com (402 units: 41 AVAILABLE_READY + 361
+    # LEASED). Vocabulary across 17 probed CWS props = {AVAILABLE_READY, LEASED}.
+    assert _cws_avail_status("AVAILABLE_READY") == "AVAILABLE"
+    assert _cws_avail_status("available_notready") == "AVAILABLE"  # any AVAILABLE_* → on-market
+    assert _cws_avail_status("LEASED") == "UNAVAILABLE"
+    assert _cws_avail_status("OCCUPIED") == "UNAVAILABLE"
+    # Missing/blank status preserves the prior AVAILABLE default (no regression
+    # for older payloads that predate the field).
+    assert _cws_avail_status(None) == "AVAILABLE"
+    assert _cws_avail_status("") == "AVAILABLE"
+
+
+def test_parse_marks_leased_units_unavailable() -> None:
+    """A mixed roster (the thewildsapts.com shape) keeps every unit but marks
+    the LEASED ones UNAVAILABLE — no more 402-available stabilized properties."""
+    body = json.dumps(
+        {
+            "units": [
+                {"unitNumber": "3312", "rent": 1399, "leaseStatus": "AVAILABLE_READY",
+                 "internalAvailableDate": "2026-05-19 00:00 -0500", "numberOfBeds": 1},
+                {"unitNumber": "2213", "rent": 1457, "leaseStatus": "LEASED",
+                 "internalAvailableDate": None, "numberOfBeds": 1},
+                {"unitNumber": "2214", "rent": 1460, "leaseStatus": "LEASED",
+                 "internalAvailableDate": None, "numberOfBeds": 1},
+            ]
+        }
+    )
+    rows = parse_realpage_cws_getunits(body, "u")
+    assert len(rows) == 3  # full roster kept
+    by = {r["unit_number"]: r for r in rows}
+    assert by["3312"]["availability_status"] == "AVAILABLE"
+    assert by["2213"]["availability_status"] == "UNAVAILABLE"
+    assert by["2214"]["availability_status"] == "UNAVAILABLE"
 
 
 def test_parse_non_json_returns_empty() -> None:

@@ -13,9 +13,44 @@ import pytest
 
 from ma_poc.pms.adapters._parsing import (
     _unwrap_name_blob,
+    clean_floor_plan_name,
     make_unit_dict,
     money_to_int,
 )
+
+
+def test_clean_floor_plan_name() -> None:
+    """Data-audit defects #4/#5 (2026-07-31)."""
+    # #4 — trailing concession % welded onto the plan code is stripped.
+    assert clean_floor_plan_name("A1 80%") == "A1"
+    assert clean_floor_plan_name("A4X  80%") == "A4X"
+    assert clean_floor_plan_name("A1LL-80%") == "A1LL"
+    assert clean_floor_plan_name("A3 60%") == "A3"
+    # #5 — a bare-number name (leaked sqft / code) becomes None.
+    assert clean_floor_plan_name("466") is None
+    assert clean_floor_plan_name("1,204") is None
+    assert clean_floor_plan_name("") is None
+    assert clean_floor_plan_name(None) is None
+    # Legit names — including alphanumeric codes — pass through untouched.
+    for keep in ("A1", "The Magnolia", "2 Bed 2 Bath", "Studio", "B2n07", "The Oak 2"):
+        assert clean_floor_plan_name(keep) == keep
+    # AMFI income tiers are NOT concessions — the mid-name % must survive.
+    amfi = "0A - AMFI 60% - INCOME RESTRICTIONS APPLY"
+    assert clean_floor_plan_name(amfi) == amfi
+    # #3-tail — a scraped field label captured as the name is scrubbed.
+    assert clean_floor_plan_name("APT SQFT: 689 SF") is None
+
+
+def test_has_field_label_contamination() -> None:
+    """Data-audit #3-tail: a generic-DOM mis-parse welded a field label into
+    unit_id / floor_plan_name ("856c8776-Baths: 1", "APT SQFT: 689 SF")."""
+    from ma_poc.pms.adapters._parsing import has_field_label_contamination as h
+
+    for bad in ("856c8776-Baths: 1", "Baths: 2", "APT SQFT: 689 SF",
+                "f14d607b-Baths: 1", "Beds: 3", "Rent: 1500"):
+        assert h(bad) is True
+    for ok in ("A1", "0609", "Building-2:B", "The Oak 2", "", None):
+        assert h(ok) is False
 
 
 @pytest.mark.parametrize(
@@ -110,3 +145,24 @@ def test_make_unit_dict_preserves_clean_floor_plan_name() -> None:
         rent_high=1200,
     )
     assert out["floor_plan_name"] == "A1"
+
+
+def test_dom_quality_gate_drops_field_label_mis_parse() -> None:
+    """Data-audit #3-tail: the DOM extractor drops rows whose identity fields
+    are scraped label text (a generic-DOM mis-parse), so a fully-contaminated
+    extraction yields [] and the property falls through — while legit rows
+    (incl. CWS 'One Bath: A' plan names) survive."""
+    from ma_poc.pms.adapters._html_extract import (
+        _drop_field_label_contaminated_rows,
+    )
+
+    rows = [
+        {"unit_number": "301", "floor_plan_name": "A1"},
+        {"unit_number": "Baths: 1", "floor_plan_name": "APT SQFT: 689 SF"},
+        {"unit_number": "302", "floor_plan_name": "Two Bedroom, One Bath: A"},
+    ]
+    kept = _drop_field_label_contaminated_rows(rows)
+    assert [r["unit_number"] for r in kept] == ["301", "302"]
+    # a wholly-contaminated batch collapses to empty (property falls through)
+    allbad = [{"unit_number": "Baths: 1", "floor_plan_name": "APT SQFT: 491 SF"}]
+    assert _drop_field_label_contaminated_rows(allbad) == []
