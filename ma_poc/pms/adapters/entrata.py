@@ -3244,6 +3244,59 @@ class EntrataAdapter:
                     result.confidence = min(0.93, 0.7 + 0.04 * len(ll_units))
                     return result
 
+        # 2026-07-31 (#93 data-attr recovery): some Entrata marketing shells
+        # (WordPress + prospectportal apply links) render the FULL unit roster
+        # inline as static ``div.unit-body[data-unit-id][data-unit-number]``
+        # cards that neither the PP-SSR grid parser nor the per-plan unit-card
+        # drill recognises — the container shape differs from
+        # prospectportal.com's ``fp-card`` / ``unit-card`` markup. The generic
+        # data-attr DOM extractor DOES read them. Run it on the captured entry
+        # body as a last-chance unit-level recovery, AFTER every entrata-native
+        # path produced nothing and BEFORE the empty-exit hands the property to
+        # Path B — which would re-detect ``generic_plan_text`` and link-hop the
+        # DOM cascade onto the WRONG page (``/live/``), shipping plan-level.
+        # Live-verified on thevillagedallas.com/.../the-village-lakes/: 24 priced
+        # units the entrata-native paths score 0 on. Additive and tightly gated
+        # (empty result + a ``data-unit-id`` token) so it cannot preempt any
+        # currently-succeeding path.
+        if not result.units:
+            _entry_body = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(_entry_body, bytes):
+                _entry_body = _entry_body.decode("utf-8", "replace")
+            if isinstance(_entry_body, str) and "data-unit-id" in _entry_body:
+                from ma_poc.extraction.post_process import post_process
+                from ma_poc.pms.adapters._html_extract import (
+                    extract_units_from_dom,
+                )
+
+                _da_url = str(getattr(fr, "final_url", "") or base)
+                try:
+                    _da_rows, _ = extract_units_from_dom(_entry_body, _da_url)
+                except Exception:
+                    _da_rows = []
+                if _da_rows:
+                    _ppda = post_process(
+                        _da_rows,
+                        property_id=getattr(ctx, "property_id", None),
+                    )
+                    if _ppda.n_admitted > 0:
+                        result.units = _ppda.admitted
+                        result.plan_summaries = _ppda.plan_summaries
+                        result.winning_url = _da_url
+                        result.tier_used = "TIER_1_DOM_ENTRATA_PP_DATA_ATTR"
+                        result.confidence = min(
+                            0.92, 0.7 + 0.04 * _ppda.n_admitted
+                        )
+                        result.api_responses.append(
+                            {
+                                "url": _da_url,
+                                "status": 200,
+                                "body": "<entrata-pp-data-attr-cards>",
+                                "via": "entrata_pp_data_attr",
+                            }
+                        )
+                        return result
+
         # 2026-05-20: emit a structured empty-exit label so Path B retry
         # can route this property to its next-best PMS candidate. The
         # default ``TIER_1_API_ENTRATA`` initial value on line 424 was
