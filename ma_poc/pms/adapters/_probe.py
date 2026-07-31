@@ -344,12 +344,24 @@ def _looks_blocked(resp: Any) -> bool:
     return bool(is_captcha and provider == "cloudflare")
 
 
-def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
+def probe_get(url: str, *, unlocker: bool = True, retries: int = 0, **kw: Any) -> Any:
     """curl_cffi GET with chrome impersonation + optional probe proxy.
 
     Raises ImportError if curl_cffi is unavailable (callers already guard
     for that). Proxy + TLS-verify-relaxation only applied when
     PROBE_PROXY_URL is set (BrightData terminates TLS at its edge).
+
+    ``retries`` (2026-07-31): bounded PLAIN re-GET on a transient soft-block
+    (403/429/503 / CF challenge shell). Under COMPLIANCE_MODE the Web Unlocker,
+    FlareSolverr and CAPTCHA-solving are a legal no-fly zone (all off), so the
+    code-only recovery routes (Lead-3 ``/conventional/``, the direct-GET family,
+    #80 ``/availableunits``) have NO fallback and a single transient 403 kills
+    them. These soft-blocks are single-shot intermittent — the same host flips
+    403↔200 seconds apart (live-verified: a plain re-GET recovered 4/4). A
+    re-GET is an ordinary polite request, NOT a solver/unblocker, so it stays
+    fully inside the compliance envelope. ``retries=0`` (default) is byte-for-
+    byte the prior behaviour, so no existing caller changes; the recovery/
+    direct-GET routes opt in with ``retries>0``.
 
     Cost-gated Web Unlocker escalation: if WEB_UNLOCKER_KEY is set and
     the proxied fetch comes back a Cloudflare challenge shell or a
@@ -418,6 +430,33 @@ def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
                 return resp2
         except Exception:
             pass  # fall through to original resp / Web Unlocker escalation
+
+    # Compliance-safe transient-block recovery (2026-07-31). A plain re-GET —
+    # NOT the (legally-off) Web Unlocker — defeats the single-shot intermittent
+    # soft-block that otherwise kills the code-only recovery routes with no
+    # fallback. Short backoff, host-throttled like the first attempt. Opt-in via
+    # retries>0, so retries=0 callers are unchanged.
+    if retries > 0 and _looks_blocked(resp):
+        import time as _time
+
+        for _attempt in range(1, retries + 1):
+            _time.sleep(min(1.0 + _attempt, 3.0))
+            try:
+                with _host_throttle(url):
+                    _resp2 = _creq.get(url, **opts)
+            except Exception:
+                break
+            if not _looks_blocked(_resp2):
+                log.info(
+                    "probe_get.soft_block_retry url=%s status=%s→%s attempt=%d",
+                    url,
+                    getattr(resp, "status_code", "?"),
+                    getattr(_resp2, "status_code", "?"),
+                    _attempt,
+                )
+                resp = _resp2
+                break
+            resp = _resp2
 
     if unlocker and web_unlocker_key() and _looks_blocked(resp):
         wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)

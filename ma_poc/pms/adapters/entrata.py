@@ -2151,11 +2151,15 @@ def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
 
 
 async def _entrata_static_fetch(
-    url: str, *, unlocker: bool = True, headers: dict[str, str] | None = None
+    url: str,
+    *,
+    unlocker: bool = True,
+    headers: dict[str, str] | None = None,
+    retries: int = 0,
 ) -> str:
     from ma_poc.pms.adapters._probe import probe_get
 
-    kw: dict[str, Any] = {"timeout": 20, "unlocker": unlocker}
+    kw: dict[str, Any] = {"timeout": 20, "unlocker": unlocker, "retries": retries}
     if headers:
         kw["headers"] = headers
     r = probe_get(url, **kw)
@@ -2182,7 +2186,13 @@ async def _entrata_fetch_ssr(
     bot-walled hosts where direct returns nothing.
     """
     try:
-        html = await _entrata_static_fetch(url, unlocker=False, headers=headers)
+        # retries=2: a transient soft-403 on this one code-only fetch otherwise
+        # sinks the whole /conventional/ recovery (the Web Unlocker is off under
+        # compliance, so there is no other fallback). A plain re-GET recovered
+        # the intermittent block 4/4 live.
+        html = await _entrata_static_fetch(
+            url, unlocker=False, retries=2, headers=headers
+        )
     except Exception:
         html = ""
     if html:
