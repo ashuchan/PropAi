@@ -2427,6 +2427,10 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     ".pricing-row",
     ".plan-card",
     "[data-unit]",
+    # Rich per-unit anchor: an element carrying BOTH data-unit-id AND
+    # data-unit-number is a real apartment (Entrata ProspectPortal marketing
+    # pages ship the full roster this way). Mapped to _extract_data_attr_unit.
+    "[data-unit-id][data-unit-number]",
     "[data-floorplan]",
     "[data-floor-plan]",
     "[data-apartment]",
@@ -3229,11 +3233,82 @@ def _extract_prisma_unit(
     return unit
 
 
+_DATA_AREA_NUM_RE = re.compile(r"([\d.]+)")
+
+
+def _extract_data_attr_unit(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """Rich ``data-*`` unit anchor → UNIT-LEVEL, code-only.
+
+    Entrata ProspectPortal marketing pages (e.g. thevillagedallas.com/…/
+    the-village-lakes → villagelakeslpc.prospectportal.com) render each
+    apartment as ``div.unit-body[data-unit-id][data-unit-number]`` carrying
+    EVERY field in data-attributes: ``data-rent``, ``data-area``
+    ("879.0000 SquareFeet"), ``data-bedrooms``, ``data-bathrooms``,
+    ``data-availability`` / ``data-status`` / ``data-available-on``,
+    ``data-building``. The generic path never admitted the container (no class
+    in its cascade, and ``[data-unit]`` does not match ``data-unit-id``), so
+    the property landed plan-level despite publishing its full roster in the
+    static HTML. Read the attributes directly — nothing to text-parse.
+    """
+    uid = str(node.get("data-unit-id") or "").strip()
+    unum = str(node.get("data-unit-number") or "").strip()
+    if not uid and not unum:
+        return None
+    unit = _empty_unit_with_ctx(
+        page_ctx, source="dom:data-unit-attr", source_url=source_url
+    )
+    if uid:
+        unit["unit_id"] = uid
+    if unum and _is_valid_unit_number(unum):
+        unit["unit_number"] = unum
+    rent_raw = str(node.get("data-rent") or "").strip()
+    if rent_raw:
+        try:
+            r = int(float(rent_raw))
+            if _RENT_LO_BOUND <= r <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = r
+                unit["market_rent_high"] = r
+                unit["rent_range"] = str(r)
+        except (ValueError, TypeError):
+            pass
+    ma = _DATA_AREA_NUM_RE.search(str(node.get("data-area") or ""))
+    if ma:
+        try:
+            unit["sqft"] = str(int(float(ma.group(1))))
+        except (ValueError, TypeError):
+            pass
+    beds = str(node.get("data-bedrooms") or "").strip()
+    if beds:
+        unit["beds"] = beds
+    baths = str(node.get("data-bathrooms") or "").strip()
+    if baths:
+        unit["baths"] = baths
+    building = str(node.get("data-building") or "").strip()
+    if building:
+        unit["building"] = building
+    avail = str(node.get("data-availability") or "").strip().lower()
+    status = str(node.get("data-status") or "").lower()
+    if avail == "true" or "available" in status:
+        unit["availability_status"] = "AVAILABLE"
+        adate = str(node.get("data-available-on") or "").strip()
+        if adate:
+            unit["availability_date"] = adate
+    elif status:
+        unit["availability_status"] = "UNAVAILABLE"
+    if not (unit.get("unit_id") or unit.get("market_rent_low")):
+        return None
+    return unit
+
+
 # Selectors mapped to specialised extractors. When the DOM container loop
 # matches one of these selectors, the matching extractor is used INSTEAD of
 # `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
 # rejects compact per-unit rows where bed/bath/sqft live in the page header.
 _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
+    # Rich data-attribute unit anchors (Entrata ProspectPortal marketing pages).
+    ("[data-unit-id][data-unit-number]", _extract_data_attr_unit),
     # AppFolio public-listings embed (verified on Emerson Apartments).
     ("div.js-listing-item", _extract_appfolio_listing_item),
     # RentCafe per-plan availability — both `.option-row` and `div.option-row`
