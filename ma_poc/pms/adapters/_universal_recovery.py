@@ -206,6 +206,22 @@ async def recover_universal_embed(
                     tier = t
             return portal_units, tier, "pms_portal_hop"
 
+        # Available-units roster embedded in the property's OWN page in a
+        # shape the primary tiers miss (2026-07-31, #93). MITS-ILS
+        # ``window.__FP_DATA__`` etc. — code-only, unit-level. Runs BEFORE the
+        # generic-DOM catchall so a real unit roster wins over a plan summary.
+        from ma_poc.pms.adapters._avail_table_recovery import recover_avail_table
+
+        avail_units = await recover_avail_table(ctx)
+        if avail_units:
+            mark_attempted(ctx, "avail_table")
+            tier = "TIER_1_EMBEDDED_MITS_ILS"
+            if isinstance(avail_units[0], dict):
+                t = str(avail_units[0].get("extraction_tier") or "").strip()
+                if t:
+                    tier = t
+            return avail_units, tier, "avail_table"
+
         generic_units, _ = await recover_generic_floorplans(page, ctx)
         if generic_units:
             mark_attempted(ctx, "generic_dom")
