@@ -233,6 +233,7 @@ def checkpoint_partial(
     *,
     tier_used: str | None = None,
     winning_page_url: str | None = None,
+    plan_summaries: list[Any] | None = None,
 ) -> None:
     """Checkpoint salvageable progress so a per-property TIMEOUT is not a total loss.
 
@@ -260,6 +261,12 @@ def checkpoint_partial(
             timeout handler onto ``profile.navigation.winning_page_url`` so the
             NEXT run starts warm instead of re-paying full discovery — the
             compounding "timed-out properties never learn" trap.
+        plan_summaries: plan-level (floor-plan) rows known so far. Sibling of
+            ``units`` — same "only overwrites when at least as large" guard so a
+            later thinner view cannot shrink an earlier richer one. Without this
+            a property that timed out after producing ONLY plan-level rows
+            salvaged nothing and was stamped FAILED_NO_DATA; the timeout handler
+            reads this back to credit SUCCESS_PLAN_LEVEL (#81).
 
     Never raises: a checkpoint failure must never break a live scrape.
     """
@@ -274,6 +281,10 @@ def checkpoint_partial(
             if not isinstance(prior, list) or len(units) >= len(prior):
                 ext_ref["units"] = list(units)
                 shared_budget["_partial_units"] = list(units)
+        if plan_summaries:
+            prior_plans = ext_ref.get("plan_summaries")
+            if not isinstance(prior_plans, list) or len(plan_summaries) >= len(prior_plans):
+                ext_ref["plan_summaries"] = list(plan_summaries)
         if tier_used:
             ext_ref["tier_used"] = tier_used
         if winning_page_url:
@@ -3113,6 +3124,7 @@ async def scrape(
         adapter_result.units,
         tier_used=adapter_result.tier_used or None,
         winning_page_url=adapter_result.winning_url or None,
+        plan_summaries=adapter_result.plan_summaries,
     )
     result["errors"].extend(adapter_result.errors)
     result["api_calls_intercepted"] = [r.get("url", "") for r in adapter_result.api_responses]
@@ -5117,6 +5129,7 @@ async def _try_link_hop(
             deduped,
             tier_used=_first_successful_result.get("extraction_tier_used"),
             winning_page_url=_best_units_page[0] or None,
+            plan_summaries=_first_successful_result.get("plan_summaries"),
         )
         existing_explored = _first_successful_result.get("_explored_links") or {}
         existing_explored.update(explored)
@@ -5786,7 +5799,10 @@ async def scrape_jugnu(
             snapped = snap_units(extracted_units, property_id)
             result["units"] = snapped
             checkpoint_partial(
-                _jugnu_budget, snapped, tier_used=result.get("extraction_tier_used")
+                _jugnu_budget,
+                snapped,
+                tier_used=result.get("extraction_tier_used"),
+                plan_summaries=result.get("plan_summaries"),
             )
             # Telemetry: how many rows snapped, and which reason set fired.
             snap_reasons: dict[str, int] = {}

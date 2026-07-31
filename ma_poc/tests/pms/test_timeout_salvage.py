@@ -72,6 +72,108 @@ def test_checkpoint_never_shrinks_a_richer_earlier_view() -> None:
     assert ext["tier_used"] == "TIER_3_DOM"
 
 
+# ── #81: plan-level salvage on timeout ──────────────────────────────────────
+# A property that times out after producing ONLY plan-level rows (no units)
+# used to salvage nothing and land FAILED_NO_DATA. The fix is three seams:
+#   (A) producer  — checkpoint_partial(plan_summaries=...) → survives into
+#                   _partial_state (tested here against the REAL function);
+#   (B) verdict   — compute(extract_result=None, plan_summaries=[...]) credits
+#                   SUCCESS_PLAN_LEVEL, and is inert when units are present;
+#   (C) emit      — _format_output routes a top-level plan_summaries key into
+#                   floor_plans, and the zero-inventory contract forces an
+#                   unpriced plan row UNAVAILABLE (no phantom AVAILABLE roster).
+# _process_one's timeout handler is a closure (captures pool/stores/run_dir) and
+# is not independently callable — same reason the route-learning chain above is
+# tested at its seams rather than by driving the whole handler.
+
+
+def test_checkpoint_writes_plan_summaries() -> None:
+    budget, ext = _budget_with_ref()
+    checkpoint_partial(
+        budget,
+        [{"unit_number": "101"}],
+        tier_used="TIER_1_API",
+        plan_summaries=[{"floor_plan_name": "The Oak"}, {"floor_plan_name": "Elm"}],
+    )
+    assert [p["floor_plan_name"] for p in ext["plan_summaries"]] == ["The Oak", "Elm"]
+    # units and plans are independent channels — both land
+    assert len(ext["units"]) == 1
+
+
+def test_checkpoint_plan_summaries_never_shrink_a_richer_earlier_view() -> None:
+    """Same monotonic guard as units: a later thinner plan view must not
+    destroy a richer earlier one (site 4 re-checkpoints on the same path)."""
+    budget, ext = _budget_with_ref()
+    checkpoint_partial(budget, None, plan_summaries=[{"n": 1}, {"n": 2}, {"n": 3}])
+    checkpoint_partial(budget, None, plan_summaries=[{"n": 9}])
+    assert len(ext["plan_summaries"]) == 3, "a 1-plan view overwrote a 3-plan view"
+    # plan-only checkpoint (zero units) must not fabricate a units key
+    assert "units" not in ext
+
+
+def test_salvage_verdict_credits_plan_level_when_units_empty() -> None:
+    """Seam B: with zero salvaged units the handler passes extract_result=None,
+    so a non-empty plan list must land SUCCESS_PLAN_LEVEL, not FAILED_NO_DATA."""
+    from ma_poc.reporting.verdict import Verdict, compute
+
+    v = compute(extract_result=None, units=None,
+                plan_summaries=[{"floor_plan_name": "A1"}])
+    assert v.verdict == Verdict.SUCCESS_PLAN_LEVEL
+    # neither units nor plans → still FAILED_NO_DATA (no free credit)
+    v0 = compute(extract_result=None, units=None, plan_summaries=None)
+    assert v0.verdict == Verdict.FAILED_NO_DATA
+
+
+def test_salvage_verdict_ignores_plan_summaries_when_units_present() -> None:
+    """Seam B safety: when real units survived, plan_summaries must not perturb
+    the units verdict — the handler passes both, relying on this being inert."""
+    from ma_poc.reporting.verdict import compute
+
+    extract = {"units": [{"unit_id": "101", "rent_low": 1450}]}
+    units = [{"unit_id": "101", "rent_low": 1450}]
+    without = compute(extract_result=extract, units=units)
+    with_plans = compute(extract_result=extract, units=units,
+                         plan_summaries=[{"floor_plan_name": "A1"}])
+    assert with_plans.verdict == without.verdict, (
+        "passing plan_summaries alongside real units changed the units verdict"
+    )
+
+
+def test_salvage_format_routes_plan_summaries_into_floor_plans() -> None:
+    """Seam C: the plan-only salvage feeds a top-level ``plan_summaries`` key to
+    _format_output; it must emit those as ``floor_plans`` through the same v2
+    chokepoint, forcing is_floor_plan_level and the zero-inventory availability
+    contract (unpriced/unanchored → UNAVAILABLE, so NO phantom AVAILABLE)."""
+    from ma_poc.scripts.runners.jugnu import _format_output
+
+    result = {
+        "units": [],
+        "plan_summaries": [{"floor_plan_name": "The Oak", "beds": 1, "baths": 1,
+                            "area": 700}],
+        "base_url": "https://example.com",
+        "_meta": {},
+    }
+    formatted = _format_output(result, {}, schema_version="v2")
+    fps = formatted.get("floor_plans") or []
+    assert len(fps) == 1, "salvaged plan row did not reach floor_plans[]"
+    assert fps[0]["is_floor_plan_level"] is True
+    assert fps[0]["availability_status"] == "UNAVAILABLE", (
+        "unpriced salvaged plan row shipped as available — phantom roster"
+    )
+    # A PRICED plan row keeps its status — real data must never be coerced away.
+    # Raw checkpointed plan rows carry the make_unit_dict shape (market_rent_low
+    # / rent_range), NOT the v2 output field rent_low; that is the shape the
+    # salvage actually feeds, and _format_v2_unit reads it into rent_low=1500 so
+    # the has_rent short-circuit keeps the row UNKNOWN (not UNAVAILABLE).
+    priced = _format_output(
+        {"units": [], "plan_summaries": [{"floor_plan_name": "Elm", "beds": 1,
+         "baths": 1, "area": 700, "market_rent_low": 1500}], "_meta": {}},
+        {}, schema_version="v2",
+    )
+    assert priced["floor_plans"][0]["availability_status"] == "UNKNOWN"
+    assert priced["floor_plans"][0]["rent_low"] == 1500.0
+
+
 def test_checkpoint_is_a_noop_without_a_ref_and_never_raises() -> None:
     # no external ref registered (e.g. daily_runner path) → silently ignored
     budget: dict[str, Any] = {}

@@ -692,6 +692,16 @@ async def run_jugnu(
             # scope (not inside the cancelled coroutine), it survives cancellation.
             _partial_units: list[Any] = _partial_state.get("units") or []
             _partial_profile = _partial_state.get("profile")
+            # #81: plan-level rows checkpointed by pms.scraper.checkpoint_partial
+            # (survives coroutine cancellation via _partial_state). Filter to
+            # dict rows only — _format_v2_floor_plan is applied to isinstance
+            # dict rows, so a non-dict here would credit SUCCESS_PLAN_LEVEL yet
+            # emit an empty floor_plans[] (the empty-plans false positive).
+            _partial_plans: list[Any] = [
+                p
+                for p in (_partial_state.get("plan_summaries") or [])
+                if isinstance(p, dict)
+            ]
             if _partial_units:
                 log.info(
                     "Property %s: recovered %d partial units from hop accumulation",
@@ -794,6 +804,12 @@ async def run_jugnu(
                         failed = _format_output(
                             {
                                 "units": _partial_units,
+                                # #81: carry any checkpointed plan rows through
+                                # the SAME chokepoint so a units+plans timeout
+                                # keeps its floor_plans instead of dropping them.
+                                # Empty when none were checkpointed → floor_plans
+                                # stays [], byte-identical to the prior behaviour.
+                                "plan_summaries": _partial_plans,
                                 "base_url": task.url,
                                 "_meta": failed["_meta"],
                             },
@@ -804,6 +820,40 @@ async def run_jugnu(
                         log.warning(
                             "salvage v2-format failed for %s: %s — "
                             "emitting raw units",
+                            task.property_id, _fmt_exc,
+                        )
+            elif _partial_plans:
+                # #81 plan-only timeout salvage: zero units survived, but
+                # plan-level rows were checkpointed. Route them through the
+                # SAME v2 chokepoint (_format_v2_floor_plan) so each plan card
+                # gets is_floor_plan_level=True, cleared identity, and the
+                # zero-inventory availability contract
+                # (resolve_plan_row_availability, has_anchor=False) — which
+                # forces an unpriced/unanchored plan row to UNAVAILABLE. That
+                # contract is why a plan-only salvage can NEVER ship phantom
+                # AVAILABLE inventory, so no rent-gap neutralisation is applied
+                # here (unlike the units branch above). The verdict computed
+                # below then lands SUCCESS_PLAN_LEVEL, not FAILED_NO_DATA.
+                log.info(
+                    "Property %s: recovered %d partial plan rows (no units)",
+                    task.property_id, len(_partial_plans),
+                )
+                failed.setdefault("_meta", {})["partial_recovery"] = True
+                if schema_version == "v2":
+                    try:
+                        failed = _format_output(
+                            {
+                                "units": [],
+                                "plan_summaries": _partial_plans,
+                                "base_url": task.url,
+                                "_meta": failed["_meta"],
+                            },
+                            csv_row,
+                            schema_version,
+                        )
+                    except Exception as _fmt_exc:
+                        log.warning(
+                            "salvage v2 plan-format failed for %s: %s",
                             task.property_id, _fmt_exc,
                         )
             # 2026-05-27: stamp a verdict on the salvage record so run_report
@@ -831,10 +881,17 @@ async def run_jugnu(
                 # stamped FAILED_NO_DATA — discarding the operator's
                 # authoritative answer. With the flag and zero partial units,
                 # compute() returns SUCCESS_NO_AVAILABILITY.
+                # #81: with zero salvaged units _salvage_extract is None, so
+                # compute() takes its extract_result-None branch and, seeing
+                # non-empty plan_summaries, returns SUCCESS_PLAN_LEVEL instead
+                # of FAILED_NO_DATA. When units ARE present the extract dict has
+                # records, so plan_summaries is never consulted — passing it is
+                # inert for the units path (verified against verdict.compute).
                 _salvage_verdict = _compute_verdict(
                     fetch_outcome=None,
                     extract_result=_salvage_extract,
                     units=_partial_units or None,
+                    plan_summaries=_partial_plans or None,
                     operator_no_availability=bool(
                         _partial_state.get("operator_no_availability")
                     ),
