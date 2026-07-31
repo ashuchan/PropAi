@@ -108,7 +108,13 @@ async def try_knock_direct(
         # unlocker=False: Knock's API is a clean public GET; never spend the
         # Web-Unlocker cap on it (and it's compliance-forced-off anyway). The
         # sync curl_cffi GET runs off-loop so it never stalls the AsyncPool.
-        r = await asyncio.to_thread(probe_get, endpoint, unlocker=False, timeout=20)
+        # retries=2 (2026-07-31, fetch reliability): the only fallback today is
+        # a full ~10-45s render, so a transient soft-403 forces the render this
+        # fast path exists to skip. A bounded compliance-safe plain re-GET
+        # (unlocker stays False under COMPLIANCE_MODE) recovers it far cheaper.
+        r = await asyncio.to_thread(
+            probe_get, endpoint, unlocker=False, retries=2, timeout=20
+        )
     except Exception as exc:
         log.debug("knock_direct GET raised for %s: %s", pid, exc)
         return None

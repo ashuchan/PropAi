@@ -107,6 +107,19 @@ _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 # disables the cap.
 _MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
 
+# Render-retry-on-transient (2026-07-31, fetch reliability). A client-XHR-
+# dependent SPA (Entrata ProspectPortal /conventional/+/floorplans/) whose
+# render times out with NO captured XHR would otherwise fall to the curl_cffi
+# static shell, which OK-returns a 200 with zero client XHR -> 0 units. A
+# static fetch can never run the client XHR; only a re-render can. When on,
+# retry the render ONCE, tightly gated (timeout-class transient + empty
+# network_log + first attempt), before the static fall pre-empts it. Default
+# OFF: it adds at most one extra render for that exact failure mode, so it is
+# canary-gated to measure the yield/runtime trade before any default flip.
+_RENDER_RETRY_ON_TRANSIENT = os.getenv(
+    "ENABLE_RENDER_RETRY_ON_TRANSIENT", ""
+).strip().lower() in ("1", "true", "yes")
+
 log = logging.getLogger(__name__)
 
 # Cookie-mint reuse (option b): exact names + prefixes of the bot-wall
@@ -842,6 +855,33 @@ class Fetcher:
                 # different TLS fingerprint + UA, often falling outside
                 # the operator's bot-pacing throttle (validated 3/3 on
                 # essexapartmenthomes.com 2026-05-23).
+                # Render-retry-on-transient (2026-07-31): for a client-XHR-
+                # dependent SPA whose render TIMED OUT with no captured XHR,
+                # the curl_cffi static shell below OK-returns a 200 that has
+                # zero client XHR -> 0 units, and that OK pre-empts every
+                # downstream/outer retry. A static fetch cannot run the client
+                # XHR; only a re-render can. Retry the render ONCE here, before
+                # the static fall, gated to the exact failure mode: timeout-
+                # class TRANSIENT, no network_log, first attempt. Dead-domain
+                # DNS/SSL transients carry a different signature and are
+                # excluded, so this never wastes a render on them. See
+                # ``_RENDER_RETRY_ON_TRANSIENT``.
+                if (
+                    _RENDER_RETRY_ON_TRANSIENT
+                    and render_result.outcome == FetchOutcome.TRANSIENT
+                    and attempt <= 1
+                    and "TIMEOUT" in (render_result.error_signature or "").upper()
+                    and not render_result.network_log
+                ):
+                    retry_render = await self._do_render(
+                        task, identity, proxy, attempt, start_ms,
+                        path_scope_hint=path_scope_hint,
+                    )
+                    if retry_render.outcome == FetchOutcome.OK:
+                        return retry_render
+                    # Still failed: carry the retried result forward so the
+                    # static/unlocker fallbacks below act on the latest state.
+                    render_result = retry_render
                 # Zero cost, zero proxy, no flag gate — we always try the
                 # free option before any paid escalation OR before
                 # returning the original failure outcome unchanged.

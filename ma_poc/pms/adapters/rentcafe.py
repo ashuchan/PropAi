@@ -1722,6 +1722,12 @@ async def _try_rentcafe_securecafe_probe(
             _direct_kw: dict[str, Any] = {"proxies": {}, "verify": True}
             if fast_direct_only:
                 _direct_kw["unlocker"] = False
+                # Fetch reliability (2026-07-31): the fast path has NO proxied/
+                # unlocker fallback, so a single transient soft-403/429 on this
+                # code-only /availableunits GET sinks it. A bounded compliance-
+                # safe plain re-GET recovers it (probe_get forces unlocker=False
+                # under COMPLIANCE_MODE, so retries can never reach a solver).
+                _direct_kw["retries"] = 2
             r = await asyncio.to_thread(
                 probe_get, candidate_au, timeout=25, **_direct_kw
             )
