@@ -176,16 +176,20 @@ def _stub_adapter(pms: str, outcome: AdapterResult | BaseException) -> AsyncMock
 async def _drive(
     *,
     baseline_units: list[Any],
+    baseline_plan_summaries: list[dict[str, Any]] | None = None,
     baseline_tier: str,
     baseline_pms: str = "g5",
     html: str = _HTML_NO_CANDIDATE,
     retry_table: dict[str, AdapterResult | BaseException] | None = None,
     candidates_side_effect: BaseException | None = None,
+    fast_recovery: AsyncMock | None = None,
 ) -> dict[str, Any]:
     """Drive the real ``scrape()`` far enough to reach the Path-B/C block.
 
     Args:
         baseline_units: what the FIRST adapter returns.
+        baseline_plan_summaries: optional plan-only channel from the first
+            adapter, independent of ``baseline_units``.
         baseline_tier: its ``tier_used`` (an ``*_EMPTY`` suffix is an
             empty-exit label and triggers Path B).
         baseline_pms: the baseline adapter's ``pms_name``; the retry excludes
@@ -198,6 +202,10 @@ async def _drive(
         candidates_side_effect: make ``detect_pms_candidates`` raise, which is
             the only way to get an exception into the loop region that the
             per-attempt ``except Exception`` does not already swallow.
+        fast_recovery: universal-recovery mock. The default is an empty miss so
+            these Path-B/C tests remain about the retry block even though their
+            detector fixture intentionally contains a SecureCafe URL. Tests of
+            the new pre-retry handoff supply an explicit side effect.
 
     Returns:
         The ``scrape()`` result dict.
@@ -205,7 +213,11 @@ async def _drive(
     baseline = _stub_adapter(
         baseline_pms,
         AdapterResult(
-            units=baseline_units, tier_used=baseline_tier, errors=[], confidence=0.85
+            units=baseline_units,
+            plan_summaries=baseline_plan_summaries or [],
+            tier_used=baseline_tier,
+            errors=[],
+            confidence=0.85,
         ),
     )
     table = retry_table or {}
@@ -254,6 +266,10 @@ async def _drive(
         patch(
             "ma_poc.pms.adapters._probe.probe_get",
             side_effect=lambda *_a, **_k: _DeadProbe(),
+        ),
+        patch(
+            "ma_poc.pms.adapters._universal_recovery.recover_universal_embed",
+            new=fast_recovery or AsyncMock(return_value=([], "", "")),
         ),
         cand_patch,
     ):
@@ -345,6 +361,91 @@ async def test_zero_budget_emits_no_budget_not_lost_max_retries(
     assert d["candidates_offered"] == -1
 
 
+@pytest.mark.asyncio
+async def test_strict_portal_handoff_redirects_retry_budget(
+    captured: _CapturedEvents,
+) -> None:
+    """A canonical SecureCafe route reaches link-hop without adapter retries."""
+    from ma_poc.pms.adapters._pms_portal_hop import (
+        _record_rentcafe_portal_hint,
+    )
+
+    canonical = (
+        "https://tenant.securecafe.com/onlineleasing/community/"
+        "availableunits.aspx"
+    )
+
+    async def _discover_portal(
+        _page: object,
+        ctx: object,
+        *,
+        body_only: bool = False,
+    ) -> tuple[list[dict[str, Any]], str, str]:
+        assert body_only is True
+        _record_rentcafe_portal_hint(ctx, canonical)  # type: ignore[arg-type]
+        return [], "", ""
+
+    fast_recovery = AsyncMock(side_effect=_discover_portal)
+    result = await _drive(
+        baseline_units=[],
+        baseline_tier="TIER_1_API_G5_EMPTY",
+        html=_HTML_TWO_CANDIDATES,
+        fast_recovery=fast_recovery,
+    )
+
+    episode = captured.episode()
+    assert episode["outcome"] == "no_budget"
+    assert episode["trigger_reason"] == "empty_exit"
+    assert episode["attempts"] == 0
+    assert episode["candidates_offered"] == -1
+    assert episode["max_retries"] == 0
+    fast_recovery.assert_awaited_once()
+    assert result["_embedded_portal_hints"] == [(canonical, "securecafe")]
+    assert "fast_securecafe_render_handoff" in result["_fallback_chain"]
+
+
+@pytest.mark.asyncio
+async def test_fast_body_unit_win_preempts_adapter_retry(
+    captured: _CapturedEvents,
+) -> None:
+    """A canonical body recovery is adopted before Path B/C evaluates."""
+    recovered = [
+        {
+            "unit_number": "701",
+            "floor_plan_name": "A1",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 750,
+            "asking_rent": 1500,
+        }
+    ]
+    fast_recovery = AsyncMock(
+        return_value=(
+            recovered,
+            "TIER_1_API_FAST_TEST",
+            "knock_dni_config",
+        )
+    )
+
+    result = await _drive(
+        baseline_units=[],
+        baseline_tier="TIER_1_API_G5_EMPTY",
+        html=_HTML_TWO_CANDIDATES,
+        fast_recovery=fast_recovery,
+    )
+
+    episode = captured.episode()
+    assert episode["outcome"] == "not_triggered"
+    assert episode["attempts"] == 0
+    assert result["units"]
+    assert result["units"][0]["unit_number"] == "701"
+    assert result["extraction_tier_used"] == "TIER_1_API_FAST_TEST"
+    assert (
+        "fast_universal_recovery:knock_dni_config"
+        in result["_fallback_chain"]
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Section 2 — the undispatched outcomes.
 # ─────────────────────────────────────────────────────────────────────
@@ -391,6 +492,29 @@ async def test_production_hook_counts_plan_level_trigger(
     assert d["attempts"] == 0
     assert d["candidates_offered"] == 0
     assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
+
+
+@pytest.mark.asyncio
+async def test_plan_summaries_only_baseline_is_plan_level_not_empty(
+    captured: _CapturedEvents,
+) -> None:
+    """The split plan channel triggers and survives even with ``units=[]``."""
+    result = await _drive(
+        baseline_units=[],
+        baseline_plan_summaries=list(_PLAN_LEVEL),
+        baseline_tier="TIER_1_API_ENTRATA_EMPTY",
+    )
+
+    d = captured.episode()
+    assert d["trigger_reason"] == "plan_level_only"
+    assert d["final_trigger_reason"] == "plan_level_only"
+    assert d["baseline_plan_level"] is True
+    assert d["baseline_unit_count"] == 0
+    assert d["baseline_restored"] is True
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+    assert result["units"] == []
+    assert len(result["plan_summaries"]) == len(_PLAN_LEVEL)
+    assert result["_verdict_quality"] == "SUCCESS_PLAN_LEVEL"
 
 
 @pytest.mark.asyncio
@@ -447,6 +571,108 @@ async def test_won_promotes_the_retry_result(captured: _CapturedEvents) -> None:
     assert d["baseline_restored"] is False
     assert len(captured.of_kind(EventKind.RETRY_SUCCESS)) == 1
     assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 1
+
+
+@pytest.mark.asyncio
+async def test_production_plan_only_first_retry_continues_to_real_unit_winner(
+    captured: _CapturedEvents,
+) -> None:
+    """A plan-card retry is not success; the later canonical unit still wins."""
+    plan_only = AdapterResult(
+        units=[
+            {
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "baths": 1,
+                "sqft": 750,
+                "asking_rent": 1500,
+            }
+        ],
+        tier_used="TIER_1_API_KNOCK",
+        errors=[],
+    )
+    real_unit = AdapterResult(
+        units=[
+            {
+                "unit_number": "311",
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "sqft": 750,
+                "asking_rent": 1550,
+            }
+        ],
+        tier_used="TIER_1_API_RENTCAFE",
+        errors=[],
+    )
+
+    result = await _drive(
+        baseline_units=[],
+        baseline_tier="TIER_1_API_G5_EMPTY",
+        html=_HTML_TWO_CANDIDATES,
+        retry_table={"knock": plan_only, "rentcafe": real_unit},
+    )
+
+    d = captured.episode()
+    assert d["outcome"] == "won"
+    assert d["attempts"] == 2
+    assert d["tried_pms"] == ["knock", "rentcafe"]
+    assert d["won_pms"] == "rentcafe"
+    assert d["won_unit_count"] == 1
+    successes = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(successes) == 1
+    assert successes[0].data["attempt"] == 2
+    assert successes[0].data["unit_count"] == 1
+    assert any(u.get("unit_number") == "311" for u in result["units"])
+
+
+@pytest.mark.asyncio
+async def test_production_all_plan_retries_keep_richest_split_channel_fallback(
+    captured: _CapturedEvents,
+) -> None:
+    """A zero-unit plan_summaries result survives without a false unit win."""
+    one_plan = AdapterResult(
+        units=[
+            {
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "sqft": 750,
+                "asking_rent": 1500,
+            }
+        ],
+        tier_used="TIER_1_API_KNOCK",
+        errors=[],
+    )
+    split_catalog = AdapterResult(
+        units=[],
+        plan_summaries=[
+            {"floor_plan_name": "A1", "beds": 1, "sqft": 750},
+            {"floor_plan_name": "B2", "beds": 2, "sqft": 1100},
+        ],
+        tier_used="TIER_1_API_RENTCAFE",
+        errors=[],
+    )
+
+    result = await _drive(
+        baseline_units=[],
+        baseline_tier="TIER_1_API_G5_EMPTY",
+        html=_HTML_TWO_CANDIDATES,
+        retry_table={"knock": one_plan, "rentcafe": split_catalog},
+    )
+
+    d = captured.episode()
+    assert d["outcome"] == "lost_max_retries"
+    assert d["attempts"] == 2
+    assert d["final_trigger_reason"] == "plan_level_only"
+    assert d["won_pms"] == ""
+    assert d["won_unit_count"] == -1
+    assert d["baseline_restored"] is False
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+    assert result["_adapter_used"] == "rentcafe"
+    assert result["_verdict_quality"] == "SUCCESS_PLAN_LEVEL"
+    assert result["_plan_level_reason"] == "empty_exit"
+    assert result["units"] == []
+    assert len(result["plan_summaries"]) == 2
+    assert result["extraction_tier_used"] == "TIER_1_API_RENTCAFE_PLAN_LEVEL"
 
 
 @pytest.mark.asyncio

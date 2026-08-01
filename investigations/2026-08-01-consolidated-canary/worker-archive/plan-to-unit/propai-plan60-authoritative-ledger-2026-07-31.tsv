@@ -1,0 +1,331 @@
+apartment_id	property_name	website	evidence_lanes
+266	Ridgewood Apartments	http://www.ridgewoodapartmentscolumbus.com/	old_replay_certified
+486	Rosewood	https://rwoodapts.prospectportal.com/	entrata_hb_focused_25|entrata_hb_grid_sample
+794	Haven Apartments & Townhomes	http://www.haven-apts.com/	v1_success_corrected
+1146	Signal Pointe Apartment Homes	http://www.signalpointe.com/	old_replay_certified
+1154	Deer Crest	www.deercrestapartments.com	v1_success_corrected
+1575	Hampden Heights	http://www.hampdenheights-apts.com/	v1_success_corrected
+1721	Hidden Valley Club	https://www.hvca2.com/	rentmanager_ssr
+2360	Prairie Shores	http://www.liveprairieshores.com	v1_success_corrected
+2927	Cornerstone Apartments	https://cornerstonemgm.com/	v1_success_corrected
+2957	Arbor Park of Alexandria	http://arborparkofalexandria.com	udr_pricing_full_scrape_strict_92
+3041	The Reserve at Bellfort	www.reserveatbellfort.com	old_replay_certified
+3106	Woodhollow	http://www.woodhollowwaco.com/	old_replay_certified
+3141	Venetian Bridges	https://www.venetianbridgesstockton.com/	v1_success_corrected
+3148	Aven	https://www.avenliving.com	zrs_ssr
+3345	Enclave at Paradise Valley	https://www.enclaveaz.com/	v1_success_corrected
+4131	North Brunswick Manor	https://bestrentnj.com/Communities/North-Brunswick-Manor/	v1_success_corrected
+4306	Meadows	https://www.themeadowsnovato.com/	rentcafe_direct_availableunits
+4708	Cherry Creek	http://www.cherrycreekapts.org/	old_replay_certified
+4709	1020 at Winter Springs	https://www.1020atwinterspringsfl.com/	zrs_ssr
+4944	Triangle Place	https://www.hgliving.com/apartments/nc/durham/triangle-place/	old_replay_certified
+5355	Winthrop West	https://cortland.com/apartments/winthrop-west/	v1_success_corrected
+5719	7400 Roosevelt	https://www.lindyproperty.com/properties/7400-roosevelt/	rentcafe_applicant_floorplans_v2_direct_21
+5859	Cypress Winds	https://gscapts.com/apartments/florida/cypress-winds-apartment-homes/?y_source=1_MTUyOTEzMTItNzE1LWxvY2F0aW9uLndlYnNpdGU%3D	v1_success_corrected
+6365	Regency Park	https://www.liveatregencypark.com/	v1_success_corrected
+6776	Muirwood Village	http://www.liveatmuirwoodvillage.com/	v1_success_corrected
+6968	Pebblebrook	www.pebblebrookapts.com	rentcafe_hyperbrowser_no_solver
+7542	Landings at North Ingle	https://www.thelandingsatnorthingle.com/	old_replay_certified
+7931	Lamonte Park	https://www.lamonteparktownhomes.com/	v1_success_corrected
+8717	Las Colinas Heights	www.liveatlascolinasheights.com	v1_success_corrected
+9791	Alta Vista	https://thealtavistaapts.com/	old_replay_certified
+10291	The Mirage Apartments	https://liveatthemirage.com/	entrata_hb_focused_25
+10496	Grayson Park	https://liveatgraysonpark.com/	old_replay_certified
+10929	Highland Park Apartments	www.hpluxuryapts.com	rentcafe_direct_availableunits
+11342	The Village Lakes	https://www.thevillagedallas.com/properties/the-village-lakes/	old_replay_certified
+12162	Vista Springs	https://www.vistaspringsapts.com/	old_replay_certified|rentcafe_direct_availableunits
+12370	Rockbrook Creek I	https://www.hgliving.com/apartments/tx/lewisville/rockbrook-creek/	old_replay_certified
+12459	Bridge Lane	http://www.bridgelaneapartments.com/Home.aspx	entrata_hb_focused_25|entrata_hb_grid_sample
+12746	Sunset Canyon	http://www.thesunsetcanyon.com/	old_replay_certified|rentcafe_direct_availableunits
+12959	Oak Bend	https://www.oakbendapt.com/	old_replay_certified
+13883	Verano Townhome Rentals	https://www.veranoapartmenthomes.com/?utm_source=GoogleLocalListing&utm_medium=organic#	v1_success_corrected
+13925	Sterling Glen	http://www.sterlingglenapthomes.com/	rentmanager_ssr
+13942	Iron Horse Flats	https://ironhorseflats.com/	old_replay_certified
+15049	Verandah at Lakepointe	https://verandahlake.com/	old_replay_certified
+15104	Portofino Apartment Homes	http://www.rent-portofino.com/	v1_success_corrected
+15517	The Artisan Residences at Bella Terra	https://www.theartisanatbellaterra.com/	v1_success_corrected
+16104	Twin Springs Apartments	https://www.twinspringsapts.com/	v1_success_corrected
+16144	Casitas	https://www.casitasapartments.com/	g5_universal_direct_strict_12
+16196	Village Square Apartments	http://www.villagesquarewheaton.com/Home/Index/36189	old_replay_certified
+16454	Casa Del Mar	www.livecasadelmar.com	entrata_direct_vus
+16818	Santa Fe Village	https://www.santafevillagescm.com/	v1_success_corrected
+16940	Clearwater Creek	www.clearwatercreekapartments.com	rentcafe_direct_availableunits
+18082	River Rock	https://riverrockapt.prospectportal.com/	entrata_direct_vus
+18271	Bryn Mawr	http://www.brynmawrapartments.com/	entrata_hb_form_action_3
+18570	Cheyenne Trails	https://www.cheyennetrailslv.com/	rentcafe_applicant_floorplans_v2_direct_4
+18684	Le Mirage	https://lemirageapts.managebuilding.com/Resident/public/home	v1_success_corrected
+18865	Meridian Green	www.meridiangreentownhomes.com	entrata_hb_focused_25
+19939	Haven at South Mountain	https://www.havenatsouthmountainapts.com/	entrata_hb_focused_25
+20943	Bremerton Park	https://www.bremertonparkapts.com/	rentcafe_direct_availableunits
+21092	Royale	https://royale.prospectportal.com/	entrata_direct_vus
+21180	Chapel View	https://www.chapelviewapartments.com/	old_replay_certified|rentcafe_direct_availableunits
+21293	Beach Villas	www.beachvillasapts.com	v1_success_corrected
+21597	Arrive West Linn	https://arrivewestlinn.com/	v1_success_corrected
+21665	Lomita Court	https://residentialforlease.mgrmgmt.com/apartments/ca/alta-loma/lomita/default	v1_success_corrected
+22297	Chestnut Park	https://www.mychestnutparkapartments.com/	v1_success_corrected
+22337	Park Wood	https://www.parkwoodluxury.com/	entrata_hb_remaining_14
+22900	Canyon Springs	https://www.liveatcanyonsprings.com/	v1_success_corrected
+23281	Mill Bridge	https://www.millbridgeapartments.com/	v1_success_corrected
+23372	Stewart Arms	https://www.stewartarms.vegas/	old_replay_certified
+23723	Pheasant Run	http://www.yourpheasantrun.com/	entrata_hb_remaining_14
+23747	Parkview Terrace	https://www.parkviewterrace.com	v1_success_corrected
+23870	The Park at London	https://www.liveattheparkatlondon.com/	old_replay_certified
+23949	North Mountain	http://www.prmnorthmountain.com/	rentcafe_direct_availableunits
+24893	Spruce Apartments I	https://prometheusapartments.com/ca/sunnyvale-apartments/spruce	old_replay_certified
+25445	Highview Terrace	https://www.southernmanagement.com/communities/highview-terrace/	old_replay_certified
+25490	Rise Creekside	https://www.risecreekside.com/	v1_success_corrected
+25563	The Hudson	https://www.thehudsondc.com/	rentcafe_direct_availableunits
+25875	Sedgefield Square	https://www.sedgefieldsquareapts.com/	old_replay_certified
+26161	Hamilton House	http://www.renthamiltonhouse.com/hamilton-house-mayfield-heights-oh	v1_success_corrected
+26278	The Park at Morella	www.theparkatmorella.com	old_replay_certified
+26351	Brooklyn Crossing	https://www.brooklyncrossingmn.com/	v1_success_corrected
+26382	The Preserve at Woodfield	https://www.thepreserveatwoodfield.com/	rentcafe_direct_availableunits
+26513	Arrive Oak Brook Heights	https://www.arriveoakbrookheights.com/	old_replay_certified
+27165	Regatta Apartments Homes	https://www.regatta-apts.net/	v1_success_corrected
+27583	Brookmore Apartments	http://www.brookmoreapts.com/	rentcafe_direct_availableunits
+27646	Hilltop Apartments	https://www.liveatha.com/	entrata_direct_vus
+27790	Magnolia Flats	https://www.magnoliaflatssa.com/	entrata_hb_focused_25
+28114	Oaks of Northgate	https://www.oaksofnorthgatesanantonio.com/	v1_success_corrected
+29910	Park West	https://www.parkwestapartmentschino.com/	old_replay_certified|rentcafe_direct_availableunits
+30171	The Henry at Rosenberg	https://www.thehenryatrosenberg.com/	entrata_direct_vus
+30734	Waterford Village	https://www.harborgroupmanagement.com/apartments/MA/Bridgewater/Waterford-Village/	harbor_group_json
+30775	Tremezzo on the Lake	https://www.tremezzoonthelake.com/	entrata_hb_remaining_14
+31099	Woodward Place Apartments	https://www.woodwardplace.com/	v1_success_corrected
+31255	Arrive Chadds Ford	https://www.arrivechaddsford.com/	v1_success_corrected
+31341	Carrington Park	http://www.carringtonparkjonesboro.com/	spherexx_zrs_live_strict_10
+32155	Montelago	http://www.montelagoapts.com/	old_replay_certified
+32307	Bear Valley Park	https://www.rentbearvalleypark.com/	v1_success_corrected
+32371	Villas de Fontenelle	http://www.villasdefontenelle.com/	entrata_direct_vus
+32794	The Majestic	https://majesticvernonhills.com/	v1_success_corrected
+33133	Parcside Townhomes	https://www.parcsidetownhomes.com/	v1_success_corrected
+33173	Hermann Park Lofts	https://hermannparklofts.com/?utm_knock=gmb	old_replay_certified
+33550	Princeton Bradford Apartment Homes	https://www.princetonbradford.com/	entrata_hb_focused_25
+33785	The Village of Hawks Creek	https://www.villageofhawkscreek.com/	v1_success_corrected
+33987	Villages at Lost Creek	www.villagesatlostcreekapts.com	rentcafe_direct_availableunits
+34079	The Village Westside	https://villagewestside.prospectportal.com/dallas/the-village-westside/conventional/	entrata_hb_self_grid_3
+34909	Polo Downs	http://www.polodowns.com/	old_replay_certified
+35738	Stamford Corners	www.stamfordcornersapts.com	v1_success_corrected
+35859	Echelon Chicago	www.echelonchicago.com	entrata_hb_focused_25|entrata_hb_retry_shell
+35901	Promenade Oaks	https://promenadeoaks-apartments.com/	v1_success_corrected
+36925	View 14	http://www.view14.com/	udr_jsonld
+36926	Fenestra at the Square	www.fenestraapts.com	entrata_hb_remaining_14|entrata_hb_retry_shell
+37390	Skyview West	https://www.skyviewwest.com/	old_replay_certified|rentcafe_direct_availableunits
+37483	Kitterman Woods	http://www.kittermanwoods.com/	old_replay_certified
+37847	Preserve at Research Park	www.preserveresearchpark.com	entrata_hb_remaining_14
+37910	Maryland Park	https://www.livemarylandpark.com/	v1_success_corrected
+38285	Warwick	www.liveatwarwick.com/	entrata_direct_vus
+38489	West Gate Town Homes	https://www.westgatetownhomes.com/	appfolio_low_zip
+38509	The Belle Meade at River Oaks	http://www.thebellemeade.com/	entrata_hb_seed_detail
+38836	Braewood	https://www.braewoodutah.com/	entrata_hb_remaining_14
+39295	The Abigail Apartments	https://www.livetheabigailapts.com/	v1_success_corrected
+39378	Andante	www.andanteapts.biz	entrata_hb_strict_conventional_3
+39573	Prime at Gardenside	https://www.liveprimegardenside.com/	residentservices365_plan_detail
+39687	29 Edgewater	https://www.live29edgewater.com/	v1_success_corrected
+40178	Park Plaza	https://www.parkplazapdx.com/	v1_success_corrected
+40539	Albers Mill Lofts	www.albersmilllofts.com	v1_success_corrected
+40565	Aventura at Contee Crossing	https://www.aventuraatconteecrossing.com/	v1_success_corrected
+40584	Regency Park North	www.regencyparknorth.com/	v1_success_corrected
+40607	Brookview Court	https://www.brookviewcourt.com/	rentcafe_direct_availableunits
+40989	Savoye	http://www.savoyeaddison.com/	udr_direct_pricing_hop_2026-07-31
+41008	Pearl Midlane River Oaks	https://pearlmidlane.com/	v1_success_corrected
+41667	Wilmington Commons	https://www.wilmingtoncommons.com/	old_replay_certified
+42064	Elements at 1600	https://www.elements1600.com/	old_replay_certified
+42261	Casas de Soledad	http://www.casasdesoledadapt.com/	entrata_hb_marketing_detail_hop
+42368	The Broadview Apartments	http://www.broadviewapartments.com/	rentcafe_direct_availableunits
+42556	Landings at Parkview	https://www.mirageatsouthpoint.com/	old_replay_certified
+42562	Palladium Park	http://www.palladiumparkapts.com/	old_replay_certified|rentcafe_direct_availableunits
+42781	Crescent Ridge	https://www.crescentridgeaptsnm.com/	old_replay_certified|rentcafe_direct_availableunits
+42925	Lakeside	https://www.thelakesideapthomes.com/	entrata_hb_focused_25|entrata_hb_high_confidence
+42949	La Cima	https://www.lacimaapts.com/	entrata_hb_focused_25
+42981	Alexander Pointe	https://www.livealexanderpointefl.com/	zrs_ssr
+43094	Grandview Pointe	www.grandviewleasing.com	old_replay_certified|rentcafe_direct_availableunits
+43299	Windsail	https://www.caseusa.com/apartments/ok/tulsa/windsail/	old_replay_certified
+43551	Willow Trail	https://www.willowtrailjax.com/contact-us/	zrs_ssr
+43715	The Heritage at Boca Raton	www.theheritageatbocaraton.com	old_replay_certified
+43741	Quatama Village	https://www.quatamaprinceton.com/	old_replay_certified
+44185	Flats on 12	https://www.flatson12.com/?utm_knock=gmb	entrata_hb_remaining_14|entrata_hb_seed_detail
+44573	Windsor Manor	www.windsormanorprinceton.com	old_replay_certified
+44669	Commons at Dawson Creek	http://www.commonsatdawsoncreek.com/index.aspx	rentcafe_direct_availableunits
+45061	Cottage Meadows	https://www.cottagemeadows.com/	entrata_hb_high_confidence
+45353	Mall	https://www.mall-apartments.com/	appfolio_low_zip
+46309	Regency at Chandler Park	http://theregency.southcorpproperties.com/	old_replay_certified
+46328	Ridge	https://www.elandisridge.com/	rentcafe_direct_availableunits
+47878	Port Royal At Spring Hill	https://www.portroyaltn.com/	v1_success_corrected
+47982	Dwell at Greenridge	https://www.dwellatgreenridge.com/	v1_success_corrected
+48133	The Lyric at Carleton Place	http://lyricliving.com/	old_replay_certified
+48344	Copper Commons	http://www.coppercommons.com/	entrata_hb_remaining_14
+48752	Valley Ridge Apartments	http://www.valleyridgeapts.com/	entrata_hb_seed_detail
+48769	Spring Gate	https://www.hgliving.com/apartments/fl/panama-city/spring-gate/#/	old_replay_certified
+49169	Pebble Creek	https://www.pebblecreekapt.com/	v1_success_corrected
+49180	Washington Townhomes	https://washingtontownhomeslorain.com/	v1_success_corrected
+49248	Sandpiper	https://www.sandpiperapartmentssaltlakecity.com/	v1_success_corrected
+49548	4th & Plum Apartments	https://www.fourthplum.com/	rentmanager_public_endpoint
+50144	Park Avenue	https://www.broadmoor.cc/parkavenueapartments	v1_success_corrected
+50384	Fairwood Apartments	https://www.fairwoodapartments.com/	v1_success_corrected
+51142	Three 44	https://www.liveatthree44.com/	entrata_hb_seed_detail
+51746	Eagle Crossing	https://www.liveeaglecrossing.com/	entrata_hb_strict_revalidation
+51860	Ravenswood	https://www.ravenswoodapartmentsstow.com/	entrata_hb_high_confidence|entrata_hb_remaining_14
+52081	Madera	https://prometheusapartments.com/ca/mountain-view-apartments/madera/?utm_source=googlemybusiness&utm_medium=organic	old_replay_certified
+52947	Parkside Trace	https://www.shamrockparksidetrace.com/	old_replay_certified
+53117	Watersedge Apartments	https://www.watersedgeapartments.net/	g5_universal_direct_strict_3
+53164	Arbor Pointe Townhomes	www.arborpointe-townhomes.com	v1_success_corrected
+54994	Verge Apartments	https://www.thevergelife.com/	old_replay_certified
+56193	Vue 180	http://www.vue180.com/	old_replay_certified|rentcafe_direct_availableunits
+56988	Prairie Creek Apartments and Townhomes	https://www.prairiecreekapartments.com/	rentcafe_direct_availableunits
+57142	Metro 303	https://www.metro303.com/	old_replay_certified
+58452	Enclave at Brookside	https://oklahoma.weidner.com/apartments/ok/tulsa/the-enclave-at-brookside/	old_replay_certified
+60311	The Reserve at Elm	http://www.reserveatelmapartmentstulsa.com/	v1_success_corrected
+60579	Steelworks	https://www.steelworksatlanta.com/	v1_success_corrected
+60660	Ovation at Lewisville	www.ovationatlewisville.com	rentcafe_direct_availableunits
+60779	The Platform	http://www.theplatformkent.com/	old_replay_certified
+60926	170 Amsterdam	https://www.equityapartments.com/new-york-city/upper-west-side/170-amsterdam-apartments	v1_success_corrected
+60939	Greenarch	http://www.greenarchtulsa.com/	residentservices365_plan_detail
+60941	Link Brookstown	https://www.linkbrookstown.com/	v1_success_corrected
+60985	Greenwood Village	https://www.corsamanagement.com/properties/greenwood-village-apartments/	v1_success_corrected
+61169	Plaza 25	https://www.plaza25apartments.com/	v1_success_corrected
+61963	Grand Oak at Town Park	http://www.grandoakattownpark.com/	v1_success_corrected
+62117	618 South Main	https://www.618southmain.com/	v1_success_corrected
+62179	The Villas at Keystone Canyon I	https://www.kromerinvestments.com/apartments/the-villas-at-keystone-canyon-2/	old_replay_certified
+62199	Cyan on Peachtree	http://www.cyanonpeachtree.com/	old_replay_certified
+62200	The Henry	https://www.thehenryapartments.com/	old_replay_certified
+62919	Be DTLA	https://www.bedtla.com/?utm_source=GoogleLocalListing&utm_medium=organic	v1_success_corrected
+63462	Telfair Lofts	https://apartmentssugarlandtexas.com/	old_replay_certified
+63465	Hanover Southampton	http://www.hanoversouthampton.com/Apartments/module/property_info/property%5Bid%5D/91437/launch_guest_card/1/	entrata_hb_seed_detail
+63498	Hanover Montrose	http://www.hanovermontrose.com/	entrata_hb_remaining_14|entrata_hb_retry_shell
+63766	Madrone II	https://prometheusapartments.com/ca/mountain-view-apartments/madrone	old_replay_certified
+63788	Novus Westshore	http://novuswestshore.com/	novus_resi_plan_detail
+64145	Crystal Riviyera	http://www.crystalriviyera.com/	v1_success_corrected
+64894	Museum Tower	http://www.museumtowerapts.com/	v1_success_corrected
+64955	Dry Creek Ranch	http://www.liveatdrycreekranch.com/	old_replay_certified
+65287	Trio Apartments	https://www.triomke.com/	entrata_hb_seed_detail
+65327	Beacon Harbor Point	http://www.beaconharborpt.com	v1_success_corrected
+65468	Red Tail Apartments	www.redtailapartments.com	v1_success_corrected
+67386	Urban North	http://www.urbannorthaustin.com	v1_success_corrected
+67524	Riverworks	https://www.hgliving.com/apartments/pa/phoenixville/riverworks	harbor_group_landing_route_full_scrape_strict_28
+67713	Riverfront	www.liveatriverfrontapts.com	old_replay_certified
+68133	Stoneplace Apartments I & II	https://www.stoneplaceapts.us/	rentcafe_direct_availableunits
+68469	1824 Defoor	http://www.1824defoor.com/	v1_success_corrected
+69368	Creekview	https://www.creekviewapthomes.com/	old_replay_certified
+69923	Concord Court Apartments	http://www.rentconcordcourtapts.com/	entrata_hb_published_legacy_root
+71093	Ashmore Trace Apartments	https://www.ashmoretrace.com/	old_replay_certified
+71747	The Atlas	http://www.copperwoodut.com/	v1_success_corrected
+72086	Maple Lane I	https://www.maplelaneapts.com/	rentcafe_direct_availableunits
+73112	Somerset Place	www.somersetplace-apartments.com	v1_success_corrected
+73955	Fairways of Inverrary	www.fairwayslauderhill.com	old_replay_certified|rentcafe_direct_availableunits
+73968	Bay Crossing	www.baycrossingapartments.com/	old_replay_certified
+74344	Private Reserve Townhomes	http://www.privatereserveapts.com	entrata_hb_strict_conventional_3
+74364	Wilmington Pointe	www.wilmingtonpointe.com	rentmanager_ssr
+75050	Santa Cruz	https://www.santacruzapartmenthomes.com/	entrata_hb_focused_25
+75158	The Glen at Oldtown	https://www.theglenatoldtown.com/?utm_source=GoogleLocalListing&utm_medium=organic#	v1_success_corrected
+77588	The Byron On Peachtree	https://www.thebyron.com/	old_replay_certified
+77796	Modera Edgewater	https://www.moderaedgewatermiami.com/	v1_success_corrected
+77834	Hanover Northgate	https://www.hanovernorthgate.com/	entrata_hb_focused_25
+78011	The Travis	https://thetravishouston.com/	v1_success_corrected
+78179	PROSPER Azalea City	https://www.prosperazaleacity.com/	old_replay_certified
+78374	Bluegrass Villas	https://www.bluegrassvillas.com/	v1_success_corrected
+90544	The Woods at Alderwood	https://thewoodsatalderwood.com/	rentcafe_applicant_floorplans_v2_direct_7_strict_nonwait
+92969	Meritum Sheely Farms	https://www.meritumsheelyfarms.com/	entrata_hb_published_legacy_grid_3
+95594	Highline	https://highline321.com/	old_replay_certified
+97501	Woodmont West At Mount Arlington	http://www.woodmontwest.net/	v1_success_corrected
+98129	Colonial Crossing Apartments	https://colonialcrossingapts.com/	custom_availability_table
+217605	Bennett Pointe	https://www.livebennettpointe.com/	old_replay_certified
+218757	The Village Drey	https://www.thevillagedallas.com/properties/the-village-drey/	v1_success_corrected
+218853	Brownstone Apartment Homes	https://www.brownstonetx.com/	old_replay_certified
+218956	Coronado Villas	https://coronadovillas.tokolaproperties.com/	entrata_hb_focused_25|entrata_hb_high_confidence
+219390	Confluence at Harvest Hills	https://northdakota.weidner.com/apartments/nd/williston/confluence-at-harvest-hills/index.aspx	v1_success_corrected
+219898	The Julian at South Pointe I	https://julianatsouthpointe.com/	old_replay_certified
+220581	Hampshire Village	http://hampshirevillage.com/	v1_success_corrected
+222707	Sundancer Apartments	http://www.prmsundancer.com/	rentcafe_direct_availableunits
+223037	River House	https://riverhousecolumbus.com/	old_replay_certified
+225785	Summerlin at Winter Park	http://www.summerlinatwinterpark.com/	v1_success_corrected
+227791	Delwyn	https://delwynapartments.com/	v1_success_corrected
+228903	Fitchburg Square Apartments	http://www.fitchburgsquare.com/	v1_success_corrected
+229374	Avoca	https://www.avocaapartments.com/	old_replay_certified
+229616	93 East	https://93east.prospectportal.com/	entrata_hb_remaining_14
+230081	Vitruvian West II	www.vitruvianwest.com	udr_pricing_full_scrape_strict_93
+230358	Evergreen Meadows	http://www.gardencommunities.com/Properties/NJ/Middlesex/Evergreen-Meadows.aspx	v1_success_corrected
+230770	Lake Haven	http://www.lakehavenluxury.com/	old_replay_certified
+231932	Sequoyah Apartments	http://www.sequoyahapts.com/Default.aspx	v1_success_corrected
+231934	450 Green Apartments	https://www.lindyproperty.com/properties/450-green-apartments/	securecafe_applicant_v2_hb_exact_7_strict_2026-07-31
+232905	Stone Ridge Apartments	https://www.stoneridgeoflawton.com/	old_replay_certified
+233260	Republic Palms	https://republicpalms.thewootenco.com/	entrata_hb_focused_25|entrata_hb_grid_sample
+234186	Middle Branch Apartments and Townhomes	http://www.middlebranchmanor.com	entrata_hb_identity_variant_3
+234616	Mountain View Apartment Homes	www.liveatmountainview.com	old_replay_certified
+234940	1010 On the Rhine	http://1010ontherhine.com	old_replay_certified
+235753	Park South	http://parksouthapartments.com/	v1_success_corrected
+235871	Elmtree Park Apartments	https://www.hgliving.com/apartments/in/indianapolis/elmtree-park/#/	old_replay_certified
+236112	La Joya Bay Resort II	https://www.lajoyabyazali.com/floorplans/	v1_success_corrected
+236157	Witham Village	https://www.withamvillageapartments.com/	entrata_hb_focused_25
+236966	The Dorsey	https://dorseywynwood.com/	v1_success_corrected
+237520	81 Arch	https://81arch.com/	old_replay_certified
+238712	Bel Air West	https://www.thebelairwest.com/	old_replay_certified|rentcafe_direct_availableunits
+239121	Enclave	http://www.theenclaveaustin.com/	v1_success_corrected
+239782	The Woods At Blue Heron Pines	https://www.woodsatblueheron.net/	rentcafe_direct_availableunits
+240132	Deerfield Place	http://www.deerfieldplaceutica.com/	entrata_hb_high_confidence|entrata_hb_remaining_14
+240761	The Pearl	https://www.ptlamgmt.com/eugene/the-pearl/conventional/	entrata_hb_self_grid_3
+241655	Encore Skyline	https://encoreskyline.com/	old_replay_certified
+241680	Blu on Farrington	https://www.bluonfarrington.com/blu-on-farrington-chapel-hill-nc	v1_success_corrected
+243358	The Villas of Castleton	http://www.castletonvillas.com/	entrata_hb_final_strict_grid_3
+244705	Devine District	https://devinedistrict.com/	old_replay_certified
+245494	Greenview At Chestnut Run	http://www.livegreenview.com	v1_success_corrected
+245526	The Bridgewater Apartments	http://thebridgewaterapartments.com	v1_success_corrected
+247411	The Tillery	https://prometheusapartments.com/ca/mountain-view-apartments/the-tillery	old_replay_certified
+247491	Astoria at Celebration	https://www.liveastoriaatcelebration.com/	v1_success_corrected
+249984	The Aspen at Melford Town Center	https://www.aspenmelford.com/?utm_source=GoogleLocalListing&utm_medium=organic&utm_campaign=AspenatMelfordTownCenterGoogleLocalListing	v1_success_corrected
+251510	Carriage Walk	https://www.carriagewalk.com/	v1_success_corrected
+251602	Apartments at Eleven240	https://www.apartmentsateleven240.com/	v1_success_corrected
+251766	Liberty Bay Club	https://libertybayclub.com/	v1_success_corrected
+253100	Aspire Gulch	https://www.aspiregulch.com/	old_replay_certified
+253158	The Lofts at Ten Mile	https://www.tenmilelofts.com/	v1_success_corrected
+253543	Redwood Lafayette	https://www.byredwood.com/apartments/in/lafayette/redwood-lafayette/	v1_success_corrected
+253887	Pinnacle Heights	https://www.pinnacleheightsapartments.com/	v1_success_corrected
+253978	Turtle Creek	https://www.turtlecreekliving.com/	v1_success_corrected
+254313	LUMA at Delray	https://lumadelray.com/	old_replay_certified
+254360	Briggs & Union	https://rent.brookfieldproperties.com/mount-laurel-nj-apartments/briggs-and-union	old_replay_certified
+255188	Edge	https://www.edge-tbd.com/	rentcafe_applicant_floorplans_v2_direct_4
+257194	The Prospector Modern Apartments	https://www.prospectorliving.com/	old_replay_certified
+257651	Brownpoint Reserve	https://brownpoint.stevebrownapts.com/?utm_medium=social&utm_source=gmb&utm_campaign=conventional+lease+up	entrata_hb_focused_25|entrata_hb_high_confidence
+257819	Sonoma Ranch Apartment Homes	https://www.rentsonomaranch.com/	entrata_hb_remaining_14
+257905	Cypress Lofts	https://cypresslofts.com/	v1_success_corrected
+261458	Eagan Heights	https://eaganheights.com/	v1_success_corrected
+262156	Modera Woodbridge	https://www.moderawoodbridge.com/	old_replay_certified
+262539	Modera Montville	https://www.moderamontville.com/	v1_success_corrected
+263325	Madison Wakefield	https://livemadisonwakefield.com/	old_replay_certified
+263992	Rivermont Park	https://www.rivermontparkapts.com/	v1_success_corrected
+264317	The Teller House	https://livethetellerhouse.com/	v1_success_corrected
+269130	The Watts	https://www.livethewatts.com/	v1_success_corrected
+269966	Inspire Missouri City	https://www.inspiremissouricity.com/	old_replay_certified
+270109	Modera Parkside	https://www.moderaparksideatl.com/	old_replay_certified
+270148	MAC Residences	https://macresidences.com/	v1_success_corrected
+270766	Hue97	https://www.hue97.com/#	v1_success_corrected
+272375	Park on Napoli	https://www.parkonnapoli.com/	v1_success_corrected
+273398	The Quinn	https://thequinnanna.com/	entrata_hb_focused_25
+273944	The Langston	https://www.livethelangston.com/	v1_success_corrected
+274173	The Residences At Career Gateway	https://www.residencesatcareergateway.com/	old_replay_certified
+274971	Bordeaux	https://www.bordeauxapts.com/	v1_success_corrected
+275341	Prospect Lake Wire I	https://www.prospectlakewire.com/	v1_success_corrected
+276686	Alexan Ludlam	https://alexanludlamtrace.com/	v1_success_corrected
+278316	The Gateway at Maverick Square	https://www.gatewayatmavericksq.com/	custom_gateway_residences
+278371	Niche	https://www.nichetampa.com/	v1_success_corrected
+278511	Merchants Plaza	https://themerchantsplaza.com/	old_replay_certified
+281751	The Franklin Marlboro	https://www.thefranklinmarlboro.com/	rentcafe_direct_availableunits
+282930	Spring Ridge on Fletcher	http://www.springridgeonfletcher.com/?utm_knock=g	entrata_hb_identity_variant_3
+283560	Prosper Crossing	https://prosefrontier.com/	v1_success_corrected
+284553	Silverstone	https://www.silverstoneapartment.com/	v1_success_corrected
+284917	Timber Ridge	https://alaska.weidner.com/apartments/ak/eagle-river/timber-ridge-4/index.aspx	v1_success_corrected
+285770	The Rise Living Community	https://www.riselivingapts.com/	v1_success_corrected
+285973	Birchway Spring Cypress	https://www.birchwayspringcypress.com/	v1_success_corrected
+289113	Infinity Hammock Bay West	https://infinityhammockbay.com/infinity-hammock-bay-west/	old_replay_certified
+289291	Vivo Living Miamisburg	https://www.vivolivingmiamisburg.com/	marketapts_live_strict_exact_rp_4
+292786	Matheson	https://www.mathesonisyourhome.com/	v1_success_corrected
+292977	LEO at Cartersville	https://www.leocartersville.com/	v1_success_corrected
+296586	Summerwell	https://www.summerwellharmony.com/	v1_success_corrected
+298932	Genesee Pointe	https://geneseepointe.com/	old_replay_certified
+299297	Grove Pointe	https://www.invitationhomes.com/communities/tampa/grove-pointe/	invitationhomes_direct_community_listing_2026-07-31
+299569	The Summit	https://www.libertyassetgroup.com/TheSummitApartments/	old_replay_certified
+299729	Whisper Valley at Quartier	https://www.whispervalleyquartier.com/	v1_success_corrected
+300194	The Residences at Fresh Meadows	https://freshmeadowstx.com/	v1_success_corrected
+300347	Bridlewood	https://www.bridlewoodtownhomes.com/	old_replay_certified
+300551	AVIA Liberty Ridge	https://www.avialibertyridge.com/	v1_success_corrected
+302308	Madison Station	https://www.liveatmadisonstation.com/	v1_success_corrected
+305576	Westwater Village	https://westwatervillage.com/	appfolio_scoped_data_listings_url_full_scrape_strict_85

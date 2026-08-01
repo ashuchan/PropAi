@@ -1,0 +1,339 @@
+{
+  "batch_label": "appfolio-generic-remaining-appfolio-current-strict",
+  "capture_date": "2026-08-01",
+  "evidence_is_current_live": true,
+  "direct_public_api": true,
+  "hyperbrowser_used": false,
+  "captcha_used": false,
+  "paid_canary_run": false,
+  "results": [
+    {
+      "property_id": 38107,
+      "property_name": "Fountain Place",
+      "website": "https://www.livefountainplaceapts.com/",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 8,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "distinct_unit_numbers": 8,
+        "distinct_native_listable_uids": 8,
+        "excluded_nonphysical_leasing_office_rows": 0,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "exact-property AppFolio-Websites domain; its current collection has exactly eight rows and every row is tagged `fountain`; the same eight native listable UIDs are linked by the exact availability page",
+        "source_urls": [
+          "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.livefountainplaceapts.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "5471-valley-ridge-columbus-oh-43228",
+            "unit_number": "4b0339fb-749"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "4b0339fb-749f-4823-b602-d83fcf8b2adf",
+            "appfolio_id": "3112",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "5471 Valley Ridge, Columbus, OH 43228"
+          },
+          "unit_name": "5471 Valley Ridge, Columbus, OH 43228",
+          "floor_plan_name": "2x2SC",
+          "availability_date": "2026-08-01",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "777-cliff-creek-drive-columbus-oh-43228",
+            "unit_number": "b1142b86-536"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "b1142b86-5367-4df4-9b1c-4bf0fe737455",
+            "appfolio_id": "3113",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "777 Cliff Creek Drive, Columbus, OH 43228"
+          },
+          "unit_name": "777 Cliff Creek Drive, Columbus, OH 43228",
+          "floor_plan_name": "1x1SC",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1050,
+            "market_rent_high": 1050
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "783-cliff-creek-drive-columbus-oh-43228",
+            "unit_number": "17ecb0ef-884"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "17ecb0ef-8843-4669-834c-d6fddc8c7f12",
+            "appfolio_id": "3114",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "783 Cliff Creek Drive, Columbus, OH 43228"
+          },
+          "unit_name": "783 Cliff Creek Drive, Columbus, OH 43228",
+          "floor_plan_name": "2x2SC",
+          "availability_date": "2026-06-24",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 46576,
+      "property_name": "Campus Pointe",
+      "website": "https://www.proresidential.com/oklahoma-properties/campus-pointe-",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 13,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 13,
+        "rows_with_native_identity_and_positive_rent": 13,
+        "distinct_unit_numbers": 13,
+        "distinct_native_listable_uids": 13,
+        "excluded_nonphysical_leasing_office_rows": 8,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "every admitted record belongs to AppFolio property_list `Campus Pointe`",
+        "source_urls": [
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=1&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=2&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=3&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=4&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=5&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=6&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=7&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=8&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=9&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=10&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=11&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=12&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=13&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=14&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=15&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=16&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=17&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.proresidential.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "1602-nw-31st-st-265-oklahoma-city-ok-73118",
+            "unit_number": "265"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "829f1518-9442-4e0a-8497-d0502e8672bb",
+            "appfolio_id": "280",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1602 NW 31st St., 265, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1602 NW 31st St., 265, Oklahoma City, OK 73118",
+          "floor_plan_name": "1+1 Up",
+          "availability_date": "2026-03-18",
+          "positive_rent_evidence": {
+            "market_rent_low": 759,
+            "market_rent_high": 759
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "1601-nw-30th-st-109-oklahoma-city-ok-73118",
+            "unit_number": "109"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "ee321e0c-b097-4afe-aa3f-5d81093cb0a3",
+            "appfolio_id": "289",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1601 NW 30th St., 109, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1601 NW 30th St., 109, Oklahoma City, OK 73118",
+          "floor_plan_name": "Junior Down",
+          "availability_date": "2025-05-14",
+          "positive_rent_evidence": {
+            "market_rent_low": 729,
+            "market_rent_high": 729
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "1604-nw-31th-st-233-oklahoma-city-ok-73118",
+            "unit_number": "233"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "ee3eb59e-7764-4951-8587-aa6325fa6a08",
+            "appfolio_id": "318",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1604 NW 31th St., 233, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1604 NW 31th St., 233, Oklahoma City, OK 73118",
+          "floor_plan_name": "2+1 Up",
+          "availability_date": "2025-11-20",
+          "positive_rent_evidence": {
+            "market_rent_low": 849,
+            "market_rent_high": 849
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 282381,
+      "property_name": "Mission Ranch",
+      "website": "https://www.missionmanagementlindale.com/",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 10,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "distinct_unit_numbers": 10,
+        "distinct_native_listable_uids": 10,
+        "excluded_nonphysical_leasing_office_rows": 0,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "every admitted record belongs to AppFolio property_list `Mission Ranch`",
+        "source_urls": [
+          "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.missionmanagementlindale.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "17037-loring-ln-lindale-tx-75771",
+            "unit_number": "501d3938-dce"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "501d3938-dce7-4938-b43b-55bed06c2dd2",
+            "appfolio_id": "320",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "17037 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "17037 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-08-10",
+          "positive_rent_evidence": {
+            "market_rent_low": 1375,
+            "market_rent_high": 1375
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "18025-loring-ln-lindale-tx-75771",
+            "unit_number": "1125c000-756"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "1125c000-756c-4c99-afb0-10ba022520cd",
+            "appfolio_id": "366",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "18025 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "18025 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-07-09",
+          "positive_rent_evidence": {
+            "market_rent_low": 875,
+            "market_rent_high": 875
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "17010-loring-ln-lindale-tx-75771",
+            "unit_number": "3b9898d9-15b"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "3b9898d9-15b5-4873-8983-c0bfebc1192b",
+            "appfolio_id": "376",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "17010 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "17010 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-08-03",
+          "positive_rent_evidence": {
+            "market_rent_low": 1295,
+            "market_rent_high": 1295
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    }
+  ],
+  "strict_qualified_property_ids": [
+    38107,
+    46576,
+    282381
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "already_in_latest_current_ledger": [
+    "19245",
+    "71962"
+  ],
+  "lane_capture_net_new_ids_vs_183_row_ledger": [
+    "19245",
+    "71962"
+  ],
+  "latest_ledger_rows": 185,
+  "latest_ledger_sha256": "dd617b6344b766f91be01f71bbd3900bd21be576fb1de40e2589760fe1379471",
+  "net_new_ids_vs_latest_current_ledger": [],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/evidence_unknown_residual35_current_strict_consolidated.json"
+}

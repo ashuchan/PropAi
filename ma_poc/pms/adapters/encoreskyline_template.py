@@ -33,6 +33,7 @@ strictly scoped.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -40,6 +41,7 @@ from typing import TYPE_CHECKING, Any
 from ma_poc.pms.adapters._encoreskyline_units import (
     is_encoreskyline_template_page,
     parse_encoreskyline_units,
+    parse_jonah_resource_json,
     parse_rentpress_data_floorplans,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
@@ -54,6 +56,11 @@ _TIER = "TIER_1_DOM_ENCORESKYLINE_TEMPLATE"
 # Encoreskyline-family sites in the cohort have 4–14 floorplans; 30 is
 # more than enough headroom while bounding worst-case page-load cost.
 _MAX_PLANS: int = 30
+# Static Jonah resource pages are ordinary public HTML and need no browser.
+# Keep the static cap aligned with the already-bounded interactive cap. The
+# exact FAILED_NO_DATA cohort contains a 19-plan property; the old cap of 18
+# silently omitted its final plan and two live units.
+_MAX_STATIC_PLANS: int = _MAX_PLANS
 # Per-plan wait for the Jonah widget to populate inline unit rows after
 # the Check-Availability click. 2.5s matches the deep-probe timing.
 _POST_CLICK_WAIT_MS: int = 2500
@@ -108,6 +115,27 @@ def _html_from_ctx(ctx: Any) -> str:
     return body if isinstance(body, str) else ""
 
 
+def _effective_ctx_url(ctx: Any) -> str:
+    """Return the URL that produced the body, after public redirects.
+
+    In fetch-only production dispatch ``ctx.base_url`` remains the configured
+    (sometimes retired) vanity URL while ``fetch_result.final_url`` identifies
+    the body in hand. Building ``/floorplans/`` from the former made redirected
+    Jonah properties probe a nonexistent path on the old host.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    return str(
+        getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or ""
+    ).strip()
+
+
+def _floorplans_index_url(base_url: str) -> str:
+    """Build the exact property-scoped floor-plan index once."""
+    if re.search(r"/floorplans/?$", base_url or "", re.IGNORECASE):
+        return base_url.rstrip("/") + "/"
+    return (base_url or "").rstrip("/") + "/floorplans/"
+
+
 async def _get_page_html(page: Page, ctx: Any = None) -> str:
     """Return the page HTML: live ``page.content()`` first, else the fetched
     body from ``ctx``. The page-only version silently returned ``""`` under the
@@ -120,6 +148,72 @@ async def _get_page_html(page: Page, ctx: Any = None) -> str:
     if isinstance(out, str) and out:
         return out
     return _html_from_ctx(ctx) if ctx is not None else ""
+
+
+async def _probe_public_html(url: str) -> tuple[str, str]:
+    """Fetch one exact public Jonah page without paid/solver escalation.
+
+    ``probe_get`` is synchronous, so off-load it from the shared event loop.
+    Compliance mode disables paid unlockers globally; ``unlocker=False`` is
+    also explicit here because a per-plan fan-out must never spend one.
+    """
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+
+        response = await asyncio.to_thread(
+            probe_get,
+            url,
+            timeout=20,
+            unlocker=False,
+            retries=1,
+        )
+    except Exception as exc:
+        log.debug("Jonah static probe failed url=%s err=%s", url, exc)
+        return "", url
+    if int(getattr(response, "status_code", 0) or 0) != 200:
+        return "", str(getattr(response, "url", "") or url)
+    text = getattr(response, "text", "") or ""
+    return (
+        text if isinstance(text, str) else "",
+        str(getattr(response, "url", "") or url),
+    )
+
+
+def _unit_key(unit: dict[str, Any]) -> str:
+    """Stable in-property dedupe key for Jonah fan-out aggregation."""
+    source_ids = unit.get("source_ids")
+    if isinstance(source_ids, dict) and source_ids.get("sightmap_unit_id"):
+        return f"sightmap:{source_ids['sightmap_unit_id']}"
+    return "|".join(
+        str(unit.get(k) or "").strip().lower()
+        for k in ("building", "unit_number", "floor_plan_name")
+    )
+
+
+async def _static_jonah_units(
+    plan_urls: list[str],
+) -> tuple[list[dict[str, Any]], int]:
+    """Fetch and parse exact published per-plan pages, sequentially.
+
+    Host throttling lives inside ``probe_get``.  Sequential traversal avoids
+    turning a 15-plan property into a burst while still replacing the old
+    browser-click + fixed-wait flow in production's ``page=None`` dispatch.
+    """
+    all_units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    pages_with_units = 0
+    for plan_url in plan_urls[:_MAX_STATIC_PLANS]:
+        plan_html, final_url = await _probe_public_html(plan_url)
+        parsed = parse_jonah_resource_json(plan_html, final_url or plan_url)
+        if parsed:
+            pages_with_units += 1
+        for unit in parsed:
+            key = _unit_key(unit)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            all_units.append(unit)
+    return all_units, pages_with_units
 
 
 def _plan_urls_from_html(html: str, base_url: str) -> list[str]:
@@ -227,6 +321,26 @@ class EncoreSkylineTemplateAdapter:
                 errors=["Jonah Digital widget marker not present"],
             )
 
+        # 1a. A per-plan page can itself be the fetched entry/hop. Modern
+        #     Jonah renders the full apartment roster in this exact JSON
+        #     resource, so consume it before doing any navigation.
+        current_url = _effective_ctx_url(ctx)
+        resource_units = parse_jonah_resource_json(html, current_url)
+        if resource_units:
+            from ma_poc.extraction.post_process import post_process as _pp_resource
+
+            resource_pp = _pp_resource(
+                resource_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if resource_pp.n_admitted > 0:
+                return AdapterResult(
+                    units=resource_pp.admitted,
+                    plan_summaries=resource_pp.plan_summaries,
+                    tier_used="TIER_1_DOM_JONAH_RESOURCE_JSON",
+                    winning_url=current_url or None,
+                    confidence=min(0.97, 0.78 + 0.015 * resource_pp.n_admitted),
+                )
+
         # 1b. Static RentPress fast-path. RentPress (RentCafe-synced) sites
         #     embed the full unit inventory as an escaped-JSON
         #     ``data-floorplans`` attribute in the initial HTML — no per-plan
@@ -234,9 +348,7 @@ class EncoreSkylineTemplateAdapter:
         #     dependent) Jonah drill for the ~8-prop RentPress cohort that
         #     otherwise fell through to LLM/failed. See
         #     parse_rentpress_data_floorplans.
-        rp_units = parse_rentpress_data_floorplans(
-            html, getattr(ctx, "base_url", "") or ""
-        )
+        rp_units = parse_rentpress_data_floorplans(html, current_url)
         if rp_units:
             from ma_poc.extraction.post_process import post_process as _pp_rp
 
@@ -258,9 +370,9 @@ class EncoreSkylineTemplateAdapter:
         plans = [str(u) for u in plans if isinstance(u, str)][:_MAX_PLANS]
 
         if not plans:
-            base_url = getattr(ctx, "base_url", "") or ""
+            base_url = current_url
             if base_url:
-                fp_url = base_url.rstrip("/") + "/floorplans/"
+                fp_url = _floorplans_index_url(base_url)
                 if await _goto(page, fp_url):
                     again = await _evaluate(page, _PER_PLAN_URLS_JS) or []
                     if isinstance(again, list):
@@ -273,13 +385,68 @@ class EncoreSkylineTemplateAdapter:
         # already-fetched HTML. A RENDER-mode body carries the JS-rendered
         # anchor set, so discovery still works even without a live page.
         if not plans:
-            plans = _plan_urls_from_html(html, getattr(ctx, "base_url", "") or "")
+            plans = _plan_urls_from_html(html, current_url)
+
+        # Production dispatches ``page=None``. If the property landing page
+        # does not itself link every plan, fetch its exact published
+        # ``/floorplans/`` index once, then harvest only same-template plan
+        # links from that HTML. This is an ordinary direct request and never
+        # uses an unlocker.
+        static_index_url = ""
+        if not plans and page is None:
+            base_url = current_url
+            if base_url:
+                static_index_url = _floorplans_index_url(base_url)
+                try:
+                    ctx.inventory_paths_attempted.append(static_index_url)
+                except Exception:
+                    pass
+                index_html, index_final_url = await _probe_public_html(static_index_url)
+                if index_html:
+                    try:
+                        ctx.inventory_pages_reachable.append(
+                            index_final_url or static_index_url
+                        )
+                    except Exception:
+                        pass
+                    plans = _plan_urls_from_html(
+                        index_html, index_final_url or static_index_url
+                    )
 
         if not plans:
             return AdapterResult(
                 tier_used="ENCORESKYLINE_NO_PLAN_LINKS",
                 confidence=0.0,
                 errors=["no /floorplans/{slug}/ anchors found"],
+            )
+
+        # 2b. Production has no live Playwright Page here. Read each exact
+        #     published plan resource directly; it contains cleaner fields
+        #     than rendered text (notably actual plan name, base rent excluding
+        #     mandatory fees, and ISO availability date).
+        if page is None:
+            static_units, pages_with_units = await _static_jonah_units(plans)
+            if static_units:
+                from ma_poc.extraction.post_process import post_process as _pp_static
+
+                static_pp = _pp_static(
+                    static_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if static_pp.n_admitted > 0:
+                    return AdapterResult(
+                        units=static_pp.admitted,
+                        plan_summaries=static_pp.plan_summaries,
+                        tier_used="TIER_1_DOM_JONAH_RESOURCE_JSON",
+                        winning_url=static_index_url or current_url or None,
+                        confidence=min(0.97, 0.78 + 0.015 * static_pp.n_admitted),
+                    )
+            return AdapterResult(
+                tier_used="ENCORESKYLINE_NO_UNITS",
+                confidence=0.0,
+                errors=[
+                    f"fetched {len(plans[:_MAX_STATIC_PLANS])} exact per-plan "
+                    f"pages; {pages_with_units} carried live Jonah unit rows"
+                ],
             )
 
         # 3. Per-plan loop: nav → click → wait → extract → parse.

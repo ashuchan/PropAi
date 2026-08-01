@@ -1,0 +1,40 @@
+{
+  "solve_captchas": false,
+  "results": [
+    {
+      "property_id": 1617,
+      "url": "https://www.crossingatriverlake.com",
+      "status": 0,
+      "body_bytes": 0,
+      "saved": false
+    },
+    {
+      "property_id": 34362,
+      "url": "https://www.thetamarronapts.com",
+      "status": 0,
+      "body_bytes": 0,
+      "saved": false
+    },
+    {
+      "property_id": 34785,
+      "url": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+      "status": 200,
+      "body_bytes": 55781,
+      "saved": true
+    },
+    {
+      "property_id": 75314,
+      "url": "https://pettinaro.com/village-park-paladin/",
+      "status": 200,
+      "body_bytes": 254260,
+      "saved": true
+    },
+    {
+      "property_id": 268888,
+      "url": "https://arthaus.mov/building-community.php?slug=arthaus-jack-london",
+      "status": 200,
+      "body_bytes": 233989,
+      "saved": true
+    }
+  ]
+}

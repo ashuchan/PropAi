@@ -1,0 +1,264 @@
+{
+  "batch_label": "rentcafe-published-routing-e2e",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      42371,
+      61979,
+      218786
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "rentcafe-published-routing-e2e",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_portal_hosts": [],
+        "applicant_property_match": false,
+        "applicant_provenance": [],
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "applicant_vanity_shell_proof": false,
+        "applicant_vanity_subdomain_match": false,
+        "distinct_unit_numbers": 0,
+        "exact_street_matches": [],
+        "onesite_api_ids": [],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [],
+        "onesite_property_match": false,
+        "onesite_provenance": [],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": false,
+        "onesite_relaxed_name_match": false,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "meetinghouseapartments.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 7,
+      "property_id": 42371,
+      "property_identity_match": false,
+      "property_name": "Meetinghouse",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath",
+        "2 Bedroom / 2.5 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "http://meetinghouseapartments.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe-published-routing-e2e",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": true,
+        "applicant_base_harvested": true,
+        "applicant_portal_hosts": [
+          "villamilano.securecafe.com"
+        ],
+        "applicant_property_match": false,
+        "applicant_provenance": [
+          "published_applicant_theme"
+        ],
+        "applicant_query_ids": [
+          "1161613"
+        ],
+        "applicant_tenant_link_harvested": true,
+        "applicant_vanity_shell_proof": false,
+        "applicant_vanity_subdomain_match": true,
+        "distinct_unit_numbers": 12,
+        "exact_street_matches": [
+          "13740 Howe Lane, Leawood, KS, 66224"
+        ],
+        "onesite_api_ids": [],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "villamilano.securecafe.com"
+        ],
+        "onesite_property_match": false,
+        "onesite_provenance": [
+          "published_applicant_theme"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": false,
+        "onesite_relaxed_name_match": true,
+        "property_name_consistent": true,
+        "row_addresses": [
+          "13740 Howe Lane, Leawood, KS, 66224"
+        ],
+        "row_property_ids": [
+          "1161613"
+        ],
+        "row_property_names": [
+          "villamilanoandvillas"
+        ],
+        "rows_with_native_identity": 12,
+        "rows_with_native_identity_and_positive_rent": 12,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "villamilano.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://villamilano.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1161613&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.villamilano.us"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/10/2026",
+          "floor_plan_name": "Verona I",
+          "identity": {
+            "floor_plan_id": "85957851be54",
+            "unit_number": "0112"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2101,
+            "market_rent_low": 1681
+          },
+          "source_api_url": "https://villamilano.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1161613&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "19347316",
+            "securecafe_floorplan_id": "3261924"
+          },
+          "source_portal_url": "https://villamilano.securecafe.com/onlineleasing/villa-milano0",
+          "source_property_id": "1161613",
+          "source_property_name": "Villa Milano Apartments and Villas",
+          "source_property_provenance": "published_applicant_theme",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "06/30/2026",
+          "floor_plan_name": "Verona I",
+          "identity": {
+            "floor_plan_id": "85957851be54",
+            "unit_number": "1801"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2112,
+            "market_rent_low": 1691
+          },
+          "source_api_url": "https://villamilano.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1161613&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "19347378",
+            "securecafe_floorplan_id": "3261924"
+          },
+          "source_portal_url": "https://villamilano.securecafe.com/onlineleasing/villa-milano0",
+          "source_property_id": "1161613",
+          "source_property_name": "Villa Milano Apartments and Villas",
+          "source_property_provenance": "published_applicant_theme",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 61979,
+      "property_identity_match": true,
+      "property_name": "Villa Milano",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Florence II",
+        "Naples II",
+        "Naples Walkout",
+        "Venice II",
+        "Verona I",
+        "Verona II",
+        "Verona Walkout"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 12,
+      "website": "https://www.villamilano.us/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "rentcafe-published-routing-e2e",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_portal_hosts": [],
+        "applicant_property_match": false,
+        "applicant_provenance": [],
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "applicant_vanity_shell_proof": false,
+        "applicant_vanity_subdomain_match": false,
+        "distinct_unit_numbers": 0,
+        "exact_street_matches": [],
+        "onesite_api_ids": [],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [],
+        "onesite_property_match": false,
+        "onesite_provenance": [],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": false,
+        "onesite_relaxed_name_match": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.landcoapartments.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 44,
+      "property_id": 218786,
+      "property_identity_match": false,
+      "property_name": "Cooper's Landing",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bed, 1 Bath - 1004 sq ft",
+        "1 Bed, 1 Bath - 670 sq ft",
+        "1 Bed, 1 Bath - 696 sq ft",
+        "1 Bed, 1 Bath - 717 sq ft",
+        "1 Bed, 1 Bath - 725 sq ft",
+        "1 Bed, 1 Bath - 752 sqft",
+        "1 Bed, 1 Bath - 760 sq ft",
+        "1 Bed, 1 Bath - 791 sq ft"
+      ],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "https://www.landcoapartments.com/coopers-landing-apartments/"
+    }
+  ]
+}

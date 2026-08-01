@@ -34,6 +34,7 @@ import pytest
 from ma_poc.pms.adapters.appfolio import (
     ScopeEvidence,
     _address_matches,
+    _extract_zip,
     _normalize_street,
     filter_listings_by_property_address,
 )
@@ -393,6 +394,40 @@ def test_five_digit_house_number_is_not_mistaken_for_the_zip() -> None:
         listing_address="11300 3rd Ave. NE, 225, Seattle, WA 98125",
         ctx_address="11300 3rd Ave NE",
         ctx_zip="98125",
+        fuzzy_threshold=85,
+    )
+
+
+def test_four_digit_csv_zip_restores_leading_zero() -> None:
+    """CSV type inference drops leading zeroes from New England ZIPs.
+
+    AppFolio Websites properties commonly span neighbouring street numbers.
+    Without restoring the zero, the same-street rule cannot prove that those
+    buildings share a ZIP and drops real units.  These are live cohort shapes:
+    Mall Apartments (01020) and West Gate Town Homes (06515).
+    """
+    assert _extract_zip("1020") == "01020"
+    assert _extract_zip("6515") == "06515"
+    assert _address_matches(
+        listing_address="90C Edbert Street, Chicopee, MA 01020",
+        ctx_address="83 Edbert St",
+        ctx_zip="1020",
+        fuzzy_threshold=85,
+    )
+    assert _address_matches(
+        listing_address="239 Cooper Pl, New Haven, CT 06515",
+        ctx_address="283 Cooper Pl",
+        ctx_zip="6515",
+        fuzzy_threshold=85,
+    )
+
+
+def test_four_digit_csv_zip_still_rejects_another_zip() -> None:
+    """Leading-zero recovery must not weaken cross-property scoping."""
+    assert not _address_matches(
+        listing_address="239 Cooper Pl, New Haven, CT 06515",
+        ctx_address="83 Edbert St",
+        ctx_zip="1020",
         fuzzy_threshold=85,
     )
 

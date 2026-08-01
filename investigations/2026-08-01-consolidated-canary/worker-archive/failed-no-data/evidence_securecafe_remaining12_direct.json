@@ -1,0 +1,682 @@
+{
+  "batch_label": "securecafe-remaining12-direct",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      5782,
+      27080,
+      56762,
+      74519,
+      225886,
+      225914,
+      231543,
+      241538,
+      247179,
+      251120,
+      266766,
+      289338
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.springfieldrenton.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 5782,
+      "property_identity_match": false,
+      "property_name": "Springfield",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.springfieldrenton.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.oxfordrealtygroup.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 27080,
+      "property_identity_match": false,
+      "property_name": "Easton North",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "http://www.oxfordrealtygroup.com/properties/new-jersey/easton-north/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "seventhwestapartments.securecafe.com"
+        ],
+        "source_urls": [
+          "https://seventhwestapartments.securecafe.com/onlineleasing/1427-seventh-street/availableunits.aspx"
+        ],
+        "website_host": "www.seventhwestapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "9/8/2026",
+          "floor_plan_name": "Two Bedrooms Two Bathrooms",
+          "identity": {
+            "floor_plan_id": "c9eef608adf8",
+            "unit_number": "406"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 4350,
+            "market_rent_low": 4350
+          },
+          "source_api_url": "https://seventhwestapartments.securecafe.com/onlineleasing/1427-seventh-street/availableunits.aspx",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 56762,
+      "property_identity_match": true,
+      "property_name": "Seventh West",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Two Bedrooms Two Bathrooms"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 1,
+      "website": "https://www.seventhwestapartments.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.thejamestownapartments.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 74519,
+      "property_identity_match": false,
+      "property_name": "The Jamestown",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.thejamestownapartments.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.casabaywoodapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 225886,
+      "property_identity_match": false,
+      "property_name": "Casa Baywood",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.casabaywoodapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": true,
+        "applicant_property_match": true,
+        "applicant_query_ids": [
+          "2087421"
+        ],
+        "distinct_unit_numbers": 10,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "2087421"
+        ],
+        "row_property_names": [
+          "foxglen"
+        ],
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "foxglen-apts.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://foxglen-apts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=2087421&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": ""
+      },
+      "identity_samples": [
+        {
+          "availability_date": "07/08/2026",
+          "floor_plan_name": "One Bedroom",
+          "identity": {
+            "floor_plan_id": "ed1b127db4ca",
+            "unit_number": "095"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 880,
+            "market_rent_low": 880
+          },
+          "source_api_url": "https://foxglen-apts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=2087421&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "45292173",
+            "securecafe_floorplan_id": "6161687"
+          },
+          "source_property_id": "2087421",
+          "source_property_name": "Fox Glen Apartments"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "One Bedroom",
+          "identity": {
+            "floor_plan_id": "ed1b127db4ca",
+            "unit_number": "234"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1005,
+            "market_rent_low": 1005
+          },
+          "source_api_url": "https://foxglen-apts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=2087421&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "45292179",
+            "securecafe_floorplan_id": "6161687"
+          },
+          "source_property_id": "2087421",
+          "source_property_name": "Fox Glen Apartments"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 2,
+      "property_id": 225914,
+      "property_identity_match": true,
+      "property_name": "Fox Glen",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "One Bedroom",
+        "Studio",
+        "Two Bedroom",
+        "Two Bedroom Two Bathroom"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 10,
+      "website": "www.foxglen-apts.com"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "bestrentnj.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 231543,
+      "property_identity_match": false,
+      "property_name": "Autumn Hills",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://bestrentnj.com/Communities/Autumn-Hills/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.block88apts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 241538,
+      "property_identity_match": false,
+      "property_name": "Block 88",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "http://www.block88apts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [
+          "1832713"
+        ],
+        "distinct_unit_numbers": 10,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "1832713"
+        ],
+        "row_property_names": [
+          "lernerparcatgatlincommons"
+        ],
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "lernerparcgatlin.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://lernerparcgatlin.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1832713&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "livelerner.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/11/2026",
+          "floor_plan_name": "B2",
+          "identity": {
+            "floor_plan_id": "28ff9bca696e",
+            "unit_number": "1305"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2915,
+            "market_rent_low": 2327
+          },
+          "source_api_url": "https://lernerparcgatlin.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1832713&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "41887464",
+            "securecafe_floorplan_id": "5343527"
+          },
+          "source_property_id": "1832713",
+          "source_property_name": "Lerner Parc at Gatlin Commons"
+        },
+        {
+          "availability_date": "10/12/2026",
+          "floor_plan_name": "B2",
+          "identity": {
+            "floor_plan_id": "28ff9bca696e",
+            "unit_number": "3105"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2796,
+            "market_rent_low": 2227
+          },
+          "source_api_url": "https://lernerparcgatlin.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1832713&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "41887508",
+            "securecafe_floorplan_id": "5343527"
+          },
+          "source_property_id": "1832713",
+          "source_property_name": "Lerner Parc at Gatlin Commons"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 4,
+      "property_id": 247179,
+      "property_identity_match": false,
+      "property_name": "Lerner Parc at Gatlin Commons",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "B1",
+        "B2",
+        "B3",
+        "C1"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 10,
+      "website": "https://livelerner.com/lerner-parc-at-gatlin-commons/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [
+          "1105527"
+        ],
+        "distinct_unit_numbers": 6,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "1105527"
+        ],
+        "row_property_names": [
+          "foundry"
+        ],
+        "rows_with_native_identity": 6,
+        "rows_with_native_identity_and_positive_rent": 6,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "thefoundry-tbd.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://thefoundry-tbd.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1105527&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.thefoundry-tbd.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/30/2026",
+          "floor_plan_name": "One Bedroom",
+          "identity": {
+            "floor_plan_id": "a0ed1c6aa48f",
+            "unit_number": "303"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1899,
+            "market_rent_low": 1899
+          },
+          "source_api_url": "https://thefoundry-tbd.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1105527&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "17086712",
+            "securecafe_floorplan_id": "3172763"
+          },
+          "source_property_id": "1105527",
+          "source_property_name": "The Foundry"
+        },
+        {
+          "availability_date": "08/25/2026",
+          "floor_plan_name": "One Bedroom",
+          "identity": {
+            "floor_plan_id": "a0ed1c6aa48f",
+            "unit_number": "307"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2049,
+            "market_rent_low": 2049
+          },
+          "source_api_url": "https://thefoundry-tbd.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1105527&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "17086716",
+            "securecafe_floorplan_id": "3172763"
+          },
+          "source_property_id": "1105527",
+          "source_property_name": "The Foundry"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 251120,
+      "property_identity_match": false,
+      "property_name": "The Foundry",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "One Bedroom",
+        "Studio"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 6,
+      "website": "https://www.thefoundry-tbd.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.101oxford.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 266766,
+      "property_identity_match": false,
+      "property_name": "101 Oxford",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.101oxford.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-remaining12-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.201walnut.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 289338,
+      "property_identity_match": false,
+      "property_name": "201 Walnut",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.201walnut.com/"
+    }
+  ]
+}

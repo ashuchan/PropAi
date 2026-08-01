@@ -17,7 +17,11 @@ import pytest
 from ma_poc.pms.adapters._udr import (
     _extract_unit_from_udr_name,
     _format_udr_plan_code,
+    canonical_udr_url_from_html,
+    is_udr_url,
+    _udr_view_model_dates,
     parse_udr_jsonld,
+    udr_pricing_urls,
 )
 
 # ─────────────────────────────────────────────────────────────────────
@@ -148,6 +152,78 @@ def test_parse_udr_jsonld_extracts_floor_plan_from_image_filename() -> None:
     units = parse_udr_jsonld(_CAMBRIDGE_WOODS_FRAGMENT, source_url="x")
     assert units[0]["floor_plan_name"] == "B1.5T"
     assert units[1]["floor_plan_name"] == "A1D"
+
+
+def test_parse_udr_jsonld_preserves_repeated_numeric_building_prefixes() -> None:
+    """Vitruvian West: repeated numeric prefixes are physical buildings."""
+    html = """
+    <script type="application/ld+json">
+    {
+      "@type": "ItemList",
+      "itemListElement": [
+        {"@type":"ListItem","item":{"@type":"Apartment",
+         "name":"Apartment #1 - 124","url":"?unitid=11",
+         "offers":{"price":1306,"availability":"https://schema.org/InStock"}}},
+        {"@type":"ListItem","item":{"@type":"Apartment",
+         "name":"Apartment #1 - 128","url":"?unitid=12",
+         "offers":{"price":1381,"availability":"https://schema.org/InStock"}}}
+      ]
+    }
+    </script>
+    """
+    units = parse_udr_jsonld(html, source_url="x")
+    assert [unit["unit_number"] for unit in units] == ["1-124", "1-128"]
+    assert [unit["building"] for unit in units] == ["1", "1"]
+
+
+def test_parse_udr_jsonld_preserves_alphanumeric_building_prefix() -> None:
+    """Arbor Park: the alphanumeric prefix is part of the public unit ID."""
+    html = """
+    <script type="application/ld+json">
+    {"@type":"ItemList","itemListElement":[
+      {"@type":"ListItem","item":{"@type":"Apartment",
+       "name":"Apartment #03R - 0202","url":"?unitid=13453695",
+       "offers":{"price":1765,"availability":"https://schema.org/InStock"}}}
+    ]}
+    </script>
+    """
+    units = parse_udr_jsonld(html, source_url="x")
+    assert units[0]["unit_number"] == "03R-0202"
+    assert units[0]["building"] == "03R"
+def test_parse_udr_jsonld_joins_first_party_view_model_date_by_unit() -> None:
+    """UDR JSON-LD omits dates, while the adjacent first-party view model
+    publishes the exact visible date keyed by marketing unit number."""
+    view_model = """
+    <script>
+    window.udr.jsonObjPropertyViewModel = {
+      "floorPlans": [{"units": [
+        {
+          "marketingName": "4020",
+          "AvailableDateLabel": "9/25/2026",
+          "rentsMatrix": [{"MoveInDate": "2026-09-26"}]
+        },
+        {
+          "lookUpName": "14218",
+          "AvailableDateLabel": "",
+          "rentsMatrix": [{"MoveInDate": "2026-08-20"}]
+        }
+      ]}]
+    };
+    </script>
+    """
+
+    units = parse_udr_jsonld(_CAMBRIDGE_WOODS_FRAGMENT + view_model, source_url="x")
+
+    assert units[0]["availability_date"] == "9/25/2026"
+    assert units[0]["available_date"] == "9/25/2026"
+    assert units[1]["availability_date"] == "2026-08-20"
+
+
+def test_udr_view_model_date_parse_is_non_fatal() -> None:
+    assert _udr_view_model_dates("<script>no marker</script>") == {}
+    assert _udr_view_model_dates(
+        "window.udr.jsonObjPropertyViewModel = {not json};"
+    ) == {}
 
 
 @pytest.mark.parametrize("raw, expected", [
@@ -327,20 +403,111 @@ def test_parse_udr_jsonld_skips_items_that_arent_apartments() -> None:
     assert units[0]["unit_number"] == "100"
 
 
+def test_udr_vanity_homepage_accepts_only_official_canonical() -> None:
+    html = """
+    <link rel="stylesheet" href="https://www.udr.com/not-canonical/">
+    <link href="https://www.udr.com/washington-dc-apartments/u-street-corridor/view-14/?tracking=1#hero"
+          rel="alternate canonical">
+    """
+    assert canonical_udr_url_from_html(html) == (
+        "https://www.udr.com/"
+        "washington-dc-apartments/u-street-corridor/view-14/"
+    )
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "https://www.udr.com.evil.test/community/",
+        "https://udr.com@evil.test/community/",
+        "http://www.udr.com/community/",
+        "//www.udr.com/community/",
+        "https://www.udr.com:8443/community/",
+    ],
+)
+def test_udr_vanity_homepage_rejects_unsafe_canonical(href: str) -> None:
+    html = f'<link rel="canonical" href="{href}">'
+    assert canonical_udr_url_from_html(html) == ""
+    assert not is_udr_url(href)
+
+
+def test_udr_pricing_urls_cover_root_and_contact_leaf() -> None:
+    root = (
+        "https://www.udr.com/tampa-apartments/"
+        "university-center/cambridge-woods"
+    )
+    assert udr_pricing_urls(root + "/contact-us/") == [
+        root + "/contact-us/apartments-pricing/",
+        root + "/apartments-pricing/",
+    ]
+    assert udr_pricing_urls(root + "/apartments-pricing/") == []
+    assert udr_pricing_urls("https://notudr.com/community/") == []
+
+
+@pytest.mark.asyncio
+async def test_generic_plan_text_recovers_udr_vanity_canonical(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PID 36925: view14.com must hop only to its official UDR canonical."""
+    from types import SimpleNamespace
+
+    from ma_poc.pms.adapters import _probe
+    from ma_poc.pms.adapters.base import AdapterContext
+    from ma_poc.pms.adapters.generic_plan_text import GenericPlanTextAdapter
+    from ma_poc.pms.detector import detect_pms
+
+    homepage = """
+    <html><head>
+      <link rel="canonical"
+            href="https://www.udr.com/washington-dc-apartments/u-street-corridor/view-14/">
+    </head><body>View 14 apartments</body></html>
+    """
+    pricing_url = (
+        "https://www.udr.com/washington-dc-apartments/"
+        "u-street-corridor/view-14/apartments-pricing/"
+    )
+    probed: list[str] = []
+
+    def fake_probe_get(url: str, timeout: int = 15) -> SimpleNamespace:
+        probed.append(url)
+        return SimpleNamespace(
+            status_code=200,
+            text=_CAMBRIDGE_WOODS_FRAGMENT,
+        )
+
+    monkeypatch.setattr(_probe, "probe_get", fake_probe_get)
+    ctx = AdapterContext(
+        base_url="https://www.view14.com/",
+        detected=detect_pms("https://www.view14.com/", homepage),
+        profile=None,
+        expected_total_units=None,
+        property_id="36925",
+        fetch_result=SimpleNamespace(body=homepage.encode()),
+    )
+
+    result = await GenericPlanTextAdapter().extract(object(), ctx)  # type: ignore[arg-type]
+
+    assert probed == [pricing_url]
+    assert result.tier_used == "TIER_1_JSONLD_UDR"
+    assert result.winning_url == pricing_url
+    assert [row["unit_number"] for row in result.units] == ["4020", "14218"]
+
+
 # ─────────────────────────────────────────────────────────────────────
 # 3) Source-level wiring check — generic.py invokes _parse_udr
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_generic_invokes_udr_parser_for_udr_dot_com() -> None:
-    """Pin the wiring: generic.py must import _parse_udr AND call it
-    when the base_url contains udr.com. A future refactor that drops
-    this gate fails the test loudly."""
+def test_generic_invokes_strict_udr_parser_gate() -> None:
+    """Pin the parser plus exact-host/canonical vanity wiring."""
     from pathlib import Path
     src = (Path(__file__).resolve().parents[3] / "pms" / "adapters" / "generic.py").read_text(encoding="utf-8")
     assert "_parse_udr" in src, (
         "generic.py no longer imports _parse_udr — UDR audit fix is gone."
     )
-    assert "udr.com" in src.lower(), (
-        "generic.py no longer gates the UDR parser by domain."
+    assert "_is_udr_url" in src, (
+        "generic.py no longer gates UDR extraction on the exact official host."
+    )
+    assert "_canonical_udr_url" in src, (
+        "generic.py no longer recognizes official canonical links on vanity sites."
     )

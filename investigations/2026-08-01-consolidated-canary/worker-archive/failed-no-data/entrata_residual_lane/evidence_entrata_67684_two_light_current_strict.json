@@ -1,0 +1,168 @@
+{
+  "result_type": "strict_current_exact_profile_route_direct_vus",
+  "capture_timestamp_utc": "2026-08-01T08:49:04.358650+00:00",
+  "property": {
+    "property_id": 67684,
+    "property_name": "Two Light",
+    "website": "http://twolightkc.com/",
+    "address": "1444 Grand Blvd",
+    "city": "Kansas City",
+    "state": "MO",
+    "zip": "64106"
+  },
+  "provider": "entrata_prospectportal",
+  "profile_provenance": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/profiles/67684.json",
+    "sha256": "30ea599ab4326e3b20aacc99f36fe41c38962418df1636be1a02461bbb2cec4f",
+    "winning_page_url": "https://twolight.prospectportal.com/floor-plans/"
+  },
+  "hyperbrowser_sessions_used": 0,
+  "index": {
+    "requested_url": "https://twolight.prospectportal.com/floor-plans/",
+    "final_url": "https://twolight.prospectportal.com/kansas-city/two-light-luxury-apartments/conventional/",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://twolight.prospectportal.com/kansas-city/two-light-luxury-apartments/conventional/",
+        "body_bytes": 194309,
+        "body_sha256": "3b61b7fa5c8371382e54cafa51d19ee9252bcf6c9205b092b7610411d0fc6121",
+        "accepted": true
+      }
+    ],
+    "published_vus_urls": [
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=574841&cached_rate_available=1&min_rent=$1,615&max_rent=$3,013&min_advertised_base_rent=1615&max_advertised_base_rent=3013&min_deposit=300.0000&max_deposit=300.0000&is_valid_rent=1&lease_term_name=3-18mo",
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=579980&cached_rate_available=1&min_rent=$1,955&max_rent=$3,521&min_advertised_base_rent=1955&max_advertised_base_rent=3521&min_deposit=300.0000&max_deposit=300.0000&is_valid_rent=1&lease_term_name=3-18mo",
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=2590&max_advertised_base_rent=3140&min_deposit=300.0000&max_deposit=300.0000&is_valid_rent=1&lease_term_name=3-18mo",
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=579996&cached_rate_available=1&min_rent=$3,325&max_rent=$5,355&min_advertised_base_rent=3325&max_advertised_base_rent=5355&min_deposit=300.0000&max_deposit=300.0000&is_valid_rent=1&lease_term_name=3-18mo",
+      "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&cached_rate_available=1&min_rent=$6,405&max_rent=$8,386&min_advertised_base_rent=6405&max_advertised_base_rent=8386&min_deposit=1500.0000&max_deposit=1500.0000&is_valid_rent=1&lease_term_name=3-18mo"
+    ]
+  },
+  "detail": {
+    "url": "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+        "body_bytes": 21248,
+        "body_sha256": "2444f63b3ddec9caf5f4d71b09bea73fc16a2b2c065fe63dc69d6f24d4f84143",
+        "accepted": true
+      }
+    ],
+    "entrata_property_id": "265564",
+    "entrata_floorplan_id": "580014"
+  },
+  "property_identity_match": true,
+  "strict_gates": {
+    "canonical_name_match": true,
+    "canonical_address_match": true,
+    "canonical_zip_match": true,
+    "saved_profile_route_same_origin_redirect": true,
+    "detail_url_published_by_exact_current_grid": true,
+    "detail_url_same_origin": true,
+    "rows_with_native_unit_number": 2,
+    "rows_with_native_entrata_uid": 2,
+    "rows_with_positive_rent": 2,
+    "distinct_unit_numbers": 2,
+    "distinct_entrata_uids": 2,
+    "sibling_or_cross_property_rows": 0
+  },
+  "contamination_verdict": "pass_exact_property_published_vus_native_ids_positive_rents",
+  "native_identity_rows": 2,
+  "native_positive_rent_rows": 2,
+  "source_urls": [
+    "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1"
+  ],
+  "native_rows": [
+    {
+      "floor_plan_name": "One Bedroom Den Penthouse",
+      "bed_label": "",
+      "bedrooms": "1",
+      "bathrooms": "1.5",
+      "sqft": "1,020",
+      "unit_number": "2405",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$4,050",
+      "market_rent_low": 4050,
+      "market_rent_high": 4050,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-01",
+      "available_date": "2026-08-01",
+      "lease_term": "",
+      "move_in_date": "",
+      "source_api_url": "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+      "source_ids": {
+        "entrata_uid": "4321822",
+        "entrata_fpid": "580014",
+        "entrata_property_id": "265564"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "One Bedroom Den Penthouse",
+      "bed_label": "",
+      "bedrooms": "1",
+      "bathrooms": "1.5",
+      "sqft": "1,020",
+      "unit_number": "2505",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$4,175",
+      "market_rent_low": 4175,
+      "market_rent_high": 4175,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-13",
+      "available_date": "2026-08-13",
+      "lease_term": "",
+      "move_in_date": "",
+      "source_api_url": "https://twolight.prospectportal.com/?module=check_availability&is_secure=1&property[id]=265564&action=view_unit_spaces&property_floorplan[id]=580014&cached_rate_available=1&min_rent=$2,590&max_rent=$3,140&min_advertised_base_rent=4050&max_advertised_base_rent=5557&min_deposit=1500.0000&max_deposit=1500.0000&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+      "source_ids": {
+        "entrata_uid": "4321831",
+        "entrata_fpid": "580014",
+        "entrata_property_id": "265564"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    }
+  ],
+  "shared_ledger": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "sha256_before": "08d27e44831c17a30d1eb0cd726c4ad119b977342cb1b78b729feb8a6784fa30",
+    "rows_before": 147,
+    "property_present_before": false
+  }
+}

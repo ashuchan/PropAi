@@ -1,0 +1,1702 @@
+{
+  "accepted_discovery": {
+    "artifact": "/private/tmp/propai-fnd-vBkmT9/annaberg_nesthub_lane/evidence_annaberg_1765_nesthub_discovery.json",
+    "artifact_sha256": "09e98651f9dafeafce55578927c4b31dd0c780d7d404b06ebc8472d84f20f232",
+    "proposal": "/private/tmp/propai-fnd-vBkmT9/annaberg_nesthub_lane/annaberg_1765_nesthub_implementation_proposal.md",
+    "proposal_sha256": "dce870b6681e4130d4a87d054da117a7ceb522eebce83e6615a50625f7bfe257"
+  },
+  "authoritative_ledger_eligible": false,
+  "authoritative_ledger_hold_reason": "Parent must independently replay/admit; this lane was instructed not to edit the strict builder or ledger.",
+  "canary_mutation": "none",
+  "cohort": {
+    "boundary": "exact_2026-07-31_FAILED_NO_DATA_344",
+    "confirmed_remaining_not_ledger": true,
+    "current_detected_adapter": "unknown",
+    "global_cohort_changed_during_run": false,
+    "source_adapter_0731": "generic",
+    "state_after": {
+      "ledger_rows": 238,
+      "ledger_sha256": "c420a96188ec4d7dcda8afccae5f52604f435f7e7097fceb1d7a9502156b9d47",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 106,
+      "remaining_sha256": "8e76275e4f6dd46056e47e73456b35993398466d1ac7d51aefb11c9991001df8",
+      "summary_sha256": "15e0ed0ec0e89275383d3b304c03183fae7fa287ce889eb50405f818bca50918"
+    },
+    "state_before": {
+      "ledger_rows": 238,
+      "ledger_sha256": "c420a96188ec4d7dcda8afccae5f52604f435f7e7097fceb1d7a9502156b9d47",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 106,
+      "remaining_sha256": "8e76275e4f6dd46056e47e73456b35993398466d1ac7d51aefb11c9991001df8",
+      "summary_sha256": "15e0ed0ec0e89275383d3b304c03183fae7fa287ce889eb50405f818bca50918"
+    }
+  },
+  "commit": "none",
+  "configured_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+  "current_source_hash_refresh": {
+    "authoritative_state_after": {
+      "ledger_rows": 243,
+      "ledger_sha256": "475f209464568dbc9e8c4bf9ddccb694241b297e3d37b2820b4fbf2877f352f7",
+      "property_in_ledger": true,
+      "property_in_remaining": false,
+      "remaining_rows": 101,
+      "remaining_sha256": "c9fa90cd26322ce717100f8727bc3d0b45aede0c82c263aaad44c42e8aacc167",
+      "summary_sha256": "ce0bff2916d6a2fd5d980d914816c53e3ffebebe0e688c41b78a4892909c1d55"
+    },
+    "authoritative_state_before": {
+      "ledger_rows": 243,
+      "ledger_sha256": "475f209464568dbc9e8c4bf9ddccb694241b297e3d37b2820b4fbf2877f352f7",
+      "property_in_ledger": true,
+      "property_in_remaining": false,
+      "remaining_rows": 101,
+      "remaining_sha256": "c9fa90cd26322ce717100f8727bc3d0b45aede0c82c263aaad44c42e8aacc167",
+      "summary_sha256": "ce0bff2916d6a2fd5d980d914816c53e3ffebebe0e688c41b78a4892909c1d55"
+    },
+    "authoritative_state_unchanged": true,
+    "configured_pipeline_replayed_three_times": true,
+    "generated_at_utc": "2026-08-01T20:14:57.126510+00:00",
+    "historical_admission_snapshot_preserved": true,
+    "ledger_mutation": "none",
+    "mode": "already_admitted_configured_e2e_source_hash_refresh"
+  },
+  "generated_at_utc": "2026-08-01T20:14:57.119081+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "compliance_mode": true,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_ENTRATA_PLAN_RENDER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_PLAN_UNIT_RENDER": "false",
+      "ENABLE_RENDER_ON_EMPTY": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "brightdata",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": "",
+      "RENDER_BACKEND": "local"
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "hyperbrowser_call_count": 0,
+    "llm": false,
+    "paid_canary": false,
+    "proxy": false,
+    "web_unlocker": false,
+    "web_unlocker_call_count": 0
+  },
+  "implementation": {
+    "source_files": [
+      "ma_poc/pms/adapters/_nesthub_public.py",
+      "ma_poc/pms/scraper.py",
+      "ma_poc/core/source_ids.py"
+    ],
+    "source_id_scope": {
+      "nesthub_listing_id": "UNIT_PENDING"
+    },
+    "test_files": [
+      "ma_poc/tests/pms/adapters/test_nesthub_public.py",
+      "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+      "ma_poc/tests/pms/adapters/test_betternoi_public.py"
+    ],
+    "tier": "TIER_1_PUBLIC_NESTHUB_SSR_EXACT_PROPERTY"
+  },
+  "lane": "annaberg_nesthub_exact_property_ssr_implementation_e2e",
+  "ledger_mutation": "none",
+  "property_id": 1765,
+  "property_name": "Annaberg",
+  "provider_direct_counts": {
+    "configured_repeats": 3,
+    "native_listing_ids_each": [
+      [
+        "602"
+      ],
+      [
+        "602"
+      ],
+      [
+        "602"
+      ]
+    ],
+    "native_positive_rent_rows_each": [
+      1,
+      1,
+      1
+    ],
+    "plan_rows_each": [
+      0,
+      0,
+      0
+    ],
+    "unit_rows_each": [
+      1,
+      1,
+      1
+    ]
+  },
+  "provider_direct_strict_pass": true,
+  "push": "none",
+  "repo_mutation": "accepted_implementation_files_only",
+  "source_snapshot_after": {
+    "dirty": true,
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "git_status_short": [
+      " M ma_poc/core/identity.py",
+      " M ma_poc/core/source_ids.py",
+      " M ma_poc/discovery/rediscovery.py",
+      " M ma_poc/fetch/fetcher.py",
+      " M ma_poc/fetch/hyperbrowser_backend.py",
+      " M ma_poc/pms/adapters/__init__.py",
+      " M ma_poc/pms/adapters/_encoreskyline_units.py",
+      " M ma_poc/pms/adapters/_leaseleads_embed.py",
+      " M ma_poc/pms/adapters/_pms_portal_hop.py",
+      " M ma_poc/pms/adapters/_rentcafe_hosted_table.py",
+      " M ma_poc/pms/adapters/_rentcafe_nestin.py",
+      " M ma_poc/pms/adapters/_universal_recovery.py",
+      " M ma_poc/pms/adapters/appfolio.py",
+      " M ma_poc/pms/adapters/encoreskyline_template.py",
+      " M ma_poc/pms/adapters/entrata.py",
+      " M ma_poc/pms/adapters/funnel.py",
+      " M ma_poc/pms/adapters/generic_plan_text.py",
+      " M ma_poc/pms/adapters/knock.py",
+      " M ma_poc/pms/adapters/onesite.py",
+      " M ma_poc/pms/adapters/rentcafe.py",
+      " M ma_poc/pms/adapters/rentmanager.py",
+      " M ma_poc/pms/adapters/rentvision.py",
+      " M ma_poc/pms/adapters/resman.py",
+      " M ma_poc/pms/adapters/spherexx.py",
+      " M ma_poc/pms/detector.py",
+      " M ma_poc/pms/scraper.py",
+      " M ma_poc/pms/signal_engine/defaults.py",
+      " M ma_poc/services/floorplan_snap.py",
+      " M ma_poc/tests/core/test_source_id_registry_coverage.py",
+      " M ma_poc/tests/discovery/test_rediscovery.py",
+      " M ma_poc/tests/fetch/test_compliance_mode.py",
+      " M ma_poc/tests/fetch/test_hyperbrowser_backend.py",
+      " M ma_poc/tests/integration/test_floorplan_snap.py",
+      " M ma_poc/tests/pms/adapters/test_encoreskyline_template_adapter.py",
+      " M ma_poc/tests/pms/adapters/test_encoreskyline_units.py",
+      " M ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py",
+      " M ma_poc/tests/pms/adapters/test_knock.py",
+      " M ma_poc/tests/pms/adapters/test_knock_empty_api_fallthrough.py",
+      " M ma_poc/tests/pms/adapters/test_knock_parse_units_status.py",
+      " M ma_poc/tests/pms/adapters/test_leaseleads_embed.py",
+      " M ma_poc/tests/pms/adapters/test_no_blocking_probe_in_async_def.py",
+      " M ma_poc/tests/pms/adapters/test_onesite_workflow.py",
+      " M ma_poc/tests/pms/adapters/test_pms_portal_hop.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_anchor_walk.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_hosted_table.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_nestin.py",
+      " M ma_poc/tests/pms/adapters/test_rentmanager_wp_cards.py",
+      " M ma_poc/tests/pms/adapters/test_rentvision.py",
+      " M ma_poc/tests/pms/adapters/test_resman.py",
+      " M ma_poc/tests/pms/adapters/test_securecafe_direct_first.py",
+      " M ma_poc/tests/pms/adapters/test_securecafe_multi_base.py",
+      " M ma_poc/tests/pms/test_detector.py",
+      " M ma_poc/tests/pms/test_path_b_retry_telemetry.py",
+      "?? investigations/2026-08-01-failed-no-data/",
+      "?? ma_poc/pms/adapters/_betternoi_public.py",
+      "?? ma_poc/pms/adapters/_doorloop_listings.py",
+      "?? ma_poc/pms/adapters/_entrata_hb_recovery.py",
+      "?? ma_poc/pms/adapters/_nesthub_public.py",
+      "?? ma_poc/pms/adapters/_showmojo_public.py",
+      "?? ma_poc/pms/adapters/_static_residence_table.py",
+      "?? ma_poc/pms/adapters/_static_team_unit_roster.py",
+      "?? ma_poc/pms/adapters/mri_prospectconnect.py",
+      "?? ma_poc/pms/adapters/yotta.py",
+      "?? ma_poc/tests/fetch/test_fetcher_render_captcha_hb_rescue.py",
+      "?? ma_poc/tests/fetch/test_hyperbrowser_raw_get_redirect.py",
+      "?? ma_poc/tests/pms/adapters/test_appfolio_detail_current_template.py",
+      "?? ma_poc/tests/pms/adapters/test_betternoi_public.py",
+      "?? ma_poc/tests/pms/adapters/test_doorloop_listings.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_beans_map.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_fallback.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_recovery.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_property_snippet_hb.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_snippet_iframe.py",
+      "?? ma_poc/tests/pms/adapters/test_funnel_nestio_items.py",
+      "?? ma_poc/tests/pms/adapters/test_mri_prospectconnect.py",
+      "?? ma_poc/tests/pms/adapters/test_nesthub_public.py",
+      "?? ma_poc/tests/pms/adapters/test_onesite_rpfp_cws.py",
+      "?? ma_poc/tests/pms/adapters/test_rentcafe_applicant_recovery.py",
+      "?? ma_poc/tests/pms/adapters/test_rentmanager_iloveleasing_public.py",
+      "?? ma_poc/tests/pms/adapters/test_showmojo_public.py",
+      "?? ma_poc/tests/pms/adapters/test_spherexx_legacy_availability.py",
+      "?? ma_poc/tests/pms/adapters/test_static_residence_table.py",
+      "?? ma_poc/tests/pms/adapters/test_static_team_unit_roster.py",
+      "?? ma_poc/tests/pms/adapters/test_yotta.py",
+      "?? ma_poc/tests/pms/test_entrata_redirect_identity_guard.py",
+      "?? ma_poc/tests/pms/test_livebh_portfolio_redirect_guard.py",
+      "?? ma_poc/tests/pms/test_page_local_static_recovery.py",
+      "?? ma_poc/tests/pms/test_stale_gsc_rediscovery.py",
+      "?? ma_poc/tests/pms/test_stale_wimmer_rediscovery.py"
+    ],
+    "sha256": {
+      "ma_poc/core/source_ids.py": "9301fc04c4d1b75d61abce895dfd7f9baafb0251396341a972f0091554880e74",
+      "ma_poc/pms/adapters/_nesthub_public.py": "b4790deebdb0e07f26bf03637ecc9fcbe195372aa50af7b6a172fd55fd5393d8",
+      "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f",
+      "ma_poc/tests/pms/adapters/test_betternoi_public.py": "362b61590aaa93f5ab8a438a83ede0436f942c22177b6739a30fc6b42a1e0c81",
+      "ma_poc/tests/pms/adapters/test_nesthub_public.py": "fc31e5a263e43fb0e3467f03bd026dc6893825ee5b0b72f4484675dfef74aad6",
+      "ma_poc/tests/pms/adapters/test_showmojo_public.py": "ee3cf42b2c7c24030f968db15a20db9bf494471118095eee4a3b31ffbdbba848"
+    }
+  },
+  "source_snapshot_before": {
+    "dirty": true,
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "git_status_short": [
+      " M ma_poc/core/identity.py",
+      " M ma_poc/core/source_ids.py",
+      " M ma_poc/discovery/rediscovery.py",
+      " M ma_poc/fetch/fetcher.py",
+      " M ma_poc/fetch/hyperbrowser_backend.py",
+      " M ma_poc/pms/adapters/__init__.py",
+      " M ma_poc/pms/adapters/_encoreskyline_units.py",
+      " M ma_poc/pms/adapters/_leaseleads_embed.py",
+      " M ma_poc/pms/adapters/_pms_portal_hop.py",
+      " M ma_poc/pms/adapters/_rentcafe_hosted_table.py",
+      " M ma_poc/pms/adapters/_rentcafe_nestin.py",
+      " M ma_poc/pms/adapters/_universal_recovery.py",
+      " M ma_poc/pms/adapters/appfolio.py",
+      " M ma_poc/pms/adapters/encoreskyline_template.py",
+      " M ma_poc/pms/adapters/entrata.py",
+      " M ma_poc/pms/adapters/funnel.py",
+      " M ma_poc/pms/adapters/generic_plan_text.py",
+      " M ma_poc/pms/adapters/knock.py",
+      " M ma_poc/pms/adapters/onesite.py",
+      " M ma_poc/pms/adapters/rentcafe.py",
+      " M ma_poc/pms/adapters/rentmanager.py",
+      " M ma_poc/pms/adapters/rentvision.py",
+      " M ma_poc/pms/adapters/resman.py",
+      " M ma_poc/pms/adapters/spherexx.py",
+      " M ma_poc/pms/detector.py",
+      " M ma_poc/pms/scraper.py",
+      " M ma_poc/pms/signal_engine/defaults.py",
+      " M ma_poc/services/floorplan_snap.py",
+      " M ma_poc/tests/core/test_source_id_registry_coverage.py",
+      " M ma_poc/tests/discovery/test_rediscovery.py",
+      " M ma_poc/tests/fetch/test_compliance_mode.py",
+      " M ma_poc/tests/fetch/test_hyperbrowser_backend.py",
+      " M ma_poc/tests/integration/test_floorplan_snap.py",
+      " M ma_poc/tests/pms/adapters/test_encoreskyline_template_adapter.py",
+      " M ma_poc/tests/pms/adapters/test_encoreskyline_units.py",
+      " M ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py",
+      " M ma_poc/tests/pms/adapters/test_knock.py",
+      " M ma_poc/tests/pms/adapters/test_knock_empty_api_fallthrough.py",
+      " M ma_poc/tests/pms/adapters/test_knock_parse_units_status.py",
+      " M ma_poc/tests/pms/adapters/test_leaseleads_embed.py",
+      " M ma_poc/tests/pms/adapters/test_no_blocking_probe_in_async_def.py",
+      " M ma_poc/tests/pms/adapters/test_onesite_workflow.py",
+      " M ma_poc/tests/pms/adapters/test_pms_portal_hop.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_anchor_walk.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_hosted_table.py",
+      " M ma_poc/tests/pms/adapters/test_rentcafe_nestin.py",
+      " M ma_poc/tests/pms/adapters/test_rentmanager_wp_cards.py",
+      " M ma_poc/tests/pms/adapters/test_rentvision.py",
+      " M ma_poc/tests/pms/adapters/test_resman.py",
+      " M ma_poc/tests/pms/adapters/test_securecafe_direct_first.py",
+      " M ma_poc/tests/pms/adapters/test_securecafe_multi_base.py",
+      " M ma_poc/tests/pms/test_detector.py",
+      " M ma_poc/tests/pms/test_path_b_retry_telemetry.py",
+      "?? investigations/2026-08-01-failed-no-data/",
+      "?? ma_poc/pms/adapters/_betternoi_public.py",
+      "?? ma_poc/pms/adapters/_doorloop_listings.py",
+      "?? ma_poc/pms/adapters/_entrata_hb_recovery.py",
+      "?? ma_poc/pms/adapters/_nesthub_public.py",
+      "?? ma_poc/pms/adapters/_showmojo_public.py",
+      "?? ma_poc/pms/adapters/_static_residence_table.py",
+      "?? ma_poc/pms/adapters/_static_team_unit_roster.py",
+      "?? ma_poc/pms/adapters/mri_prospectconnect.py",
+      "?? ma_poc/pms/adapters/yotta.py",
+      "?? ma_poc/tests/fetch/test_fetcher_render_captcha_hb_rescue.py",
+      "?? ma_poc/tests/fetch/test_hyperbrowser_raw_get_redirect.py",
+      "?? ma_poc/tests/pms/adapters/test_appfolio_detail_current_template.py",
+      "?? ma_poc/tests/pms/adapters/test_betternoi_public.py",
+      "?? ma_poc/tests/pms/adapters/test_doorloop_listings.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_beans_map.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_fallback.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_recovery.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_property_snippet_hb.py",
+      "?? ma_poc/tests/pms/adapters/test_entrata_snippet_iframe.py",
+      "?? ma_poc/tests/pms/adapters/test_funnel_nestio_items.py",
+      "?? ma_poc/tests/pms/adapters/test_mri_prospectconnect.py",
+      "?? ma_poc/tests/pms/adapters/test_nesthub_public.py",
+      "?? ma_poc/tests/pms/adapters/test_onesite_rpfp_cws.py",
+      "?? ma_poc/tests/pms/adapters/test_rentcafe_applicant_recovery.py",
+      "?? ma_poc/tests/pms/adapters/test_rentmanager_iloveleasing_public.py",
+      "?? ma_poc/tests/pms/adapters/test_showmojo_public.py",
+      "?? ma_poc/tests/pms/adapters/test_spherexx_legacy_availability.py",
+      "?? ma_poc/tests/pms/adapters/test_static_residence_table.py",
+      "?? ma_poc/tests/pms/adapters/test_static_team_unit_roster.py",
+      "?? ma_poc/tests/pms/adapters/test_yotta.py",
+      "?? ma_poc/tests/pms/test_entrata_redirect_identity_guard.py",
+      "?? ma_poc/tests/pms/test_livebh_portfolio_redirect_guard.py",
+      "?? ma_poc/tests/pms/test_page_local_static_recovery.py",
+      "?? ma_poc/tests/pms/test_stale_gsc_rediscovery.py",
+      "?? ma_poc/tests/pms/test_stale_wimmer_rediscovery.py"
+    ],
+    "sha256": {
+      "ma_poc/core/source_ids.py": "9301fc04c4d1b75d61abce895dfd7f9baafb0251396341a972f0091554880e74",
+      "ma_poc/pms/adapters/_nesthub_public.py": "b4790deebdb0e07f26bf03637ecc9fcbe195372aa50af7b6a172fd55fd5393d8",
+      "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f",
+      "ma_poc/tests/pms/adapters/test_betternoi_public.py": "362b61590aaa93f5ab8a438a83ede0436f942c22177b6739a30fc6b42a1e0c81",
+      "ma_poc/tests/pms/adapters/test_nesthub_public.py": "fc31e5a263e43fb0e3467f03bd026dc6893825ee5b0b72f4484675dfef74aad6",
+      "ma_poc/tests/pms/adapters/test_showmojo_public.py": "ee3cf42b2c7c24030f968db15a20db9bf494471118095eee4a3b31ffbdbba848"
+    }
+  },
+  "verification": {
+    "all_repeats_pass": true,
+    "checks": [
+      {
+        "command": [
+          "ruff",
+          "check",
+          "ma_poc/pms/adapters/_nesthub_public.py",
+          "ma_poc/pms/scraper.py",
+          "ma_poc/core/source_ids.py",
+          "ma_poc/tests/pms/adapters/test_nesthub_public.py",
+          "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+          "ma_poc/tests/pms/adapters/test_betternoi_public.py"
+        ],
+        "elapsed_ms": 91,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "All checks passed!\n"
+      },
+      {
+        "command": [
+          "pytest",
+          "-q",
+          "ma_poc/tests/pms/adapters/test_nesthub_public.py",
+          "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+          "ma_poc/tests/pms/adapters/test_betternoi_public.py",
+          "ma_poc/tests/pms/test_page_local_static_recovery.py",
+          "ma_poc/tests/pms/test_universal_recovery_plan_level_gate.py"
+        ],
+        "elapsed_ms": 1725,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "..............................................                           [100%]\n46 passed in 0.35s\n"
+      },
+      {
+        "command": [
+          "pytest",
+          "-q",
+          "ma_poc/tests/pms/test_scraper.py",
+          "ma_poc/tests/pms/test_scraper_jugnu.py",
+          "ma_poc/tests/pms/test_empty_exit_plan_text.py",
+          "ma_poc/tests/pms/test_no_availability_salvage_checkpoint.py",
+          "ma_poc/tests/integration/test_floorplan_snap.py"
+        ],
+        "elapsed_ms": 1410,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": ".......................................................                  [100%]\n55 passed in 0.51s\n"
+      }
+    ],
+    "configured_pipeline_repeats": [
+      {
+        "adapter": "nesthub_public",
+        "assertions": {
+          "adapter_exact": true,
+          "configured_fetch_200": true,
+          "configured_stale_id_never_emitted": true,
+          "exact_candidate_and_acceptance_counts": true,
+          "exact_one_native_priced_row": true,
+          "fallback_provenance_present": true,
+          "full_roster_paginated": true,
+          "llm_not_used": true,
+          "native_listing_id_exact": true,
+          "native_listing_id_pending_scope": true,
+          "natural_unit_anchor_e7": true,
+          "provider_address_exact": true,
+          "provider_dimensions_exact": true,
+          "provider_floor_plan_exact": true,
+          "provider_future_date_exact": true,
+          "provider_raw_date_preserved": true,
+          "provider_rent_exact": true,
+          "published_property_filter_exact": true,
+          "same_zip_wrong_street_control_excluded": true,
+          "source_urls_exact": true,
+          "stale_deposit_plan_discarded": true,
+          "tier_exact": true,
+          "wrong_property_city_zip_control_excluded": true
+        },
+        "configured_fetch": {
+          "body_bytes": 46522,
+          "final_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "generic_plan_text",
+          "page_published_native:nesthub_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 1,
+        "native_rows": 1,
+        "official_chain": {
+          "accepted_rows": 1,
+          "attempted": true,
+          "community_url": "https://www.augustarentalhomes.net/annabergs",
+          "configured_listing_id": "56",
+          "configured_listing_must_not_emit": true,
+          "configured_status": "This Property Is Not Available",
+          "configured_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "exact_address_candidates": 1,
+          "failure_reason": "",
+          "native_listing_ids": [
+            "602"
+          ],
+          "pages": [
+            {
+              "page": 1,
+              "rows": 21,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+            },
+            {
+              "page": 2,
+              "rows": 12,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent?pg=2"
+            }
+          ],
+          "portfolio_rows": 33,
+          "published_property_filter": "search=ANNBRG",
+          "rejected_rows": [
+            {
+              "location": "2019 Buckhaven Way, Augusta, GA 30909",
+              "provider_listing_id": "80",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "207 Old Berzelia Road, Grovetown, GA 30813",
+              "provider_listing_id": "280",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "306 West Buena Vista Avenue, North Augusta, SC 29841",
+              "provider_listing_id": "284",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2515 Center West Parkway - 3F, Augusta, GA 30909",
+              "provider_listing_id": "403",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2812C Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "483",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - Waitlist, North Augusta, SC 29841",
+              "provider_listing_id": "539",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - Waitlist, Edgefield, SC 29824",
+              "provider_listing_id": "551",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-21, Edgefield, SC 29824",
+              "provider_listing_id": "552",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 406, North Augusta, SC 29841",
+              "provider_listing_id": "587",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "208 West Buena Vista Avenue - 1, North Augusta, SC 29841",
+              "provider_listing_id": "588",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-6, Edgefield, SC 29824",
+              "provider_listing_id": "590",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 405, North Augusta, SC 29841",
+              "provider_listing_id": "593",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 407, North Augusta, SC 29841",
+              "provider_listing_id": "594",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 501, North Augusta, SC 29841",
+              "provider_listing_id": "596",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 704, North Augusta, SC 29841",
+              "provider_listing_id": "599",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1531 Abby Way - 1, Augusta, GA 30909",
+              "provider_listing_id": "601",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "104 Canary Street, Thomson, GA 30824",
+              "provider_listing_id": "606",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "33 Ashton Pointe Drive, North Augusta, SC 29841",
+              "provider_listing_id": "607",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "146 Chalet North Blvd - 146, North Augusta, SC 29841",
+              "provider_listing_id": "609",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "37 Conifer Court, North Augusta, SC 29841",
+              "provider_listing_id": "610",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "171 Caroleton Drive, Grovetown, GA 30813",
+              "provider_listing_id": "611",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 607, North Augusta, SC 29841",
+              "provider_listing_id": "612",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2822D Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "613",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1425 Lee Beard Way Unit 109, Augusta, GA 30901",
+              "provider_listing_id": "614",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2509 Otter Run Unit 3204, Augusta, GA 30909",
+              "provider_listing_id": "616",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - A, Hephzibah, GA 30815",
+              "provider_listing_id": "617",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 907, North Augusta, SC 29841",
+              "provider_listing_id": "618",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "707 Cardinal Street, Thomson, GA 30824",
+              "provider_listing_id": "619",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - B, Hephzibah, GA 30815",
+              "provider_listing_id": "620",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "3001C Strickland Court, Augusta, GA 30906",
+              "provider_listing_id": "621",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2328 Prague Court, Augusta, GA 30906",
+              "provider_listing_id": "622",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1934 Bolin Road, North Augusta, SC 29841",
+              "provider_listing_id": "623",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch"
+              ]
+            }
+          ],
+          "roster_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+        },
+        "plan_rows": 0,
+        "repeat": 1,
+        "tier": "TIER_1_PUBLIC_NESTHUB_SSR_EXACT_PROPERTY",
+        "unit": {
+          "availability_date": "2026-08-19",
+          "availability_date_provenance": "provider_roster_and_detail_exact_date_agree",
+          "availability_status": "AVAILABLE",
+          "availability_text": "Available: 08-19-2026",
+          "available_date": "2026-08-19",
+          "bathrooms": "2.5",
+          "bedrooms": "2",
+          "floor_plan_name": "Chesapeake",
+          "floor_plan_name_provenance": "provider_detail_scoped_the_name_is_a_bedroom_sentence",
+          "market_rent_high": 1160,
+          "market_rent_low": 1160,
+          "provider_unit_address": "2905 Arrowhead Drive - E7",
+          "source_api_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_community_url": "https://www.augustarentalhomes.net/annabergs",
+          "source_ids": {
+            "nesthub_listing_id": "602"
+          },
+          "source_listing_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_portal_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent",
+          "source_property_name": "Annaberg",
+          "source_property_provenance": "exact_configured_nesthub_detail_same_host_community_published_filter_roster_exact_address_detail_revalidation",
+          "sqft": "1268",
+          "unit_name": "2905 Arrowhead Drive - E7",
+          "unit_number": "E7"
+        },
+        "unit_rows": 1
+      },
+      {
+        "adapter": "nesthub_public",
+        "assertions": {
+          "adapter_exact": true,
+          "configured_fetch_200": true,
+          "configured_stale_id_never_emitted": true,
+          "exact_candidate_and_acceptance_counts": true,
+          "exact_one_native_priced_row": true,
+          "fallback_provenance_present": true,
+          "full_roster_paginated": true,
+          "llm_not_used": true,
+          "native_listing_id_exact": true,
+          "native_listing_id_pending_scope": true,
+          "natural_unit_anchor_e7": true,
+          "provider_address_exact": true,
+          "provider_dimensions_exact": true,
+          "provider_floor_plan_exact": true,
+          "provider_future_date_exact": true,
+          "provider_raw_date_preserved": true,
+          "provider_rent_exact": true,
+          "published_property_filter_exact": true,
+          "same_zip_wrong_street_control_excluded": true,
+          "source_urls_exact": true,
+          "stale_deposit_plan_discarded": true,
+          "tier_exact": true,
+          "wrong_property_city_zip_control_excluded": true
+        },
+        "configured_fetch": {
+          "body_bytes": 46522,
+          "final_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "generic_plan_text",
+          "page_published_native:nesthub_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 1,
+        "native_rows": 1,
+        "official_chain": {
+          "accepted_rows": 1,
+          "attempted": true,
+          "community_url": "https://www.augustarentalhomes.net/annabergs",
+          "configured_listing_id": "56",
+          "configured_listing_must_not_emit": true,
+          "configured_status": "This Property Is Not Available",
+          "configured_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "exact_address_candidates": 1,
+          "failure_reason": "",
+          "native_listing_ids": [
+            "602"
+          ],
+          "pages": [
+            {
+              "page": 1,
+              "rows": 21,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+            },
+            {
+              "page": 2,
+              "rows": 12,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent?pg=2"
+            }
+          ],
+          "portfolio_rows": 33,
+          "published_property_filter": "search=ANNBRG",
+          "rejected_rows": [
+            {
+              "location": "2019 Buckhaven Way, Augusta, GA 30909",
+              "provider_listing_id": "80",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "207 Old Berzelia Road, Grovetown, GA 30813",
+              "provider_listing_id": "280",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "306 West Buena Vista Avenue, North Augusta, SC 29841",
+              "provider_listing_id": "284",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2515 Center West Parkway - 3F, Augusta, GA 30909",
+              "provider_listing_id": "403",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2812C Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "483",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - Waitlist, North Augusta, SC 29841",
+              "provider_listing_id": "539",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - Waitlist, Edgefield, SC 29824",
+              "provider_listing_id": "551",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-21, Edgefield, SC 29824",
+              "provider_listing_id": "552",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 406, North Augusta, SC 29841",
+              "provider_listing_id": "587",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "208 West Buena Vista Avenue - 1, North Augusta, SC 29841",
+              "provider_listing_id": "588",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-6, Edgefield, SC 29824",
+              "provider_listing_id": "590",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 405, North Augusta, SC 29841",
+              "provider_listing_id": "593",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 407, North Augusta, SC 29841",
+              "provider_listing_id": "594",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 501, North Augusta, SC 29841",
+              "provider_listing_id": "596",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 704, North Augusta, SC 29841",
+              "provider_listing_id": "599",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1531 Abby Way - 1, Augusta, GA 30909",
+              "provider_listing_id": "601",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "104 Canary Street, Thomson, GA 30824",
+              "provider_listing_id": "606",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "33 Ashton Pointe Drive, North Augusta, SC 29841",
+              "provider_listing_id": "607",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "146 Chalet North Blvd - 146, North Augusta, SC 29841",
+              "provider_listing_id": "609",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "37 Conifer Court, North Augusta, SC 29841",
+              "provider_listing_id": "610",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "171 Caroleton Drive, Grovetown, GA 30813",
+              "provider_listing_id": "611",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 607, North Augusta, SC 29841",
+              "provider_listing_id": "612",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2822D Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "613",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1425 Lee Beard Way Unit 109, Augusta, GA 30901",
+              "provider_listing_id": "614",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2509 Otter Run Unit 3204, Augusta, GA 30909",
+              "provider_listing_id": "616",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - A, Hephzibah, GA 30815",
+              "provider_listing_id": "617",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 907, North Augusta, SC 29841",
+              "provider_listing_id": "618",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "707 Cardinal Street, Thomson, GA 30824",
+              "provider_listing_id": "619",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - B, Hephzibah, GA 30815",
+              "provider_listing_id": "620",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "3001C Strickland Court, Augusta, GA 30906",
+              "provider_listing_id": "621",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2328 Prague Court, Augusta, GA 30906",
+              "provider_listing_id": "622",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1934 Bolin Road, North Augusta, SC 29841",
+              "provider_listing_id": "623",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch"
+              ]
+            }
+          ],
+          "roster_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+        },
+        "plan_rows": 0,
+        "repeat": 2,
+        "tier": "TIER_1_PUBLIC_NESTHUB_SSR_EXACT_PROPERTY",
+        "unit": {
+          "availability_date": "2026-08-19",
+          "availability_date_provenance": "provider_roster_and_detail_exact_date_agree",
+          "availability_status": "AVAILABLE",
+          "availability_text": "Available: 08-19-2026",
+          "available_date": "2026-08-19",
+          "bathrooms": "2.5",
+          "bedrooms": "2",
+          "floor_plan_name": "Chesapeake",
+          "floor_plan_name_provenance": "provider_detail_scoped_the_name_is_a_bedroom_sentence",
+          "market_rent_high": 1160,
+          "market_rent_low": 1160,
+          "provider_unit_address": "2905 Arrowhead Drive - E7",
+          "source_api_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_community_url": "https://www.augustarentalhomes.net/annabergs",
+          "source_ids": {
+            "nesthub_listing_id": "602"
+          },
+          "source_listing_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_portal_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent",
+          "source_property_name": "Annaberg",
+          "source_property_provenance": "exact_configured_nesthub_detail_same_host_community_published_filter_roster_exact_address_detail_revalidation",
+          "sqft": "1268",
+          "unit_name": "2905 Arrowhead Drive - E7",
+          "unit_number": "E7"
+        },
+        "unit_rows": 1
+      },
+      {
+        "adapter": "nesthub_public",
+        "assertions": {
+          "adapter_exact": true,
+          "configured_fetch_200": true,
+          "configured_stale_id_never_emitted": true,
+          "exact_candidate_and_acceptance_counts": true,
+          "exact_one_native_priced_row": true,
+          "fallback_provenance_present": true,
+          "full_roster_paginated": true,
+          "llm_not_used": true,
+          "native_listing_id_exact": true,
+          "native_listing_id_pending_scope": true,
+          "natural_unit_anchor_e7": true,
+          "provider_address_exact": true,
+          "provider_dimensions_exact": true,
+          "provider_floor_plan_exact": true,
+          "provider_future_date_exact": true,
+          "provider_raw_date_preserved": true,
+          "provider_rent_exact": true,
+          "published_property_filter_exact": true,
+          "same_zip_wrong_street_control_excluded": true,
+          "source_urls_exact": true,
+          "stale_deposit_plan_discarded": true,
+          "tier_exact": true,
+          "wrong_property_city_zip_control_excluded": true
+        },
+        "configured_fetch": {
+          "body_bytes": 46522,
+          "final_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "generic_plan_text",
+          "page_published_native:nesthub_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 1,
+        "native_rows": 1,
+        "official_chain": {
+          "accepted_rows": 1,
+          "attempted": true,
+          "community_url": "https://www.augustarentalhomes.net/annabergs",
+          "configured_listing_id": "56",
+          "configured_listing_must_not_emit": true,
+          "configured_status": "This Property Is Not Available",
+          "configured_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+          "exact_address_candidates": 1,
+          "failure_reason": "",
+          "native_listing_ids": [
+            "602"
+          ],
+          "pages": [
+            {
+              "page": 1,
+              "rows": 21,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+            },
+            {
+              "page": 2,
+              "rows": 12,
+              "url": "https://www.augustarentalhomes.net/augusta-homes-for-rent?pg=2"
+            }
+          ],
+          "portfolio_rows": 33,
+          "published_property_filter": "search=ANNBRG",
+          "rejected_rows": [
+            {
+              "location": "2019 Buckhaven Way, Augusta, GA 30909",
+              "provider_listing_id": "80",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "207 Old Berzelia Road, Grovetown, GA 30813",
+              "provider_listing_id": "280",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "306 West Buena Vista Avenue, North Augusta, SC 29841",
+              "provider_listing_id": "284",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2515 Center West Parkway - 3F, Augusta, GA 30909",
+              "provider_listing_id": "403",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2812C Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "483",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - Waitlist, North Augusta, SC 29841",
+              "provider_listing_id": "539",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - Waitlist, Edgefield, SC 29824",
+              "provider_listing_id": "551",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-21, Edgefield, SC 29824",
+              "provider_listing_id": "552",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 406, North Augusta, SC 29841",
+              "provider_listing_id": "587",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "208 West Buena Vista Avenue - 1, North Augusta, SC 29841",
+              "provider_listing_id": "588",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "320 Peachtree Street - 325-6, Edgefield, SC 29824",
+              "provider_listing_id": "590",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 405, North Augusta, SC 29841",
+              "provider_listing_id": "593",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 407, North Augusta, SC 29841",
+              "provider_listing_id": "594",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 501, North Augusta, SC 29841",
+              "provider_listing_id": "596",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 704, North Augusta, SC 29841",
+              "provider_listing_id": "599",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1531 Abby Way - 1, Augusta, GA 30909",
+              "provider_listing_id": "601",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "104 Canary Street, Thomson, GA 30824",
+              "provider_listing_id": "606",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "33 Ashton Pointe Drive, North Augusta, SC 29841",
+              "provider_listing_id": "607",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "146 Chalet North Blvd - 146, North Augusta, SC 29841",
+              "provider_listing_id": "609",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "37 Conifer Court, North Augusta, SC 29841",
+              "provider_listing_id": "610",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "171 Caroleton Drive, Grovetown, GA 30813",
+              "provider_listing_id": "611",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 607, North Augusta, SC 29841",
+              "provider_listing_id": "612",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2822D Thomas Lane, Augusta, GA 30906",
+              "provider_listing_id": "613",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1425 Lee Beard Way Unit 109, Augusta, GA 30901",
+              "provider_listing_id": "614",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2509 Otter Run Unit 3204, Augusta, GA 30909",
+              "provider_listing_id": "616",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - A, Hephzibah, GA 30815",
+              "provider_listing_id": "617",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "520 East Buena Vista Avenue - 907, North Augusta, SC 29841",
+              "provider_listing_id": "618",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "707 Cardinal Street, Thomson, GA 30824",
+              "provider_listing_id": "619",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2575 1/2 Tobacco Road - B, Hephzibah, GA 30815",
+              "provider_listing_id": "620",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "3001C Strickland Court, Augusta, GA 30906",
+              "provider_listing_id": "621",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "2328 Prague Court, Augusta, GA 30906",
+              "provider_listing_id": "622",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_zip_mismatch",
+                "no_exact_roster_availability_date"
+              ]
+            },
+            {
+              "location": "1934 Bolin Road, North Augusta, SC 29841",
+              "provider_listing_id": "623",
+              "reasons": [
+                "canonical_street_and_native_unit_suffix_mismatch",
+                "canonical_city_mismatch",
+                "canonical_state_mismatch",
+                "canonical_zip_mismatch"
+              ]
+            }
+          ],
+          "roster_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent"
+        },
+        "plan_rows": 0,
+        "repeat": 3,
+        "tier": "TIER_1_PUBLIC_NESTHUB_SSR_EXACT_PROPERTY",
+        "unit": {
+          "availability_date": "2026-08-19",
+          "availability_date_provenance": "provider_roster_and_detail_exact_date_agree",
+          "availability_status": "AVAILABLE",
+          "availability_text": "Available: 08-19-2026",
+          "available_date": "2026-08-19",
+          "bathrooms": "2.5",
+          "bedrooms": "2",
+          "floor_plan_name": "Chesapeake",
+          "floor_plan_name_provenance": "provider_detail_scoped_the_name_is_a_bedroom_sentence",
+          "market_rent_high": 1160,
+          "market_rent_low": 1160,
+          "provider_unit_address": "2905 Arrowhead Drive - E7",
+          "source_api_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_community_url": "https://www.augustarentalhomes.net/annabergs",
+          "source_ids": {
+            "nesthub_listing_id": "602"
+          },
+          "source_listing_url": "https://www.augustarentalhomes.net/_system/listings/602/2905-Arrowhead-Drive---E7-Augusta-GA-30909-US",
+          "source_portal_url": "https://www.augustarentalhomes.net/augusta-homes-for-rent",
+          "source_property_name": "Annaberg",
+          "source_property_provenance": "exact_configured_nesthub_detail_same_host_community_published_filter_roster_exact_address_detail_revalidation",
+          "sqft": "1268",
+          "unit_name": "2905 Arrowhead Drive - E7",
+          "unit_number": "E7"
+        },
+        "unit_rows": 1
+      }
+    ],
+    "source_id_coverage_diagnostic": {
+      "command": [
+        "pytest",
+        "-q",
+        "ma_poc/tests/core/test_source_id_registry_coverage.py::test_every_written_source_id_key_is_registered"
+      ],
+      "elapsed_ms": 2128,
+      "exit_code": 1,
+      "stderr": "",
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________ test_every_written_source_id_key_is_registered ________________\n\n    def test_every_written_source_id_key_is_registered() -> None:\n        \"\"\"An unclassified key fails CI \u2014 declare its scope in core/source_ids.py.\n    \n        This is the guard that turns the registry from documentation into an\n        enforced namespace. A new adapter landing a new ``source_ids`` key must say\n        what that key proves; it may not default into either derived view by the\n        shape of its name.\n        \"\"\"\n        unregistered = {k: v for k, v in _WRITERS.items() if scope_of(k) is None}\n>       assert not unregistered, (\n            \"source_ids keys written by an adapter but NOT registered in \"\n            \"ma_poc/core/source_ids.py:\\n\"\n            + \"\\n\".join(f\"  {k}  <- {', '.join(v)}\" for k, v in sorted(unregistered.items()))\n            + \"\\nAdd each to SOURCE_ID_SCOPES with its scope + the evidence for it.\"\n        )\nE       AssertionError: source_ids keys written by an adapter but NOT registered in ma_poc/core/source_ids.py:\nE           entrata_beans_listing_id  <- ma_poc/pms/adapters/entrata.py:2789\nE           entrata_property_id  <- ma_poc/pms/adapters/entrata.py:2788\nE           funnel_building_id  <- ma_poc/pms/adapters/funnel.py:456\nE           funnel_community_id  <- ma_poc/pms/adapters/funnel.py:459\nE           funnel_listing_id  <- ma_poc/pms/adapters/funnel.py:453\nE         Add each to SOURCE_ID_SCOPES with its scope + the evidence for it.\nE       assert not {'entrata_beans_listing_id': ['ma_poc/pms/adapters/entrata.py:2789'], 'entrata_property_id': ['ma_poc/pms/adapters/ent...building_id': ['ma_poc/pms/adapters/funnel.py:456'], 'funnel_community_id': ['ma_poc/pms/adapters/funnel.py:459'], ...}\n\nma_poc/tests/core/test_source_id_registry_coverage.py:163: AssertionError\n=========================== short test summary info ============================\nFAILED ma_poc/tests/core/test_source_id_registry_coverage.py::test_every_written_source_id_key_is_registered\n1 failed in 1.46s\n"
+    },
+    "source_id_coverage_external_concurrent_failure": true,
+    "source_id_coverage_external_keys": [
+      "funnel_listing_id",
+      "funnel_building_id",
+      "funnel_community_id"
+    ]
+  }
+}

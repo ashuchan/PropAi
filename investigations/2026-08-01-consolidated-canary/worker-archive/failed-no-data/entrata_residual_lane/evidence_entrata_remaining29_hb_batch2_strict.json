@@ -1,0 +1,2229 @@
+{
+  "summary": {
+    "result_type": "one_session_entrata_residual_followup_strict_audit",
+    "capture_timestamp_utc": "2026-08-01T09:15:15.607773+00:00",
+    "target_properties": 8,
+    "sessions_used": 8,
+    "strict_unit_qualified_properties": 2,
+    "strict_unit_qualified_property_ids": [
+      43908,
+      247119
+    ],
+    "native_positive_rent_rows": 21,
+    "captcha_solving": false
+  },
+  "results": [
+    {
+      "property_id": 22986,
+      "property_name": "Tuscany Hills",
+      "website": "http://www.tuscanyhillsapartments.com/",
+      "seed_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+      "seed_final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+      "seed_title": "1- 2- 3- Bed Apartments | Tuscany Hills Apartments | Apartments in San Marcos",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "title": "Just a moment...",
+          "body_bytes": 27710,
+          "body_sha256": "87f962acdbd8496aa47d3388cfe0abac41a4177aff1e9e14d7280535eb20797d",
+          "challenge_detected": true,
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "title": "1- 2- 3- Bed Apartments | Tuscany Hills Apartments | Apartments in San Marcos",
+          "body_bytes": 196561,
+          "body_sha256": "afe3ec5a4821ea188fd64d78819302c3aeaf4dfd863c21148a537235ed5231d0",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "Tuscany Hills",
+        "canonical_address": "715 Ash Ln",
+        "canonical_city_state_zip": "San Marcos CA 92069",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "index_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+      "index_title": "1- 2- 3- Bed Apartments | Tuscany Hills Apartments | Apartments in San Marcos",
+      "index_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "title": "1- 2- 3- Bed Apartments | Tuscany Hills Apartments | Apartments in San Marcos",
+          "body_bytes": 195508,
+          "body_sha256": "218008dcac92ad4b692bb5f05935db5bc87ca3afce6ca38a2995ea2d78a6d32f",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "index_identity": {
+        "canonical_name": "Tuscany Hills",
+        "canonical_address": "715 Ash Ln",
+        "canonical_city_state_zip": "San Marcos CA 92069",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [],
+      "published_vus_links": [],
+      "fetches": [],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 26736,
+      "property_name": "The Boro - Phipps",
+      "website": "https://www.theboroapartments.com/?switch_cls%5Bid%5D=64893&utm_source=gmb&utm_medium=organic&oll_switch_cls%5Bid%5D=64893&oll_utm_source=gmb&oll_utm_medium=organic",
+      "seed_url": "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+      "seed_final_url": "https://www.theboroapartments.com/atlanta/phipps-place/conventional/",
+      "seed_title": "1, 2, & 3 Bedroom Apartments In Atlanta, GA | Phipps Place",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.theboroapartments.com/atlanta/phipps-place/conventional/",
+          "title": "1, 2, & 3 Bedroom Apartments In Atlanta, GA | Phipps Place",
+          "body_bytes": 299341,
+          "body_sha256": "63174d3c339e179c1522b96b58b51762e9f9c4d28a1ae7808528d5d991a69a8d",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "The Boro - Phipps",
+        "canonical_address": "3460 Kingsboro Rd NE",
+        "canonical_city_state_zip": "Atlanta GA 30326",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 1,
+        "pass": true
+      },
+      "index_url": "https://www.theboroapartments.com/atlanta/phipps-place/conventional/",
+      "index_title": "1, 2, & 3 Bedroom Apartments In Atlanta, GA | Phipps Place",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "The Boro - Phipps",
+        "canonical_address": "3460 Kingsboro Rd NE",
+        "canonical_city_state_zip": "Atlanta GA 30326",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 1,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-902-sf-772350/fp_name/occupancy_type/conventional/",
+        "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-with-den-1049-sf-772398/fp_name/occupancy_type/conventional/",
+        "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-with-den-1151-sf-777508/fp_name/occupancy_type/conventional/",
+        "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/two-bedroom-two-bath-1293-sf-772478/fp_name/occupancy_type/conventional/",
+        "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/two-bedroom-two-bath-with-den-1417-sf-772596/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,800&max_rent=$6,732&min_advertised_base_rent=1723&max_advertised_base_rent=6655&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+        "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,766&min_advertised_base_rent=1867&max_advertised_base_rent=6689&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+        "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$2,099&max_rent=$6,636&min_advertised_base_rent=2022&max_advertised_base_rent=6559&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+        "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,653&max_rent=$10,000&min_advertised_base_rent=1576&max_advertised_base_rent=9923&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+        "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$2,310&max_rent=$11,765&min_advertised_base_rent=2233&max_advertised_base_rent=11688&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo"
+      ],
+      "fetches": [
+        {
+          "url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,800&max_rent=$6,732&min_advertised_base_rent=1723&max_advertised_base_rent=6655&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,766&min_advertised_base_rent=1867&max_advertised_base_rent=6689&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$2,099&max_rent=$6,636&min_advertised_base_rent=2022&max_advertised_base_rent=6559&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,653&max_rent=$10,000&min_advertised_base_rent=1576&max_advertised_base_rent=9923&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&cached_rate_available=1&min_rent=$2,310&max_rent=$11,765&min_advertised_base_rent=2233&max_advertised_base_rent=11688&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-902-sf-772350/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 141205,
+          "body_sha256": "b37b3f3c6bd3e4223c42754ded83f2c721289e4ac8edc1476a4a0b99bd79ae65",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-with-den-1049-sf-772398/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 140538,
+          "body_sha256": "e5fd2e4a288b7b3f0692c260653cbf6e1f45abe449b85c97995e32c8a4ebfb2c",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/one-bedroom-one-bath-with-den-1151-sf-777508/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 141317,
+          "body_sha256": "efe71cf6031c7cb6805c13bc9d926c8a4bb5f01d3a85b0df8766895e7790449e",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/two-bedroom-two-bath-1293-sf-772478/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6773,
+          "body_sha256": "0f2f42ef5b7b064b93b71013c1113625f23adb7667233273472f65ffad4de82e",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.theboroapartments.com/atlanta/phipps-place/floorplans/two-bedroom-two-bath-with-den-1417-sf-772596/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6800,
+          "body_sha256": "bd0834f2632b072950f0769277fe61bc53f934b86bdd04ae869c3d279e1f221f",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        }
+      ],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 43908,
+      "property_name": "ReNew Johnson Creek",
+      "website": "https://www.renewjohnsoncreek.com/",
+      "seed_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+      "seed_final_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+      "seed_title": "Studio - 2 Bed Apartments - Check Availability | ReNew Johnson Creek",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+          "title": "Studio - 2 Bed Apartments - Check Availability | ReNew Johnson Creek",
+          "body_bytes": 192020,
+          "body_sha256": "86b7f6d65467584ea2e9514fa5f46a437dfb8611904d57b64ffd84ad6b62e44e",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "ReNew Johnson Creek",
+        "canonical_address": "12435 SE Linwood Ave",
+        "canonical_city_state_zip": "Milwaukie OR 97222",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 3,
+        "pass": true
+      },
+      "index_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+      "index_title": "Studio - 2 Bed Apartments - Check Availability | ReNew Johnson Creek",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "ReNew Johnson Creek",
+        "canonical_address": "12435 SE Linwood Ave",
+        "canonical_city_state_zip": "Milwaukie OR 97222",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 3,
+        "pass": true
+      },
+      "outcome": "STRICT_UNIT_QUALIFIED",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/juniper-698926/fp_name/occupancy_type/conventional/",
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [],
+      "fetches": [
+        {
+          "url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/juniper-698926/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 163841,
+          "body_sha256": "00d583fd6a30efe63b098025bf7ded0fc55bd9fcfc1290e36735ced44d095230",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 174028,
+          "body_sha256": "02a6699d36e2a3b5cb1cd425f7b82a93c41ed1cc810ca61b3f6785aac551f9c8",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 5,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 5
+        },
+        {
+          "url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 173067,
+          "body_sha256": "ca04559e7dd83c4aaba2c8a525376b74e22e68e15762c4fdf7f71f6aa8ccaa2f",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 5,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 5
+        }
+      ],
+      "native_identity_rows": 11,
+      "native_positive_rent_rows": 11,
+      "contamination_verdict": "pass_exact_property_published_same_origin_native_ids_positive_rents",
+      "source_urls": [
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/juniper-698926/fp_name/occupancy_type/conventional/"
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Juniper",
+          "bed_label": "Studio",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "380",
+          "unit_number": "29",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,299",
+          "market_rent_low": 1299,
+          "market_rent_high": 1299,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-17",
+          "available_date": "2026-08-17",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/juniper-698926/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201671",
+            "entrata_fpid": "698926"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Juniper",
+          "bed_label": "Studio",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "380",
+          "unit_number": "7",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,299",
+          "market_rent_low": 1299,
+          "market_rent_high": 1299,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/juniper-698926/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201649",
+            "entrata_fpid": "698926"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Aspen",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "11",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,389",
+          "market_rent_low": 1389,
+          "market_rent_high": 1389,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201745",
+            "entrata_fpid": "698927"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Aspen",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "1",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-04",
+          "available_date": "2026-08-04",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201723",
+            "entrata_fpid": "698927"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Aspen",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "8",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201764",
+            "entrata_fpid": "698927"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Aspen",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "520",
+          "unit_number": "3",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201771",
+            "entrata_fpid": "698927"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Aspen",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "670",
+          "unit_number": "9",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,419",
+          "market_rent_low": 1419,
+          "market_rent_high": 1419,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-26",
+          "available_date": "2026-08-26",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/aspen-698927/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201683",
+            "entrata_fpid": "698927"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Cedar",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "776",
+          "unit_number": "5",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,549",
+          "market_rent_low": 1549,
+          "market_rent_high": 1549,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201709",
+            "entrata_fpid": "698928"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Cedar",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "776",
+          "unit_number": "12",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,549",
+          "market_rent_low": 1549,
+          "market_rent_high": 1549,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201734",
+            "entrata_fpid": "698928"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Cedar",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "776",
+          "unit_number": "10",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,599",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-18",
+          "available_date": "2026-08-18",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201696",
+            "entrata_fpid": "698928"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Cedar",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "776",
+          "unit_number": "6",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,599",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "13mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/floorplans/cedar-698928/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5201710",
+            "entrata_fpid": "698928"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ]
+    },
+    {
+      "property_id": 46036,
+      "property_name": "Serengeti Springs",
+      "website": "http://www.serengetisprings.com",
+      "seed_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+      "seed_final_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+      "seed_title": "Floor Plans | 1-3 Bdrm Apts | Serengeti Springs | West Jordan",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "title": "Floor Plans | 1-3 Bdrm Apts | Serengeti Springs | West Jordan",
+          "body_bytes": 212894,
+          "body_sha256": "132801c7f2deb3ef2c4cf0650debd61af70745a9d96d02966a66c667d6749d35",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "Serengeti Springs",
+        "canonical_address": "7898 Serenera Way",
+        "canonical_city_state_zip": "West Jordan UT 84081",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "index_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+      "index_title": "Floor Plans | 1-3 Bdrm Apts | Serengeti Springs | West Jordan",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "Serengeti Springs",
+        "canonical_address": "7898 Serenera Way",
+        "canonical_city_state_zip": "West Jordan UT 84081",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/chui-leopard-9165-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/mamba-crocodile-9166-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/simba-lion-9167-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/twiga-giraffe-9168-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/kiboko-townhome-hippo-9169-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/tembo-townhome-elephant-9170-1/",
+        "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/faru-rhino-1143293-1/"
+      ],
+      "published_vus_links": [],
+      "fetches": [
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/chui-leopard-9165-1/",
+          "status": 200,
+          "body_bytes": 214481,
+          "body_sha256": "cc94a5d5480a5f3730dc8b6a28b7f2c1d21920cea6b97aece6c757005b08c557",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/mamba-crocodile-9166-1/",
+          "status": 200,
+          "body_bytes": 208478,
+          "body_sha256": "6f729cdbb436b6b4e3a7eb0255fd09c4e0517167aa54b99fbe8ead7932de1fd4",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/simba-lion-9167-1/",
+          "status": 200,
+          "body_bytes": 210994,
+          "body_sha256": "a8650c9efa6a8eea174835943bc55143535e4b5c02fd52a3d84def27aac312b5",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/twiga-giraffe-9168-1/",
+          "status": 200,
+          "body_bytes": 218834,
+          "body_sha256": "f915303fd0da469936ac80de5ab66b9463560d7776c496833766e477e9f89e70",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/kiboko-townhome-hippo-9169-1/",
+          "status": 200,
+          "body_bytes": 220702,
+          "body_sha256": "dbd01e0470820d03216d026fb83cf321f3f53727292bdf4b3105a5efa9f04e45",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/tembo-townhome-elephant-9170-1/",
+          "status": 200,
+          "body_bytes": 220786,
+          "body_sha256": "723d0a34d079ae2abf64b3caef314033bab56f542494f9c1fd2ad34fe0bcf3ba",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 2,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 2
+        },
+        {
+          "url": "https://www.serengetisprings.com/floorplans/west-jordan-ut-apartments-UT/serengeti-springs-apartments/faru-rhino-1143293-1/",
+          "status": 200,
+          "body_bytes": 159947,
+          "body_sha256": "90150742e32fe4c2e2267fbccfa72314caa8d8a8d036b8e5173de3163e71c3ed",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        }
+      ],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 234772,
+      "property_name": "The Pointe at Harpers Mill",
+      "website": "http://www.liveattp.com/",
+      "seed_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+      "seed_final_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+      "seed_title": "1 - 3 Bed Apartments - Check Availability | The Pointe at Harpers Mill",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "title": "Just a moment...",
+          "body_bytes": 27616,
+          "body_sha256": "2eff1d10e1772632f9ecc6cbc399ee87b9f8c2460094a48a200e983c91593e48",
+          "challenge_detected": true,
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "final_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "title": "1 - 3 Bed Apartments - Check Availability | The Pointe at Harpers Mill",
+          "body_bytes": 218597,
+          "body_sha256": "4119d6c8f65a8095d92b03be5089e7ae8a33458116d4fca7bb930d43b42836a5",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "The Pointe at Harpers Mill",
+        "canonical_address": "600 Harpers Mill Rd",
+        "canonical_city_state_zip": "Glen Burnie MD 21108",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 3,
+        "pass": true
+      },
+      "index_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+      "index_title": "1 - 3 Bed Apartments - Check Availability | The Pointe at Harpers Mill",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "The Pointe at Harpers Mill",
+        "canonical_address": "600 Harpers Mill Rd",
+        "canonical_city_state_zip": "Glen Burnie MD 21108",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 3,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/solo-633553/fp_name/occupancy_type/conventional/",
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/soprano-633555/fp_name/occupancy_type/conventional/",
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/rhapsody-633557/fp_name/occupancy_type/conventional/",
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/harmony-633559/fp_name/occupancy_type/conventional/",
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/melody-633561/fp_name/occupancy_type/conventional/",
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/symphony-633563/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633553&cached_rate_available=1&min_rent=$1,712&max_rent=$1,712&min_advertised_base_rent=1712&max_advertised_base_rent=1712&lease_term_name=12mo",
+        "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633555&cached_rate_available=1&min_rent=$1,916&max_rent=$1,936&min_advertised_base_rent=1916&max_advertised_base_rent=1936&lease_term_name=12mo",
+        "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633557&cached_rate_available=1&min_rent=$1,992&max_rent=$1,992&min_advertised_base_rent=1992&max_advertised_base_rent=1992&lease_term_name=12mo",
+        "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633561&cached_rate_available=1&min_rent=$2,201&max_rent=$2,201&min_advertised_base_rent=2201&max_advertised_base_rent=2201&lease_term_name=12mo"
+      ],
+      "fetches": [
+        {
+          "url": "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633553&cached_rate_available=1&min_rent=$1,712&max_rent=$1,712&min_advertised_base_rent=1712&max_advertised_base_rent=1712&lease_term_name=12mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633555&cached_rate_available=1&min_rent=$1,916&max_rent=$1,936&min_advertised_base_rent=1916&max_advertised_base_rent=1936&lease_term_name=12mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633557&cached_rate_available=1&min_rent=$1,992&max_rent=$1,992&min_advertised_base_rent=1992&max_advertised_base_rent=1992&lease_term_name=12mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633561&cached_rate_available=1&min_rent=$2,201&max_rent=$2,201&min_advertised_base_rent=2201&max_advertised_base_rent=2201&lease_term_name=12mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/solo-633553/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 157841,
+          "body_sha256": "024028067d0834deba035bbaba07782071005bb10a729ac4399b3fa3cc65b5aa",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/soprano-633555/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 160260,
+          "body_sha256": "c666ef55dd4c01ac159d4b562ac41b328711bb8603606e23fce3197d897c9250",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/rhapsody-633557/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 157909,
+          "body_sha256": "c6cda62a98bf10a6ec3db62da25dec86f09f2404e600495ff8bf29a4c0659eae",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/harmony-633559/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 156849,
+          "body_sha256": "2a6746855b37e70b994139981e972ab2ea813cacc73a3da1503b7524d6531b2c",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/melody-633561/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 157854,
+          "body_sha256": "8df50319bc96820ada1cbf1dad93fa8380be8560259a6eef36b8199e0df754aa",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/floorplans/symphony-633563/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 156824,
+          "body_sha256": "e2e3115ff39767114fc7fb2e9f3dd526a8c5bc41f59c77b077b67e043dd644b9",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        }
+      ],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 239274,
+      "property_name": "Strata on California",
+      "website": "http://www.strataoncalifornia.com",
+      "seed_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+      "seed_final_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+      "seed_title": "Junction Apartments for Rent Seattle, WA | Strata on California",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "title": "Junction Apartments for Rent Seattle, WA | Strata on California",
+          "body_bytes": 185553,
+          "body_sha256": "7da5d348953312f1fdd435344a591b713c9574407b49848894e8db06ccdac34b",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "Strata on California",
+        "canonical_address": "6312 California Ave SW",
+        "canonical_city_state_zip": "Seattle WA 98136",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "index_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+      "index_title": "Junction Apartments for Rent Seattle, WA | Strata on California",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "Strata on California",
+        "canonical_address": "6312 California Ave SW",
+        "canonical_city_state_zip": "Seattle WA 98136",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.strataoncalifornia.com/seattle/strata-on-california/floorplans/1-bedroom-856131/fp_name/occupancy_type/conventional/",
+        "https://www.strataoncalifornia.com/seattle/strata-on-california/floorplans/2-bedroom-856132/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.strataoncalifornia.com/?module=check_availability&is_secure=1&property[id]=100136434&action=view_unit_spaces&property_floorplan[id]=856131&cached_rate_available=1&min_rent=$1,950&max_rent=$1,950&min_advertised_base_rent=1950&max_advertised_base_rent=1950&min_deposit=500.0000&max_deposit=500.0000&is_valid_rent=1&lease_term_name=12mo"
+      ],
+      "fetches": [
+        {
+          "url": "https://www.strataoncalifornia.com/?module=check_availability&is_secure=1&property[id]=100136434&action=view_unit_spaces&property_floorplan[id]=856131&cached_rate_available=1&min_rent=$1,950&max_rent=$1,950&min_advertised_base_rent=1950&max_advertised_base_rent=1950&min_deposit=500.0000&max_deposit=500.0000&is_valid_rent=1&lease_term_name=12mo",
+          "status": 400,
+          "body_bytes": 11,
+          "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+          "same_origin": true,
+          "parsed_rows": 0,
+          "strict_native_id_rows": 0
+        },
+        {
+          "url": "https://www.strataoncalifornia.com/seattle/strata-on-california/floorplans/1-bedroom-856131/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 142242,
+          "body_sha256": "21bb1c8a952ae86aa1b91f93532a1e0ba7f7dd1f1294ef4827dc2371e868f1ec",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.strataoncalifornia.com/seattle/strata-on-california/floorplans/2-bedroom-856132/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 141462,
+          "body_sha256": "6008eb8ee381ac6ac7e9b196067d2aec8f231e7a0b5cdb5c7cd3b6c3ded026dc",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        }
+      ],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 242976,
+      "property_name": "Kelly Farms",
+      "website": "http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk",
+      "seed_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+      "seed_final_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+      "seed_title": "1 - 3 Bed Apartments - Check Availability | Kelly Farms Apartments | Columbia Apartments",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "title": "1 - 3 Bed Apartments - Check Availability | Kelly Farms Apartments | Columbia Apartments",
+          "body_bytes": 299968,
+          "body_sha256": "7fb2833be5eeab301872fa910550b1ce41428c91f1940cb90e55558ba2a96aae",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "Kelly Farms",
+        "canonical_address": "1280 Cinnamon Hill Ln",
+        "canonical_city_state_zip": "Columbia MO 65201",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "index_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+      "index_title": "1 - 3 Bed Apartments - Check Availability | Kelly Farms Apartments | Columbia Apartments",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "Kelly Farms",
+        "canonical_address": "1280 Cinnamon Hill Ln",
+        "canonical_city_state_zip": "Columbia MO 65201",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-1-278301/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-2-278303/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-3-278307/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-4-278309/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-grand-278305/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-1-278311/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-2-278313/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-3-278317/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-grand-278315/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-2nd-278323/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-1st-278321/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-3rd-278325/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-2-278329/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-grand-278331/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-3-278333/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-1-278327/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-1-278337/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-3-278343/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-grand-278341/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-2-278339/fp_name/occupancy_type/conventional/",
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/villas-1058149/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional"
+      ],
+      "fetches": [
+        {
+          "url": "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional",
+          "status": 200,
+          "body_bytes": 29128,
+          "body_sha256": "0bfdff592fca0aed948bccc3fa41077a3c90c546dce465497ece8f8af4208709",
+          "same_origin": true,
+          "parsed_rows": 1,
+          "strict_native_id_rows": 1
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-1-278301/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144563,
+          "body_sha256": "2e810f633beddbd1972aec316db4860a1300ee960ec484423b50fc87c120d224",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-2-278303/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144801,
+          "body_sha256": "3ee828b30515fc03bf7793f7109e50842b36eeeeb53b192c75aeec326fdd2b20",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-3-278307/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144563,
+          "body_sha256": "ebf8c7a1f063abde353159fa7968ff26ae01a1b940b2588320063858aea1fb7a",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-style-4-278309/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144563,
+          "body_sha256": "f7f00d210948d623a6788089847c4e87373c2116d912e7c0067140cd9b4d52c1",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/kiernan-grand-278305/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144533,
+          "body_sha256": "29631378dec80db16ab149789f84cac6df49cc5f1bfaa5d88f0151c6aec21272",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-1-278311/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 145816,
+          "body_sha256": "c908f2e986b5443de6266d7354655c240d7c3fbb7393533d0c5a0c356b8cac64",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-2-278313/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 146149,
+          "body_sha256": "ae56708376930e50c498f6cd3676418cf3133df3c925b3013cb4bb85a51cbec7",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-style-3-278317/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 146129,
+          "body_sha256": "edf25d5da738d4fd8f3f974b337d034a1151fd67128cfef3ce0729ccc6b5a41a",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/rory-grand-278315/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144518,
+          "body_sha256": "9a2284da01b346be8d2d2bcb8be48fd5e9fd96ab332b8c9e9a2bbdeb9a220a7d",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-2nd-278323/fp_name/occupancy_type/conventional/",
+          "status": 200,
+          "body_bytes": 144513,
+          "body_sha256": "40ae1ad8cbd947046fb3c49b5cf9d644466bda8c97950f4445e61fbc7079335a",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-1st-278321/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6724,
+          "body_sha256": "0e44450abe62cdba22e7dfbeb8630f944c447c8582bbf3707e314c96164dc8f1",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/declan-3rd-278325/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6724,
+          "body_sha256": "132f8e03608d5d76b1990775450d297b065004351e1e8753bccbc88473477b9c",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-2-278329/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6733,
+          "body_sha256": "42d9ae56a997c31f1c31c66e35d91cbe0708ab86b4fe47ff41c4fd97d8d837ae",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-grand-278331/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6706,
+          "body_sha256": "76b0e7148b84ffec2c8d6d5a58469adb1158f53bea5ea714979f76358f536ede",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-3-278333/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6733,
+          "body_sha256": "e59f4712c90c93bc4bd3ef78addca2fcb8a1692f171e798a6cc10a657bf83399",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/oneal-style-1-278327/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6712,
+          "body_sha256": "3f7683c0efaf1335509cf01f8c41d1db0dd6391f5ddddc105a14777856481e5b",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-1-278337/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6715,
+          "body_sha256": "097da75436c6596d5daaac6c17d14c833e55d0b83de9fa49cb2dbdff20cddec7",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-3-278343/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6736,
+          "body_sha256": "e3e7dd35a17a343b27a53c733aa6e9937101fd0c541e69182d3bf814651dab07",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-grand-278341/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6709,
+          "body_sha256": "c3404dae607615672d8e40fc17ca72f16e46f2fe81bb0cff3f998683822b61ee",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/teague-style-2-278339/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6736,
+          "body_sha256": "436c786629a00dab6a75d4ea50962183aa475ab88839d733629344fc047ef179",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/floorplans/villas-1058149/fp_name/occupancy_type/conventional/",
+          "status": 429,
+          "body_bytes": 6715,
+          "body_sha256": "b91891654b8aa84279fadbdd40b55dd6b127cb115adc1b22490acdaddd6c9fa2",
+          "same_origin": true,
+          "parser_counts": {},
+          "parsed_rows": 0
+        }
+      ],
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 247119,
+      "property_name": "Riverside Place",
+      "website": "https://www.riversidegp.com/",
+      "seed_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+      "seed_final_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+      "seed_title": "Spacious 1, 2 & 3 Bedroom Apartments in Grand Prairie",
+      "seed_navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+          "title": "Spacious 1, 2 & 3 Bedroom Apartments in Grand Prairie",
+          "body_bytes": 208426,
+          "body_sha256": "8abb32a8979b792f7510b7a3e044d9d15095174b856ed36f51573be7c043ccf7",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "seed_identity": {
+        "canonical_name": "Riverside Place",
+        "canonical_address": "2800 NE Green Oaks Blvd",
+        "canonical_city_state_zip": "Grand Prairie TX 75050",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "index_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+      "index_title": "Spacious 1, 2 & 3 Bedroom Apartments in Grand Prairie",
+      "index_navigation_attempts": [],
+      "index_identity": {
+        "canonical_name": "Riverside Place",
+        "canonical_address": "2800 NE Green Oaks Blvd",
+        "canonical_city_state_zip": "Grand Prairie TX 75050",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "outcome": "STRICT_UNIT_QUALIFIED",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "property_identity_match": true,
+      "published_plan_links": [
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1-598716-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1a-598725-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2a-598722-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1-598718-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1a-598727-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2-598719-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2a-598717-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b3-598720-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b3a-598723-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1-598724-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1a-598726-1/"
+      ],
+      "published_vus_links": [],
+      "fetches": [
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1-598716-1/",
+          "status": 200,
+          "body_bytes": 191879,
+          "body_sha256": "71b2a592864b45dbb232790fcb80f59dc64f55d1a385e43dd96e51b0569eabe8",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 1,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 1
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1a-598725-1/",
+          "status": 200,
+          "body_bytes": 163583,
+          "body_sha256": "08a72ed6ae5d7fbb0fe1ad273a968501acb94c120a393646a5fd328b0ac38857",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "status": 200,
+          "body_bytes": 306832,
+          "body_sha256": "b553384f16ff47d5f30a189d66c87c3440c298d80c7525512542b83965b78e93",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 6,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 6
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2a-598722-1/",
+          "status": 200,
+          "body_bytes": 162813,
+          "body_sha256": "b7b086626eac03e976d221cd0e4e4852fa6db15cad8aadde1bd311c5f55d3e34",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1-598718-1/",
+          "status": 200,
+          "body_bytes": 191981,
+          "body_sha256": "c7bc4dfbe1c47f758461491854a9fce5e10f305ff2caecbc67dd755197c0e8e7",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 1,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 1
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1a-598727-1/",
+          "status": 200,
+          "body_bytes": 162159,
+          "body_sha256": "2d1073ff58497f1571a2c684007bd96d55266c34aac226a3aa923dc6668aa0a4",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2-598719-1/",
+          "status": 200,
+          "body_bytes": 163070,
+          "body_sha256": "1b1576c7eb2536b8822666c0126b4cde9025bcac4ebd45276f8955951c79cc2c",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2a-598717-1/",
+          "status": 200,
+          "body_bytes": 193041,
+          "body_sha256": "9a8e29ef358b60871a13bf3d50462295f321705486fbeb1598bf1945ff72d77f",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 1,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 1
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b3-598720-1/",
+          "status": 200,
+          "body_bytes": 162682,
+          "body_sha256": "c291eccff360c55f142aba27c4379d9c9134adc8d7ca2129ca63e7876fc8b660",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b3a-598723-1/",
+          "status": 200,
+          "body_bytes": 160533,
+          "body_sha256": "32445e2551db8f321c0c7c00ae9610ea25984e0b79227712b251263571552d67",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1-598724-1/",
+          "status": 200,
+          "body_bytes": 160870,
+          "body_sha256": "7c35fddab1097fc09a1b09cf4ffc642b9f41de3a8fc3e7a762adc3c78daea878",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 0,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 0
+        },
+        {
+          "url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1a-598726-1/",
+          "status": 200,
+          "body_bytes": 189043,
+          "body_sha256": "0fadb11c0f2e430e9fbd2e98ef923c662d6c41f52f0fa514be01eb3ccbcfd6ae",
+          "same_origin": true,
+          "parser_counts": {
+            "parse_entrata_pp_unit_cards": 1,
+            "parse_entrata_pp_jd_fp_cards": 0,
+            "parse_entrata_modern_units_data": 0
+          },
+          "parsed_rows": 1
+        }
+      ],
+      "native_identity_rows": 10,
+      "native_positive_rent_rows": 10,
+      "contamination_verdict": "pass_exact_property_published_same_origin_native_ids_positive_rents",
+      "source_urls": [
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1-598716-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1-598718-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2a-598717-1/",
+        "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1a-598726-1/"
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "A1",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "657",
+          "unit_number": "4203",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,299",
+          "market_rent_low": 1299,
+          "market_rent_high": 1299,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a1-598716-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315776",
+            "entrata_fpid": "598716"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "3302",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,474",
+          "market_rent_low": 1474,
+          "market_rent_high": 1474,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315759",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "4206",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315779",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "3207",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315753",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "3204",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,474",
+          "market_rent_low": 1474,
+          "market_rent_high": 1474,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-06",
+          "available_date": "2026-08-06",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315750",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "2205",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-07",
+          "available_date": "2026-09-07",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315717",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "764",
+          "unit_number": "4305",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,399",
+          "market_rent_low": 1399,
+          "market_rent_high": 1399,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-07",
+          "available_date": "2026-08-07",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/a2-598721-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315790",
+            "entrata_fpid": "598721"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "B1",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "950",
+          "unit_number": "3305",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,599",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-04",
+          "available_date": "2026-08-04",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b1-598718-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315762",
+            "entrata_fpid": "598718"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "B2A",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "976",
+          "unit_number": "2111",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,599",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/b2a-598717-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315709",
+            "entrata_fpid": "598717"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "C1A",
+          "bed_label": "3 Bedroom",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1281",
+          "unit_number": "4211",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,100",
+          "market_rent_low": 2100,
+          "market_rent_high": 2100,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riversidegp.com/floorplans/grand-prairie-TX/riverside-place-apartments/c1a-598726-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4315784",
+            "entrata_fpid": "598726"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ]
+    }
+  ]
+}

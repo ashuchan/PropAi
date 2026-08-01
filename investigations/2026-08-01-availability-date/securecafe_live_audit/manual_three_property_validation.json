@@ -1,0 +1,47 @@
+[
+  {
+    "result_type": "local_current_live_audit_not_canary",
+    "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+    "property_id": "265098",
+    "property_name": "Smith & Rio",
+    "portal_url": "https://smithandrio.securecafe.com/onlineleasing/smith-rio/availableunits.aspx",
+    "target_unit_id": "1002",
+    "independent_row_unit": "1002",
+    "independent_visible_date": "",
+    "independent_apply_move_in_date": "8/28/2026",
+    "patched_parser_raw_date": "8/28/2026",
+    "canonical_date": "2026-08-28",
+    "canonical_provenance": "explicit_future",
+    "independent_action_matches_parser": "true"
+  },
+  {
+    "result_type": "local_current_live_audit_not_canary",
+    "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+    "property_id": "268338",
+    "property_name": "Solace at Cimarron Hills",
+    "portal_url": "https://livesolacecimarron.securecafe.com/onlineleasing/solace-at-cimarron-hills-apartments/availableunits.aspx",
+    "target_unit_id": "A108",
+    "independent_row_unit": "A108",
+    "independent_visible_date": "",
+    "independent_apply_move_in_date": "9/16/2026",
+    "patched_parser_raw_date": "9/16/2026",
+    "canonical_date": "2026-09-16",
+    "canonical_provenance": "explicit_future",
+    "independent_action_matches_parser": "true"
+  },
+  {
+    "result_type": "local_current_live_audit_not_canary",
+    "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+    "property_id": "296175",
+    "property_name": "Compass Meridian",
+    "portal_url": "https://sheaapartments.securecafe.com/onlineleasing/compass-meridian/availableunits.aspx",
+    "target_unit_id": "0535-102",
+    "independent_row_unit": "0535-102",
+    "independent_visible_date": "",
+    "independent_apply_move_in_date": "9/26/2026",
+    "patched_parser_raw_date": "9/26/2026",
+    "canonical_date": "2026-09-26",
+    "canonical_provenance": "explicit_future",
+    "independent_action_matches_parser": "true"
+  }
+]

@@ -152,6 +152,72 @@ def test_entrata_commoncf_marker_still_routes_to_entrata() -> None:
     assert result.pms == "entrata"
 
 
+def test_entrata_snippet_iframe_beats_jonah_marketing_shell() -> None:
+    html = (
+        '<html><body><script src="//meetelise.com/widget.js"></script>'
+        '<iframe src="//entratasnipit.exampleplace.com/columbus/example-place/'
+        '?snippet_type=website"></iframe></body></html>'
+    )
+    result = detect_pms("https://www.exampleplace.com/pricing", page_html=html)
+    assert result.pms == "entrata"
+    assert result.confidence == 0.92
+    assert any("EntrataSnippet inventory iframe" in row for row in result.evidence)
+
+
+def test_property_owned_entrata_snippet_beats_incidental_sightmap_link() -> None:
+    """Scully pages link to SightMap's marketing site but publish the actual
+    roster in an Entrata website-snippet iframe on a property child host."""
+    html = (
+        '<html><body><a href="https://sightmap.com">Map vendor</a>'
+        '<iframe id="website_100003046" '
+        'src="//hamiltonhall.scullycompany.com/norristown/hamilton-hall/'
+        '?is_responsive_snippet=1&amp;snippet_type=website&amp;occupancy_type=1">'
+        '</iframe></body></html>'
+    )
+    result = detect_pms(
+        "https://www.scullycompany.com/apartments/hamilton-hall/",
+        page_html=html,
+    )
+    assert result.pms == "entrata"
+    assert result.confidence == 0.92
+    assert any("property child host" in row for row in result.evidence)
+
+
+def test_foreign_or_non_inventory_website_iframe_is_not_entrata() -> None:
+    html = (
+        '<html><body><a href="https://sightmap.com">Map vendor</a>'
+        '<iframe id="website_100003046" '
+        'src="//sibling.example.net/city/sibling/'
+        '?is_responsive_snippet=1&amp;snippet_type=website&amp;occupancy_type=1">'
+        '</iframe></body></html>'
+    )
+    result = detect_pms(
+        "https://www.scullycompany.com/apartments/hamilton-hall/",
+        page_html=html,
+    )
+    assert result.pms != "entrata"
+
+
+def test_incidental_entrata_snippet_text_is_not_routing_evidence() -> None:
+    html = (
+        '<html><body><script src="//meetelise.com/widget.js"></script>'
+        '<p>Docs: entratasnipit.exampleplace.com is a historical provider.</p>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.exampleplace.com/pricing", page_html=html)
+    assert result.pms != "entrata"
+
+
+def test_entrata_snippet_authentication_iframe_is_not_inventory() -> None:
+    html = (
+        '<html><body><script src="//meetelise.com/widget.js"></script>'
+        '<iframe src="//entratasnipit.exampleplace.com/Apartments/module/'
+        'application_authentication/"></iframe></body></html>'
+    )
+    result = detect_pms("https://www.exampleplace.com/pricing", page_html=html)
+    assert result.pms != "entrata"
+
+
 def test_detect_funnel_from_funnelleasing_script() -> None:
     """2026-05-13: confirmed Funnel uses ``integrations.funnelleasing.com``
     on its newer customer base (e.g. Brook Lane, Arbor Park). Previously
@@ -482,6 +548,66 @@ def test_detect_onesite_from_welcomehome_html_marker() -> None:
     assert r.confidence >= 0.90
 
 
+def test_detect_onesite_from_exact_ollr_widget_loader() -> None:
+    """The executable OLLR loader is a definitive OneSite inventory marker."""
+    html = (
+        '<html><head><script src="https://property.onesite.realpage.com/'
+        'OLLR/widgetLoader.js?siteId=4845783"></script></head></html>'
+    )
+    r = detect_pms("https://property.example/floorplans/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence == 0.94
+    assert "OLLR widgetLoader" in " ".join(r.evidence)
+
+
+def test_detect_onesite_from_leasing_realpage_ollr_widget_loader() -> None:
+    """The exact OLLR route is decisive on RealPage's leasing host too."""
+    html = (
+        '<html><head><script src="https://leasing.realpage.com/'
+        'ollr/widgetLoader.js?siteId=5194917"></script></head></html>'
+    )
+    r = detect_pms("https://property.example/floorplans/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence == 0.94
+
+
+def test_generic_leasing_realpage_asset_without_ollr_stays_realpage_oll() -> None:
+    """A generic RealPage asset must not be promoted to OneSite."""
+    html = (
+        '<html><head><script src="https://leasing.realpage.com/'
+        'static/app.js"></script></head></html>'
+    )
+    r = detect_pms("https://property.example/floorplans/", page_html=html)
+    assert r.pms == "realpage_oll"
+    assert r.confidence >= 0.80
+
+
+def test_ollr_widget_loader_does_not_steal_co_resident_knock() -> None:
+    """OLLR can be an apply flow on a real Knock-backed property."""
+    html = (
+        '<html><head><script src="https://doorway.knck.io/latest/'
+        'doorway.min.js"></script><script src="https://property.onesite.'
+        'realpage.com/ollr/widgetLoader.js?siteId=5061093"></script>'
+        '</head></html>'
+    )
+    r = detect_pms("https://knock-property.example/", page_html=html)
+    assert r.pms == "knock"
+    assert r.confidence == 0.90
+
+
+def test_ollr_widget_loader_outranks_realpage_oll_asset() -> None:
+    """An exact OneSite widget wins over a co-resident generic OLL asset."""
+    html = (
+        '<html><head><script src="https://property.onesite.realpage.com/'
+        'ollr/widgetLoader.js?siteId=4843024"></script>'
+        '<script src="https://leasing.realpage.com/static/app.js"></script>'
+        '</head></html>'
+    )
+    r = detect_pms("https://onesite-property.example/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence == 0.94
+
+
 def test_knock_wins_with_only_doorway_script_no_init_call() -> None:
     """Knock can be co-resident with just the doorway script tag
     (no inline knockDoorway.init() call) — that's still a Knock-PMS
@@ -564,6 +690,30 @@ def test_apts247_wins_when_co_resident_with_resman_registration_link() -> None:
         f"co-resident apts247+ResMan must route to apts247 (the real data "
         f"API); got pms={r.pms!r} confidence={r.confidence}"
     )
+
+
+def test_property_scoped_resman_new_is_first_retry_after_apts247() -> None:
+    """Plan-only Apts247 can retry its exact property-scoped ResMan roster."""
+    html = (
+        '<script src="https://static2.apts247.info/widget.js"></script>'
+        '<script>window.JonahWidget = {};</script>'
+        '<a href="https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054">'
+        'Apply</a>'
+    )
+
+    candidates = detect_pms_candidates(
+        "https://www.thegrandatwestchase.com/",
+        page_html=html,
+        max_candidates=4,
+    )
+
+    assert [candidate.pms for candidate in candidates[:3]] == [
+        "apts247",
+        "resman",
+        "encoreskyline_template",
+    ]
+    assert candidates[0].confidence == 0.90
+    assert candidates[1].confidence == 0.86
 
 
 def test_pure_resman_no_apts247_still_resman() -> None:

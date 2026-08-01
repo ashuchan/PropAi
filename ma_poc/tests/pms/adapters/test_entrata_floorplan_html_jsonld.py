@@ -66,6 +66,11 @@ class TestUnitLevelFromJsonLd:
         assert u["unit_number"] == "19-318"
         assert u["market_rent_low"] == 2005
         assert str(u["sqft"]) == "462"
+        assert u["availability_date"] == "Available Aug 29"
+
+    def test_visible_available_now_survives_as_source_token(self) -> None:
+        rows = _rows("prospectportal_floorplan_html_jsonld_ravel")
+        assert {u["availability_date"] for u in rows} == {"Available Now"}
 
 
 class TestDegradesSafely:

@@ -239,9 +239,10 @@ def _last_resort_key(unit: dict[str, Any], property_id: str) -> str | None:
 #
 # 2026-07-27: the hand-maintained 6-key tuple that used to live here is gone.
 # It had drifted from ``reporting/verdict.PER_UNIT_SOURCE_ID_KEYS`` in BOTH
-# directions, and two of its six entries (``entrata_unit_id``,
-# ``knock_unit_id``) had no writer anywhere in the repo while ten real per-unit
-# keys were in neither list. Membership now comes from the one registry that
+# directions, and two of its six entries (``entrata_unit_id``, and at that
+# time ``knock_unit_id``) had no writer anywhere in the repo while ten real
+# per-unit keys were in neither list. Knock now has a measured native writer;
+# membership comes from the one registry that
 # every consumer shares — see ``ma_poc/core/source_ids.py`` for the per-key
 # evidence and the "no name-shaped admission rule" argument.
 

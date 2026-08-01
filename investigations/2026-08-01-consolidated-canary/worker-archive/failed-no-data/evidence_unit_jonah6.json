@@ -1,0 +1,190 @@
+{
+  "batch_label": "strict99-unit-jonah-gsc",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "unit",
+    "source_adapter": "encoreskyline_template"
+  },
+  "results": [
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.gscapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 6477,
+      "property_identity_match": false,
+      "property_name": "Harbour Pointe",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Bradenton_FL/zip_34210/gsc/15388"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.gscapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 34303,
+      "property_identity_match": false,
+      "property_name": "Duke Manor",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Durham_NC/zip_27705/gsc/4506"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.gscapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 74488,
+      "property_identity_match": false,
+      "property_name": "St. Johns Wood",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Richmond_VA/zip_23225/gsc/4497"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.gscapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 78593,
+      "property_identity_match": false,
+      "property_name": "Estes Park",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Carrboro_NC/zip_27510/gsc/4510"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "themobilelofts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 217796,
+      "property_identity_match": false,
+      "property_name": "Old Shell Lofts",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://themobilelofts.com/apartments/al/mobile/the-old-shell-lofts/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "batch_label": "strict99-unit-jonah-gsc",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.gscapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 221995,
+      "property_identity_match": false,
+      "property_name": "Booker Creek Townhouse Apartments",
+      "sample_plan_names": [],
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Chapel_Hill_NC/zip_27514/gsc/4508"
+    }
+  ]
+}

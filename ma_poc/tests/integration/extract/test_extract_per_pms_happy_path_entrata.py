@@ -16,7 +16,6 @@ import pytest
 from pms.adapters.base import AdapterContext
 from pms.adapters.entrata import EntrataAdapter
 
-
 # ── probe-seam stub (2026-07-26) ────────────────────────────────────────────
 # ``test_entrata_empty_api_returns_no_units`` passes an empty response list, so
 # the adapter walks its static Prospect-Portal fallbacks
@@ -82,28 +81,16 @@ def _make_ctx(api_responses: list[dict[str, Any]], property_id: str = "prop-en-0
     return ctx
 
 
-def test_entrata_corpus_extracts_units(corpus: Any) -> None:
-    """Entrata corpus fixture → at least 1 unit with beds and rent fields."""
+def test_entrata_corpus_preserves_plans_without_fabricating_units(corpus: Any) -> None:
+    """Entrata's flat floor-plan catalogue must not fabricate unit IDs."""
     api_responses = corpus.load_json("entrata/widget_response.json")
     ctx = _make_ctx(api_responses)
     result = asyncio.run(EntrataAdapter().extract(page=None, ctx=ctx))
 
-    assert len(result.units) >= 1, (
-        f"Expected at least 1 unit from Entrata corpus but got 0. "
-        f"tier_used={result.tier_used!r}, errors={result.errors}"
-    )
-    for unit in result.units:
-        assert isinstance(unit, dict)
-        has_beds = unit.get("bedrooms") is not None or unit.get("beds") is not None
-        has_rent = (
-            unit.get("market_rent_low") is not None
-            or unit.get("rent_low") is not None
-            or unit.get("rent_range") is not None
-            or unit.get("asking_rent") is not None
-        )
-        assert has_beds or has_rent, (
-            f"Entrata unit missing beds AND rent fields: {unit}"
-        )
+    assert result.units == []
+    assert len(result.plan_summaries) == 3
+    assert "PLAN_LEVEL" in result.tier_used
+    assert all(not plan.get("unit_number") for plan in result.plan_summaries)
 
 
 def test_entrata_corpus_tier_is_api(corpus: Any) -> None:
@@ -118,12 +105,13 @@ def test_entrata_corpus_tier_is_api(corpus: Any) -> None:
 
 
 def test_entrata_corpus_confidence_above_threshold(corpus: Any) -> None:
-    """Corpus extraction should have confidence ≥ 0.7."""
+    """A preserved plan catalogue should still carry bounded confidence."""
     api_responses = corpus.load_json("entrata/widget_response.json")
     ctx = _make_ctx(api_responses)
     result = asyncio.run(EntrataAdapter().extract(page=None, ctx=ctx))
 
-    assert len(result.units) >= 1
+    assert result.units == []
+    assert len(result.plan_summaries) == 3
     assert result.confidence >= 0.7, (
         f"Expected confidence ≥ 0.7 but got {result.confidence}"
     )
@@ -137,12 +125,11 @@ def test_entrata_empty_api_returns_no_units() -> None:
     assert result.units == []
 
 
-def test_entrata_flat_list_fixture_extracts_multiple_units(corpus: Any) -> None:
-    """The corpus has 3 floor plans; all 3 should be extracted."""
+def test_entrata_flat_list_fixture_preserves_multiple_plans(corpus: Any) -> None:
+    """The corpus has three floor plans; all remain plan summaries."""
     api_responses = corpus.load_json("entrata/widget_response.json")
     ctx = _make_ctx(api_responses)
     result = asyncio.run(EntrataAdapter().extract(page=None, ctx=ctx))
 
-    assert len(result.units) >= 3, (
-        f"Expected ≥3 units from 3-entry corpus but got {len(result.units)}"
-    )
+    assert result.units == []
+    assert len(result.plan_summaries) == 3

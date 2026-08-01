@@ -1,0 +1,169 @@
+{
+  "property_id": 38378,
+  "canonical_identity": {
+    "address": "1601 Roane St",
+    "city": "Richmond",
+    "configured_url": "https://www.parknorthsiderva.com/",
+    "name": "Park Northside",
+    "state": "VA",
+    "zip": "23222"
+  },
+  "authoritative_ledger_eligible": false,
+  "authoritative_ledger_hold_reason": "Implementation and local configured E2E pass; parent requested independent replay before any ledger admission.",
+  "guardrails": {
+    "captcha_solving": false,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_ENTRATA_PLAN_RENDER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_PLAN_UNIT_RENDER": "false",
+      "ENABLE_RENDER_ON_EMPTY": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "brightdata",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": "",
+      "RENDER_BACKEND": "local"
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "hyperbrowser_call_count": 0,
+    "llm": false,
+    "ordinary_direct_get_only": true,
+    "paid_canary": false,
+    "proxy": false,
+    "web_unlocker": false,
+    "web_unlocker_call_count": 0
+  },
+  "verification": {
+    "all_repeats_pass": true,
+    "strict_native_positive_rent_counts": [
+      13,
+      13,
+      13
+    ],
+    "repeats": [
+      {
+        "repeat": 1,
+        "adapter": "showmojo_public",
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "strict_counts": null,
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "chain": {
+          "portfolio_rows": null,
+          "accepted_rows": null,
+          "rejected_rows": null
+        },
+        "unit_evidence": null
+      },
+      {
+        "repeat": 2,
+        "adapter": "showmojo_public",
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "strict_counts": null,
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "chain": {
+          "portfolio_rows": null,
+          "accepted_rows": null,
+          "rejected_rows": null
+        },
+        "unit_evidence": null
+      },
+      {
+        "repeat": 3,
+        "adapter": "showmojo_public",
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "strict_counts": null,
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "chain": {
+          "portfolio_rows": null,
+          "accepted_rows": null,
+          "rejected_rows": null
+        },
+        "unit_evidence": null
+      }
+    ]
+  }
+}

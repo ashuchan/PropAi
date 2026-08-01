@@ -1196,7 +1196,12 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
             _key_ctx = html[max(0, start - 60):start].lower()
             if not any(
                 k in _key_ctx
-                for k in ("sightmap_embed_url", "sightmap_link", "engrainedurl")
+                for k in (
+                    "sightmap_embed_url",
+                    "sightmap_url",
+                    "sightmap_link",
+                    "engrainedurl",
+                )
             ):
                 continue
 
@@ -1249,6 +1254,11 @@ def _extract_sightmap_embed_codes(body: str) -> list[str]:
     """
     if not body:
         return []
+    # Entrata/Spaces config blobs can JSON-escape every slash in the exact
+    # published ``sightmap_url`` value (``https:\/\/sightmap.com\/embed\/
+    # {code}``).  The iframe fallback already normalizes this shape before
+    # applying its embed regex; keep the direct-probe discovery path aligned.
+    body = _normalize_sightmap_slashes(body)
     out: list[str] = []
     for m in _SM_EMBED_RE.finditer(body):
         code = m.group(1)

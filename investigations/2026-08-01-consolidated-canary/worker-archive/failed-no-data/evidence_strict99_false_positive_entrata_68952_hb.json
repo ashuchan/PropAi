@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "attempted": true,
+      "complete": false,
+      "contamination_verdict": "no_native_units",
+      "elapsed_session_seconds": 21.5,
+      "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+      "matched_url": "https://www.livewyeast.com/vancouver-vancouver/wyeast-pointe-apartments/conventional/",
+      "native_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 2,
+      "property_id": 68952,
+      "property_identity_match": true,
+      "property_name": "Wy' East Pointe",
+      "session_calls": 1,
+      "source_urls": [],
+      "units": 0,
+      "website": "https://www.livewyeast.com/",
+      "winning_url": "https://www.livewyeast.com/vancouver-vancouver/wyeast-pointe-apartments/conventional/"
+    }
+  ]
+}

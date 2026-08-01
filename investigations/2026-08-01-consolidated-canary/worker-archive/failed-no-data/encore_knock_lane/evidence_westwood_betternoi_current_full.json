@@ -1,0 +1,80 @@
+{
+  "generated_at_utc": "2026-08-01T12:31:53.742047+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "westwood_betternoi_current_full_configured_pipeline",
+  "results": [
+    {
+      "adapter": "betternoi_public",
+      "configured_final_url": "https://westwoodvillageapthomes.com/en/",
+      "contamination_verdict": "pass_exact_property_page_single_betternoi_client_native_units",
+      "elapsed_seconds": 4.82,
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "fallback_chain": [
+        "encoreskyline_template",
+        "retry:generic_plan_text",
+        "page_published_native:betternoi_public"
+      ],
+      "identity_evidence": {
+        "portal_urls": [
+          "https://westwoodvillageapthomes.com/en/floor-plans/"
+        ],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_property_ids": [
+          "01a0e491-f0fd-4d03-9529-00d881128a10"
+        ],
+        "source_urls": [
+          "https://ares.betternoi.com/api/pub/v1/client/building/unit/?client_uuid=01a0e491-f0fd-4d03-9529-00d881128a10&is_available=true"
+        ]
+      },
+      "link_hop_from": "https://westwoodvillageapthomes.com/en/",
+      "native_samples": [
+        {
+          "availability_date": "2026-10-02",
+          "floor_plan_name": "1 Bedrooms, 1 Bathrooms",
+          "identity": {
+            "betternoi_unit_uuid": "a127a64c-31d4-473a-a50e-eb0290f63a6b",
+            "unit_number": "C-06"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1230
+          },
+          "source_api_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit/?client_uuid=01a0e491-f0fd-4d03-9529-00d881128a10&is_available=true",
+          "source_property_id": "01a0e491-f0fd-4d03-9529-00d881128a10"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 42571,
+      "property_identity_match": true,
+      "property_name": "Westwood Village",
+      "strict_gates": {
+        "all_emitted_rows_native_and_positive_rent": true,
+        "all_sources_exact_public_betternoi_unit_api": true,
+        "configured_root_http_200": true,
+        "configured_root_name_visible": true,
+        "current_full_pipeline_betternoi_tier": true,
+        "current_full_pipeline_link_hop_reached_inventory": true,
+        "exact_property_inventory_portal": true,
+        "exact_property_page_provenance": true,
+        "native_recovery_winner_betternoi": true,
+        "sole_exact_published_client": true,
+        "unique_native_unit_uuids": true,
+        "unique_visible_unit_numbers": true
+      },
+      "tier": "TIER_1_PUBLIC_BETTERNOI_API",
+      "units": 1,
+      "website": "https://westwoodvillageapthomes.com/en/",
+      "winning_page_url": "https://westwoodvillageapthomes.com/en/floor-plans/"
+    }
+  ]
+}

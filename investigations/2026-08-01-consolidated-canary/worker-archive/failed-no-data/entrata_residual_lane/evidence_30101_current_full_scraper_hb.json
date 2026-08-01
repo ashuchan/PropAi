@@ -1,0 +1,168 @@
+{
+  "generated_at_utc": "2026-08-01T11:40:19.902784+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions_max": 1,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "entrata_30101_current_full_scraper_hb",
+  "results": [
+    {
+      "adapter": "entrata",
+      "configured_final_url": "https://www.aptsatbelair.com/",
+      "configured_identity": {
+        "name_visible": true,
+        "street_visible": true,
+        "zip_visible": true
+      },
+      "contamination_verdict": "pass_exact_configured_property_published_entrata_grid_same_origin_native_ids",
+      "errors": [],
+      "identity_evidence": {
+        "distinct_entrata_uids": 44,
+        "rows_with_native_identity": 44,
+        "rows_with_native_identity_and_positive_rent": 44,
+        "source_urls": [
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-683-sq-ft-1166927-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-deluxe-748-sq-ft-1166942-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-w-den-753-sq-ft-1166929-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-w-den-756-sq-ft-1166932-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-w-den-787-sq-ft-1166928-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-w-den-818-sq-ft-1166943-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/2-bedroom1-bathroom-916-sq-ft-1166924-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/2-bedroom1-bathroom-925-sq-ft-1166940-1/",
+          "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/2-bedroom1-bathroom-deluxe-1023-sq-ft-1166933-1/"
+        ]
+      },
+      "matched_conventional_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+      "native_samples": [
+        {
+          "availability_date": "2026-09-01",
+          "floor_plan_name": "1 Bedroom1 Bathroom 683 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640477",
+            "unit_number": "RE62-C"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1597,
+            "market_rent_low": 1597
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-683-sq-ft-1166927-1/"
+        },
+        {
+          "availability_date": "2026-09-07",
+          "floor_plan_name": "1 Bedroom1 Bathroom 683 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640652",
+            "unit_number": "V112-J"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1532,
+            "market_rent_low": 1532
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-683-sq-ft-1166927-1/"
+        },
+        {
+          "availability_date": "2026-09-08",
+          "floor_plan_name": "1 Bedroom1 Bathroom 683 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640443",
+            "unit_number": "RE53-E"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1547,
+            "market_rent_low": 1547
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-683-sq-ft-1166927-1/"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom1 Bathroom 693 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640586",
+            "unit_number": "S957-D"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1605,
+            "market_rent_low": 1605
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom1 Bathroom 693 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640377",
+            "unit_number": "R155-K"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1675,
+            "market_rent_low": 1675
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom1 Bathroom 693 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640622",
+            "unit_number": "T956-D"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1675,
+            "market_rent_low": 1675
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom1 Bathroom 693 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640627",
+            "unit_number": "T956-I"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1675,
+            "market_rent_low": 1675
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom1 Bathroom 693 Sq Ft",
+          "identity": {
+            "entrata_uid": "9640615",
+            "unit_number": "T954-I"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1675,
+            "market_rent_low": 1675
+          },
+          "source_api_url": "https://www.aptsatbelair.com/floorplans/bel-air-MD/apartments-at-bel-air/1-bedroom1-bathroom-693-sq-ft-1166931-1/"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 30101,
+      "property_identity_match": true,
+      "property_name": "Apartments at Bel Air",
+      "strict_gates": {
+        "all_native_ids_unique": true,
+        "all_output_rows_native_and_positive_rent": true,
+        "all_sources_match_property_slug": true,
+        "all_sources_same_origin_as_exact_property_grid": true,
+        "configured_route_http_200": true,
+        "configured_route_identity_visible": true,
+        "current_full_scraper_selected_entrata": true,
+        "current_full_scraper_selected_unit_tier": true,
+        "one_exact_published_property_conventional_url": true
+      },
+      "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "units": 44,
+      "website": "https://www.seasonsbelair.com/"
+    }
+  ]
+}

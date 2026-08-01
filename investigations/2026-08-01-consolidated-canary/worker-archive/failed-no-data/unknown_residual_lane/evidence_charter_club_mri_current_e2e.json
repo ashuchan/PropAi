@@ -1,0 +1,78 @@
+{
+  "generated_at_utc": "2026-08-01T11:10:17.974420+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "charter_club_mri_current_source_full_pipeline",
+  "results": [
+    {
+      "adapter": "mri_prospectconnect",
+      "configured_final_url": "https://charterclubapts.com/",
+      "contamination_verdict": "pass_exact_configured_page_published_mri_property_session_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)",
+        "generic_plan_text: <2 distinct plan rows found (anti-noise threshold; falls to LLM)"
+      ],
+      "identity_evidence": {
+        "distinct_provider_native_ids": 1,
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_property_ids": [
+          "CCA"
+        ],
+        "source_urls": [
+          "https://smg.mriprospectconnect.com/Search/Search"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-08-01",
+          "building": "A01",
+          "identity": {
+            "provider_native_unit_id": "A01:42-B",
+            "unit_number": "42-B"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1099,
+            "market_rent_low": 1099
+          },
+          "source_api_url": "https://smg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "CCA",
+          "sqft": "750"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 74523,
+      "property_identity_match": true,
+      "property_name": "Charter Club",
+      "provider_community": "CCA",
+      "provider_index_url": "https://smg.mriprospectconnect.com/Search/Index/CCA",
+      "published_provider_links": [
+        "https://smg.mriprospectconnect.com/Search/Index/cca",
+        "https://smg.mriprospectconnect.com/cca"
+      ],
+      "strict_gates": {
+        "all_rows_native_and_positive_rent": true,
+        "configured_route_http_200": true,
+        "configured_scheme_only_normalization": true,
+        "current_full_scraper_selected_mri": true,
+        "current_full_scraper_selected_mri_unit_tier": true,
+        "native_ids_unique": true,
+        "provider_identity_matches_exact_configured_property": true,
+        "provider_index_http_200": true,
+        "sole_published_mri_property_route": true,
+        "sole_source_property_id_matches_community": true,
+        "sole_source_url_matches_property_search": true
+      },
+      "tier": "TIER_1_API_MRI_PROSPECTCONNECT",
+      "units": 1,
+      "website": "http://www.charterclubapts.com/"
+    }
+  ]
+}

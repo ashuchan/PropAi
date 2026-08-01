@@ -1,0 +1,281 @@
+{
+  "batch_label": "copper-onesite-collision-current-source-configured-e2e",
+  "generated_at_utc": "2026-08-01T11:38:55.468123+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified": true,
+    "web_unlocker": false,
+    "workflow_transport": "fixed chrome116 curl_cffi, no rotation"
+  },
+  "ledger_snapshot": {
+    "net_new_ids": [
+      261116
+    ],
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "remaining_path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+    "remaining_rows": 150,
+    "remaining_sha256": "e22aa84fcf3eab97d1f82fa9c44514962d83a05b788ec72c503cbc41d023c778",
+    "rows": 194,
+    "sha256": "b76f1a0a4a072fe8bd205eebf443a609f59488cd9b3dad07c5fbd020e094a698"
+  },
+  "recoveries": [
+    {
+      "current_full_pipeline": {
+        "adapter": "knock",
+        "detected_pms": "knock",
+        "errors": [],
+        "strict_native_positive_rent_rows": 20,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "native_identity_rows": 20,
+      "native_positive_rent_rows": 20,
+      "property_boundary_evidence": {
+        "canonical_address": "6410 S New Braunfels Ave",
+        "canonical_city": "San Antonio",
+        "canonical_name": "Copper Pointe",
+        "canonical_state": "TX",
+        "canonical_zip": "78223",
+        "city_visible": true,
+        "configured_final_url": "https://copperpointeapts.com/",
+        "gates": {
+          "all_output_rows_native_positive": true,
+          "configured_city_visible": true,
+          "configured_exact_final_host": true,
+          "configured_http_200": true,
+          "configured_name_visible": true,
+          "configured_state_visible": true,
+          "configured_street_visible": true,
+          "configured_zip_visible": true,
+          "current_adapter_knock": true,
+          "current_detector_knock": true,
+          "current_pipeline_no_errors": true,
+          "current_pipeline_no_llm": true,
+          "current_tier_onesite_workflow": true,
+          "output_native_ids_equal_raw_workflow": true,
+          "output_property_id_exact": true,
+          "output_source_url_exact_workflow": true,
+          "output_unit_numbers_unique": true,
+          "portal_http_200": true,
+          "portal_publishes_sole_expected_site_id": true,
+          "raw_workflow_has_native_units": true,
+          "sole_published_portal": true,
+          "workflow_http_200": true,
+          "workflow_payload_site_id_exact": true
+        },
+        "name_visible_exact_normalized": true,
+        "portal_site_id": "4629273",
+        "raw_native_unit_count": 20,
+        "sole_published_portal": "https://9131096aff.onlineleasing.realpage.com/",
+        "state_visible": true,
+        "street_number_and_words_visible": true,
+        "workflow_probe": {
+          "fixed_tls_fingerprint": "chrome116",
+          "payload_site_id": "4629273",
+          "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "status": 200
+        },
+        "zip_visible": true
+      },
+      "property_id": 261116,
+      "property_name": "Copper Pointe",
+      "source_urls": [
+        "https://copperpointeapts.com/",
+        "https://9131096aff.onlineleasing.realpage.com/",
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>"
+      ],
+      "strict_verdict": "pass_exact_configured_sole_published_onesite_portal_native_workflow_units_after_empty_knock",
+      "units": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1-80B",
+          "provider_unit_id": "15",
+          "rent": 1120,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "15"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1-M",
+          "provider_unit_id": "26",
+          "rent": 1217,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "26"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-80B",
+          "provider_unit_id": "186",
+          "rent": 1087,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "186"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-80B",
+          "provider_unit_id": "162",
+          "rent": 1087,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "162"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-80B",
+          "provider_unit_id": "190",
+          "rent": 1087,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "190"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-M",
+          "provider_unit_id": "71",
+          "rent": 1117,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "71"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-M",
+          "provider_unit_id": "93",
+          "rent": 1117,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "93"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-M",
+          "provider_unit_id": "95",
+          "rent": 1117,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "95"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-M",
+          "provider_unit_id": "167",
+          "rent": 1117,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "167"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B1-M",
+          "provider_unit_id": "72",
+          "rent": 1117,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "72"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B2-M",
+          "provider_unit_id": "198",
+          "rent": 1303,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "198"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B2-M",
+          "provider_unit_id": "203",
+          "rent": 1303,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "203"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "B2-M",
+          "provider_unit_id": "204",
+          "rent": 1303,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "204"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-80B",
+          "provider_unit_id": "214",
+          "rent": 1448,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "214"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-80B",
+          "provider_unit_id": "216",
+          "rent": 1448,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "216"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-80B",
+          "provider_unit_id": "229",
+          "rent": 1448,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "229"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-80B",
+          "provider_unit_id": "250",
+          "rent": 1448,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "250"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-M",
+          "provider_unit_id": "244",
+          "rent": 1474,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "244"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-M",
+          "provider_unit_id": "249",
+          "rent": 1474,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "249"
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C1-M",
+          "provider_unit_id": "241",
+          "rent": 1474,
+          "source_property_id": "4629273",
+          "source_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4629273/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "unit_number": "241"
+        }
+      ],
+      "website": "https://copperpointeapts.com/"
+    }
+  ],
+  "source": {
+    "path": "ma_poc/pms/adapters/knock.py",
+    "sha256": "903b1bd8219911354f46fe61ae3d3329a3dc344b7c27c5a56bb89c42c63ec7f0"
+  }
+}

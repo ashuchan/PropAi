@@ -1,0 +1,74 @@
+{
+  "batch_label": "unit-generic1-tight",
+  "filters": {
+    "evidence_lane": "generic_direct_e2e",
+    "ledger_level": "unit",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unit-generic1-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)",
+        "generic_plan_text: lifted via subpage /availability/ (31 rows)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 31,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 31,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "murphyvarnishlofts.com"
+        ],
+        "source_urls": [
+          "https://murphyvarnishlofts.com/availability/"
+        ],
+        "website_host": "murphyvarnishlofts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "2 Bedroom",
+          "identity": {
+            "floor_plan_id": "f23e4f91f7c3",
+            "unit_number": "101"
+          },
+          "source_api_url": "https://murphyvarnishlofts.com/availability/",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "4c0f42f46aef",
+            "unit_number": "102"
+          },
+          "source_api_url": "https://murphyvarnishlofts.com/availability/",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 231355,
+      "property_identity_match": true,
+      "property_name": "Murphy Varnish Lofts",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bedroom",
+        "2 Bedroom",
+        "Studio"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 31,
+      "website": "https://murphyvarnishlofts.com/"
+    }
+  ]
+}

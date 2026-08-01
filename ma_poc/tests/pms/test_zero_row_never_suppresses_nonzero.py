@@ -14,14 +14,12 @@ scraper hooks — see test_path_b_retry_telemetry's "checked for drift via the
 source-grep contract test"). It asserts, structurally, that each of the three
 seams keeps its non-empty guard:
 
-  Seam 1  generic fallback (~2931): ``adapter_result = fallback_result`` only
-          inside an ``if`` testing ``fallback_result.units``.
+  Seam 1  generic fallback: a canonical unit roster always wins; plan-only
+          fallback can replace only a truly empty primary.
   Seam 2  retry win condition (~1983): ``_retry_win_condition`` requires
           ``res.units``.
-  Seam 3  plan-level baseline restore (~2227): ``adapter_result =
-          _baseline_result`` only inside an ``if`` testing
-          ``_baseline_result.units`` (so a re-routed empty primary cannot lose
-          the baseline plan rows).
+  Seam 3  retry fallback: empty results cannot enter the plan fallback set,
+          while channel-split plan summaries remain eligible evidence.
 
 If any assertion fails, a change removed a guard that prevents an empty result
 from winning. That is the exact defect the plan-level recovery program must not
@@ -86,18 +84,105 @@ def _guarded_assignment_exists(fn: ast.AST, guard_var: str, target: str, value: 
 
 
 class TestGenericFallbackSeam:
-    """Seam 1 — the generic fallback replaces the primary ONLY when it has units."""
+    """Seam 1 — generic fallback must be a strict semantic improvement."""
 
-    def test_generic_fallback_is_guarded_by_units(self) -> None:
-        scrape = _func("scrape")
-        assert _guarded_assignment_exists(
-            scrape, "fallback_result", "adapter_result", "fallback_result"
-        ), (
-            "The generic fallback no longer promotes `fallback_result` behind an "
-            "`if fallback_result.units:` guard. Without it, a zero-row generic "
-            "fallback could overwrite a non-empty adapter_result — the winner-"
-            "selection regression #82 exists to prevent."
+    def test_generic_fallback_adoption_matrix(self) -> None:
+        from ma_poc.pms.adapters.base import AdapterResult
+        from ma_poc.pms.scraper import _should_adopt_generic_fallback
+
+        empty = AdapterResult()
+        plan = AdapterResult(plan_summaries=[{"floor_plan_name": "A1"}])
+        other_plan = AdapterResult(units=[{"floor_plan_name": "B1"}])
+        units = AdapterResult(units=[{"unit_number": "204", "rent_low": 1500}])
+
+        assert not _should_adopt_generic_fallback(plan, empty)
+        assert not _should_adopt_generic_fallback(plan, other_plan)
+        assert _should_adopt_generic_fallback(empty, other_plan)
+        assert _should_adopt_generic_fallback(plan, units)
+        assert not _should_adopt_generic_fallback(empty, empty)
+
+    def test_generic_fallback_cannot_relabel_entrata_plan_ids_as_units(self) -> None:
+        """Andante/Brownstone: the same plan PKs are not apartments."""
+        from ma_poc.pms.adapters.base import AdapterResult
+        from ma_poc.pms.scraper import _should_adopt_generic_fallback
+
+        primary = AdapterResult(
+            plan_summaries=[
+                {
+                    "floor_plan_name": "Pisa",
+                    "bedrooms": "1",
+                    "sqft": "689",
+                    "market_rent_low": 1405,
+                    "source_ids": {"entrata_fpid": "525217"},
+                },
+                {
+                    "floor_plan_name": "Milan",
+                    "bedrooms": "1",
+                    "sqft": "742",
+                    "market_rent_low": 1355,
+                    "source_ids": {"entrata_fpid": "525219"},
+                },
+            ]
         )
+        generic = AdapterResult(
+            units=[
+                {
+                    "unit_number": "525217",
+                    "floor_plan_name": "Pisa",
+                    "bedrooms": "1",
+                    "sqft": "689",
+                    "market_rent_low": 1405,
+                },
+                {
+                    "unit_number": "525219",
+                    "floor_plan_name": "Milan",
+                    "bedrooms": "1",
+                    "sqft": "742",
+                    "market_rent_low": 1355,
+                },
+            ]
+        )
+
+        assert not _should_adopt_generic_fallback(primary, generic)
+
+    def test_real_generic_unit_roster_still_improves_a_plan_catalogue(self) -> None:
+        from ma_poc.pms.adapters.base import AdapterResult
+        from ma_poc.pms.scraper import _should_adopt_generic_fallback
+
+        primary = AdapterResult(
+            plan_summaries=[
+                {
+                    "floor_plan_name": "Pisa",
+                    "bedrooms": "1",
+                    "sqft": "689",
+                    "source_ids": {"entrata_fpid": "525217"},
+                },
+                {
+                    "floor_plan_name": "Milan",
+                    "bedrooms": "1",
+                    "sqft": "742",
+                    "source_ids": {"entrata_fpid": "525219"},
+                },
+            ]
+        )
+        real_units = AdapterResult(
+            units=[
+                {
+                    "unit_number": "A-101",
+                    "floor_plan_name": "Pisa",
+                    "sqft": "689",
+                    "market_rent_low": 1405,
+                },
+                {
+                    "unit_number": "B-204",
+                    "floor_plan_name": "Milan",
+                    "sqft": "742",
+                    "market_rent_low": 1355,
+                },
+            ]
+        )
+
+        assert _should_adopt_generic_fallback(primary, real_units)
 
 
 class TestRetryWinConditionSeam:
@@ -119,18 +204,18 @@ class TestRetryWinConditionSeam:
 
 
 class TestBaselineRestoreSeam:
-    """Seam 3 — when every retry loses, a plan-level baseline is restored, not dropped."""
+    """Seam 3 — only genuine plan evidence can become the retry fallback."""
 
-    def test_baseline_restore_is_guarded_by_units(self) -> None:
-        scrape = _func("scrape")
-        assert _guarded_assignment_exists(
-            scrape, "_baseline_result", "adapter_result", "_baseline_result"
-        ), (
-            "The plan-level baseline restore no longer checks "
-            "`_baseline_result.units`. A property re-routed to an adapter that "
-            "returns zero must fall back to its baseline plan rows — dropping "
-            "them is the net-loss #80 warned about."
-        )
+    def test_empty_result_cannot_become_plan_fallback(self) -> None:
+        from ma_poc.pms.adapters.base import AdapterResult
+        from ma_poc.pms.scraper import _retry_plan_rows
+
+        assert _retry_plan_rows(AdapterResult(units=[], plan_summaries=[])) == []
+
+        split_plan = {"floor_plan_name": "A1", "beds": 1, "sqft": 750}
+        assert _retry_plan_rows(
+            AdapterResult(units=[], plan_summaries=[split_plan])
+        ) == [split_plan]
 
 
 class TestNegativeControls:

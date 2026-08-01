@@ -157,14 +157,11 @@ def test_emits_fpid_in_source_ids_from_url_slug() -> None:
         assert _sids(u)["entrata_fpid"] == "1440"
 
 
-def test_handles_available_now_phrase_as_empty_date() -> None:
-    """The first foxlake card publishes "Available Now" (no date).
-    availability_date must be empty so downstream date-validation
-    doesn't flag a synthetic date. status stays AVAILABLE so the
-    unit isn't dropped by the validity gate."""
+def test_preserves_available_now_phrase_for_formatter_provenance() -> None:
+    """Keep the visible token; the formatter owns capture-date resolution."""
     units = parse_entrata_pp_unit_cards(_foxlake_html(), FOXLAKE_URL)
     unit_8700 = next(u for u in units if u["unit_number"] == "8700")
-    assert unit_8700["availability_date"] == ""
+    assert unit_8700["availability_date"] == "Available Now"
     assert unit_8700["availability_status"] == "AVAILABLE"
 
 
@@ -392,8 +389,25 @@ async def test_render_lever_body_plan_links_drilled(monkeypatch: Any) -> None:
     monkeypatch.setattr(entrata_mod, "_entrata_static_fetch", _fake_fetch)
     monkeypatch.setattr(EntrataAdapter, "_probe_known_endpoints", _no_probe)
 
+    # A captured Entrata floor-plan catalogue used to return immediately here
+    # because its plan id was written into unit_number.  Include that exact
+    # earlier surface so the test proves it no longer suppresses the unit
+    # drill below.
+    captured_plan_catalogue = [{
+        "url": "https://www.brownstonetx.com/Apartments/module/widgets/",
+        "body": [{
+            "id": 53,
+            "floorplan-name": "1 Bedroom 1 Bath A1",
+            "no_of_bedroom": 1,
+            "no_of_bathroom": 1,
+            "square_footage": "610",
+            "min_rent": "$1,250",
+            "max_rent": "$1,250",
+        }],
+    }]
     ctx = SimpleNamespace(
-        _api_responses=[], base_url="https://www.brownstonetx.com/",
+        _api_responses=captured_plan_catalogue,
+        base_url="https://www.brownstonetx.com/",
         property_id="218853", address="", zip_code="",
         fetch_result=SimpleNamespace(
             final_url="https://www.brownstonetx.com/", body=rendered_body,

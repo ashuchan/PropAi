@@ -1,0 +1,764 @@
+{
+  "batch_label": "residual-appfolio15-direct",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      3788,
+      15693,
+      23572,
+      25443,
+      32716,
+      38107,
+      44955,
+      46576,
+      47845,
+      56567,
+      69282,
+      241145,
+      251514,
+      260761,
+      282381
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=147 ctx_addr='913 N Chelton Rd' ctx_zip='80909'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.citadelvillageco.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 3788,
+      "property_identity_match": false,
+      "property_name": "Citadel Village",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "http://www.citadelvillageco.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=299 ctx_addr='18700 Yorba Linda Blvd' ctx_zip='92886'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "livehappy.appfolio.com"
+        ],
+        "source_urls": [
+          "https://livehappy.appfolio.com/listings"
+        ],
+        "website_host": "www.yorbalindapines.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "8/28/26",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "cba1e9abb88a",
+            "unit_id": "18700-yorba-linda-boulevard-61-yorba-linda-ca-92886",
+            "unit_number": "61"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3895,
+            "market_rent_low": 3895
+          },
+          "source_api_url": "https://livehappy.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "7331"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 15693,
+      "property_identity_match": false,
+      "property_name": "Yorba Linda Pines",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "http://www.yorbalindapines.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=12 ctx_addr='2939 Unicornio St' ctx_zip='92009'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "riveroaksmgmt.appfolio.com"
+        ],
+        "source_urls": [
+          "https://riveroaksmgmt.appfolio.com/listings"
+        ],
+        "website_host": "www.riveroaksmgmt.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "d7663bd215ca",
+            "unit_id": "2939-unicornio-street-carlsbad-ca-92009",
+            "unit_number": "709"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3295,
+            "market_rent_low": 3295
+          },
+          "source_api_url": "https://riveroaksmgmt.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "709"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 23572,
+      "property_identity_match": false,
+      "property_name": "Somerset La Costa",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "https://www.riveroaksmgmt.com/vacancies-sommerset-la-costa"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=11 ctx_addr='126 Chanel Terrace' ctx_zip='22046'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.leesquareapartments.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 25443,
+      "property_identity_match": false,
+      "property_name": "Lee Square",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "http://www.leesquareapartments.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=299 ctx_addr='10853 Firestone Blvd' ctx_zip='90650'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "livehappy.appfolio.com"
+        ],
+        "source_urls": [
+          "https://livehappy.appfolio.com/listings"
+        ],
+        "website_host": "portobellaapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "a7c3fc984ae4",
+            "unit_id": "10853-firestone-boulevard-40b-norwalk-ca-90650",
+            "unit_number": "40B"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2080,
+            "market_rent_low": 2080
+          },
+          "source_api_url": "https://livehappy.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "3487"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 32716,
+      "property_identity_match": false,
+      "property_name": "Porto Bella",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "https://portobellaapts.com/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.livefountainplaceapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 3,
+      "property_id": 38107,
+      "property_identity_match": false,
+      "property_name": "Fountain Place",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "https://www.livefountainplaceapts.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=83 ctx_addr='1000 Fulton Ave' ctx_zip='95825'",
+        "appfolio-duda-address-filter: reason=filter_rejected_all_demote kept=0 dropped=83 ctx_addr='1000 Fulton Ave' ctx_zip='95825'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.kjaxproperty.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 44955,
+      "property_identity_match": false,
+      "property_name": "Fulton Woods",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://www.kjaxproperty.com/fulton-woods"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=7 dropped=293 ctx_addr='1601 NW 30th St' ctx_zip='73118'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "proresidential.appfolio.com"
+        ],
+        "source_urls": [
+          "https://proresidential.appfolio.com/listings"
+        ],
+        "website_host": "www.proresidential.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "0edc18384ea3",
+            "unit_id": "1604-nw-31th-st-233-oklahoma-city-ok-73118",
+            "unit_number": "233"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 849,
+            "market_rent_low": 849
+          },
+          "source_api_url": "https://proresidential.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "318"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "0edc18384ea3",
+            "unit_id": "1600-nw-31st-st-157-oklahoma-city-ok-73118",
+            "unit_number": "157"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 899,
+            "market_rent_low": 899
+          },
+          "source_api_url": "https://proresidential.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "967"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 46576,
+      "property_identity_match": false,
+      "property_name": "Campus Pointe",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 7,
+      "website": "https://www.proresidential.com/oklahoma-properties/campus-pointe-"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=33 ctx_addr='5240 E Bellevue St' ctx_zip='85712'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.equilibriumprops.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 47845,
+      "property_identity_match": false,
+      "property_name": "Casa De Caro",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://www.equilibriumprops.com/casa-de-caro-apartments"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.apartmentsstatecollege.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 56567,
+      "property_identity_match": false,
+      "property_name": "Park Forest Apartments",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://www.apartmentsstatecollege.com/park-forest-apartments"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.vistadelplaza.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 69282,
+      "property_identity_match": false,
+      "property_name": "Vista Del Plaza",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "http://www.vistadelplaza.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=55 ctx_addr='3730 4th St' ctx_zip='48201'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.midtownwestdetroit.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 241145,
+      "property_identity_match": false,
+      "property_name": "Fourth & Selden",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://www.midtownwestdetroit.com/single-family"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "lifestylecommunities.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 251514,
+      "property_identity_match": false,
+      "property_name": "LC SoBro I",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://lifestylecommunities.com/community/lc-sobro"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.westridgelofts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 260761,
+      "property_identity_match": false,
+      "property_name": "Westridge Lofts",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "http://www.westridgelofts.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "residual-appfolio15-direct",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=filter_rejected_all_demote kept=0 dropped=117 ctx_addr='FM Rd 16' ctx_zip='75771'",
+        "No AppFolio unit data found in captured API responses or SSR DOM"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.missionmanagementlindale.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 282381,
+      "property_identity_match": false,
+      "property_name": "Mission Ranch",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_APPFOLIO_EMPTY",
+      "units": 0,
+      "website": "https://www.missionmanagementlindale.com/"
+    }
+  ]
+}

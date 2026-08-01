@@ -1,0 +1,2555 @@
+{
+  "accepted": [
+    {
+      "artifact": "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/local_b/evidence_19245_tenzen_current_strict.json",
+      "contamination_verdict": "exact_property_page_to_single_knock_property_id",
+      "current_full_scraper_e2e": {
+        "adapter": "knock",
+        "emitted_units": 2,
+        "errors": [],
+        "rows": [
+          {
+            "availability_date": "2026-08-21",
+            "floor_plan_name": "2X1",
+            "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+            "rent": 2650.0,
+            "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+            "source_ids": {
+              "knock_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502"
+            },
+            "source_property_id": "2022654",
+            "unit_id": "knock_unit_id-ddd80a1f-7cea-4920-862a-fe90cef79502",
+            "unit_number": "104"
+          },
+          {
+            "availability_date": "2026-09-08",
+            "floor_plan_name": "1X1",
+            "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+            "rent": 2050.0,
+            "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+            "source_ids": {
+              "knock_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d"
+            },
+            "source_property_id": "2022654",
+            "unit_id": "knock_unit_id-b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+            "unit_number": "504"
+          }
+        ],
+        "strict_native_positive_rent_rows": 2,
+        "tier": "TIER_1_KNOCK_API",
+        "winning_url": "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5"
+      },
+      "native_identity_rows": 2,
+      "native_positive_rent_rows": 2,
+      "native_rows": [
+        {
+          "available_on": "2026-08-21",
+          "floor_plan_name": "2X1",
+          "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+          "property_id": "2022654",
+          "rent": 2650.0,
+          "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "unit_number": "104"
+        },
+        {
+          "available_on": "2026-09-08",
+          "floor_plan_name": "1X1",
+          "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+          "property_id": "2022654",
+          "rent": 2050.0,
+          "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "unit_number": "504"
+        }
+      ],
+      "net_new_vs_current_ledger": true,
+      "property_id": "19245",
+      "property_identity_match": true,
+      "property_name": "Tenzen",
+      "source_urls": [
+        "https://tenzenapartments.com/",
+        "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5",
+        "https://doorway-api.knockrentals.com/v1/property/2022654/units"
+      ],
+      "strict_qualifies": true,
+      "website": "http://www.tenzenapartments.com/"
+    },
+    {
+      "artifact": "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/agent_a/evidence_unknown_residual17_current_strict.json",
+      "contamination_verdict": "pass_exact_property_single_provider_native_identity_positive_rent",
+      "current_full_scraper_e2e": {
+        "adapter": "knock",
+        "detected_confidence": 0.9,
+        "detected_evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "detected_pms": "knock",
+        "errors": [],
+        "fallback_chain": [
+          "knock"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 2,
+        "units_gate": {
+          "all_rows_native_priced": true,
+          "distinct_native_anchors": 2,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": true,
+          "provider_boundary_single_property": true,
+          "rows": 2,
+          "rows_with_native_identity_and_positive_rent": 2,
+          "rows_with_provider_native_id_or_number": 2,
+          "samples": [
+            {
+              "availability_date": "2026-10-15",
+              "availability_status": "UNAVAILABLE",
+              "floor_plan_name": "2 Bed",
+              "native_anchor": "knock_unit_id-c883d35e-a9b7-4056-afa1-73d22d053b86",
+              "positive_rent": 2500,
+              "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+              "source_ids": {
+                "knock_unit_id": "c883d35e-a9b7-4056-afa1-73d22d053b86"
+              },
+              "source_property_id": "2023031",
+              "unit_number": "200"
+            },
+            {
+              "availability_date": "2026-10-15",
+              "availability_status": "UNAVAILABLE",
+              "floor_plan_name": "2 Bed (1st Flr)",
+              "native_anchor": "knock_unit_id-72de9f8a-61c5-4d3f-84ce-fc831d9b0b58",
+              "positive_rent": 2400,
+              "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+              "source_ids": {
+                "knock_unit_id": "72de9f8a-61c5-4d3f-84ce-fc831d9b0b58"
+              },
+              "source_property_id": "2023031",
+              "unit_number": "108"
+            }
+          ],
+          "source_hosts": [
+            "doorway-api.knockrentals.com"
+          ],
+          "source_property_ids": [
+            "2023031"
+          ],
+          "source_urls": [
+            "https://doorway-api.knockrentals.com/v1/property/2023031/units"
+          ]
+        },
+        "winning_url": "https://doorway-api.knockrentals.com/v1/property/community/07a497e4cab311ee"
+      },
+      "native_identity_rows": 2,
+      "native_positive_rent_rows": 2,
+      "native_samples": [
+        {
+          "availability_date": "2026-10-15",
+          "availability_status": "UNAVAILABLE",
+          "floor_plan_name": "2 Bed",
+          "native_anchor": "knock_unit_id-c883d35e-a9b7-4056-afa1-73d22d053b86",
+          "positive_rent": 2500,
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+          "source_ids": {
+            "knock_unit_id": "c883d35e-a9b7-4056-afa1-73d22d053b86"
+          },
+          "source_property_id": "2023031",
+          "unit_number": "200"
+        },
+        {
+          "availability_date": "2026-10-15",
+          "availability_status": "UNAVAILABLE",
+          "floor_plan_name": "2 Bed (1st Flr)",
+          "native_anchor": "knock_unit_id-72de9f8a-61c5-4d3f-84ce-fc831d9b0b58",
+          "positive_rent": 2400,
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+          "source_ids": {
+            "knock_unit_id": "72de9f8a-61c5-4d3f-84ce-fc831d9b0b58"
+          },
+          "source_property_id": "2023031",
+          "unit_number": "108"
+        }
+      ],
+      "net_new_vs_lane_capture_ledger": true,
+      "page_identity": {
+        "canonical_address": "151 Sea St",
+        "canonical_city": "Quincy",
+        "canonical_name": "Towne House",
+        "canonical_state": "MA",
+        "canonical_zip": "2169",
+        "name_visible_core_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true,
+        "zip_visible_normalized": true
+      },
+      "property_id": "71962",
+      "property_identity_match": true,
+      "property_name": "Towne House",
+      "provider_identity": {
+        "address_match": true,
+        "city_match": true,
+        "community_id": "07a497e4cab311ee",
+        "community_status": 200,
+        "community_url": "https://doorway-api.knockrentals.com/v1/property/community/07a497e4cab311ee",
+        "error": "",
+        "name_match": true,
+        "numeric_property_id": "2023031",
+        "property_identity_match": true,
+        "provider_address": " 151 Sea Street Quincy MA 02169",
+        "provider_city": "Quincy",
+        "provider_name": "Towne House",
+        "provider_state": "MA",
+        "provider_zip": "02169",
+        "state_match": true,
+        "zip_match": true
+      },
+      "source_property_ids": [
+        "2023031"
+      ],
+      "source_urls": [
+        "https://doorway-api.knockrentals.com/v1/property/2023031/units"
+      ],
+      "strict_qualifies": true,
+      "website": "https://www.townehousequincy.com/"
+    }
+  ],
+  "audit": "current strict unknown residual 35-property consolidated audit",
+  "capture_date": "2026-08-01",
+  "latest_ledger_snapshot": {
+    "rows": 185,
+    "sha256_end": "dd617b6344b766f91be01f71bbd3900bd21be576fb1de40e2589760fe1379471",
+    "sha256_start": "dd617b6344b766f91be01f71bbd3900bd21be576fb1de40e2589760fe1379471",
+    "unchanged_during_consolidation": true
+  },
+  "latest_remaining_snapshot": {
+    "rows": 159,
+    "sha256_end": "6bf98c9b7d85d72862bef8fb9ce47c6fd936a3824db30d2ae35aa80a3766d513",
+    "sha256_start": "6bf98c9b7d85d72862bef8fb9ce47c6fd936a3824db30d2ae35aa80a3766d513",
+    "unchanged_during_consolidation": true,
+    "unknown_rows": 33
+  },
+  "near_misses": [
+    {
+      "current_configured_route_e2e_units": 0,
+      "current_native_positive_rent_rows": 1,
+      "evidence": {
+        "contamination_verdict": "single_exact_mri_property_session",
+        "native_identity_rows": 1,
+        "native_positive_rent_rows": 1,
+        "native_rows": [
+          {
+            "available_date": "2026-08-01",
+            "available_end_date": "2026-08-30",
+            "building_id": "A01",
+            "lease_term_months": "12",
+            "provider_unit_id": "A01:42-B",
+            "rent": 1099.0,
+            "source_url": "https://smg.mriprospectconnect.com/Search/Search",
+            "unit_address": "1042 B SEACOVE CIRCLE",
+            "unit_number": "42-B"
+          }
+        ],
+        "property_identity_match": true,
+        "provider": "MRI ProspectConnect",
+        "provider_property_id": "CCA",
+        "source_urls": [
+          "https://smg.mriprospectconnect.com/Search/Index/CCA",
+          "https://smg.mriprospectconnect.com/Search/Search"
+        ]
+      },
+      "minimal_code_lever": "property_scoped_mri_prospectconnect_link_hop_with_session_csrf_search_post_and_data_unitid_parser",
+      "property_id": "74523",
+      "property_name": "Charter Club",
+      "why_rejected": "exact_mri_search_has_one_native_positive_rent_unit_but_current_configured_route_scraper_emits_zero_units"
+    },
+    {
+      "current_configured_route_e2e_units": 0,
+      "current_native_positive_rent_rows": 13,
+      "evidence": {
+        "current_generic_api_injection_e2e": {
+          "adapter": "generic",
+          "detected_confidence": 0.0,
+          "detected_evidence": [
+            "no URL/HTML/mgmt signal"
+          ],
+          "detected_pms": "unknown",
+          "errors": [
+            "Generic parser found no units in captured API responses"
+          ],
+          "fallback_chain": [
+            "generic"
+          ],
+          "llm_budget": 0,
+          "plans": 0,
+          "reason": "completed",
+          "run": true,
+          "tier": "TIER_1_API",
+          "units": 13,
+          "units_gate": {
+            "all_rows_native_priced": true,
+            "distinct_native_anchors": 13,
+            "duplicate_native_anchors": [],
+            "native_anchors_unique": true,
+            "provider_boundary_single_property": true,
+            "rows": 13,
+            "rows_with_native_identity_and_positive_rent": 13,
+            "rows_with_provider_native_id_or_number": 13,
+            "samples": [
+              {
+                "availability_date": "10/3/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "0215",
+                "positive_rent": 905.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "0215"
+              },
+              {
+                "availability_date": "8/8/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1016",
+                "positive_rent": 983.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1016"
+              },
+              {
+                "availability_date": "8/25/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "0819",
+                "positive_rent": 910.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "0819"
+              },
+              {
+                "availability_date": "8/26/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1015",
+                "positive_rent": 860.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1015"
+              },
+              {
+                "availability_date": "8/29/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1019",
+                "positive_rent": 1198.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1019"
+              }
+            ],
+            "source_hosts": [
+              "residentapis.yottareal.com"
+            ],
+            "source_property_ids": [],
+            "source_urls": [
+              "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+            ]
+          },
+          "winning_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+        },
+        "details_url": "https://residentapis.yottareal.com/api/DBA/GetDBADetails/55",
+        "preserved_source_id_rows": 0,
+        "provider_identity": {
+          "address_match": true,
+          "city_match": true,
+          "name_match": true,
+          "property_identity_match": true,
+          "provider_address": "2701 Longmire Drive",
+          "provider_city": "College Station",
+          "provider_name": "Pepper Tree",
+          "provider_state": "TX",
+          "provider_zip": "77845",
+          "state_match": true,
+          "zip_match": true
+        },
+        "raw_rows_with_unit_id_number_positive_rent": 13,
+        "raw_samples": [
+          {
+            "available_date": "2026-10-03T00:00:00",
+            "floor_plan_id": "390",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9795&2026-10-03&2026-10-24",
+            "rent": 905.0,
+            "unit_id": "9795",
+            "unit_number": "0215"
+          },
+          {
+            "available_date": "2026-08-08T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9892&2026-08-08&2026-08-29",
+            "rent": 983.0,
+            "unit_id": "9892",
+            "unit_number": "1016"
+          },
+          {
+            "available_date": "2026-08-25T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9871&2026-08-25&2026-09-15",
+            "rent": 910.0,
+            "unit_id": "9871",
+            "unit_number": "0819"
+          },
+          {
+            "available_date": "2026-08-26T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9891&2026-08-26&2026-09-16",
+            "rent": 860.0,
+            "unit_id": "9891",
+            "unit_number": "1015"
+          },
+          {
+            "available_date": "2026-08-29T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9895&2026-08-29&2026-09-19",
+            "rent": 1198.0,
+            "unit_id": "9895",
+            "unit_number": "1019"
+          }
+        ],
+        "raw_unit_rows": 13,
+        "units_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+      },
+      "minimal_code_lever": "Upgrade the exact Yotta route from HTTP to HTTPS; detect Id=55; GET GetDBADetails/55 for managementCompanyId; GET GetFloorPlans/55/1; map unitId into a registered yotta_unit_id, unitNumber, rent, floor plan and available date.",
+      "property_id": "34785",
+      "property_name": "Pepper Tree",
+      "why_rejected": "Current exact-route baseline scraper emits zero units. Injecting the public provider payload yields rows but current generic normalization drops native unitId/source_ids, so this is a code lever, not an acceptance."
+    }
+  ],
+  "policy": {
+    "all_35_properties_probed": true,
+    "captcha_solving": false,
+    "current_live_property_scoped_sources": true,
+    "llm_calls": 0,
+    "minimum_three_before_cluster_generalization": true,
+    "paid_canary": false,
+    "repository_production_edits": 0,
+    "shared_ledger_or_builder_mutations_by_audit": 0,
+    "web_unlocker_calls": 0
+  },
+  "rejections": [
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 0,
+        "captcha_solving": false,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 20002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "final_url": "",
+        "paid_proxy": false,
+        "requested_url": "https://www.crossingatriverlake.com",
+        "status": null,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "1070 Lake Front Dr",
+        "canonical_city": "Sacramento",
+        "canonical_name": "Crossing at Riverlake",
+        "canonical_state": "CA",
+        "canonical_zip": "95831",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "1617",
+      "property_name": "Crossing at Riverlake",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_fetch_error"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://www.crossingatriverlake.com",
+      "strict_qualifies": false,
+      "website": "https://www.crossingatriverlake.com",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)"
+        ],
+        "outcome": "PLAN_ONLY",
+        "plans": 1,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 46522,
+        "body_sha256": "a5e4fe4103a90b7fa225f856daa9fdd8a787f31850fcbf241bb99b511c415dd3",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 2,
+          "positive_currency_tokens": 5
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://augustarentalhomes2.managebuilding.com/Resident/portal",
+          "https://www.augustarentalhomes.net/communities"
+        ],
+        "status": 200,
+        "title": "2905 Arrowhead Drive - D3 Augusta, GA 30909 | Augusta Rental Homes"
+      },
+      "minimal_code_lever": "none_current_source_explicitly_withdraws_the_listing",
+      "native_provider_near_miss": null,
+      "property_id": "1765",
+      "property_name": "Annaberg",
+      "rejection_reason": "exact_native_listing_explicitly_states_property_is_not_available_and_current_scraper_emits_plan_only",
+      "strict_qualifies": false,
+      "website": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 3,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_3_DOM_PLAN_LEVEL",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": "https://tramor.com/property/tramor-cannon-place/"
+      },
+      "current_page": {
+        "body_bytes": 66583,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://tramor.com/property/tramor-cannon-place/",
+        "paid_proxy": false,
+        "requested_url": "https://tramor.com/property/tramor-cannon-place/",
+        "status": 200,
+        "title": "Tramor at Cannon Place \u2013 Tramor",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "1500 W William Cannon Dr",
+        "canonical_city": "Austin",
+        "canonical_name": "Tramor at Cannon Place",
+        "canonical_state": "TX",
+        "canonical_zip": "78745",
+        "name_visible_core_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true,
+        "zip_visible_normalized": true
+      },
+      "property_id": "4124",
+      "property_name": "Tramor at Cannon Place",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "current_full_scraper_e2e_emitted_zero_units",
+        "current_source_is_plan_level_only"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://tramor.com/property/tramor-cannon-place/",
+      "strict_qualifies": false,
+      "website": "https://tramor.com/property/tramor-cannon-place/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "knock",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 564091,
+        "body_sha256": "43e08055ccaea55f78e52e341a3b0fa8ee6d36dff07adcdcb4a984bfa99f85ae",
+        "detected_adapter": "knock",
+        "error": "",
+        "final_url": "https://www.clearrunaptswilmington.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 200,
+        "title": "Gables"
+      },
+      "minimal_code_lever": "none_without_a_current_exact_clear_run_inventory_route",
+      "native_provider_near_miss": null,
+      "property_id": "4756",
+      "property_name": "Clear Run",
+      "rejection_reason": "configured_clear_run_domain_serves_gables_corporate_homepage_identity_mismatch",
+      "strict_qualifies": false,
+      "website": "https://www.clearrunaptswilmington.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 0,
+        "captcha_solving": false,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 20002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "final_url": "",
+        "paid_proxy": false,
+        "requested_url": "http://brooklawngardensapts.com/property/brooklawn/",
+        "status": null,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "1617 Solook Dr",
+        "canonical_city": "Parlin",
+        "canonical_name": "Brooklawn Gardens",
+        "canonical_state": "NJ",
+        "canonical_zip": "8859",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "16509",
+      "property_name": "Brooklawn Gardens",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_fetch_error"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://brooklawngardensapts.com/property/brooklawn/",
+      "strict_qualifies": false,
+      "website": "http://brooklawngardensapts.com/property/brooklawn/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_1_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 123357,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+        "paid_proxy": false,
+        "requested_url": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+        "status": 200,
+        "title": "Fox Lane Apartments - Princeton Management",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "45600 Fox Ln W",
+        "canonical_city": "Shelby Township",
+        "canonical_name": "Fox Lane",
+        "canonical_state": "MI",
+        "canonical_zip": "48317",
+        "name_visible_core_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true,
+        "zip_visible_normalized": true
+      },
+      "property_id": "22962",
+      "property_name": "Fox Lane",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "current_full_scraper_e2e_emitted_zero_units"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+      "strict_qualifies": false,
+      "website": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_API",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 121735,
+        "body_sha256": "4525e3902f5cd6f28b2b83de676d438eeee4fe227503e3640527a244b8c1e7b5",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://www.tropicanavillageapartments.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://www.tropicanavillageapartments.com/apply-now/application-process",
+          "https://www.tropicanavillageapartments.com/resident-portal/resident-portal"
+        ],
+        "status": 200,
+        "title": "Tropicana Village"
+      },
+      "minimal_code_lever": "none_without_a_current_property_scoped_inventory_source",
+      "native_provider_near_miss": null,
+      "property_id": "22964",
+      "property_name": "Tropicana Village Apartments",
+      "rejection_reason": "exact_property_page_publishes_no_native_availability_or_positive_rent_rows",
+      "strict_qualifies": false,
+      "website": "https://www.tropicanavillageapartments.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 962,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://nonpayment.spherexx.com/",
+        "paid_proxy": false,
+        "requested_url": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940",
+        "status": 200,
+        "title": "Site Taken Down (Non-Payment) - Web hosting provided by Spherexx.com",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "343 S Dearborn St",
+        "canonical_city": "Chicago",
+        "canonical_name": "Fisher Building",
+        "canonical_state": "IL",
+        "canonical_zip": "60604",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "24982",
+      "property_name": "Fisher Building",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "configured_property_host_redirects_to_nonpayment_suspension"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940",
+      "strict_qualifies": false,
+      "website": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)",
+          "generic_plan_text: sqft chase via /floor-plans/ merged sqft into 14/25 rows"
+        ],
+        "outcome": "PLAN_ONLY",
+        "plans": 24,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 194982,
+        "body_sha256": "d3628aaa0cb046d85cf58927e161207cc27357b719e51636c50ccec9622cb2ed",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://www.countryvillageapthomes.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 10,
+          "positive_currency_tokens": 58
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://www.countryvillageapthomes.com/#floorplans"
+        ],
+        "status": 200,
+        "title": "Country Village Apartments in Sherman, TX (Official Site)"
+      },
+      "minimal_code_lever": "none_without_native_unit_inventory",
+      "native_provider_near_miss": null,
+      "property_id": "27349",
+      "property_name": "Country Village of Sherman",
+      "rejection_reason": "current_exact_page_and_scraper_are_plan_level_only_no_native_unit_identity",
+      "strict_qualifies": false,
+      "website": "https://www.countryvillageapthomes.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "detected_confidence": 0.55,
+        "detected_evidence": [
+          "bedroom/bath + $ text pattern present in body (last-resort plan-level extractor; gated by \u22652-row parser threshold)"
+        ],
+        "detected_pms": "generic_plan_text",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)"
+        ],
+        "fallback_chain": [
+          "generic_plan_text"
+        ],
+        "llm_budget": 0,
+        "plans": 3,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards"
+      },
+      "current_page": {
+        "body_bytes": 86356,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://www.camdenliving.com/",
+        "paid_proxy": false,
+        "requested_url": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards",
+        "status": 200,
+        "title": "Luxury Apartments for Rent <!-- --> - camdenliving.com",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "24323 Jackson Ave",
+        "canonical_city": "Murrieta",
+        "canonical_name": "Camden Vineyards",
+        "canonical_state": "CA",
+        "canonical_zip": "92562",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "32978",
+      "property_name": "Camden Vineyards",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "current_source_is_plan_level_only"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards",
+      "strict_qualifies": false,
+      "website": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 962,
+        "body_sha256": "b2c976262fe571eebda365cf80d6ae482aaaee0693a232e76446c578ffedc7e7",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://nonpayment.spherexx.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 200,
+        "title": "Site Taken Down (Non-Payment) - Web hosting provided by Spherexx.com"
+      },
+      "minimal_code_lever": "none_website_or_provider_route_must_be_restored",
+      "native_provider_near_miss": null,
+      "property_id": "33993",
+      "property_name": "City Club Apartments MDA",
+      "rejection_reason": "configured_url_redirects_to_spherexx_nonpayment_hosting_suspension_page",
+      "strict_qualifies": false,
+      "website": "https://www.cityclubapartments.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 195,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "http://www.thetamarronapts.com/",
+        "paid_proxy": false,
+        "requested_url": "http://www.thetamarronapts.com/",
+        "status": 200,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "4410 N 99th Ave",
+        "canonical_city": "Phoenix",
+        "canonical_name": "Tamarron",
+        "canonical_state": "AZ",
+        "canonical_zip": "85037",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "34362",
+      "property_name": "Tamarron",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "http_200_body_too_small_for_property_inventory"
+      ],
+      "route_normalization": "scheme_only",
+      "selected_exact_route": "http://www.thetamarronapts.com/",
+      "strict_qualifies": false,
+      "website": "https://www.thetamarronapts.com",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)"
+        ],
+        "outcome": "PLAN_ONLY",
+        "plans": 3,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 86356,
+        "body_sha256": "d7a09195d09ed6b086239878fbc3fe7c0f378dd4d286871edc4d771ef1c0d247",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://www.camdenliving.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 1
+        },
+        "name_visible": false,
+        "provider_links": [
+          "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap",
+          "https://www.camdenliving.com/unit-comparison",
+          "https://images.ctfassets.net/pg6xj64qk0kh/D0ps4L5t3sDAoas6sddFy/e35b97066890620ffcf180a63c72fbf0/camden-franklin-apartments-franklin-tn-living-room-with-wood-style-floors.jpg?w=326",
+          "https://privacyportal.onetrust.com/webform/c06874e4-75dc-4e9f-855f-32bef2e26c79/4d598682-f8c2-4dcb-afcf-7ec59bcea307"
+        ],
+        "status": 200,
+        "title": "Luxury Apartments for Rent - camdenliving.com"
+      },
+      "minimal_code_lever": "none_without_a_current_exact_property_route",
+      "native_provider_near_miss": null,
+      "property_id": "34708",
+      "property_name": "Camden Main & Jamboree",
+      "rejection_reason": "retired_property_route_redirects_to_camden_corporate_homepage_identity_mismatch",
+      "strict_qualifies": false,
+      "website": "https://www.camdenliving.com/apartments/irvine-ca/camden-main-and-jamboree"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "GENERIC_VALIDITY_REJECTED: 1 rows from GENERIC_VALIDITY_REJECTED failed unit_validity (no numeric dimension)"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "GENERIC_VALIDITY_REJECTED",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": "https://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55"
+      },
+      "current_page": {
+        "body_bytes": 55781,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+        "paid_proxy": false,
+        "requested_url": "https://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+        "status": 200,
+        "title": "Luxury Apartment Homes",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "2701 Longmire Dr",
+        "canonical_city": "College Station",
+        "canonical_name": "Pepper Tree",
+        "canonical_state": "TX",
+        "canonical_zip": "77845",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "34785",
+      "property_name": "Pepper Tree",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "yotta_public_api_has_native_rows_but_current_entrypoint_e2e_and_source_id_preservation_fail"
+      ],
+      "route_normalization": "scheme_only",
+      "selected_exact_route": "https://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+      "strict_qualifies": false,
+      "website": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+      "yotta_near_miss": {
+        "current_generic_api_injection_e2e": {
+          "adapter": "generic",
+          "detected_confidence": 0.0,
+          "detected_evidence": [
+            "no URL/HTML/mgmt signal"
+          ],
+          "detected_pms": "unknown",
+          "errors": [
+            "Generic parser found no units in captured API responses"
+          ],
+          "fallback_chain": [
+            "generic"
+          ],
+          "llm_budget": 0,
+          "plans": 0,
+          "reason": "completed",
+          "run": true,
+          "tier": "TIER_1_API",
+          "units": 13,
+          "units_gate": {
+            "all_rows_native_priced": true,
+            "distinct_native_anchors": 13,
+            "duplicate_native_anchors": [],
+            "native_anchors_unique": true,
+            "provider_boundary_single_property": true,
+            "rows": 13,
+            "rows_with_native_identity_and_positive_rent": 13,
+            "rows_with_provider_native_id_or_number": 13,
+            "samples": [
+              {
+                "availability_date": "10/3/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "0215",
+                "positive_rent": 905.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "0215"
+              },
+              {
+                "availability_date": "8/8/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1016",
+                "positive_rent": 983.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1016"
+              },
+              {
+                "availability_date": "8/25/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "0819",
+                "positive_rent": 910.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "0819"
+              },
+              {
+                "availability_date": "8/26/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1015",
+                "positive_rent": 860.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1015"
+              },
+              {
+                "availability_date": "8/29/2026 12:00:00 AM",
+                "availability_status": "",
+                "floor_plan_name": "",
+                "native_anchor": "1019",
+                "positive_rent": 1198.0,
+                "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+                "source_ids": {},
+                "source_property_id": "",
+                "unit_number": "1019"
+              }
+            ],
+            "source_hosts": [
+              "residentapis.yottareal.com"
+            ],
+            "source_property_ids": [],
+            "source_urls": [
+              "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+            ]
+          },
+          "winning_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+        },
+        "current_normalized_rows_with_preserved_source_ids": 0,
+        "details_error": "",
+        "details_status": 200,
+        "details_url": "https://residentapis.yottareal.com/api/DBA/GetDBADetails/55",
+        "distinct_raw_unit_ids": 13,
+        "distinct_raw_unit_numbers": 13,
+        "provider_identity": {
+          "address_match": true,
+          "city_match": true,
+          "name_match": true,
+          "property_identity_match": true,
+          "provider_address": "2701 Longmire Drive",
+          "provider_city": "College Station",
+          "provider_name": "Pepper Tree",
+          "provider_state": "TX",
+          "provider_zip": "77845",
+          "state_match": true,
+          "zip_match": true
+        },
+        "raw_positive_rent_rows": 13,
+        "raw_rows_with_unit_id_number_positive_rent": 13,
+        "raw_samples": [
+          {
+            "available_date": "2026-10-03T00:00:00",
+            "floor_plan_id": "390",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9795&2026-10-03&2026-10-24",
+            "rent": 905.0,
+            "unit_id": "9795",
+            "unit_number": "0215"
+          },
+          {
+            "available_date": "2026-08-08T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9892&2026-08-08&2026-08-29",
+            "rent": 983.0,
+            "unit_id": "9892",
+            "unit_number": "1016"
+          },
+          {
+            "available_date": "2026-08-25T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9871&2026-08-25&2026-09-15",
+            "rent": 910.0,
+            "unit_id": "9871",
+            "unit_number": "0819"
+          },
+          {
+            "available_date": "2026-08-26T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9891&2026-08-26&2026-09-16",
+            "rent": 860.0,
+            "unit_id": "9891",
+            "unit_number": "1015"
+          },
+          {
+            "available_date": "2026-08-29T00:00:00",
+            "floor_plan_id": "391",
+            "online_path": "https://onlineapp.yottareal.com/#/quotesummary/9895&2026-08-29&2026-09-19",
+            "rent": 1198.0,
+            "unit_id": "9895",
+            "unit_number": "1019"
+          }
+        ],
+        "raw_unit_rows": 13,
+        "strict_entrypoint_accept": false,
+        "strict_rejection": "Current exact-route baseline scraper emits zero units. Injecting the public provider payload yields rows but current generic normalization drops native unitId/source_ids, so this is a code lever, not an acceptance.",
+        "units_error": "",
+        "units_status": 200,
+        "units_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+      }
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 150828,
+        "body_sha256": "a5db0ae014b801c5483869aee774c301de5f4eba4675f8e55e0753f8d81f82f4",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://www.summerwoodindy.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 200,
+        "title": "\u4e5d\u6e38\u5b98\u65b9\u7aef\u7f51\u7ad9\u5728\u7ebf\u767b\u5165-\u4e5d\u6e38(\u4e2d\u56fd)"
+      },
+      "minimal_code_lever": "none_domain_is_no_longer_a_property_source",
+      "native_provider_near_miss": null,
+      "property_id": "37071",
+      "property_name": "Summerwood on Towne Line",
+      "rejection_reason": "configured_domain_serves_unrelated_chinese_gambling_content_identity_mismatch",
+      "strict_qualifies": false,
+      "website": "www.summerwoodindy.com"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 1621,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://block.charter-prod.hosted.cujo.io/warn.html?url=http://www.vistadepalmasapartments.com/&token=621218a3",
+        "paid_proxy": false,
+        "requested_url": "http://www.vistadepalmasapartments.com/",
+        "status": 200,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "1415 W Freddy Gonzalez Dr",
+        "canonical_city": "Edinburg",
+        "canonical_name": "Vista De Palmas Apartments",
+        "canonical_state": "TX",
+        "canonical_zip": "78539",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "39198",
+      "property_name": "Vista De Palmas Apartments",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "network_security_interstitial_not_property_content"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://www.vistadepalmasapartments.com/",
+      "strict_qualifies": false,
+      "website": "http://www.vistadepalmasapartments.com/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)"
+        ],
+        "outcome": "PLAN_ONLY",
+        "plans": 3,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 53909,
+        "body_sha256": "56554c2645eeadf678b264950d206b2a1b136557ec5c1f6ce27cf83ddbfdab15",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://www.smdproperty.com/resident-properties/country-club-apartments/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 8
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://www.smdproperty.com/lease-application/"
+        ],
+        "status": 200,
+        "title": "Country Club Apartments"
+      },
+      "minimal_code_lever": "none_without_native_unit_inventory",
+      "native_provider_near_miss": null,
+      "property_id": "40733",
+      "property_name": "Country Club",
+      "rejection_reason": "current_exact_page_and_scraper_publish_plan_pricing_only_no_native_unit_identity",
+      "strict_qualifies": false,
+      "website": "https://www.smdproperty.com/resident-properties/country-club-apartments/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 0,
+        "captcha_solving": false,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 20003 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "final_url": "",
+        "paid_proxy": false,
+        "requested_url": "http://summerwindaptsfl.com/",
+        "status": null,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "5262 Timuquana Rd",
+        "canonical_city": "Jacksonville",
+        "canonical_name": "Vintage Grove Apartments",
+        "canonical_state": "FL",
+        "canonical_zip": "32210",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "42554",
+      "property_name": "Vintage Grove Apartments",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_fetch_error"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://summerwindaptsfl.com/",
+      "strict_qualifies": false,
+      "website": "http://summerwindaptsfl.com/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "knock",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 10176,
+        "body_sha256": "fcc79d35c9cf7f4d972c0db254fe7eeac0024008409e466090de8dfa16374a44",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://stoneyrunelmsliving.com/call-support.html",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [
+          "https://s.realpage.com/favicon.ico",
+          "https://www.realpage.com/apple-touch-icon.png",
+          "https://www.realpage.com/support/",
+          "https://www.realpage.com/privacy-policy/",
+          "https://www.realpage.com/privacy-shield/",
+          "https://www.realpage.com/dmca-notice/"
+        ],
+        "status": 200,
+        "title": "Property Management Software & Services | RealPage"
+      },
+      "minimal_code_lever": "none_without_a_current_exact_realpage_property_route",
+      "native_provider_near_miss": null,
+      "property_id": "42977",
+      "property_name": "Elms at Stoney Run",
+      "rejection_reason": "configured_route_redirects_to_realpage_call_support_page_no_property_inventory",
+      "strict_qualifies": false,
+      "website": "https://stoneyrunelmsliving.com/home#"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 167,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://www.edgefieldaptsva.com/",
+        "paid_proxy": false,
+        "requested_url": "https://www.edgefieldaptsva.com/",
+        "status": 202,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "5699 Craneybrook Ln",
+        "canonical_city": "Portsmouth",
+        "canonical_name": "Edgefield",
+        "canonical_state": "VA",
+        "canonical_zip": "23703",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "48075",
+      "property_name": "Edgefield",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_http_202"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://www.edgefieldaptsva.com/",
+      "strict_qualifies": false,
+      "website": "https://www.edgefieldaptsva.com/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "contamination_verdict": "live_entry_unreachable",
+        "errors": [],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": null,
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 167,
+        "body_sha256": "5f230657705c40a29f335e3014fe26ed29911b6afdf916ad47e2030dae28e01a",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "http://www.villagegatenc.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 202,
+        "title": ""
+      },
+      "minimal_code_lever": "non_captcha_current_provider_route_or_allowed_hyperbrowser_fetch_then_full_e2e",
+      "native_provider_near_miss": null,
+      "property_id": "48389",
+      "property_name": "Village Gate Apartments",
+      "rejection_reason": "current_route_returns_sgcaptcha_interstitial_no_captcha_interaction_or_source_data",
+      "strict_qualifies": false,
+      "website": "http://www.villagegatenc.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_1_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 132581,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+        "paid_proxy": false,
+        "requested_url": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+        "status": 200,
+        "title": "Woodbridge Manor Apartments - Princeton Management",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "517 E Edgewood Blvd",
+        "canonical_city": "Lansing",
+        "canonical_name": "Woodbridge Manor",
+        "canonical_state": "MI",
+        "canonical_zip": "48911",
+        "name_visible_core_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true,
+        "zip_visible_normalized": true
+      },
+      "property_id": "52541",
+      "property_name": "Woodbridge Manor",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "current_full_scraper_e2e_emitted_zero_units"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+      "strict_qualifies": false,
+      "website": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_API",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 121537,
+        "body_sha256": "0529e3428f54f8d6fb4fe81fe0b29b0f5cf97449382193ab56089835f43b44af",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 8
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+          "https://princetonmanagement.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fprincetonmanagement.com%2Fcommunities%2Ftrafalgar-square-apartments%2F",
+          "https://princetonmanagement.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fprincetonmanagement.com%2Fcommunities%2Ftrafalgar-square-apartments%2F&format=xml",
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/#carousel-listing",
+          "https://princetonmanagement.com/apply-trafalgar-square-apartments",
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/#description50230",
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/#floor50230",
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/#details50230",
+          "https://princetonmanagement.com/communities/trafalgar-square-apartments/#features50230",
+          "https://princetonmanagement.com/communities/timber-creek-apartments/",
+          "https://princetonmanagement.com/communities/tuscan-manor-apartments/"
+        ],
+        "status": 200,
+        "title": "Trafalgar Square Apartments - Princeton Management"
+      },
+      "minimal_code_lever": "none_without_new_native_inventory",
+      "native_provider_near_miss": null,
+      "property_id": "53567",
+      "property_name": "Trafalgar Square Apartments",
+      "rejection_reason": "current_exact_mri_search_publishes_plan_pricing_only_no_native_unit_rows",
+      "strict_qualifies": false,
+      "website": "https://princetonmanagement.com/communities/trafalgar-square-apartments/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 7764,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "http://www.landmarkrealty.org/misty-hollow/",
+        "paid_proxy": false,
+        "requested_url": "http://www.landmarkrealty.org/misty-hollow/",
+        "status": 403,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "2826 Misty Ln",
+        "canonical_city": "Bossier City",
+        "canonical_name": "Misty Hollow",
+        "canonical_state": "LA",
+        "canonical_zip": "71111",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "53932",
+      "property_name": "Misty Hollow",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_http_403"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://www.landmarkrealty.org/misty-hollow/",
+      "strict_qualifies": false,
+      "website": "http://www.landmarkrealty.org/misty-hollow/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 114,
+        "body_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://www.riverplacecr.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 200,
+        "title": ""
+      },
+      "minimal_code_lever": "none_domain_is_parked",
+      "native_provider_near_miss": null,
+      "property_id": "64068",
+      "property_name": "Riverplace",
+      "rejection_reason": "configured_domain_is_a_godaddy_parking_lander_not_a_property_source",
+      "strict_qualifies": false,
+      "website": "www.riverplacecr.com"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)"
+        ],
+        "outcome": "PLAN_ONLY",
+        "plans": 2,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 77571,
+        "body_sha256": "428031bf495f4fc418fa451dfc1d3762230a553f2717b1e3c9ebd47999c70c5c",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://www.centralmngt.com/Search?Community=15",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 1,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 4
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://www.centralmngt.com/Search?Community=15",
+          "https://s3.amazonaws.com/rlportal/CentralMGMT/Images/Portal/logo_big@2x.png",
+          "https://centralmgmt.quickleasepro.com/properties/willow/apply",
+          "https://s3.amazonaws.com/rlportal/CentralMGMT/Images/Building/15/Brochure/Willows_brochure.pdf",
+          "https://s3.amazonaws.com/rlportal/CentralMGMT/Images/Portal/ApplicationForm/application.pdf"
+        ],
+        "status": 200,
+        "title": "Central Management"
+      },
+      "minimal_code_lever": "none_without_native_unit_inventory",
+      "native_provider_near_miss": null,
+      "property_id": "72732",
+      "property_name": "The Willows",
+      "rejection_reason": "current_exact_page_and_scraper_publish_bedroom_type_rent_ranges_only_no_native_units",
+      "strict_qualifies": false,
+      "website": "http://www.centralmngt.com/Search?Community=15"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)",
+          "generic_plan_text: <2 distinct plan rows found (anti-noise threshold; falls to LLM)"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 131731,
+        "body_sha256": "fe3b5197098ac9800838852790d34b22803f950a3c87aac58bea52c140dcaab7",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://charterclubapts.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://use.fontawesome.com/releases/v6.2.0/css/all.css",
+          "https://use.fontawesome.com/releases/v6.2.0/css/v4-shims.css",
+          "https://smg.mriprospectconnect.com/cca",
+          "https://smg.mriprospectconnect.com/Search/Index/cca"
+        ],
+        "status": 200,
+        "title": "Home - Charter Club Apartments"
+      },
+      "minimal_code_lever": "property_scoped_mri_prospectconnect_link_hop_with_session_csrf_search_post_and_data_unitid_parser",
+      "native_provider_near_miss": {
+        "contamination_verdict": "single_exact_mri_property_session",
+        "native_identity_rows": 1,
+        "native_positive_rent_rows": 1,
+        "native_rows": [
+          {
+            "available_date": "2026-08-01",
+            "available_end_date": "2026-08-30",
+            "building_id": "A01",
+            "lease_term_months": "12",
+            "provider_unit_id": "A01:42-B",
+            "rent": 1099.0,
+            "source_url": "https://smg.mriprospectconnect.com/Search/Search",
+            "unit_address": "1042 B SEACOVE CIRCLE",
+            "unit_number": "42-B"
+          }
+        ],
+        "property_identity_match": true,
+        "provider": "MRI ProspectConnect",
+        "provider_property_id": "CCA",
+        "source_urls": [
+          "https://smg.mriprospectconnect.com/Search/Index/CCA",
+          "https://smg.mriprospectconnect.com/Search/Search"
+        ]
+      },
+      "property_id": "74523",
+      "property_name": "Charter Club",
+      "rejection_reason": "exact_mri_search_has_one_native_positive_rent_unit_but_current_configured_route_scraper_emits_zero_units",
+      "strict_qualifies": false,
+      "website": "http://www.charterclubapts.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": null,
+        "detected_pms": null,
+        "errors": [],
+        "plans": 0,
+        "reason": "fetch_not_http_200_with_body",
+        "run": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "current_page": {
+        "body_bytes": 190,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://pettinaro.com/village-park-paladin/",
+        "paid_proxy": false,
+        "requested_url": "https://pettinaro.com/village-park-paladin/",
+        "status": 202,
+        "title": "",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "101 Clifton Park Cir",
+        "canonical_city": "Wilmington",
+        "canonical_name": "Village Park at Paladin",
+        "canonical_state": "DE",
+        "canonical_zip": "19802",
+        "name_visible_core_normalized": false,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "75314",
+      "property_name": "Village Park at Paladin",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_route_http_202"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "https://pettinaro.com/village-park-paladin/",
+      "strict_qualifies": false,
+      "website": "https://pettinaro.com/village-park-paladin/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_API",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": true,
+        "body_bytes": 125535,
+        "body_sha256": "49f9ddaff9543d3d823038af9b98ec52a225179e545764975225953fed17de1f",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 9
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+          "https://princetonmanagement.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fprincetonmanagement.com%2Fcommunities%2Fcuster-crossing-apartments%2F",
+          "https://princetonmanagement.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fprincetonmanagement.com%2Fcommunities%2Fcuster-crossing-apartments%2F&format=xml",
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/#carousel-listing",
+          "https://princetonmanagement.com/apply-custer-crossing-apartments",
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/#description1693",
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/#floor1693",
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/#details1693",
+          "https://princetonmanagement.com/communities/custer-crossing-apartments/#features1693",
+          "https://princetonmanagement.com/wp-content/uploads/2018/05/Custer-Crossing-2-Bed-Corner-Level-1-3D-Floor-Plan-1.jpg",
+          "https://princetonmanagement.com/communities/covington-apartments/",
+          "https://princetonmanagement.com/communities/dearborn-club-apartments/"
+        ],
+        "status": 200,
+        "title": "Custer Crossing Apartments - Princeton Management"
+      },
+      "minimal_code_lever": "none_without_new_native_inventory",
+      "native_provider_near_miss": null,
+      "property_id": "232583",
+      "property_name": "Custer Crossing Apartments",
+      "rejection_reason": "current_exact_mri_search_publishes_plan_pricing_only_no_native_unit_rows",
+      "strict_qualifies": false,
+      "website": "https://princetonmanagement.com/communities/custer-crossing-apartments/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "detected_confidence": 0.55,
+        "detected_evidence": [
+          "bedroom/bath + $ text pattern present in body (last-resort plan-level extractor; gated by \u22652-row parser threshold)"
+        ],
+        "detected_pms": "generic_plan_text",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)",
+          "generic_plan_text: <2 distinct plan rows found (anti-noise threshold; falls to LLM)"
+        ],
+        "fallback_chain": [
+          "generic_plan_text",
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 170880,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "https://rooftop252.com/",
+        "paid_proxy": false,
+        "requested_url": "http://www.rooftop252.com/",
+        "status": 200,
+        "title": "Rooftop252 |",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "252 Marie Ave E",
+        "canonical_city": "West St Paul",
+        "canonical_name": "Rooftop 252",
+        "canonical_state": "MN",
+        "canonical_zip": "55118",
+        "name_visible_core_normalized": true,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": true
+      },
+      "property_id": "235473",
+      "property_name": "Rooftop 252",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://www.rooftop252.com/",
+      "strict_qualifies": false,
+      "website": "http://www.rooftop252.com/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 114,
+        "body_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+        "detected_adapter": "unknown",
+        "error": "",
+        "final_url": "http://www.bridgecreekapthomes.com/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 0,
+          "positive_currency_tokens": 0
+        },
+        "name_visible": false,
+        "provider_links": [],
+        "status": 200,
+        "title": ""
+      },
+      "minimal_code_lever": "none_domain_is_parked",
+      "native_provider_near_miss": null,
+      "property_id": "246962",
+      "property_name": "Portola Bridge Creek",
+      "rejection_reason": "configured_domain_is_a_godaddy_parking_lander_not_a_property_source",
+      "strict_qualifies": false,
+      "website": "http://www.bridgecreekapthomes.com/"
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic",
+        "detected_confidence": 0.0,
+        "detected_evidence": [
+          "no URL/HTML/mgmt signal"
+        ],
+        "detected_pms": "unknown",
+        "errors": [
+          "LLM_GATE_NO_BODY: page body too short or no rent tokens"
+        ],
+        "fallback_chain": [
+          "generic"
+        ],
+        "llm_budget": 0,
+        "plans": 0,
+        "reason": "completed",
+        "run": true,
+        "tier": "LLM_GATE_NO_BODY",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_anchors": 0,
+          "duplicate_native_anchors": [],
+          "native_anchors_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "rows_with_provider_native_id_or_number": 0,
+          "samples": [],
+          "source_hosts": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "current_page": {
+        "body_bytes": 13607,
+        "captcha_solving": false,
+        "error": "",
+        "final_url": "http://hawkeyevillageapartments.com/",
+        "paid_proxy": false,
+        "requested_url": "http://hawkeyevillageapartments.com/",
+        "status": 200,
+        "title": "Welcome to Hawkeye Village",
+        "web_unlocker": false
+      },
+      "page_identity": {
+        "canonical_address": "1422 Irish Dr",
+        "canonical_city": "Waterloo",
+        "canonical_name": "Hawkeye Village",
+        "canonical_state": "IA",
+        "canonical_zip": "50701",
+        "name_visible_core_normalized": true,
+        "property_identity_match": false,
+        "street_number_and_words_visible": false,
+        "zip_visible_normalized": false
+      },
+      "property_id": "272772",
+      "property_name": "Hawkeye Village",
+      "provider_identity": {
+        "community_id": "",
+        "property_identity_match": false
+      },
+      "rejection_reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units"
+      ],
+      "route_normalization": "none",
+      "selected_exact_route": "http://hawkeyevillageapartments.com/",
+      "strict_qualifies": false,
+      "website": "http://hawkeyevillageapartments.com/",
+      "yotta_near_miss": null
+    },
+    {
+      "current_full_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)",
+          "generic_plan_text: <2 distinct plan rows found (anti-noise threshold; falls to LLM)"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0
+      },
+      "current_page": {
+        "address_visible": false,
+        "body_bytes": 446492,
+        "body_sha256": "bdc22680d4caee5f0b38314a0627112caeb7e09fbec0af9f713118da3d834915",
+        "detected_adapter": "generic_plan_text",
+        "error": "",
+        "final_url": "https://parkplace380.com/listings/aster-village-two/",
+        "marker_counts": {
+          "knock_doorway_init": 0,
+          "native_data_unitid": 0,
+          "native_unit_number_tokens": 0,
+          "not_available_tokens": 10,
+          "positive_currency_tokens": 1
+        },
+        "name_visible": true,
+        "provider_links": [
+          "https://passport.appf.io/sign_in?idp_type=tportal&vhostless=true&waldo=true"
+        ],
+        "status": 200,
+        "title": "Aster Village Two - Park Place 380"
+      },
+      "minimal_code_lever": "none_without_a_property_scoped_native_inventory_source",
+      "native_provider_near_miss": null,
+      "property_id": "274886",
+      "property_name": "Aster Village Two",
+      "rejection_reason": "exact_property_page_has_floorplan_content_but_no_native_unit_identity_or_current_availability",
+      "strict_qualifies": false,
+      "website": "https://parkplace380.com/listings/aster-village-two/"
+    }
+  ],
+  "scope": {
+    "accepted_ids_removed_from_latest_remaining": [
+      "19245",
+      "71962"
+    ],
+    "latest_remaining_unknown_count": 33,
+    "original_target_count": 35,
+    "original_target_ids": [
+      "1617",
+      "1765",
+      "4124",
+      "4756",
+      "16509",
+      "19245",
+      "22962",
+      "22964",
+      "24982",
+      "27349",
+      "32978",
+      "33993",
+      "34362",
+      "34708",
+      "34785",
+      "37071",
+      "39198",
+      "40733",
+      "42554",
+      "42977",
+      "48075",
+      "48389",
+      "52541",
+      "53567",
+      "53932",
+      "64068",
+      "71962",
+      "72732",
+      "74523",
+      "75314",
+      "232583",
+      "235473",
+      "246962",
+      "272772",
+      "274886"
+    ]
+  },
+  "strict_gate": {
+    "contamination_checks": true,
+    "current_full_configured_route_adapter_scraper_e2e": true,
+    "exact_property_identity": true,
+    "positive_rent": true,
+    "provider_native_unit_id_or_number": true
+  },
+  "summary": {
+    "already_in_latest_current_ledger": [
+      "19245",
+      "71962"
+    ],
+    "lane_capture_net_new_ids_vs_183_row_ledger": [
+      "19245",
+      "71962"
+    ],
+    "latest_ledger_rows": 185,
+    "near_miss_native_positive_rent_rows": 14,
+    "near_miss_properties": 2,
+    "net_new_ids_vs_latest_current_ledger": [],
+    "projected_ledger_rows_after_net_new": 185,
+    "projected_strict_recovery_rate_of_344": 0.537791,
+    "remaining_property_gap_to_60_percent": 22,
+    "rows_needed_for_60_percent": 207,
+    "strict_native_positive_rent_rows": 4,
+    "strict_recovered_properties": 2,
+    "strict_recovery_rate": 0.057143,
+    "strict_rejected_properties": 33,
+    "targets": 35
+  },
+  "supporting_artifacts": [
+    "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/local_b/evidence_unknown_residual_local18_current_strict.json",
+    "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/agent_a/evidence_unknown_residual17_current_strict.json"
+  ]
+}

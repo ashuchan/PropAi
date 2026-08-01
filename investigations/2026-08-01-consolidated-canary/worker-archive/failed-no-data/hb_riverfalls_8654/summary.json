@@ -1,0 +1,29 @@
+{
+  "property_id": 8654,
+  "url": "https://www.riverfallsatbellmar.com/",
+  "status": 200,
+  "body_bytes": 144653,
+  "body_sha256": "56e9da8443c53bda4473f5f2b96df1cbb1350360a0df01995f856d90604e8f90",
+  "identity": {
+    "name_visible": true,
+    "street_visible": true,
+    "city_zip_visible": true
+  },
+  "provider_markers": [
+    "rentcafe",
+    "securecafe",
+    "onlineleasing"
+  ],
+  "candidate_urls": [
+    "https://riverfallsatbellmar.securecafenet.com/residentservices/riverfalls-at-bellmar/userlogin"
+  ],
+  "hyperbrowser_sessions": 1,
+  "session_options": {
+    "solve_captchas": false,
+    "stealth": false,
+    "fingerprint_rotation": false,
+    "residential_proxy": true
+  },
+  "llm": false,
+  "paid_canary": false
+}

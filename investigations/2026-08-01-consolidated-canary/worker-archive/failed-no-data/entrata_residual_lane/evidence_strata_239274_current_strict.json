@@ -1,0 +1,249 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:33:24.640832+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      239274
+    ],
+    "native_positive_rent_rows": 4,
+    "captcha_solving": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 239274,
+      "property_name": "Strata on California",
+      "website": "http://www.strataoncalifornia.com",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 4,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_ids_positive_rents",
+      "identity_evidence": {
+        "canonical_name": "Strata on California",
+        "canonical_address": "6312 California Ave SW",
+        "current_page_name_match": true,
+        "current_page_full_address_match": true,
+        "current_listing_provider_property_binding": "100136434",
+        "current_listing_property_floorplan_binding": "856131",
+        "current_listing_immediate_unit_count": 3,
+        "provider_modal_current_native_rows_including_future": 4,
+        "rows_with_native_identity": 4,
+        "rows_with_native_identity_and_positive_rent": 4,
+        "source_urls": [
+          "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "109"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1950,
+            "market_rent_high": 1950
+          },
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "101"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1950,
+            "market_rent_high": 1950
+          },
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "115"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1950,
+            "market_rent_high": 1950
+          },
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "307"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1950,
+            "market_rent_high": 1950
+          },
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "1 Bedroom",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "630",
+          "unit_number": "109",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,950",
+          "market_rent_low": 1950,
+          "market_rent_high": 1950,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "1 Bedroom",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "675",
+          "unit_number": "101",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,950",
+          "market_rent_low": 1950,
+          "market_rent_high": 1950,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "1 Bedroom",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "630",
+          "unit_number": "115",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,950",
+          "market_rent_low": 1950,
+          "market_rent_high": 1950,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "1 Bedroom",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "630",
+          "unit_number": "307",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,950",
+          "market_rent_low": 1950,
+          "market_rent_high": 1950,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-10",
+          "available_date": "2026-09-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:32:03.821045+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_239274_current.json",
+        "capture_artifact_sha256": "2a215ae5360284b1b5ccfc35b0fff3ad9829cbe96d259f1d812aafe632deea36",
+        "listing_html_sha256": "ae2613847a1fa4b71562d621acf4431ffb7b25b5d522b731b706782036b6a003",
+        "page_html_sha256": "6b32c56c08f755eaeab59bd0217472b075dd77c2289c7d213c5aa778c2142288",
+        "endpoint_html_sha256": "94eec4e1a42bf7999a33f45fac99f65c844e6ae8099d50cf5f54413ab636b513",
+        "published_endpoint": "https://www.strataoncalifornia.com/?module=check_availability&is_secure=1&property[id]=100136434&action=view_unit_spaces&property_floorplan[id]=856131&cached_rate_available=1&min_rent=$1,950&max_rent=$1,950&min_advertised_base_rent=1950&max_advertised_base_rent=1950&min_deposit=500.0000&max_deposit=500.0000&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=3",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": true,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

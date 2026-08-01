@@ -1,0 +1,787 @@
+{
+  "batch_label": "avana-sightmap-current-source-configured-e2e",
+  "generated_at_utc": "2026-08-01T11:20:23.655322+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified_by_lane": false,
+    "shared_builder_modified": false,
+    "shared_ledger_modified": false,
+    "web_unlocker": false
+  },
+  "ledger_snapshot": {
+    "net_new_ids": [
+      3169
+    ],
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "rows": 187,
+    "sha256": "0f49bccfac1fda91af0c4d910d69c5670cdccdf33039765dea899372dcfc3ec1"
+  },
+  "recoveries": [
+    {
+      "current_full_pipeline": {
+        "adapter": "sightmap",
+        "detected_pms": "entrata",
+        "errors": [],
+        "link_hop_from": "https://www.avanacourt.com/",
+        "link_hop_success": true,
+        "strict_native_positive_rent_rows": 58,
+        "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+        "winning_page_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290"
+      },
+      "native_identity_rows": 58,
+      "native_positive_rent_rows": 58,
+      "property_boundary_evidence": {
+        "canonical_address": "3800 Club Dr",
+        "canonical_city": "Duluth",
+        "canonical_state": "GA",
+        "canonical_zip": "30096",
+        "configured_final_url": "https://www.avanacourt.com/",
+        "current_pipeline_emitted_rows": 58,
+        "embed_code": "rxwjj3lyw1e",
+        "gates": {
+          "all_emitted_rows_strict_native_positive": true,
+          "all_output_native_ids_in_api": true,
+          "all_output_native_ids_present": true,
+          "all_output_source_urls_exact_api": true,
+          "all_output_unit_numbers_present": true,
+          "api_asset_name_exact": true,
+          "api_http_200": true,
+          "api_sightmap_id_matches_url": true,
+          "configured_address_visible": true,
+          "configured_city_visible": true,
+          "configured_http_200": true,
+          "configured_name_visible": true,
+          "configured_state_visible": true,
+          "configured_zip_visible": true,
+          "current_pipeline_adapter_sightmap": true,
+          "current_pipeline_link_hop_success": true,
+          "current_pipeline_tier_sightmap": true,
+          "current_pipeline_winning_url_exact_api": true,
+          "embed_http_200": true,
+          "embed_publishes_api_url": true,
+          "floor_plan_page_http_200": true,
+          "single_same_origin_floor_plan_link": true,
+          "single_sightmap_embed": true,
+          "zero_parser_join_drops": true
+        },
+        "raw_api_rows": 59,
+        "sightmap_asset_id": "25706",
+        "sightmap_asset_name": "Avana Court",
+        "sightmap_id": "75290"
+      },
+      "property_id": 3169,
+      "property_name": "Avana Court",
+      "source_urls": [
+        "https://www.avanacourt.com/",
+        "https://www.avanacourt.com/duluth/avana-court/conventional/",
+        "https://sightmap.com/embed/rxwjj3lyw1e",
+        "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290"
+      ],
+      "strict_verdict": "pass_exact_configured_same_origin_sightmap_current_e2e",
+      "units": [
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 988,
+          "rent": 988,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852037"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1010N"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 993,
+          "rent": 993,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852039"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1010E"
+        },
+        {
+          "availability_date": "2026-08-28",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1372,
+          "rent": 1372,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852042"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1010H"
+        },
+        {
+          "availability_date": "2026-08-07",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1228,
+          "rent": 1228,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852047"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1010I"
+        },
+        {
+          "availability_date": "2026-08-28",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1381,
+          "rent": 1381,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852054"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1020D"
+        },
+        {
+          "availability_date": "2026-09-09",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1584,
+          "rent": 1584,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852063"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1020O"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1323,
+          "rent": 1323,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852064"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1020P"
+        },
+        {
+          "availability_date": "2026-08-28",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1143,
+          "rent": 1143,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852074"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1030F"
+        },
+        {
+          "availability_date": "2026-09-23",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 929,
+          "rent": 929,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640759",
+            "sightmap_unit_id": "8852075"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1030H"
+        },
+        {
+          "availability_date": "2026-08-06",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 993,
+          "rent": 993,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852080"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1030L"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 989,
+          "rent": 989,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640759",
+            "sightmap_unit_id": "8852102"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1035K"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1518,
+          "rent": 1518,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852114"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1040P"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1464,
+          "rent": 1464,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852126"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1040S"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1089,
+          "rent": 1089,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852134"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1050N"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1273,
+          "rent": 1273,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852145"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1050S"
+        },
+        {
+          "availability_date": "2026-08-19",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1083,
+          "rent": 1083,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852154"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1060M"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1173,
+          "rent": 1173,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852157"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1060H"
+        },
+        {
+          "availability_date": "2026-08-14",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1083,
+          "rent": 1083,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852169"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1070E"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 1045,
+          "rent": 1045,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640759",
+            "sightmap_unit_id": "8852171"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1070H"
+        },
+        {
+          "availability_date": "2026-09-29",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1096,
+          "rent": 1096,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852183"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1070Q"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 1055,
+          "rent": 1055,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640757",
+            "sightmap_unit_id": "8852192"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1075F"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath (1300 SF)",
+          "market_rent_high": 1448,
+          "rent": 1448,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640756",
+            "sightmap_unit_id": "8852205"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1080C"
+        },
+        {
+          "availability_date": "2026-09-10",
+          "floor_plan_name": "Two Bedroom Two Bath (1300 SF)",
+          "market_rent_high": 1449,
+          "rent": 1449,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640756",
+            "sightmap_unit_id": "8852213"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1080G"
+        },
+        {
+          "availability_date": "2026-08-31",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1222,
+          "rent": 1222,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852214"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1080J"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1392,
+          "rent": 1392,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852229"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1090Q"
+        },
+        {
+          "availability_date": "2026-08-28",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1563,
+          "rent": 1563,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852239"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1090J"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1266,
+          "rent": 1266,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852240"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1090P"
+        },
+        {
+          "availability_date": "2026-10-16",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1177,
+          "rent": 1177,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852248"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1100T"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 993,
+          "rent": 993,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852250"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1100F"
+        },
+        {
+          "availability_date": "2026-08-24",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1048,
+          "rent": 1048,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852256"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1100R"
+        },
+        {
+          "availability_date": "2026-08-05",
+          "floor_plan_name": "Two Bedroom Two Bath (1300 SF)",
+          "market_rent_high": 1471,
+          "rent": 1471,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640756",
+            "sightmap_unit_id": "8852266"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1110L"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1207,
+          "rent": 1207,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852273"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1110N"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath (1300 SF)",
+          "market_rent_high": 1406,
+          "rent": 1406,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640756",
+            "sightmap_unit_id": "8852277"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1110H"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "floor_plan_name": "Two Bedroom Two Bath (1250 SF)",
+          "market_rent_high": 1486,
+          "rent": 1486,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640731",
+            "sightmap_unit_id": "8852284"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1120F"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1409,
+          "rent": 1409,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852296"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1120T"
+        },
+        {
+          "availability_date": "2026-08-11",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1273,
+          "rent": 1273,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852322"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1140B"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath (1300 SF)",
+          "market_rent_high": 1536,
+          "rent": 1536,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640756",
+            "sightmap_unit_id": "8852323"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1140C"
+        },
+        {
+          "availability_date": "2026-09-11",
+          "floor_plan_name": "One Bedroom One Bath (720 SF)",
+          "market_rent_high": 1177,
+          "rent": 1177,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640735",
+            "sightmap_unit_id": "8852338"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1140I"
+        },
+        {
+          "availability_date": "2026-10-26",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 983,
+          "rent": 983,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852348"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1150P"
+        },
+        {
+          "availability_date": "2026-09-13",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 998,
+          "rent": 998,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852351"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1150G"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1149,
+          "rent": 1149,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852385"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1170K"
+        },
+        {
+          "availability_date": "2026-08-24",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 983,
+          "rent": 983,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852390"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1170F"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 998,
+          "rent": 998,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852399"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1170S"
+        },
+        {
+          "availability_date": "2026-08-12",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1476,
+          "rent": 1476,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852414"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1180O"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1149,
+          "rent": 1149,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852423"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1190E"
+        },
+        {
+          "availability_date": "2026-09-02",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 929,
+          "rent": 929,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640759",
+            "sightmap_unit_id": "8852425"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1190H"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 993,
+          "rent": 993,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852430"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1190L"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 954,
+          "rent": 954,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640757",
+            "sightmap_unit_id": "8852431"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1190M"
+        },
+        {
+          "availability_date": "2026-09-17",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 924,
+          "rent": 924,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640757",
+            "sightmap_unit_id": "8852436"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1190P"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 1033,
+          "rent": 1033,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640759",
+            "sightmap_unit_id": "8852443"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1195J"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 1028,
+          "rent": 1028,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852448"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1195H"
+        },
+        {
+          "availability_date": "2026-08-18",
+          "floor_plan_name": "Studio (550 SF)",
+          "market_rent_high": 1029,
+          "rent": 1029,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640757",
+            "sightmap_unit_id": "8852451"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1195I"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 998,
+          "rent": 998,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852453"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1195M"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "One Bedroom One Bath (610 SF)",
+          "market_rent_high": 998,
+          "rent": 998,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640732",
+            "sightmap_unit_id": "8852454"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1195N"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1426,
+          "rent": 1426,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852457"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1200A"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1571,
+          "rent": 1571,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852461"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1200K"
+        },
+        {
+          "availability_date": "2026-08-04",
+          "floor_plan_name": "Two Bedroom One Bath with Den (1245 SF)",
+          "market_rent_high": 1463,
+          "rent": 1463,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640750",
+            "sightmap_unit_id": "8852464"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1200N"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bedroom Two Bath with Den (1300 SF)",
+          "market_rent_high": 1328,
+          "rent": 1328,
+          "source_ids": {
+            "sightmap_floor_plan_id": "640746",
+            "sightmap_unit_id": "8852467"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/gow3zq4zp2m/sightmaps/75290",
+          "unit_number": "1200G"
+        }
+      ],
+      "website": "https://www.avanacourt.com/"
+    }
+  ]
+}

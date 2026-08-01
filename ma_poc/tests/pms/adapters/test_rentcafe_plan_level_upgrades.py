@@ -73,6 +73,94 @@ def test_securecafe_plain_plan_name_still_parses() -> None:
     assert units[0]["unit_number"] == "101"
 
 
+def test_securecafe_cross_plan_constant_code_is_demoted_to_plans() -> None:
+    """A true cross-plan constant is a pricing ordinal, not an apartment."""
+    html = "".join(
+        (
+            f"Floor Plan: {plan} - {beds} Bedroom, {baths} Bathroom"
+            "<table>"
+            "<tr class='AvailUnitRow'>"
+            "<th data-label='Apartment'>#1</th>"
+            f"<td data-label=Sq.Ft.>{area}</td>"
+            f"<td data-label='Rent'>${rent:,}</td>"
+            "<td data-label='Action'>"
+            "<input onclick=\"SetTermsUrl('rentaloptions.aspx?"
+            f"UnitID={unit_pk}&FloorPlanID={plan_pk}&MoveInDate=8/1/2026')\">"
+            "</td></tr></table>"
+        )
+        for plan, beds, baths, area, rent, unit_pk, plan_pk in (
+            ("A1", 1, 1, 700, 1200, 11, 101),
+            ("B1", 2, 2, 950, 1500, 12, 102),
+            ("C1", 3, 2, 1200, 1800, 13, 103),
+        )
+    )
+    rows = parse_securecafe_availableunits(
+        html,
+        "https://x.securecafe.com/onlineleasing/x/availableunits.aspx",
+    )
+    assert len(rows) == 3
+    assert all(row["unit_number"] == "" for row in rows)
+    assert all("PLAN_LEVEL_AMBIGUOUS_UNIT_CODE" in row["extraction_tier"] for row in rows)
+    assert {row["source_ids"]["securecafe_floorplan_id"] for row in rows} == {
+        "101",
+        "102",
+        "103",
+    }
+
+
+def test_securecafe_underscore_apartment_codes_remain_unit_level() -> None:
+    """PID 253788 publishes native apartment codes such as ``1_0412``."""
+    html = "".join(
+        (
+            f"Floor Plan: {plan} - {beds} Bedroom, {baths} Bathroom"
+            "<table>"
+            "<tr class='AvailUnitRow'>"
+            f"<th data-label='Apartment'>#{unit_code}</th>"
+            f"<td data-label=Sq.Ft.>{area}</td>"
+            f"<td data-label='Rent'>${rent:,}</td>"
+            "<td data-label='Action'>"
+            "<input onclick=\"SetTermsUrl('rentaloptions.aspx?"
+            f"UnitID={unit_pk}&FloorPlanID={plan_pk}&MoveInDate=8/1/2026')\">"
+            "</td></tr></table>"
+        )
+        for plan, beds, baths, unit_code, area, rent, unit_pk, plan_pk in (
+            ("Studio", 0, 1, "1_0412", 623, 1_610, 45_018_675, 101),
+            ("Studio", 0, 1, "1_0330", 623, 1_640, 45_018_644, 101),
+            ("A1", 1, 1, "1_0630", 760, 1_825, 45_018_707, 102),
+        )
+    )
+    rows = parse_securecafe_availableunits(
+        html,
+        "https://x.securecafe.com/onlineleasing/x/availableunits.aspx",
+    )
+    assert len(rows) == 3
+    assert {row["unit_number"] for row in rows} == {
+        "1_0412",
+        "1_0330",
+        "1_0630",
+    }
+    assert all("PLAN_LEVEL" not in row["extraction_tier"] for row in rows)
+    assert {row["source_ids"]["securecafe_floorplan_id"] for row in rows} == {
+        "101",
+        "102",
+    }
+
+
+def test_securecafe_same_plan_duplicate_capture_keeps_one_apartment() -> None:
+    html = (
+        "Floor Plan: A1 - 1 Bedroom, 1 Bathroom"
+        "<table>"
+        "<tr class='AvailUnitRow'><th data-label='Apartment'>#101</th>"
+        "<td data-label='Rent'>$1,200</td></tr>"
+        "<tr class='AvailUnitRow'><th data-label='Apartment'>#101</th>"
+        "<td data-label='Rent'>$1,250</td></tr>"
+        "</table>"
+    )
+    rows = parse_securecafe_availableunits(html, "https://x/availableunits.aspx")
+    assert len(rows) == 1
+    assert rows[0]["unit_number"] == "101"
+
+
 # ── Fix 2: ysi.unitsList embedded JSON ──────────────────────────────────────
 
 # Field shape observed live on parksouthapartments.com/floorplans:

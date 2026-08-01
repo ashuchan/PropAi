@@ -22,6 +22,7 @@ import html as _html
 import json
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qs, urlsplit
 
 from ma_poc.pms.adapters._parsing import make_unit_dict
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
@@ -38,6 +39,11 @@ _RESMAN_AVAIL_RE = re.compile(
     re.IGNORECASE,
 )
 _RESMAN_HOST_RE = re.compile(r"https?://([a-z0-9-]+)\.myresman\.com", re.IGNORECASE)
+_RESMAN_APPLICANT_RE = re.compile(
+    r"https?://[a-z0-9-]+\.myresman\.com/Portal/Applicants/New/"
+    r"[a-z0-9_-]+\?a=\d+",
+    re.IGNORECASE,
+)
 _UNITTYPES_RE = re.compile(r"var\s+unitTypes\s*=\s*(\[)")
 _MSDATE_RE = re.compile(r"/Date\((-?\d+)\)/")
 _STANDARD_LEASE_TERM_MONTHS = 12
@@ -218,16 +224,73 @@ def find_resman_availability_url(html: str) -> str | None:
     return m.group(0) if m else None
 
 
-async def _fetch(url: str) -> str:
+def find_resman_applicant_url(html: str) -> str | None:
+    """Return one exact property-scoped ResMan ``Applicants/New`` URL.
+
+    Apts247 marketing sites can publish plan metadata while delegating the
+    real apartment roster to this ResMan route.  The route redirects to one
+    public ``Availability?a=<account>&p=<property-guid>`` page.  Generic
+    account/login and resident links are deliberately excluded.
+    """
+    if not html:
+        return None
+    matches = {
+        match.group(0)
+        for match in _RESMAN_APPLICANT_RE.finditer(_html.unescape(html))
+    }
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+async def _fetch_page(url: str) -> tuple[str, str]:
     from ma_poc.pms.adapters._probe import probe_get
 
     r = probe_get(url, timeout=25)
     if r.status_code != 200:
-        return ""
+        return "", str(r.url or url)
     # Auth-redirect (no public availability) → empty.
     if "auth.myresman.com" in str(r.url).lower() or "/account/login" in str(r.url).lower():
-        return ""
-    return r.text or ""
+        return "", str(r.url or url)
+    return r.text or "", str(r.url or url)
+
+
+async def _fetch(url: str) -> str:
+    body, _final_url = await _fetch_page(url)
+    return body
+
+
+def _applicant_redirect_availability(
+    applicant_url: str,
+    final_url: str,
+) -> str | None:
+    """Validate a same-tenant, same-account applicant→availability redirect."""
+    match = _RESMAN_AVAIL_RE.search(final_url or "")
+    if match is None:
+        return None
+    availability_url = match.group(0)
+    try:
+        applicant = urlsplit(applicant_url)
+        availability = urlsplit(availability_url)
+        applicant_account = parse_qs(applicant.query).get("a", [""])[0]
+        availability_query = parse_qs(availability.query)
+        availability_account = availability_query.get("a", [""])[0]
+        property_guid = availability_query.get("p", [""])[0]
+    except (TypeError, ValueError):
+        return None
+    if (
+        applicant.scheme.casefold() != "https"
+        or availability.scheme.casefold() != "https"
+        or not applicant.hostname
+        or applicant.hostname.casefold() != (availability.hostname or "").casefold()
+        or not applicant_account
+        or applicant_account != availability_account
+        or not re.fullmatch(
+            r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+            property_guid,
+            re.IGNORECASE,
+        )
+    ):
+        return None
+    return availability_url
 
 
 class ResManAdapter:
@@ -257,20 +320,28 @@ class ResManAdapter:
         elif isinstance(body, str):
             html = body
 
+        current_url = str(getattr(fr, "final_url", "") or "") if fr is not None else ""
         avail = find_resman_availability_url(html)
+        current_avail = find_resman_availability_url(current_url)
+        if not avail and current_avail:
+            avail = current_avail
+        prefetched_availability_html = (
+            html if avail and current_avail == avail and _extract_unittypes(html) else ""
+        )
+        applicant = find_resman_applicant_url(html) if not avail else None
 
         # The marketing /floorplans/ page (not the homepage) carries the
         # Availability link. Same pattern as RentCafe-securecafe: the
         # rendered body / captured network log often miss it, so fall
         # back to a curl_cffi homepage+/floorplans/ refetch.
-        if not avail:
+        if not avail and not applicant:
             for resp in getattr(ctx, "_api_responses", []) or []:
                 u = str(resp.get("url", "") or "")
                 m = _RESMAN_AVAIL_RE.search(u)
                 if m:
                     avail = m.group(0)
                     break
-        if not avail:
+        if not avail and not applicant:
             origin = ""
             if fr is not None:
                 origin = str(getattr(fr, "final_url", "") or "")
@@ -287,8 +358,29 @@ class ResManAdapter:
                         except Exception:
                             hh = ""
                         avail = find_resman_availability_url(hh)
-                        if avail:
+                        applicant = (
+                            find_resman_applicant_url(hh) if not avail else None
+                        )
+                        if avail or applicant:
                             break
+
+        # A property-scoped ``Applicants/New/<property-code>?a=<account>``
+        # route can be the public handoff to the real roster.  Follow only one
+        # exact page-published route, and accept it only when it resolves to
+        # HTTPS on the same ResMan tenant with the same account id plus one
+        # concrete property GUID.
+        if not avail and applicant:
+            try:
+                applicant_html, applicant_final = await _fetch_page(applicant)
+            except Exception as exc:
+                result.tier_used = f"{_TIER}_FETCH_ERROR"
+                result.errors.append(
+                    f"resman-applicant-fetch-error: {type(exc).__name__}: {str(exc)[:120]}"
+                )
+                return result
+            avail = _applicant_redirect_availability(applicant, applicant_final)
+            if avail and applicant_html:
+                prefetched_availability_html = applicant_html
 
         if not avail:
             result.tier_used = f"{_TIER}_NO_PORTAL"
@@ -296,12 +388,14 @@ class ResManAdapter:
             result.errors.append("RESMAN: no Availability portal URL discoverable")
             return result
 
-        try:
-            ahtml = await _fetch(avail)
-        except Exception as exc:
-            result.tier_used = f"{_TIER}_FETCH_ERROR"
-            result.errors.append(f"resman-fetch-error: {type(exc).__name__}: {str(exc)[:120]}")
-            return result
+        ahtml = prefetched_availability_html
+        if not ahtml:
+            try:
+                ahtml = await _fetch(avail)
+            except Exception as exc:
+                result.tier_used = f"{_TIER}_FETCH_ERROR"
+                result.errors.append(f"resman-fetch-error: {type(exc).__name__}: {str(exc)[:120]}")
+                return result
 
         data = _extract_unittypes(ahtml)
         if not data:

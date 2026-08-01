@@ -1,0 +1,284 @@
+{
+  "cohort": "exact_2026-07-31_FAILED_NO_DATA_344",
+  "commit": "none",
+  "configured_identity": {
+    "address": "1251 Aster Dr",
+    "apartmentid": "274886",
+    "city": "Tiffin",
+    "name": "Aster Village Two",
+    "state": "IA",
+    "website": "https://parkplace380.com/listings/aster-village-two/",
+    "zip": "52340"
+  },
+  "current_template_cluster_controls": [
+    {
+      "body_bytes": 37140,
+      "label": "cross",
+      "observed": [
+        "3",
+        "2",
+        "1180",
+        1375,
+        "2026-08-10"
+      ],
+      "status": 200,
+      "url": "https://cross.appfolio.com/listings/detail/501d3938-dce7-4938-b43b-55bed06c2dd2"
+    },
+    {
+      "body_bytes": 28400,
+      "label": "terracemgmt",
+      "observed": [
+        "2",
+        "2",
+        "934",
+        1150,
+        ""
+      ],
+      "status": 200,
+      "url": "https://terracemgmt.appfolio.com/listings/detail/4b0339fb-749f-4823-b602-d83fcf8b2adf"
+    },
+    {
+      "body_bytes": 34537,
+      "label": "equilibrium",
+      "observed": [
+        "4",
+        "1.5",
+        "1400",
+        1695,
+        ""
+      ],
+      "status": 200,
+      "url": "https://equilibriumprops.appfolio.com/listings/detail/9424e2e3-c0f9-46e4-82cd-6f284b64ea62"
+    }
+  ],
+  "generated_at_utc": "2026-08-01T20:11:44.867943+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "direct_public_http_only": true,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER5_VISION": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "PROBE_PROXY_URL": "",
+      "WEB_UNLOCKER_KEY": ""
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr_calls": 0,
+    "hyperbrowser_calls": 0,
+    "llm_calls": 0,
+    "proxy_calls": 0,
+    "web_unlocker_calls": 0
+  },
+  "http_evidence": {
+    "appfolio_owned_syndication": {
+      "body_bytes": 46124,
+      "body_sha256": "55c69c7da308e9ac845650301ea4ab7ea7c6a4d874282f49189a59437c2492e7",
+      "status": 200
+    },
+    "configured": {
+      "body_bytes": 446525,
+      "body_sha256": "aee216e682cc6eebe5d38937cd2bef50c4454477e07fe205c3d97e7d88248f34",
+      "status": 200
+    },
+    "official_detail": {
+      "body_bytes": 32426,
+      "body_sha256": "6d65a4ee5902836f86ae7ae22e01f91b5bbe433358d5c978d26208c1fae171cd",
+      "status": 200
+    }
+  },
+  "identity_chain": {
+    "appfolio_owned_syndication_url": "https://www.showmetherent.com/listing/details/1251-Aster-Drive-Tiffin-IA-52340/4de2d364-61bc-11eb-abab-0efd77e47219",
+    "checks": {
+      "configured_exact_manager": true,
+      "configured_exact_property_name": true,
+      "official_detail_exact_address": true,
+      "syndication_exact_application_uid": true,
+      "syndication_exact_name_address": true,
+      "syndication_one_available_unit": true
+    },
+    "configured_url": "https://parkplace380.com/listings/aster-village-two/",
+    "exact_application_url": "https://thedersgrp.appfolio.com/listings/rental_applications/new?listable_uid=13c06338-c373-42ae-a236-8687d24c30ad&source=Show+Me+The+Rent",
+    "floor_plan_name_policy": "blank: AppFolio h2 is marketing_title, not proven unit_template_name",
+    "official_detail_title": "1251 Aster Drive - 108, 108, Tiffin, IA 52340 MAP",
+    "official_detail_url": "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad",
+    "published_listing_title": "Village Two - One Bedroom Style A"
+  },
+  "lane": "aster_current_appfolio_detail_parser_e2e",
+  "ledger_mutation": "none",
+  "materializer": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/aster_appfolio_detail_lane/materialize_aster_274886_current_appfolio_e2e.py",
+    "sha256": "974c470abf60007493c6d862d58bb01a5c82bfd3b0f5475f6d42d0962c471fbb"
+  },
+  "paid_canary": false,
+  "push": "none",
+  "results": [
+    {
+      "adapter": "appfolio",
+      "contamination_verdict": "pass_configured_exact_name_manager_to_appfolio_owned_syndication_exact_name_address_application_uid_to_official_detail_exact_address_native_unit_positive_rent_three_repeats",
+      "identity_evidence": {
+        "checks": {
+          "configured_exact_manager": true,
+          "configured_exact_property_name": true,
+          "official_detail_exact_address": true,
+          "syndication_exact_application_uid": true,
+          "syndication_exact_name_address": true,
+          "syndication_one_available_unit": true
+        },
+        "native_identity_rows": 1,
+        "native_positive_rent_rows": 1,
+        "source_urls": [
+          "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-10-10",
+          "availability_status": "AVAILABLE",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 1365,
+          "market_rent_low": 1365,
+          "source_api_url": "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad",
+          "source_ids": {
+            "appfolio_listable_uid": "13c06338-c373-42ae-a236-8687d24c30ad"
+          },
+          "sqft": "821",
+          "unit_id": "1251-aster-drive-108-108-tiffin-ia-52340",
+          "unit_name": "1251 Aster Drive - 108, 108, Tiffin, IA 52340",
+          "unit_number": "108"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 274886,
+      "property_identity_match": true,
+      "property_name": "Aster Village Two",
+      "tier": "TIER_1_DOM_APPFOLIO_DETAIL",
+      "units": 1,
+      "website": "https://parkplace380.com/listings/aster-village-two/"
+    }
+  ],
+  "source_snapshot_after": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/appfolio.py": "f8500b9c2047df55a887dc8ee8dcf8eb505571eb7ca30a3862a1244f986b9655",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  },
+  "source_snapshot_before": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/appfolio.py": "f8500b9c2047df55a887dc8ee8dcf8eb505571eb7ca30a3862a1244f986b9655",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  },
+  "three_full_pipeline_repeats": [
+    {
+      "checks": {
+        "appfolio_adapter": true,
+        "appfolio_detected": true,
+        "detail_tier": true,
+        "exact_address": true,
+        "exact_source": true,
+        "native_uid": true,
+        "native_unit_108": true,
+        "no_pipeline_errors": true,
+        "operator_date": true,
+        "physical_fields": true,
+        "positive_rent": true
+      },
+      "errors": [],
+      "repeat": 1,
+      "unit": {
+        "availability_date": "2026-10-10",
+        "availability_status": "AVAILABLE",
+        "bathrooms": "1",
+        "bedrooms": "1",
+        "floor_plan_name": "",
+        "market_rent_high": 1365,
+        "market_rent_low": 1365,
+        "source_api_url": "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad",
+        "source_ids": {
+          "appfolio_listable_uid": "13c06338-c373-42ae-a236-8687d24c30ad"
+        },
+        "sqft": "821",
+        "unit_id": "1251-aster-drive-108-108-tiffin-ia-52340",
+        "unit_name": "1251 Aster Drive - 108, 108, Tiffin, IA 52340",
+        "unit_number": "108"
+      }
+    },
+    {
+      "checks": {
+        "appfolio_adapter": true,
+        "appfolio_detected": true,
+        "detail_tier": true,
+        "exact_address": true,
+        "exact_source": true,
+        "native_uid": true,
+        "native_unit_108": true,
+        "no_pipeline_errors": true,
+        "operator_date": true,
+        "physical_fields": true,
+        "positive_rent": true
+      },
+      "errors": [],
+      "repeat": 2,
+      "unit": {
+        "availability_date": "2026-10-10",
+        "availability_status": "AVAILABLE",
+        "bathrooms": "1",
+        "bedrooms": "1",
+        "floor_plan_name": "",
+        "market_rent_high": 1365,
+        "market_rent_low": 1365,
+        "source_api_url": "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad",
+        "source_ids": {
+          "appfolio_listable_uid": "13c06338-c373-42ae-a236-8687d24c30ad"
+        },
+        "sqft": "821",
+        "unit_id": "1251-aster-drive-108-108-tiffin-ia-52340",
+        "unit_name": "1251 Aster Drive - 108, 108, Tiffin, IA 52340",
+        "unit_number": "108"
+      }
+    },
+    {
+      "checks": {
+        "appfolio_adapter": true,
+        "appfolio_detected": true,
+        "detail_tier": true,
+        "exact_address": true,
+        "exact_source": true,
+        "native_uid": true,
+        "native_unit_108": true,
+        "no_pipeline_errors": true,
+        "operator_date": true,
+        "physical_fields": true,
+        "positive_rent": true
+      },
+      "errors": [],
+      "repeat": 3,
+      "unit": {
+        "availability_date": "2026-10-10",
+        "availability_status": "AVAILABLE",
+        "bathrooms": "1",
+        "bedrooms": "1",
+        "floor_plan_name": "",
+        "market_rent_high": 1365,
+        "market_rent_low": 1365,
+        "source_api_url": "https://thedersgrp.appfolio.com/listings/detail/13c06338-c373-42ae-a236-8687d24c30ad",
+        "source_ids": {
+          "appfolio_listable_uid": "13c06338-c373-42ae-a236-8687d24c30ad"
+        },
+        "sqft": "821",
+        "unit_id": "1251-aster-drive-108-108-tiffin-ia-52340",
+        "unit_name": "1251 Aster Drive - 108, 108, Tiffin, IA 52340",
+        "unit_number": "108"
+      }
+    }
+  ]
+}

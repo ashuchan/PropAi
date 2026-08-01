@@ -1,0 +1,28 @@
+{
+  "lane": "park_northside_showmojo_independent_admission",
+  "property_id": 38378,
+  "replayed_at_utc": "2026-08-01T15:58:24Z",
+  "replayed_by": "root_independent_verifier",
+  "evidence_path": "/private/tmp/propai-fnd-vBkmT9/park_northside_showmojo_lane/evidence_park_northside_38378_showmojo_implementation_e2e.json",
+  "evidence_sha256": "3396c364d36f4b7c36479350cb80ed7dd00d5cab145eb214ff55e08ee0ece495",
+  "materializer_path": "/private/tmp/propai-fnd-vBkmT9/park_northside_showmojo_lane/materialize_park_northside_showmojo_implementation.py",
+  "materializer_sha256": "29cb0ed9d3b579158cf7e7526a9d00da0820768698ad6e678e4d14c0c3e5830b",
+  "configured_pipeline_repeats": 3,
+  "strict_native_positive_rent_counts": [13, 13, 13],
+  "adapter": "showmojo_public",
+  "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+  "all_repeats_pass": true,
+  "independent_replay_exit_code": 0,
+  "guardrails": {
+    "compliance_mode": true,
+    "llm": false,
+    "hyperbrowser": false,
+    "web_unlocker": false,
+    "proxy": false,
+    "captcha_solving": false,
+    "flaresolverr": false,
+    "fingerprint_rotation": false,
+    "paid_canary": false
+  },
+  "verdict": "pass_independent_configured_pipeline_replay_exact_property_native_positive_rent"
+}

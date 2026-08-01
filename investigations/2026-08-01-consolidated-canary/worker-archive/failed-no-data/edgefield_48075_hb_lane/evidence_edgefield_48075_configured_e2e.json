@@ -1,0 +1,262 @@
+{
+  "contamination_controls": {
+    "all_rows_bound_to_published_site_id": true,
+    "all_rows_have_distinct_native_unit_numbers": true,
+    "all_rows_positive_rent": true,
+    "exact_first_party_identity_in_all_repeats": true,
+    "negative_code_controls": [
+      "cross-host redirect uses final path/query, not operator root",
+      "same-host path/query remains unchanged",
+      "navigation/evaluation failure returns (0, '') and closes session",
+      "non-CAPTCHA RENDER is unchanged",
+      "empty HTTP200 RENDER does not enter the precise 202 rescue",
+      "failed rescue remains BOT_BLOCKED"
+    ],
+    "plan_summaries_all_repeats": 0,
+    "sole_published_onlineleasing_host_in_all_repeats": "6359.onlineleasing.realpage.com",
+    "sole_published_site_id_in_all_repeats": "1060300",
+    "stable_unit_set_across_three_repeats": [
+      "13",
+      "38",
+      "108"
+    ]
+  },
+  "guardrails": {
+    "compliance_mode": true,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_max_calls_per_property": 1,
+    "hyperbrowser_proxy": true,
+    "hyperbrowser_stealth": false,
+    "llm": false,
+    "paid_canary": false,
+    "solve_captchas": false,
+    "web_unlocker": false
+  },
+  "implementation": {
+    "branch": "codex/failed-no-data-recovery",
+    "changes": [
+      "hb_raw_get uses the actual HTTP(S) final landing path/query after goto",
+      "COMPLIANCE_MODE forces Hyperbrowser solveCaptchas=false and useStealth=false",
+      "late RENDER CAPTCHA promotion gets one compliant direct-to-HB rescue",
+      "exact RENDER HTTP202+empty-body shape gets the same bounded rescue",
+      "clean rescue forbids PROBE_PROXY fallback and caps HB at one property session",
+      "rescued CAPTCHA bodies are rejected fail-closed"
+    ],
+    "head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "origin_main": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "source_files": [
+      {
+        "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/fetch/fetcher.py",
+        "sha256": "d830c3ab1881f8f6f4eb7e47cb10122cb941c805a4815348ee8946b1098f093f"
+      },
+      {
+        "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/fetch/hyperbrowser_backend.py",
+        "sha256": "b6d2b462c377092736cf2bc6461a4dfcd8ecd5c22a0ee6ad38f3dcff2ff540d6"
+      },
+      {
+        "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/tests/fetch/test_fetcher_render_captcha_hb_rescue.py",
+        "sha256": "8e138eded8fc88607dd5edb2b6c10361f1f69afc5c5b987e436a7703bfbb9443"
+      },
+      {
+        "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/tests/fetch/test_hyperbrowser_raw_get_redirect.py",
+        "sha256": "e3df9c04154b3dc01be10bd9ad1d993721681643cba16107deccff46dfe81529"
+      }
+    ]
+  },
+  "quality_limitation": {
+    "current_workflow_availability_dates_present": false,
+    "current_workflow_floor_plan_name": "Two Bedroom",
+    "current_workflow_native_rows": 3
+  },
+  "rentpress_quality_diagnostic": {
+    "all_rows_have_availability_date": true,
+    "captured_body": {
+      "decompressed_body_sha256": "fc142b78041f46a8ccc47e0c043bd2445df9ed83eb2d20d02373d2d3b3969873",
+      "gzip_file_sha256": "8914dca5d50338e9557e552e62fe9cd79aee5e9ce180f470a4d22186460d351c",
+      "path": "/private/tmp/propai-fnd-vBkmT9/edgefield_48075_hb_lane/final_landing_raw.html.gz",
+      "source_url": "https://lawsoncompanies.com/apartments/edgefield-apartments/?utm_source=redirect&utm_medium=redirect&utm_campaign=edgefieldaptsva.com"
+    },
+    "existing_parser": "parse_rentpress_data_floorplans",
+    "limitation": "Current configured detector routes the page to OneSite workflow, which emits three native rows but no availability_date. The nine-row RentPress payload is documented only; no unapproved routing change was made.",
+    "native_positive_rows": 9,
+    "rows": [
+      {
+        "availability_date": "2026-09-29",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_10"
+        },
+        "sqft": "950",
+        "unit_number": "5639-B"
+      },
+      {
+        "availability_date": "2026-07-31",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_108"
+        },
+        "sqft": "950",
+        "unit_number": "5679-D"
+      },
+      {
+        "availability_date": "2026-07-10",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_13"
+        },
+        "sqft": "950",
+        "unit_number": "5641-A"
+      },
+      {
+        "availability_date": "2026-09-18",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_156"
+        },
+        "sqft": "950",
+        "unit_number": "5694-D"
+      },
+      {
+        "availability_date": "2026-08-19",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_29"
+        },
+        "sqft": "950",
+        "unit_number": "5647-A"
+      },
+      {
+        "availability_date": "2026-07-17",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_38"
+        },
+        "sqft": "950",
+        "unit_number": "5649-B"
+      },
+      {
+        "availability_date": "2026-10-10",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_42"
+        },
+        "sqft": "950",
+        "unit_number": "5651-B"
+      },
+      {
+        "availability_date": "2026-08-19",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_52"
+        },
+        "sqft": "950",
+        "unit_number": "5654-D"
+      },
+      {
+        "availability_date": "2026-10-22",
+        "bathrooms": "1.5",
+        "bedrooms": "2",
+        "floor_plan_name": "Two Bedroom",
+        "rent": 1475,
+        "source_ids": {
+          "rentpress_unit_code": "1060300_91"
+        },
+        "sqft": "950",
+        "unit_number": "5669-C"
+      }
+    ],
+    "status": "read_only_quality_diagnostic_not_current_e2e_admission"
+  },
+  "scope": {
+    "cohort": "exact 2026-07-31 FAILED_NO_DATA remainder",
+    "configured_identity": {
+      "address": "5699 Craneybrook Ln",
+      "city": "Portsmouth",
+      "state": "VA",
+      "zip": "23703"
+    },
+    "configured_url": "https://www.edgefieldaptsva.com/",
+    "current_remainder_artifact": {
+      "candidate_row": "48075,,https://www.edgefieldaptsva.com/,,unknown,0,0,residual_unconverted",
+      "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+      "sha256": "442a03d16a91c1f95f1d87341174e406c269094969bd0ef1a58069fe03cb9ec9"
+    },
+    "ledger_or_builder_modified": false,
+    "paid_canary": false,
+    "property": "Edgefield",
+    "property_id": 48075
+  },
+  "verification": {
+    "configured_e2e_gate": "3/3 strict pass",
+    "focused_and_fetch_regression_tests": {
+      "command": "python -m pytest -q test_fetcher_render_captcha_hb_rescue.py test_compliance_mode.py test_fetcher_curl_cffi_fallback.py test_fetcher_render_unlocker_fallback.py test_dead_proxy_defenses.py test_hyperbrowser_raw_get_redirect.py test_hyperbrowser_backend.py",
+      "result": "71 passed"
+    },
+    "repeat_artifacts": [
+      {
+        "fetch_body_bytes": 145301,
+        "fetch_body_sha256": "18eae693d2d5244a6fccad660d4e359675ec94248ef1ebc1ccfc72cc9e332fe6",
+        "fetch_status": 200,
+        "path": "/private/tmp/propai-fnd-vBkmT9/edgefield_48075_hb_lane/configured_e2e_gate_repeat_1.json",
+        "sha256": "0630f5794de72434e18d7fe0fa719d6ec2a88988ed0800d15d36ea2f61d63eef",
+        "strict_rows": 3,
+        "unit_numbers": [
+          "108",
+          "13",
+          "38"
+        ]
+      },
+      {
+        "fetch_body_bytes": 145301,
+        "fetch_body_sha256": "18eae693d2d5244a6fccad660d4e359675ec94248ef1ebc1ccfc72cc9e332fe6",
+        "fetch_status": 200,
+        "path": "/private/tmp/propai-fnd-vBkmT9/edgefield_48075_hb_lane/configured_e2e_gate_repeat_2.json",
+        "sha256": "5336d1c4583b1985b3a08657cb57393651d143a33cea5c6432c75f93067be2a8",
+        "strict_rows": 3,
+        "unit_numbers": [
+          "108",
+          "13",
+          "38"
+        ]
+      },
+      {
+        "fetch_body_bytes": 646237,
+        "fetch_body_sha256": "33c09749d1f56ed3df134bd4e5116ab1f8656f79f8f1db126345ade77b42bf72",
+        "fetch_status": 202,
+        "path": "/private/tmp/propai-fnd-vBkmT9/edgefield_48075_hb_lane/configured_e2e_gate_repeat_3.json",
+        "sha256": "1cfc21ca60b6e0e76801275ab79fd9225daf92ac49ec005e618ab378b7470b8b",
+        "strict_rows": 3,
+        "unit_numbers": [
+          "108",
+          "13",
+          "38"
+        ]
+      }
+    ]
+  }
+}

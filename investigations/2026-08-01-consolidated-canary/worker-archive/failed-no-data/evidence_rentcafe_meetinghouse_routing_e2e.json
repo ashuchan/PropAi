@@ -1,0 +1,141 @@
+{
+  "batch_label": "rentcafe-meetinghouse-routing-e2e",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      42371
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe-meetinghouse-routing-e2e",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": true,
+        "applicant_base_harvested": true,
+        "applicant_portal_hosts": [
+          "meetinghouseapartments.securecafe.com"
+        ],
+        "applicant_property_match": false,
+        "applicant_provenance": [
+          "published_applicant_theme"
+        ],
+        "applicant_query_ids": [
+          "185073"
+        ],
+        "applicant_tenant_link_harvested": true,
+        "applicant_vanity_shell_proof": false,
+        "applicant_vanity_subdomain_match": true,
+        "distinct_unit_numbers": 24,
+        "exact_street_matches": [
+          "3131 Meetinghouse Rd., Boothwyn, PA, 19061"
+        ],
+        "onesite_api_ids": [],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "meetinghouseapartments.securecafe.com"
+        ],
+        "onesite_property_match": false,
+        "onesite_provenance": [
+          "published_applicant_theme"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": false,
+        "onesite_relaxed_name_match": false,
+        "property_name_consistent": true,
+        "row_addresses": [
+          "3131 Meetinghouse Rd., Boothwyn, PA, 19061"
+        ],
+        "row_property_ids": [
+          "185073"
+        ],
+        "row_property_names": [
+          "meetinghousetownhouses"
+        ],
+        "rows_with_native_identity": 24,
+        "rows_with_native_identity_and_positive_rent": 24,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "meetinghouseapartments.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://meetinghouseapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=185073&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "meetinghouseapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/15/2026",
+          "floor_plan_name": "Chichester",
+          "identity": {
+            "floor_plan_id": "2a43a30fb7f8",
+            "unit_number": "A13"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2859,
+            "market_rent_low": 1670
+          },
+          "source_api_url": "https://meetinghouseapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=185073&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "3411182",
+            "securecafe_floorplan_id": "1028321"
+          },
+          "source_portal_url": "https://meetinghouseapartments.securecafe.com/onlineleasing/meetinghouse-park-apartments",
+          "source_property_id": "185073",
+          "source_property_name": "Meetinghouse Apartments & Townhouses",
+          "source_property_provenance": "published_applicant_theme",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "10/16/2026",
+          "floor_plan_name": "Concord",
+          "identity": {
+            "floor_plan_id": "9577cccb1f41",
+            "unit_number": "G07"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3192,
+            "market_rent_low": 1737
+          },
+          "source_api_url": "https://meetinghouseapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=185073&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "3411280",
+            "securecafe_floorplan_id": "1028324"
+          },
+          "source_portal_url": "https://meetinghouseapartments.securecafe.com/onlineleasing/meetinghouse-park-apartments",
+          "source_property_id": "185073",
+          "source_property_name": "Meetinghouse Apartments & Townhouses",
+          "source_property_provenance": "published_applicant_theme",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 2,
+      "property_id": 42371,
+      "property_identity_match": true,
+      "property_name": "Meetinghouse",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Arden",
+        "Brandywine Townhouse",
+        "Chadds Ford Townhouse",
+        "Chichester",
+        "Concord",
+        "Garnet",
+        "Naamans",
+        "Ogden"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 24,
+      "website": "http://meetinghouseapartments.com/"
+    }
+  ]
+}

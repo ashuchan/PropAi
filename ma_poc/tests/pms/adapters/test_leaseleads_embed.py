@@ -9,9 +9,14 @@ Move-In-date, and Waitlist.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
+from types import SimpleNamespace
+
 import pytest
 
+from ma_poc.pms.adapters import _leaseleads_embed as leaseleads
 from ma_poc.pms.adapters._leaseleads_embed import (
+    extract_leaseleads_uuids,
     parse_leaseleads_floorplans,
     recover_leaseleads_embed,
 )
@@ -57,11 +62,73 @@ _LL_PLANS = [
     },
 ]
 
+_LL_UUID = "9e5e0a14-d118-40db-89df-b02a6176e804"
+_LL_META = {
+    "id": _LL_UUID,
+    "name": "Lumina",
+    "domain": "https://www.liveatlumina.com",
+    "address": {
+        "street": "301 Washington St.",
+        "city": "Conshohocken",
+        "state": "Pennsylvania",
+        "post_code": "19428",
+    },
+}
+_LL_NATIVE_PLANS = [
+    {
+        "id": "b0e0f039-86e9-4fd9-8a22-c7f07ccd8b22",
+        "external_id": "1056344",
+        "property_id": _LL_UUID,
+        "name": "Rigel Luxury",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "marketing_label": "One month free",
+        "units": {
+            "count": 2,
+            "data": [
+                {
+                    "id": "row-1",
+                    "property_id": _LL_UUID,
+                    "unit_id": "4666227",
+                    "unit_number": "2411",
+                    "floorplan_uuid": "b0e0f039-86e9-4fd9-8a22-c7f07ccd8b22",
+                    "floorplan_id": "1056344",
+                    "available_on": "2026-09-24",
+                    "price_min": 2533,
+                    "price_max": 3707,
+                    "size": "737",
+                    "building": "2",
+                    "floor": "4",
+                    "deposit_min": "300",
+                    "deposit_max": "300",
+                },
+                {
+                    "id": "row-2",
+                    "property_id": _LL_UUID,
+                    "unit_id": "4666004",
+                    "unit_number": "1106",
+                    "floorplan_uuid": "b0e0f039-86e9-4fd9-8a22-c7f07ccd8b22",
+                    "floorplan_id": "1056344",
+                    "available_on": "2026-06-09",
+                    "price_min": 2242,
+                    "price_max": 2242,
+                    "size": "737",
+                },
+            ],
+        },
+    }
+]
+
 
 class _FakePage:
     """Stub Page whose evaluate() dispatches on JS shape (scan vs API)."""
 
-    def __init__(self, scan_result: object, api_text: str, url: str = "https://liveatlumina.com/all-floor-plans") -> None:
+    def __init__(
+        self,
+        scan_result: object,
+        api_text: str,
+        url: str = "https://www.liveatlumina.com/all-floor-plans",
+    ) -> None:
         self._scan = scan_result
         self._api = api_text
         self.url = url
@@ -76,14 +143,40 @@ class _FakePage:
         return self._scan
 
 
-def _ctx() -> AdapterContext:
+def _ctx(body: str = "") -> AdapterContext:
     return AdapterContext(
-        base_url="https://liveatlumina.com/",
-        detected=detect_pms("https://liveatlumina.com/"),
+        base_url="https://www.liveatlumina.com/",
+        detected=detect_pms("https://www.liveatlumina.com/"),
         profile=None,
         expected_total_units=None,
         property_id="P_TEST",
+        fetch_result=SimpleNamespace(
+            body=body.encode(),
+            final_url="https://www.liveatlumina.com/all-floor-plans",
+        ),
+        property_name="Lumina",
+        address="301 Washington St",
+        city="Conshohocken",
+        state="PA",
+        zip_code="19428",
     )
+
+
+def _install_api(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    meta: object = _LL_META,
+    plans: object = _LL_PLANS,
+) -> None:
+    async def fake_fetch(
+        url: str, *, referer: str, origin: str
+    ) -> tuple[int, object, str]:
+        assert referer == "https://www.liveatlumina.com/all-floor-plans"
+        assert origin == "https://www.liveatlumina.com"
+        payload = plans if url.endswith("/floor-plans") else meta
+        return (200 if payload is not None else 403), payload, url
+
+    monkeypatch.setattr(leaseleads, "_fetch_api_payload", fake_fetch)
 
 
 def test_parse_available_with_range() -> None:
@@ -123,7 +216,8 @@ def test_parse_skips_empty_rows() -> None:
 
 
 @pytest.mark.asyncio
-async def test_recover_via_live_iframe() -> None:
+async def test_recover_via_live_iframe(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_api(monkeypatch)
     scan = {"hits": ["https://embed.leaseleads.co/9e5e0a14-d118-40db-89df-b02a6176e804/floor-plans"], "source": "live"}
     page = _FakePage(scan, json.dumps(_LL_PLANS))
     units = await recover_leaseleads_embed(page, _ctx())  # type: ignore[arg-type]
@@ -141,7 +235,8 @@ async def test_recover_no_iframe_returns_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_recover_api_returns_empty_body() -> None:
+async def test_recover_api_returns_empty_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_api(monkeypatch, plans=None)
     scan = {"hits": ["https://embed.leaseleads.co/9e5e0a14-d118-40db-89df-b02a6176e804/floor-plans"], "source": "live"}
     page = _FakePage(scan, None)  # API fails / returns null
     units = await recover_leaseleads_embed(page, _ctx())  # type: ignore[arg-type]
@@ -155,3 +250,74 @@ async def test_recover_pageless_stub() -> None:
 
     units = await recover_leaseleads_embed(_Bare(), _ctx())  # type: ignore[arg-type]
     assert units == []
+
+
+def test_extract_protocol_relative_and_init_uuid_deduplicates() -> None:
+    html = f"""
+    <iframe src="//embed.leaseleads.co/{_LL_UUID}/floor-plans"></iframe>
+    <script>new LeaseLeadsEmbed('{_LL_UUID}')</script>
+    """
+    assert extract_leaseleads_uuids(html) == [_LL_UUID]
+
+
+def test_native_roster_preempts_plan_shells() -> None:
+    rows = parse_leaseleads_floorplans(
+        _LL_NATIVE_PLANS,
+        "https://api.leaseleads.co/api/v2/property/x/floor-plans",
+        property_uuid=_LL_UUID,
+    )
+    assert len(rows) == 2
+    assert {row["unit_number"] for row in rows} == {"2411", "1106"}
+    assert {row["source_ids"]["leaseleads_unit_id"] for row in rows} == {
+        "4666227",
+        "4666004",
+    }
+    assert rows[0]["availability_date"] == "2026-09-24"
+    assert rows[0]["market_rent_low"] == 2533
+    assert rows[0]["extraction_tier"] == "TIER_1_API_LEASELEADS_UNITS"
+
+
+def test_native_roster_foreign_property_rejects_entire_payload() -> None:
+    contaminated = deepcopy(_LL_NATIVE_PLANS)
+    contaminated[0]["units"]["data"][1]["property_id"] = (
+        "00000000-0000-0000-0000-000000000000"
+    )
+    assert (
+        parse_leaseleads_floorplans(
+            contaminated,
+            "https://api.leaseleads.co/api/v2/property/x/floor-plans",
+            property_uuid=_LL_UUID,
+        )
+        == []
+    )
+
+
+@pytest.mark.asyncio
+async def test_pageless_render_body_recovers_native_units(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_api(monkeypatch, plans=_LL_NATIVE_PLANS)
+    body = f'<iframe src="//embed.leaseleads.co/{_LL_UUID}/floor-plans"></iframe>'
+
+    class _Bare:
+        url = ""
+
+    rows = await recover_leaseleads_embed(_Bare(), _ctx(body))  # type: ignore[arg-type]
+    assert len(rows) == 2
+    assert all(row["source_property_id"] == _LL_UUID for row in rows)
+    assert all(row["source_property_name"] == "Lumina" for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_provider_identity_mismatch_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wrong = deepcopy(_LL_META)
+    wrong["address"]["post_code"] = "00000"
+    _install_api(monkeypatch, meta=wrong, plans=_LL_NATIVE_PLANS)
+    body = f'<iframe src="//embed.leaseleads.co/{_LL_UUID}/floor-plans"></iframe>'
+
+    class _Bare:
+        url = ""
+
+    assert await recover_leaseleads_embed(_Bare(), _ctx(body)) == []  # type: ignore[arg-type]

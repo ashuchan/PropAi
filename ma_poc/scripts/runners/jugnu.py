@@ -1138,15 +1138,22 @@ async def _try_rentcafe_direct(
 
 
 def _unit_level_row_count(result: dict[str, Any]) -> int:
-    """Count extracted rows carrying a real (non-empty) ``unit_number`` — i.e.
-    genuine per-apartment unit-level rows, vs plan-level floorplan rows (which
-    the PP_SSR / plan parsers emit with ``unit_number=""``). Used to decide
-    whether a render escalation strictly improved a plan-level result. Never
-    raises on malformed input."""
+    """Count rows with a canonical per-apartment identity.
+
+    A non-empty ``unit_number`` alone is not enough: several plan APIs publish
+    a numeric floor-plan id in that field, and plan rows can also retain a
+    legacy token while carrying an explicit plan-level marker.  Use the same
+    identity predicate as the verdict and retry gates so render acceptance
+    cannot mistake plan ids for apartments.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
     n = 0
     for u in result.get("units") or []:
         try:
-            if str(u.get("unit_number") or "").strip():
+            if not isinstance(u, dict):
+                continue
+            if unit_has_real_anchor(u):
                 n += 1
         except Exception:
             continue
@@ -1154,15 +1161,16 @@ def _unit_level_row_count(result: dict[str, Any]) -> int:
 
 
 def _is_plan_level(result: dict[str, Any]) -> bool:
-    """True iff *result* is a SUCCESS that stalled at PLAN level: rows present
-    but NONE carrying a real ``unit_number`` (floorplan placeholders). The
-    generic trigger for the task #45 plan→unit render lever — platform-agnostic;
-    the circuit-breaker (``_plan_render_allowed``), not tier scoping, is what
-    keeps legitimately plan-only adapters from being re-rendered forever.
-    Mirrors ``_compute_quality_signals``'s PLAN_LEVEL flag definition. Never
-    raises."""
-    if not (result.get("units") or []):
-        return False  # zero-units is the render-on-empty path, not this one
+    """True when admitted rows exist but none is a physical apartment.
+
+    Since the Stage-2 channel split, correctly classified plan rows live in
+    ``plan_summaries`` while ``units`` is empty.  Looking only at ``units``
+    made every proper plan-only result look like a zero-data result and made
+    the plan→unit circuit-breaker unreachable.  Keep compatibility with older
+    combined-channel callers while recognising the canonical plan channel.
+    """
+    if not (result.get("units") or result.get("plan_summaries")):
+        return False
     return _unit_level_row_count(result) == 0
 
 
@@ -1338,14 +1346,14 @@ def _emit_route_shadow(
         from ma_poc.services.route_policy import compute_signals, route
 
         units = result.get("units") or []
-        # Both channels, same reason as the profile learner: a plan-only
-        # property extracted fine and must not be signalled to the router as a
-        # zero. Harmless today (this observer never acts and is flag-gated off),
-        # but its entire purpose is deciding whether to let the router act in
-        # Phase 3 — so it must not be trained on a signal that reads a
-        # successful plan-only extraction as nothing.
+        # Router ``units_extracted`` means physical apartments, not all
+        # admitted records.  Plan rows are a successful extraction for profile
+        # learning, but they must not tell the unit-recovery router to STOP.
+        # The 2026-07-31 shadow run otherwise produced STOP for every one of
+        # 549 unitless plan properties because this used the both-channel
+        # profile counter.
         sig = compute_signals(
-            fetch_result, None, profile, units_extracted=_extracted_row_count(result)
+            fetch_result, None, profile, units_extracted=_unit_level_row_count(result)
         )
         dec = route(sig, profile)
         rec = {
@@ -1710,7 +1718,10 @@ async def _process_property(
     #     guard (never spends a render inside the last stretch of the 600s
     #     per-property budget, so a slow/walled property can't be converted
     #     from a plan-level SUCCESS into a timeout FAILED).
-    _zero_units = not (result.get("units") or [])
+    # A plan-only extraction is not an empty extraction.  It may still trigger
+    # the dedicated plan→unit lever below, with its own circuit-breaker, but it
+    # must not bypass that breaker through the render-on-empty path.
+    _zero_units = _extracted_row_count(result) == 0
     _entrata_plan = ENABLE_ENTRATA_PLAN_RENDER and _is_entrata_plan_level(result)
     _generic_plan = (
         ENABLE_PLAN_UNIT_RENDER
@@ -3230,6 +3241,8 @@ def _format_v2_unit(
     # Delegate the available-now → scrape-date fallback to the canonical
     # resolver (single source of truth; see the available_date field below).
     from ma_poc.core.schema_v2 import (
+        _availability_date_value,
+        _classify_availability_date_provenance,
         _is_floor_plan_level,
         _resolve_available_date,
         _row_has_availability_date,
@@ -3237,6 +3250,7 @@ def _format_v2_unit(
         resolve_plan_row_availability,
         withdraw_unsupported_available,
     )
+    _available_date_raw = _availability_date_value(unit)
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
     # formatting. Emitted as first-class ``<field>_raw`` columns at the
@@ -3281,7 +3295,7 @@ def _format_v2_unit(
         "building": unit.get("building") or unit.get("_building"),
         "available_units": unit.get("available_units"),
         "date_captured": None,
-        "available_date": unit.get("available_date"),
+        "available_date": _available_date_raw,
         "availability_status": (
             unit.get("availability_status") or unit.get("_availability_status")
         ),
@@ -3319,7 +3333,16 @@ def _format_v2_unit(
             is_junk_unit_number,
         )
 
-        if is_junk_floor_plan(fp_name):
+        # BetterNOI's strict UUID-scoped API publishes ``floor_plan.name``
+        # explicitly, and real operator names on that surface include
+        # ``1 Bed 1 Bath``.  Keep the generic placeholder filter everywhere
+        # else; bypass it only for the exact provenance token stamped by the
+        # property-scoped BetterNOI parser.
+        _explicit_betternoi_plan = (
+            unit.get("_floor_plan_name_provenance")
+            == "betternoi.floor_plan.name"
+        )
+        if is_junk_floor_plan(fp_name) and not _explicit_betternoi_plan:
             fp_name = None
         if is_junk_unit_number(uid):
             uid = None
@@ -3542,6 +3565,20 @@ def _format_v2_unit(
         has_date=_row_has_availability_date(unit),
     )
 
+    _available_date_parsed = _format_date_str(_available_date_raw, scrape_ts)
+    _available_date_resolved = _resolve_available_date(
+        _available_date_parsed,
+        _availability_status,
+        scrape_ts,
+        has_rent=(_has_rent and uid not in (None, "", "null")),
+    )
+    _available_date_provenance = _classify_availability_date_provenance(
+        _available_date_raw,
+        _available_date_parsed,
+        _available_date_resolved,
+        scrape_ts,
+    )
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -3610,12 +3647,8 @@ def _format_v2_unit(
         # _norm_avail_status call) so a zero-inventory plan row cannot be
         # UNAVAILABLE and simultaneously carry a manufactured "available
         # today" scrape-date stamp.
-        "available_date": _resolve_available_date(
-            _format_date_str(unit.get("available_date")),
-            _availability_status,
-            scrape_ts,
-            has_rent=(_has_rent and uid not in (None, "", "null")),
-        ),
+        "available_date": _available_date_resolved,
+        "availability_date_provenance": _available_date_provenance,
         # 2026-05-26: availability_status was absent from this function
         # (present in core/schema_v2.py but never synced here).  That caused
         # 93.9% of units to have a blank availability_status in the canary
@@ -4669,7 +4702,10 @@ def _format_area(
     )
 
 
-def _format_date_str(val: Any) -> str | None:
+def _format_date_str(
+    val: Any,
+    reference_ts: datetime | None = None,
+) -> str | None:
     """Normalize date to YYYY-MM-DD. None if unparseable.
 
     2026-05-19: delegate to ``schema_v2._format_date``. This runner had a
@@ -4685,7 +4721,7 @@ def _format_date_str(val: Any) -> str | None:
     """
     from ma_poc.core.schema_v2 import _format_date
 
-    return _format_date(val)
+    return _format_date(val, reference_ts)
 
 
 def _format_floor(val: Any) -> int | None:

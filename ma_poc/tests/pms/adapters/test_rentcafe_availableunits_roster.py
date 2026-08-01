@@ -23,9 +23,17 @@ Two properties make it worth a dedicated path rather than more drill anchors:
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 import pytest
 
-from ma_poc.pms.adapters.base import AdapterContext
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.rentcafe import (
+    RentCafeAdapter,
+    _try_rentcafe_vanity_availableunits,
+    parse_rentcafe_inline_available_units,
+)
 from ma_poc.pms.adapters.rentcafe_layout_tab import (
     RentCafeLayoutTabAdapter,
     parse_rentcafe_lt_applyga,
@@ -63,6 +71,43 @@ AVAILABLEUNITS_HTML = (
     + _row("18062", "A2- VL/LI", "1 Bed(s)", "710", "764.00", "Available", "18028523")
     + _row("16021", "B1", "2 Bed(s)", "838", "1,009.00", "Available", "18028481")
     + "</tbody></table></body></html>"
+)
+
+
+INLINE_AVAILABLE_UNITS_ROWS = [
+    {
+        "AvailableDate": "2026-08-28T00:00:00",
+        "Baths": 1.0,
+        "Beds": 1.0,
+        "DepositCol": "$0.00",
+        "FloorPlanID": 4332154,
+        "FloorPlanName": "One Bedroom, One Bath",
+        "IpmDisplayMinRent": 1625,
+        "IpmDisplayMaxRent": 1625,
+        "SquareFeet": 650,
+        "UnitCode": "IB203-A",
+        "UnitId": 32505942,
+        "bRestrictPublish": False,
+    },
+    {
+        "AvailableDate": "2026-09-01T00:00:00",
+        "Baths": 1.0,
+        "Beds": 1.0,
+        "DepositCol": "$0.00",
+        "FloorPlanID": 4332154,
+        "FloorPlanName": "One Bedroom, One Bath",
+        "IpmDisplayMinRent": 1520,
+        "IpmDisplayMaxRent": 1520,
+        "SquareFeet": 650,
+        "UnitCode": "IB114-B",
+        "UnitId": 32505929,
+        "bRestrictPublish": False,
+    },
+]
+INLINE_AVAILABLE_UNITS_HTML = (
+    "<html><script>var available_units = "
+    + json.dumps(INLINE_AVAILABLE_UNITS_ROWS)
+    + ";</script></html>"
 )
 
 
@@ -109,6 +154,59 @@ def test_non_roster_page_yields_nothing() -> None:
     assert parse_rentcafe_lt_applyga("<html><body><h1>Floor Plans</h1></body></html>", "u") == []
 
 
+def test_parses_strict_inline_available_units_roster() -> None:
+    units = parse_rentcafe_inline_available_units(
+        INLINE_AVAILABLE_UNITS_HTML,
+        "https://www.indigobremerton.com/floorplans",
+    )
+    assert [unit["unit_number"] for unit in units] == ["IB203-A", "IB114-B"]
+    assert units[0]["market_rent_low"] == 1625
+    assert units[0]["availability_date"] == "2026-08-28"
+    assert units[0]["source_ids"] == {
+        "securecafe_apartment_id": "32505942",
+        "securecafe_floorplan_id": "4332154",
+    }
+
+
+def test_inline_roster_rejects_plan_rows_and_ambiguous_identity() -> None:
+    plan_only = [
+        {
+            "FloorPlanID": 4332154,
+            "FloorPlanName": "One Bedroom",
+            "IpmDisplayMinRent": 1625,
+        }
+    ]
+    assert parse_rentcafe_inline_available_units(
+        f"<script>var available_units = {json.dumps(plan_only)};</script>",
+        "https://example.test/floorplans",
+    ) == []
+
+    duplicate = [dict(row) for row in INLINE_AVAILABLE_UNITS_ROWS]
+    duplicate[1]["UnitId"] = duplicate[0]["UnitId"]
+    assert parse_rentcafe_inline_available_units(
+        f"<script>var available_units = {json.dumps(duplicate)};</script>",
+        "https://example.test/floorplans",
+    ) == []
+
+
+@pytest.mark.asyncio
+async def test_inline_roster_wins_without_any_network_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_probe(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("inline roster must not make a network request")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", unexpected_probe)
+    ctx = _ctx()
+    ctx.fetch_result = SimpleNamespace(body=INLINE_AVAILABLE_UNITS_HTML)
+
+    result = await RentCafeAdapter().extract(_FakePage(), ctx)  # type: ignore[arg-type]
+
+    assert len(result.units) == 2
+    assert result.tier_used == "TIER_1_DOM_RENTCAFE_INLINE_AVAILABLE_UNITS"
+    assert result.winning_url == ctx.base_url
+
+
 # ── The adapter tries the URL, and prefers it over the drill fan-out ─────────
 
 
@@ -135,9 +233,10 @@ def _ctx() -> AdapterContext:
 
 
 class _Resp:
-    def __init__(self, status: int, text: str) -> None:
+    def __init__(self, status: int, text: str, url: str = "") -> None:
         self.status_code = status
         self.text = text
+        self.url = url
 
 
 @pytest.mark.asyncio
@@ -202,6 +301,149 @@ async def test_probe_exception_is_never_fatal(monkeypatch: pytest.MonkeyPatch) -
 
     result = await RentCafeLayoutTabAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
     assert len(result.units) == 3
+
+
+# ── General RentCafe fast-flag handoff ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_fast_flag_recovers_roster_before_broad_rentcafe_fallbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same-origin roster is useful beyond the exact layout-tab theme.
+
+    Its production contract is one direct request with every escalation path
+    disabled, followed by an immediate strict-unit return.
+    """
+    monkeypatch.setenv("ENABLE_RENTCAFE_AVAILUNITS_FAST", "true")
+    seen: list[tuple[str, dict[str, object]]] = []
+
+    def fake_probe_get(url: str, **kw: object) -> _Resp:
+        seen.append((url, kw))
+        if url.endswith("/availableunits"):
+            return _Resp(200, AVAILABLEUNITS_HTML, url)
+        raise AssertionError(f"broad fallback ran after roster win: {url}")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeAdapter().extract(_FakePage(), _ctx())  # type: ignore[arg-type]
+
+    assert len(result.units) == 3
+    assert result.tier_used == "TIER_1_DOM_RENTCAFE_AVAILABLEUNITS_ROSTER"
+    assert [url for url, _ in seen] == [
+        "https://www.oaksofnorthgatesanantonio.com/availableunits"
+    ]
+    kwargs = seen[0][1]
+    assert kwargs.get("unlocker") is False
+    assert kwargs.get("proxies") == {}
+    assert kwargs.get("retries") == 1
+
+
+@pytest.mark.asyncio
+async def test_fast_roster_declines_cross_host_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A portfolio/sibling redirect must not become this property's units."""
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        return _Resp(
+            200,
+            AVAILABLEUNITS_HTML,
+            "https://sibling-property.example/availableunits",
+        )
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    recovered = await _try_rentcafe_vanity_availableunits(
+        _ctx(),
+        result=AdapterResult(),
+    )
+    assert recovered is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blocked_status", [403, 429])
+async def test_fast_roster_uses_hyperbrowser_only_for_transient_block(
+    monkeypatch: pytest.MonkeyPatch,
+    blocked_status: int,
+) -> None:
+    """A clean HB raw fetch may recover the exact blocked same-origin route.
+
+    The distinct tier is required so canary yield and cost can be measured
+    without conflating the direct and residential-browser lanes.
+    """
+    monkeypatch.setenv("FETCH_BACKEND", "hyperbrowser")
+    hb_calls: list[tuple[str, str, bool]] = []
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        return _Resp(blocked_status, "", url)
+
+    async def fake_hb_raw_get(
+        url: str,
+        property_id: str,
+        *,
+        same_origin_only: bool = False,
+    ) -> tuple[int, str]:
+        hb_calls.append((url, property_id, same_origin_only))
+        return 200, AVAILABLEUNITS_HTML
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.hb_raw_get",
+        fake_hb_raw_get,
+    )
+
+    recovered = await _try_rentcafe_vanity_availableunits(_ctx(), AdapterResult())
+
+    assert recovered is not None
+    assert len(recovered.units) == 3
+    assert recovered.tier_used.endswith("_HYPERBROWSER")
+    assert hb_calls == [
+        (
+            "https://www.oaksofnorthgatesanantonio.com/availableunits",
+            "P_OAKS",
+            True,
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_fast_roster_never_uses_hyperbrowser_when_backend_is_not_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FETCH_BACKEND", "brightdata")
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        return _Resp(403, "", url)
+
+    async def unexpected_hb(*_args: object, **_kwargs: object) -> tuple[int, str]:
+        raise AssertionError("Hyperbrowser must remain behind its explicit backend switch")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    monkeypatch.setattr("ma_poc.fetch.hyperbrowser_backend.hb_raw_get", unexpected_hb)
+
+    assert await _try_rentcafe_vanity_availableunits(_ctx(), AdapterResult()) is None
+
+
+@pytest.mark.asyncio
+async def test_fast_roster_attempt_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        nonlocal calls
+        calls += 1
+        return _Resp(404, "", url)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+    ctx = _ctx()
+    assert await _try_rentcafe_vanity_availableunits(
+        ctx, AdapterResult()
+    ) is None
+    assert await _try_rentcafe_vanity_availableunits(
+        ctx, AdapterResult()
+    ) is None
+    assert calls == 1
 
 
 # ── SecureCafe portal fallback (404/403 on the vanity route) ────────────────

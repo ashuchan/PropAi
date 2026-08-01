@@ -1,0 +1,2857 @@
+{
+  "lane": "exact_current_official_migrations_three_strict",
+  "summary": {
+    "result_type": "stale_or_hijacked_domain_to_exact_current_official",
+    "capture_timestamp_utc": "2026-08-01T14:55:02.720733+00:00",
+    "strict_unit_qualified_properties": 3,
+    "strict_unit_qualified_property_ids": [
+      246962,
+      37071,
+      42977
+    ],
+    "native_positive_rent_rows": 50,
+    "unit_rows_by_property": {
+      "246962": 13,
+      "37071": 16,
+      "42977": 21
+    },
+    "configured_routes_with_strict_native_positive_rent": 0,
+    "current_official_routes_with_strict_native_positive_rent": 3,
+    "captcha_solving": false,
+    "flaresolverr": false,
+    "fingerprint_rotation": false,
+    "unlocker": false,
+    "proxies": {},
+    "hyperbrowser": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 246962,
+      "property_name": "Portola Bridge Creek",
+      "website": "http://www.bridgecreekapthomes.com/",
+      "current_official_url": "https://www.portolabridgecreek.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "marketapts",
+      "tier": "TIER_1_DOM_MARKETAPTS_B_UNIT_LEVEL",
+      "units": 13,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_official_portola_bridge_creek_nine_same_origin_marketapts_unit_drills_native_apply_binding_full_pipeline",
+      "identity_evidence": {
+        "canonical_name": "Portola Bridge Creek",
+        "published_names": [
+          "Portola Bridge Creek"
+        ],
+        "published_address": "9211 NE 15th Ave",
+        "city_state_zip": "Vancouver, WA 98665",
+        "current_root_identity_checks": {
+          "published_name": true,
+          "street": true,
+          "city": true,
+          "postal_code": true
+        },
+        "configured_route_identity_checks": {
+          "published_name": false,
+          "street": false,
+          "city": false,
+          "postal_code": false
+        },
+        "rows_with_native_identity": 13,
+        "rows_with_native_identity_and_positive_rent": 13,
+        "distinct_unit_numbers": 13,
+        "source_urls": [
+          "https://www.portolabridgecreek.com/unit/2x1a",
+          "https://www.portolabridgecreek.com/unit/2x1ar",
+          "https://www.portolabridgecreek.com/unit/2x1b",
+          "https://www.portolabridgecreek.com/unit/2x1br",
+          "https://www.portolabridgecreek.com/unit/2x1c",
+          "https://www.portolabridgecreek.com/unit/2x1cr",
+          "https://www.portolabridgecreek.com/unit/2x1d",
+          "https://www.portolabridgecreek.com/unit/3x2a",
+          "https://www.portolabridgecreek.com/unit/3x2ar"
+        ]
+      },
+      "configured_source_validation": {
+        "configured_url": "http://www.bridgecreekapthomes.com/",
+        "configured_probe_url": "http://www.bridgecreekapthomes.com/",
+        "configured_fetch": {
+          "requested_url": "http://www.bridgecreekapthomes.com/",
+          "status": 200,
+          "final_url": "http://www.bridgecreekapthomes.com/",
+          "body_bytes": 114,
+          "body_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": false,
+            "street": false,
+            "city": false,
+            "postal_code": false
+          }
+        },
+        "configured_full_pipeline": {
+          "adapter": "generic",
+          "detected_pms": {
+            "pms": "unknown",
+            "confidence": 0.0,
+            "evidence": [
+              "no URL/HTML/mgmt signal"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "cascade"
+          },
+          "tier": "TIER_1_API",
+          "errors": [
+            "Generic parser found no units in captured API responses"
+          ],
+          "strict_native_positive_rent_rows": 0,
+          "distinct_native_unit_numbers": 0,
+          "source_urls": [],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "configured_route_exact_property_identity": false,
+        "current_official_fetch": {
+          "requested_url": "https://www.portolabridgecreek.com/",
+          "status": 200,
+          "final_url": "https://www.portolabridgecreek.com/",
+          "body_bytes": 91110,
+          "body_sha256": "3fdd69b781116ae6b321b359d17bc5786ef19663636c07d17d8a84874a75ba4b",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": true,
+            "street": true,
+            "city": true,
+            "postal_code": true
+          }
+        },
+        "current_official_full_pipeline": {
+          "adapter": "marketapts",
+          "detected_pms": {
+            "pms": "marketapts",
+            "confidence": 0.8,
+            "evidence": [
+              "Market Apartments CMS marker in HTML (assets.marketapts.com / api.marketapts.com / marketapts.com/js/schedule / Powered by MarketApts)"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "dom_first"
+          },
+          "tier": "TIER_1_DOM_MARKETAPTS_B_UNIT_LEVEL",
+          "errors": [],
+          "strict_native_positive_rent_rows": 13,
+          "distinct_native_unit_numbers": 13,
+          "source_urls": [
+            "https://www.portolabridgecreek.com/floorplans"
+          ],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "minimal_production_lever": "update canonical website to the exact current official property URL"
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "01607-5",
+            "marketapts_unit_number": "01607-5",
+            "marketapts_plan_code": "2X1A"
+          },
+          "floor_plan_name": "2X1A",
+          "availability_date": "2026-08-10",
+          "positive_rent_evidence": {
+            "market_rent_low": 1425,
+            "market_rent_high": 1425
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1a"
+        },
+        {
+          "identity": {
+            "unit_number": "01512-7",
+            "marketapts_unit_number": "01512-7",
+            "marketapts_plan_code": "2X1AR"
+          },
+          "floor_plan_name": "2X1AR",
+          "availability_date": "2026-08-10",
+          "positive_rent_evidence": {
+            "market_rent_low": 1818,
+            "market_rent_high": 1818
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1ar"
+        },
+        {
+          "identity": {
+            "unit_number": "000A309",
+            "marketapts_unit_number": "000A309",
+            "marketapts_plan_code": "2X1B"
+          },
+          "floor_plan_name": "2X1B",
+          "availability_date": "2026-09-02",
+          "positive_rent_evidence": {
+            "market_rent_low": 1475,
+            "market_rent_high": 1475
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1b"
+        },
+        {
+          "identity": {
+            "unit_number": "000J132",
+            "marketapts_unit_number": "000J132",
+            "marketapts_plan_code": "2X1B"
+          },
+          "floor_plan_name": "2X1B",
+          "availability_date": "2026-09-07",
+          "positive_rent_evidence": {
+            "market_rent_low": 1475,
+            "market_rent_high": 1475
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1b"
+        },
+        {
+          "identity": {
+            "unit_number": "000C118",
+            "marketapts_unit_number": "000C118",
+            "marketapts_plan_code": "2X1BR"
+          },
+          "floor_plan_name": "2X1BR",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1499,
+            "market_rent_high": 1499
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1br"
+        },
+        {
+          "identity": {
+            "unit_number": "000J232",
+            "marketapts_unit_number": "000J232",
+            "marketapts_plan_code": "2X1BR"
+          },
+          "floor_plan_name": "2X1BR",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1499,
+            "market_rent_high": 1499
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1br"
+        },
+        {
+          "identity": {
+            "unit_number": "000C319",
+            "marketapts_unit_number": "000C319",
+            "marketapts_plan_code": "2X1C"
+          },
+          "floor_plan_name": "2X1C",
+          "availability_date": "2026-08-20",
+          "positive_rent_evidence": {
+            "market_rent_low": 1425,
+            "market_rent_high": 1425
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1c"
+        },
+        {
+          "identity": {
+            "unit_number": "000E364",
+            "marketapts_unit_number": "000E364",
+            "marketapts_plan_code": "2X1CR"
+          },
+          "floor_plan_name": "2X1CR",
+          "availability_date": "2026-08-18",
+          "positive_rent_evidence": {
+            "market_rent_low": 1650,
+            "market_rent_high": 1650
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1cr"
+        },
+        {
+          "identity": {
+            "unit_number": "9306-7",
+            "marketapts_unit_number": "9306-7",
+            "marketapts_plan_code": "2X1D"
+          },
+          "floor_plan_name": "2X1D",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1825,
+            "market_rent_high": 1825
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1d"
+        },
+        {
+          "identity": {
+            "unit_number": "000N201",
+            "marketapts_unit_number": "000N201",
+            "marketapts_plan_code": "3X2A"
+          },
+          "floor_plan_name": "3X2A",
+          "availability_date": "2026-08-08",
+          "positive_rent_evidence": {
+            "market_rent_low": 1899,
+            "market_rent_high": 1899
+          },
+          "source_api_url": "https://www.portolabridgecreek.com/unit/3x2a"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "2X1A",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "765",
+          "unit_number": "01607-5",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,425",
+          "market_rent_low": 1425,
+          "market_rent_high": 1425,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1a",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "01607-5",
+            "marketapts_plan_code": "2X1A"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/10/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=01607-5&t=2X1A"
+        },
+        {
+          "floor_plan_name": "2X1AR",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "765",
+          "unit_number": "01512-7",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,818",
+          "market_rent_low": 1818,
+          "market_rent_high": 1818,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1ar",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "01512-7",
+            "marketapts_plan_code": "2X1AR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/10/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=01512-7&t=2X1AR"
+        },
+        {
+          "floor_plan_name": "2X1B",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "930",
+          "unit_number": "000A309",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,475",
+          "market_rent_low": 1475,
+          "market_rent_high": 1475,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-09-02",
+          "available_date": "2026-09-02",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1b",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000A309",
+            "marketapts_plan_code": "2X1B"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "09/02/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000A309&t=2X1B"
+        },
+        {
+          "floor_plan_name": "2X1B",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "930",
+          "unit_number": "000J132",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,475",
+          "market_rent_low": 1475,
+          "market_rent_high": 1475,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-09-07",
+          "available_date": "2026-09-07",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1b",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000J132",
+            "marketapts_plan_code": "2X1B"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "09/07/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000J132&t=2X1B"
+        },
+        {
+          "floor_plan_name": "2X1BR",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "930",
+          "unit_number": "000C118",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,499",
+          "market_rent_low": 1499,
+          "market_rent_high": 1499,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1br",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000C118",
+            "marketapts_plan_code": "2X1BR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "Now",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000C118&t=2X1BR"
+        },
+        {
+          "floor_plan_name": "2X1BR",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "930",
+          "unit_number": "000J232",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,499",
+          "market_rent_low": 1499,
+          "market_rent_high": 1499,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1br",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000J232",
+            "marketapts_plan_code": "2X1BR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "Now",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000J232&t=2X1BR"
+        },
+        {
+          "floor_plan_name": "2X1C",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "980",
+          "unit_number": "000C319",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,425",
+          "market_rent_low": 1425,
+          "market_rent_high": 1425,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-20",
+          "available_date": "2026-08-20",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1c",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000C319",
+            "marketapts_plan_code": "2X1C"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/20/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000C319&t=2X1C"
+        },
+        {
+          "floor_plan_name": "2X1CR",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "930",
+          "unit_number": "000E364",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,650",
+          "market_rent_low": 1650,
+          "market_rent_high": 1650,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-18",
+          "available_date": "2026-08-18",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1cr",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000E364",
+            "marketapts_plan_code": "2X1CR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/18/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000E364&t=2X1CR"
+        },
+        {
+          "floor_plan_name": "2X1D",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "765",
+          "unit_number": "9306-7",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,825",
+          "market_rent_low": 1825,
+          "market_rent_high": 1825,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/2x1d",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "9306-7",
+            "marketapts_plan_code": "2X1D"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "Now",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=9306-7&t=2X1D"
+        },
+        {
+          "floor_plan_name": "3X2A",
+          "bed_label": "3 Bedroom",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1150",
+          "unit_number": "000N201",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,899",
+          "market_rent_low": 1899,
+          "market_rent_high": 1899,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-08",
+          "available_date": "2026-08-08",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/3x2a",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000N201",
+            "marketapts_plan_code": "3X2A"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/08/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000N201&t=3X2A"
+        },
+        {
+          "floor_plan_name": "3X2A",
+          "bed_label": "3 Bedroom",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1150",
+          "unit_number": "000A310",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,099",
+          "market_rent_low": 2099,
+          "market_rent_high": 2099,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/3x2a",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000A310",
+            "marketapts_plan_code": "3X2A"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/10/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000A310&t=3X2A"
+        },
+        {
+          "floor_plan_name": "3X2AR",
+          "bed_label": "3 Bedroom",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1150",
+          "unit_number": "000M145",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,099",
+          "market_rent_low": 2099,
+          "market_rent_high": 2099,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/3x2ar",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000M145",
+            "marketapts_plan_code": "3X2AR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/10/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000M145&t=3X2AR"
+        },
+        {
+          "floor_plan_name": "3X2AR",
+          "bed_label": "3 Bedroom",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1150",
+          "unit_number": "000M250",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,099",
+          "market_rent_low": 2099,
+          "market_rent_high": 2099,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "1",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.portolabridgecreek.com/unit/3x2ar",
+          "extraction_tier": "TIER_1_DOM_MARKETAPTS",
+          "source_ids": {
+            "marketapts_unit_number": "000M250",
+            "marketapts_plan_code": "3X2AR"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "published_availability_text": "08/10/2026",
+          "application_url": "https://www.portolabridgecreek.com/apply-online?u=000M250&t=3X2AR"
+        }
+      ],
+      "strict_gates": {
+        "exact_current_property_identity": true,
+        "marketapts_template_b": true,
+        "nine_unit_drill_pages_discovered": true,
+        "nine_unit_drill_pages_directly_probed": true,
+        "all_drill_pages_exact_property_identity": true,
+        "all_rows_same_origin_native_apply_unit_and_plan_binding": true,
+        "all_rows_native_unit_number": true,
+        "all_rows_positive_row_level_rent": true,
+        "full_pipeline_current_root_13_native_positive_rent_rows": true,
+        "full_pipeline_and_direct_unit_rent_plan_date_match": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true
+      },
+      "nine_plan_direct_probes": [
+        {
+          "plan_code": "2X1A",
+          "url": "https://www.portolabridgecreek.com/unit/2x1a",
+          "status": 200,
+          "native_positive_rent_rows": 1,
+          "unit_numbers": [
+            "01607-5"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1AR",
+          "url": "https://www.portolabridgecreek.com/unit/2x1ar",
+          "status": 200,
+          "native_positive_rent_rows": 1,
+          "unit_numbers": [
+            "01512-7"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1B",
+          "url": "https://www.portolabridgecreek.com/unit/2x1b",
+          "status": 200,
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "000A309",
+            "000J132"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1BR",
+          "url": "https://www.portolabridgecreek.com/unit/2x1br",
+          "status": 200,
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "000C118",
+            "000J232"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1C",
+          "url": "https://www.portolabridgecreek.com/unit/2x1c",
+          "status": 200,
+          "native_positive_rent_rows": 1,
+          "unit_numbers": [
+            "000C319"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1CR",
+          "url": "https://www.portolabridgecreek.com/unit/2x1cr",
+          "status": 200,
+          "native_positive_rent_rows": 1,
+          "unit_numbers": [
+            "000E364"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "2X1D",
+          "url": "https://www.portolabridgecreek.com/unit/2x1d",
+          "status": 200,
+          "native_positive_rent_rows": 1,
+          "unit_numbers": [
+            "9306-7"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "3X2A",
+          "url": "https://www.portolabridgecreek.com/unit/3x2a",
+          "status": 200,
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "000N201",
+            "000A310"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_code": "3X2AR",
+          "url": "https://www.portolabridgecreek.com/unit/3x2ar",
+          "status": 200,
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "000M145",
+            "000M250"
+          ],
+          "same_origin_native_unit_apply_routes": true,
+          "exact_property_identity_on_page": true
+        }
+      ],
+      "floorplan_name_and_date_semantics": {
+        "exact_published_floorplan_names": [
+          "2X1A",
+          "2X1AR",
+          "2X1B",
+          "2X1BR",
+          "2X1C",
+          "2X1CR",
+          "2X1D",
+          "3X2A",
+          "3X2AR"
+        ],
+        "unavailable_plan_only_names": [
+          "1X1A",
+          "1X1AR"
+        ],
+        "explicit_availability_date_rows": 10,
+        "available_now_rows": 3,
+        "names_are_native_plan_card_titles": true,
+        "dates_are_native_unit_drill_available_values": true,
+        "available_now_rows_leave_date_blank": true
+      },
+      "contamination_negative_checks": {
+        "all_inventory_hosts": [
+          "www.portolabridgecreek.com"
+        ],
+        "all_application_hosts": [
+          "www.portolabridgecreek.com"
+        ],
+        "all_apply_query_units_exactly_match_native_rows": true,
+        "all_apply_query_plan_codes_exactly_match_plan_cards": true,
+        "sibling_rows_admitted": 0,
+        "direct_vs_full_pipeline_row_set_difference": []
+      },
+      "current_capture": {
+        "configured_route": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/246962_configured_route.html.gz",
+          "compressed_sha256": "545a1b0c637833f62e4032dd0aa88a80f99a8da0c6d974ee2f97b6426fcba677",
+          "raw_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+          "raw_bytes": 114
+        },
+        "current_official_root": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/246962_current_official_root.html.gz",
+          "compressed_sha256": "8ceeae587747ceb0cd815d8e88240289cf4ba4a5ccc13000625b5ae9718fd503",
+          "raw_sha256": "3fdd69b781116ae6b321b359d17bc5786ef19663636c07d17d8a84874a75ba4b",
+          "raw_bytes": 91110
+        },
+        "floorplans_index": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_floorplans.html.gz",
+          "compressed_sha256": "3c194a4f1e7c76d660e96eebcc755b85972653c2031005ea8c719e3831f255a6",
+          "raw_sha256": "3580cfc92eae87d8f881ed0cb2dc4e029279e2a6a0b90aedd628997f6c390c6d",
+          "raw_bytes": 129805
+        },
+        "unit_drill_pages": [
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1a.html.gz",
+            "compressed_sha256": "7b5ba5838a134c0292a795daa2c8f147d7f38f2ed7fbe9e16569089ac3e8d11f",
+            "raw_sha256": "83a29df2bacec12012d186a875960f2b780c84139d5c1c8a899a020211996c6d",
+            "raw_bytes": 65481,
+            "url": "https://www.portolabridgecreek.com/unit/2x1a"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1ar.html.gz",
+            "compressed_sha256": "4752b540d8234250faa9c0da735083a3a46ac8105a9046406540c0b1237f5af0",
+            "raw_sha256": "d86284a6c606fb5c5cf8755fba927a3daa4adcbbe46e8e522ce90eca77248c04",
+            "raw_bytes": 65271,
+            "url": "https://www.portolabridgecreek.com/unit/2x1ar"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1b.html.gz",
+            "compressed_sha256": "b14c5fcf9d078d44e5163800d680640bf82d41c626b7bf48a7f259dfedbd01f8",
+            "raw_sha256": "eb82d9f909d6619c9cf7634175e1814d92e0f12b2f6bb5936beaf1200a7e62cd",
+            "raw_bytes": 66611,
+            "url": "https://www.portolabridgecreek.com/unit/2x1b"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1br.html.gz",
+            "compressed_sha256": "434a3935d52aeb91d5ef44edfab303878d4b94041f0b0182ab36b74d665b8966",
+            "raw_sha256": "9c9b16ec8c3a4107794a23366985c16df02ade6f8b0bb2e8772780adee88e945",
+            "raw_bytes": 66722,
+            "url": "https://www.portolabridgecreek.com/unit/2x1br"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1c.html.gz",
+            "compressed_sha256": "0096f384787a039bb1f92fbab9d6d2e0bfd723fe1aea4293e101d86a60fbf4ff",
+            "raw_sha256": "62bb1773d1ad6c883a0ee2358629a5f292a38823940d8100185c13f8d50df419",
+            "raw_bytes": 65481,
+            "url": "https://www.portolabridgecreek.com/unit/2x1c"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1cr.html.gz",
+            "compressed_sha256": "e1a891ea9a72cc0d0a16869cfa203e2976ea5f9e0dd7be1ad5493691da7cd0ac",
+            "raw_sha256": "84127abdddab37d45b09f43616bf764b77192aad7f1bb4116aa0d8bb7dc92c6b",
+            "raw_bytes": 65700,
+            "url": "https://www.portolabridgecreek.com/unit/2x1cr"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_2x1d.html.gz",
+            "compressed_sha256": "aca0c11d7c353db618fb70a9df376de02972867c5f307881e977ec1e754dc785",
+            "raw_sha256": "c460fddc45e6ad35f4b3db50f6ce659be4d12899a04fddc256908f76a2b50d37",
+            "raw_bytes": 65472,
+            "url": "https://www.portolabridgecreek.com/unit/2x1d"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_3x2a.html.gz",
+            "compressed_sha256": "8343ce6510386e2aee984340e0eb34bddb50c9f41699ca26627aefd40e6e5552",
+            "raw_sha256": "71184239f80ae177dbdff9c900aad2131b316881de1072dbf2fce687b6560726",
+            "raw_bytes": 66461,
+            "url": "https://www.portolabridgecreek.com/unit/3x2a"
+          },
+          {
+            "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/portola_direct_3x2ar.html.gz",
+            "compressed_sha256": "bc55165cbb3bdc168581c1b6ffebf81966e5b8ef9b30c09029ca7a1422389bbf",
+            "raw_sha256": "df7475e2a4a85a9e0fa887f19254f6202aab850943ff76bf79c2cceb9322a0ab",
+            "raw_bytes": 66477,
+            "url": "https://www.portolabridgecreek.com/unit/3x2ar"
+          }
+        ]
+      }
+    },
+    {
+      "property_id": 37071,
+      "property_name": "Summerwood on Towne Line",
+      "website": "www.summerwoodindy.com",
+      "current_official_url": "https://www.summerwoodontownelineapartments.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "g5",
+      "tier": "TIER_1_API_G5",
+      "units": 16,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_official_summerwood_canonical_datalayer_g5_native_graphql_full_pipeline_sibling_rejected",
+      "identity_evidence": {
+        "canonical_name": "Summerwood on Towne Line",
+        "published_names": [
+          "Summerwood on Towne Line"
+        ],
+        "published_address": "2520 Summer Dr",
+        "city_state_zip": "Indianapolis, IN 46268",
+        "current_root_identity_checks": {
+          "published_name": true,
+          "street": true,
+          "city": true,
+          "postal_code": true
+        },
+        "configured_route_identity_checks": {
+          "published_name": false,
+          "street": false,
+          "city": false,
+          "postal_code": false
+        },
+        "rows_with_native_identity": 16,
+        "rows_with_native_identity_and_positive_rent": 16,
+        "distinct_unit_numbers": 16,
+        "source_urls": [
+          "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        ]
+      },
+      "configured_source_validation": {
+        "configured_url": "www.summerwoodindy.com",
+        "configured_probe_url": "https://www.summerwoodindy.com/",
+        "configured_fetch": {
+          "requested_url": "https://www.summerwoodindy.com/",
+          "status": 200,
+          "final_url": "https://www.summerwoodindy.com/",
+          "body_bytes": 150828,
+          "body_sha256": "a5db0ae014b801c5483869aee774c301de5f4eba4675f8e55e0753f8d81f82f4",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": false,
+            "street": false,
+            "city": false,
+            "postal_code": false
+          }
+        },
+        "configured_full_pipeline": {
+          "adapter": "generic",
+          "detected_pms": {
+            "pms": "unknown",
+            "confidence": 0.0,
+            "evidence": [
+              "no URL/HTML/mgmt signal"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "cascade"
+          },
+          "tier": "TIER_1_API",
+          "errors": [
+            "Generic parser found no units in captured API responses"
+          ],
+          "strict_native_positive_rent_rows": 0,
+          "distinct_native_unit_numbers": 0,
+          "source_urls": [],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "configured_route_exact_property_identity": false,
+        "current_official_fetch": {
+          "requested_url": "https://www.summerwoodontownelineapartments.com/",
+          "status": 200,
+          "final_url": "https://www.summerwoodontownelineapartments.com/",
+          "body_bytes": 198586,
+          "body_sha256": "37f17bb07df9eb7c27b0962aa9a6cb5b3ce6b21244696e5875967634bd74ca64",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": true,
+            "street": true,
+            "city": true,
+            "postal_code": true
+          }
+        },
+        "current_official_full_pipeline": {
+          "adapter": "g5",
+          "detected_pms": {
+            "pms": "g5",
+            "confidence": 0.9,
+            "evidence": [
+              "G5 Marketing Cloud marker in HTML (inventory.g5marketingcloud / g5-cl- / g5dxm.com / dnn506yrbagrg.cloudfront.net)"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "api_first"
+          },
+          "tier": "TIER_1_API_G5",
+          "errors": [],
+          "strict_native_positive_rent_rows": 16,
+          "distinct_native_unit_numbers": 16,
+          "source_urls": [],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "minimal_production_lever": "update canonical website to the exact current official property URL"
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "1324",
+            "g5_apartment_id": "1494748811",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Poplar",
+          "availability_date": "2026-07-01",
+          "positive_rent_evidence": {
+            "market_rent_low": 1128,
+            "market_rent_high": 1128
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "0313",
+            "g5_apartment_id": "1494748829",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Poplar",
+          "availability_date": "2026-07-25",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "0314",
+            "g5_apartment_id": "1494748858",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Poplar",
+          "availability_date": "2026-07-28",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "1033",
+            "g5_apartment_id": "1494748875",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Willow",
+          "availability_date": "2026-07-06",
+          "positive_rent_evidence": {
+            "market_rent_low": 1264,
+            "market_rent_high": 1264
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "0634",
+            "g5_apartment_id": "1494748893",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Willow",
+          "availability_date": "2026-08-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 1270,
+            "market_rent_high": 1270
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "0913",
+            "g5_apartment_id": "1494748911",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Willow",
+          "availability_date": "2026-10-10",
+          "positive_rent_evidence": {
+            "market_rent_low": 1270,
+            "market_rent_high": 1270
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "1134",
+            "g5_apartment_id": "1494748936",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Sycamore",
+          "availability_date": "2026-03-17",
+          "positive_rent_evidence": {
+            "market_rent_low": 1223,
+            "market_rent_high": 1223
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "0111",
+            "g5_apartment_id": "1494748954",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Sycamore",
+          "availability_date": "2026-05-13",
+          "positive_rent_evidence": {
+            "market_rent_low": 1223,
+            "market_rent_high": 1223
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "1128",
+            "g5_apartment_id": "1494748980",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Sycamore",
+          "availability_date": "2026-06-27",
+          "positive_rent_evidence": {
+            "market_rent_low": 1262,
+            "market_rent_high": 1262
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "identity": {
+            "unit_number": "1431",
+            "g5_apartment_id": "1494749011",
+            "g5_floorplan_id": "33240361",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "floor_plan_name": "Mulberry",
+          "availability_date": "2026-06-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 1424,
+            "market_rent_high": 1424
+          },
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        }
+      ],
+      "native_rows": [
+        {
+          "unit_number": "1324",
+          "floor_plan_name": "Poplar",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "671",
+          "market_rent_low": 1128,
+          "market_rent_high": 1128,
+          "rent_range": "1128",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-01",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748811",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0313",
+          "floor_plan_name": "Poplar",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "671",
+          "market_rent_low": 1150,
+          "market_rent_high": 1150,
+          "rent_range": "1150",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-25",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748829",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0314",
+          "floor_plan_name": "Poplar",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "671",
+          "market_rent_low": 1150,
+          "market_rent_high": 1150,
+          "rent_range": "1150",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-28",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748858",
+            "g5_floorplan_id": "33240246",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1033",
+          "floor_plan_name": "Willow",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "768",
+          "market_rent_low": 1264,
+          "market_rent_high": 1264,
+          "rent_range": "1264",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-06",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748875",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0634",
+          "floor_plan_name": "Willow",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "768",
+          "market_rent_low": 1270,
+          "market_rent_high": 1270,
+          "rent_range": "1270",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748893",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0913",
+          "floor_plan_name": "Willow",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "768",
+          "market_rent_low": 1270,
+          "market_rent_high": 1270,
+          "rent_range": "1270",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-10-10",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748911",
+            "g5_floorplan_id": "33240267",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1134",
+          "floor_plan_name": "Sycamore",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "859",
+          "market_rent_low": 1223,
+          "market_rent_high": 1223,
+          "rent_range": "1223",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-03-17",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748936",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0111",
+          "floor_plan_name": "Sycamore",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "859",
+          "market_rent_low": 1223,
+          "market_rent_high": 1223,
+          "rent_range": "1223",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-05-13",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748954",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1128",
+          "floor_plan_name": "Sycamore",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "859",
+          "market_rent_low": 1262,
+          "market_rent_high": 1262,
+          "rent_range": "1262",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-27",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494748980",
+            "g5_floorplan_id": "33240300",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1431",
+          "floor_plan_name": "Mulberry",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1086",
+          "market_rent_low": 1424,
+          "market_rent_high": 1424,
+          "rent_range": "1424",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749011",
+            "g5_floorplan_id": "33240361",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1022",
+          "floor_plan_name": "Mulberry",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1086",
+          "market_rent_low": 1468,
+          "market_rent_high": 1468,
+          "rent_range": "1468",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-17",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749039",
+            "g5_floorplan_id": "33240361",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "1337",
+          "floor_plan_name": "Mulberry",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1086",
+          "market_rent_low": 1468,
+          "market_rent_high": 1468,
+          "rent_range": "1468",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-24",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749052",
+            "g5_floorplan_id": "33240361",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0931",
+          "floor_plan_name": "Magnolia",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1163",
+          "market_rent_low": 1420,
+          "market_rent_high": 1420,
+          "rent_range": "1420",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-04-11",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749064",
+            "g5_floorplan_id": "33240397",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0534",
+          "floor_plan_name": "Cottonwood",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1269",
+          "market_rent_low": 1661,
+          "market_rent_high": 1661,
+          "rent_range": "1661",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-01-05",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749076",
+            "g5_floorplan_id": "33240407",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0833",
+          "floor_plan_name": "Cottonwood",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1269",
+          "market_rent_low": 1661,
+          "market_rent_high": 1661,
+          "rent_range": "1661",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-05-21",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749094",
+            "g5_floorplan_id": "33240407",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        },
+        {
+          "unit_number": "0532",
+          "floor_plan_name": "Cottonwood",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1269",
+          "market_rent_low": 1661,
+          "market_rent_high": 1661,
+          "rent_range": "1661",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-06",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_API_G5",
+          "source_ids": {
+            "g5_apartment_id": "1494749110",
+            "g5_floorplan_id": "33240407",
+            "g5_apartment_complex_id": "272596562",
+            "g5_location_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+          },
+          "source_property_id": "272596562",
+          "source_api_url": "https://inventory.g5marketingcloud.com/graphql?urn=g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in"
+        }
+      ],
+      "strict_gates": {
+        "exact_current_property_identity": true,
+        "canonical_g5_datalayer_urn_ranked_first": true,
+        "canonical_g5_complex_id_is_numeric_and_distinct_from_sibling": true,
+        "six_exact_numeric_floorplan_ids": true,
+        "all_rows_unique_native_g5_apartment_id": true,
+        "all_rows_native_unit_number": true,
+        "all_rows_positive_row_level_rent": true,
+        "full_pipeline_current_root_16_native_positive_rent_rows": true,
+        "full_pipeline_and_direct_graphql_unit_rent_plan_date_match": true,
+        "denver_sibling_urn_explicitly_rejected": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true
+      },
+      "g5_direct_probe": {
+        "canonical_urn": "g5-cl-1ogmyorq1z-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-indianapolis-in",
+        "canonical_complex_id": "272596562",
+        "canonical_native_apartments": 16,
+        "canonical_floorplans": {
+          "Poplar": "33240246",
+          "Willow": "33240267",
+          "Sycamore": "33240300",
+          "Mulberry": "33240361",
+          "Magnolia": "33240397",
+          "Cottonwood": "33240407"
+        },
+        "canonical_unit_numbers": [
+          "1324",
+          "0313",
+          "0314",
+          "1033",
+          "0634",
+          "0913",
+          "1134",
+          "0111",
+          "1128",
+          "1431",
+          "1022",
+          "1337",
+          "0931",
+          "0534",
+          "0833",
+          "0532"
+        ],
+        "numeric_id_semantics": "G5 numeric complex, apartment, and floorplan IDs are captured from this live snapshot; the property boundary is the page-published canonical G5_STORE_ID URN, not a hard-coded numeric ID",
+        "sibling_urn": "g5-cl-1ofqzxojd0-starwood-capital-fka-highmark-residential-scg-global-holdings-l-l-c-denver-co",
+        "sibling_complex_id": "272592143",
+        "sibling_native_apartments": 28,
+        "sibling_floorplan_prefix": "7575 - "
+      },
+      "floorplan_name_and_date_semantics": {
+        "exact_published_floorplan_names": [
+          "Cottonwood",
+          "Magnolia",
+          "Mulberry",
+          "Poplar",
+          "Sycamore",
+          "Willow"
+        ],
+        "exact_numeric_floorplan_ids": [
+          "33240246",
+          "33240267",
+          "33240300",
+          "33240361",
+          "33240397",
+          "33240407"
+        ],
+        "explicit_availability_date_rows": 16,
+        "names_are_native_graphql_floorplan_names": true,
+        "dates_are_native_graphql_availabilityDate_values": true
+      },
+      "contamination_negative_checks": {
+        "canonical_urn_source": "current property page G5_STORE_ID dataLayer",
+        "canonical_complex_ids_admitted": [
+          "272596562"
+        ],
+        "denver_sibling_complex_ids_admitted": [],
+        "denver_sibling_rows_admitted": 0,
+        "direct_vs_full_pipeline_row_set_difference": []
+      },
+      "current_capture": {
+        "configured_route": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/37071_configured_route.html.gz",
+          "compressed_sha256": "b1a4b35db098af560ccc14c4358d9d23280dc00fd0263cf362810bcb90aa855a",
+          "raw_sha256": "a5db0ae014b801c5483869aee774c301de5f4eba4675f8e55e0753f8d81f82f4",
+          "raw_bytes": 150828
+        },
+        "current_official_root": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/37071_current_official_root.html.gz",
+          "compressed_sha256": "e231c44528b110a9c4efa64edfcd5764567235bb671c4d0be28af798f3984272",
+          "raw_sha256": "37f17bb07df9eb7c27b0962aa9a6cb5b3ce6b21244696e5875967634bd74ca64",
+          "raw_bytes": 198586
+        },
+        "canonical_g5_graphql_payload": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/summerwood_g5_canonical_graphql.json.gz",
+          "compressed_sha256": "57b237e269056538a92ec7ced4f8b03ddb0be05742264bd20dc18efa82fa16c0",
+          "raw_sha256": "6bc3bfd59b536c575ed6d4d74ce24b1e9d038614b29d421f99551a14967cb329",
+          "raw_bytes": 7364
+        },
+        "rejected_sibling_g5_graphql_payload": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/summerwood_g5_denver_sibling_graphql.json.gz",
+          "compressed_sha256": "46f64dd03c3ec116068bbf3726e805b23c676b190e1e93934f7b28d0b2f82f0f",
+          "raw_sha256": "0ecc6b87091ce5d4ca94c5b715cfaf93c91c868195de666257da23fe35fec93e",
+          "raw_bytes": 14592
+        }
+      }
+    },
+    {
+      "property_id": 42977,
+      "property_name": "Elms at Stoney Run",
+      "website": "https://stoneyrunelmsliving.com/home#",
+      "current_official_url": "https://www.stoneyrunelmsliving.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "knock",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 21,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_official_elms_stoney_run_knock_community_11ed3548d8dabea8_property_2017709_native_api_full_pipeline",
+      "identity_evidence": {
+        "canonical_name": "Elms at Stoney Run",
+        "published_names": [
+          "Elms Stoney Run Village",
+          "The Elms at Stoney Run Village",
+          "Elms at Stoney Run"
+        ],
+        "published_address": "7581 Stoney Run Drive",
+        "city_state_zip": "Hanover, MD 21076",
+        "current_root_identity_checks": {
+          "published_name": true,
+          "street": true,
+          "city": true,
+          "postal_code": true
+        },
+        "configured_route_identity_checks": {
+          "published_name": false,
+          "street": false,
+          "city": false,
+          "postal_code": false
+        },
+        "rows_with_native_identity": 21,
+        "rows_with_native_identity_and_positive_rent": 21,
+        "distinct_unit_numbers": 21,
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        ]
+      },
+      "configured_source_validation": {
+        "configured_url": "https://stoneyrunelmsliving.com/home#",
+        "configured_probe_url": "https://stoneyrunelmsliving.com/home#",
+        "configured_fetch": {
+          "requested_url": "https://stoneyrunelmsliving.com/home#",
+          "status": 200,
+          "final_url": "https://stoneyrunelmsliving.com/call-support.html",
+          "body_bytes": 10177,
+          "body_sha256": "18822bee6c7e71f77fac982d88a71837b44947bf3671574670f6d5933c068169",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": false,
+            "street": false,
+            "city": false,
+            "postal_code": false
+          }
+        },
+        "configured_full_pipeline": {
+          "adapter": "knock",
+          "detected_pms": {
+            "pms": "knock",
+            "confidence": 0.9,
+            "evidence": [
+              "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "api_first"
+          },
+          "tier": "TIER_1_KNOCK_API",
+          "errors": [
+            "knock-adapter: no knockDoorway.init() call in HTML"
+          ],
+          "strict_native_positive_rent_rows": 0,
+          "distinct_native_unit_numbers": 0,
+          "source_urls": [],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "configured_route_exact_property_identity": false,
+        "current_official_fetch": {
+          "requested_url": "https://www.stoneyrunelmsliving.com/",
+          "status": 200,
+          "final_url": "https://www.stoneyrunelmsliving.com/",
+          "body_bytes": 207445,
+          "body_sha256": "8527ad5b99ec9ad47262fdcbdb77bf47609e1512529a58a7c63533e027e229db",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          },
+          "identity_checks": {
+            "published_name": true,
+            "street": true,
+            "city": true,
+            "postal_code": true
+          }
+        },
+        "current_official_full_pipeline": {
+          "adapter": "knock",
+          "detected_pms": {
+            "pms": "knock",
+            "confidence": 0.9,
+            "evidence": [
+              "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "api_first"
+          },
+          "tier": "TIER_1_KNOCK_API",
+          "errors": [],
+          "strict_native_positive_rent_rows": 21,
+          "distinct_native_unit_numbers": 21,
+          "source_urls": [
+            "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+          ],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "minimal_production_lever": "update canonical website to the exact current official property URL"
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "7577G",
+            "knock_unit_id": "28d9dae7-cf9b-448b-bde7-f826107a3012",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "availability_date": "2026-08-15",
+          "positive_rent_evidence": {
+            "market_rent_low": 2265,
+            "market_rent_high": 2265
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1607C",
+            "knock_unit_id": "fac4a854-daec-4107-9302-9252d97af704",
+            "knock_layout_id": "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath SR/Loft",
+          "availability_date": "2026-07-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 2867,
+            "market_rent_high": 2867
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1609L",
+            "knock_unit_id": "8798b612-0bef-4e7d-848d-459cf79662f5",
+            "knock_layout_id": "5d729406-2199-4fdb-8159-87eba14fc665",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath",
+          "availability_date": "2026-09-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 2126,
+            "market_rent_high": 2126
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1626I",
+            "knock_unit_id": "2e5e5ab8-e52d-478f-8e2c-49613582171a",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "availability_date": "2026-08-19",
+          "positive_rent_evidence": {
+            "market_rent_low": 2200,
+            "market_rent_high": 2200
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1630N",
+            "knock_unit_id": "9a1c974d-1c0e-45b4-8b06-bcc20cf73f9a",
+            "knock_layout_id": "8d5c220b-6b78-41d9-8b99-a0e7cfa2bc09",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 1 Bath",
+          "availability_date": "2026-09-22",
+          "positive_rent_evidence": {
+            "market_rent_low": 2059,
+            "market_rent_high": 2059
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1620O",
+            "knock_unit_id": "33f28f88-e1eb-45a1-8ebb-60f05cc391c7",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "availability_date": "2026-08-14",
+          "positive_rent_evidence": {
+            "market_rent_low": 2083,
+            "market_rent_high": 2083
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1608I",
+            "knock_unit_id": "c5cfa534-33ef-459f-8e8e-842d113db54c",
+            "knock_layout_id": "83911603-7e01-404e-885b-55810f7272cb",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "3 Bed 2 Bath",
+          "availability_date": "2026-09-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 3134,
+            "market_rent_high": 3134
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1612B",
+            "knock_unit_id": "6f054cba-01ea-4b66-938d-47d4ba3da19f",
+            "knock_layout_id": "fc42ac30-4aa1-498e-ad5e-5613a6d3c1ad",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath w/Loft",
+          "availability_date": "2026-07-24",
+          "positive_rent_evidence": {
+            "market_rent_low": 2615,
+            "market_rent_high": 2615
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1618M",
+            "knock_unit_id": "86674eda-c035-4517-8c2d-abf1964b3cdb",
+            "knock_layout_id": "8dfc73bb-c67a-4494-a505-71845132090f",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "1 Bed 1 Bath",
+          "availability_date": "2026-06-22",
+          "positive_rent_evidence": {
+            "market_rent_low": 2218,
+            "market_rent_high": 2218
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        },
+        {
+          "identity": {
+            "unit_number": "1620H",
+            "knock_unit_id": "b7bb8a54-1155-4fcb-b915-c47e3a91b764",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "availability_date": "2026-07-29",
+          "positive_rent_evidence": {
+            "market_rent_low": 2260,
+            "market_rent_high": 2260
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units"
+        }
+      ],
+      "native_rows": [
+        {
+          "unit_number": "7577G",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2265,
+          "market_rent_high": 2265,
+          "rent_range": "2265",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-15",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "28d9dae7-cf9b-448b-bde7-f826107a3012",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-28d9dae7-cf9b-448b-bde7-f826107a3012"
+        },
+        {
+          "unit_number": "1607C",
+          "floor_plan_name": "2 Bed 2 Bath SR/Loft",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1533",
+          "market_rent_low": 2867,
+          "market_rent_high": 2867,
+          "rent_range": "2867",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "fac4a854-daec-4107-9302-9252d97af704",
+            "knock_layout_id": "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-fac4a854-daec-4107-9302-9252d97af704"
+        },
+        {
+          "unit_number": "1609L",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1165",
+          "market_rent_low": 2126,
+          "market_rent_high": 2126,
+          "rent_range": "2126",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-09-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "8798b612-0bef-4e7d-848d-459cf79662f5",
+            "knock_layout_id": "5d729406-2199-4fdb-8159-87eba14fc665",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-8798b612-0bef-4e7d-848d-459cf79662f5"
+        },
+        {
+          "unit_number": "1626I",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2200,
+          "market_rent_high": 2200,
+          "rent_range": "2200",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-08-19",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "2e5e5ab8-e52d-478f-8e2c-49613582171a",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-2e5e5ab8-e52d-478f-8e2c-49613582171a"
+        },
+        {
+          "unit_number": "1630N",
+          "floor_plan_name": "2 Bed 1 Bath",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "965",
+          "market_rent_low": 2059,
+          "market_rent_high": 2059,
+          "rent_range": "2059",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-09-22",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "9a1c974d-1c0e-45b4-8b06-bcc20cf73f9a",
+            "knock_layout_id": "8d5c220b-6b78-41d9-8b99-a0e7cfa2bc09",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-9a1c974d-1c0e-45b4-8b06-bcc20cf73f9a"
+        },
+        {
+          "unit_number": "1620O",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2083,
+          "market_rent_high": 2083,
+          "rent_range": "2083",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-14",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "33f28f88-e1eb-45a1-8ebb-60f05cc391c7",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-33f28f88-e1eb-45a1-8ebb-60f05cc391c7"
+        },
+        {
+          "unit_number": "1608I",
+          "floor_plan_name": "3 Bed 2 Bath",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1390",
+          "market_rent_low": 3134,
+          "market_rent_high": 3134,
+          "rent_range": "3134",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-09-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "c5cfa534-33ef-459f-8e8e-842d113db54c",
+            "knock_layout_id": "83911603-7e01-404e-885b-55810f7272cb",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-c5cfa534-33ef-459f-8e8e-842d113db54c"
+        },
+        {
+          "unit_number": "1612B",
+          "floor_plan_name": "2 Bed 2 Bath w/Loft",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1455",
+          "market_rent_low": 2615,
+          "market_rent_high": 2615,
+          "rent_range": "2615",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-24",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "6f054cba-01ea-4b66-938d-47d4ba3da19f",
+            "knock_layout_id": "fc42ac30-4aa1-498e-ad5e-5613a6d3c1ad",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-6f054cba-01ea-4b66-938d-47d4ba3da19f"
+        },
+        {
+          "unit_number": "1618M",
+          "floor_plan_name": "1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "830",
+          "market_rent_low": 2218,
+          "market_rent_high": 2218,
+          "rent_range": "2218",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-22",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "86674eda-c035-4517-8c2d-abf1964b3cdb",
+            "knock_layout_id": "8dfc73bb-c67a-4494-a505-71845132090f",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-86674eda-c035-4517-8c2d-abf1964b3cdb"
+        },
+        {
+          "unit_number": "1620H",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2260,
+          "market_rent_high": 2260,
+          "rent_range": "2260",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-29",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "b7bb8a54-1155-4fcb-b915-c47e3a91b764",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-b7bb8a54-1155-4fcb-b915-c47e3a91b764"
+        },
+        {
+          "unit_number": "1625G",
+          "floor_plan_name": "1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "830",
+          "market_rent_low": 2269,
+          "market_rent_high": 2269,
+          "rent_range": "2269",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-04-02",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "14ee5236-d418-4be8-9ff9-37daafc4e44e",
+            "knock_layout_id": "8dfc73bb-c67a-4494-a505-71845132090f",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-14ee5236-d418-4be8-9ff9-37daafc4e44e"
+        },
+        {
+          "unit_number": "1623C",
+          "floor_plan_name": "2 Bed 2 Bath SR/Loft",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1533",
+          "market_rent_low": 2874,
+          "market_rent_high": 2874,
+          "rent_range": "2874",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-12",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "d0a701b6-6d04-42fb-8f25-d211f0721b97",
+            "knock_layout_id": "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-d0a701b6-6d04-42fb-8f25-d211f0721b97"
+        },
+        {
+          "unit_number": "1624J",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2209,
+          "market_rent_high": 2209,
+          "rent_range": "2209",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-24",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "b716cf3e-fd1a-4a6f-913f-00a8a8f03c35",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-b716cf3e-fd1a-4a6f-913f-00a8a8f03c35"
+        },
+        {
+          "unit_number": "1624H",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2250,
+          "market_rent_high": 2250,
+          "rent_range": "2250",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-09-02",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "850b7a15-63de-4596-aee0-8dad721f3a7a",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-850b7a15-63de-4596-aee0-8dad721f3a7a"
+        },
+        {
+          "unit_number": "1615M",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1165",
+          "market_rent_low": 2211,
+          "market_rent_high": 2211,
+          "rent_range": "2211",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-19",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "7255c570-1f3c-4759-8cae-0c46dfa04b04",
+            "knock_layout_id": "5d729406-2199-4fdb-8159-87eba14fc665",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-7255c570-1f3c-4759-8cae-0c46dfa04b04"
+        },
+        {
+          "unit_number": "7563G",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1165",
+          "market_rent_low": 2200,
+          "market_rent_high": 2200,
+          "rent_range": "2200",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-22",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "19902def-225c-428e-9559-9e13cecf2f47",
+            "knock_layout_id": "5d729406-2199-4fdb-8159-87eba14fc665",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-19902def-225c-428e-9559-9e13cecf2f47"
+        },
+        {
+          "unit_number": "1622M",
+          "floor_plan_name": "2 Bed 2 Bath SR",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1255",
+          "market_rent_low": 2214,
+          "market_rent_high": 2214,
+          "rent_range": "2214",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-10",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "e25e32e8-819d-41a2-b4b6-1567245ed543",
+            "knock_layout_id": "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-e25e32e8-819d-41a2-b4b6-1567245ed543"
+        },
+        {
+          "unit_number": "1611O",
+          "floor_plan_name": "2 Bed 1 Bath",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "965",
+          "market_rent_low": 2082,
+          "market_rent_high": 2082,
+          "rent_range": "2082",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-07-03",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "9d684047-c5fc-4d92-aa8b-b9dab7864722",
+            "knock_layout_id": "8d5c220b-6b78-41d9-8b99-a0e7cfa2bc09",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-9d684047-c5fc-4d92-aa8b-b9dab7864722"
+        },
+        {
+          "unit_number": "7579I",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1165",
+          "market_rent_low": 2150,
+          "market_rent_high": 2150,
+          "rent_range": "2150",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-06-23",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "9d0365cf-7fbe-4035-b482-06ab20142342",
+            "knock_layout_id": "5d729406-2199-4fdb-8159-87eba14fc665",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-9d0365cf-7fbe-4035-b482-06ab20142342"
+        },
+        {
+          "unit_number": "7577C",
+          "floor_plan_name": "2 Bed 2 Bath SR/Loft",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1533",
+          "market_rent_low": 2870,
+          "market_rent_high": 2870,
+          "rent_range": "2870",
+          "availability_status": "UNAVAILABLE",
+          "availability_date": "2026-09-04",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "ca7e2575-0ee6-46a7-91ba-98523dc3f115",
+            "knock_layout_id": "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-ca7e2575-0ee6-46a7-91ba-98523dc3f115"
+        },
+        {
+          "unit_number": "1621E",
+          "floor_plan_name": "1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "830",
+          "market_rent_low": 2269,
+          "market_rent_high": 2269,
+          "rent_range": "2269",
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-05-15",
+          "building": "",
+          "concession": "",
+          "extraction_tier": "TIER_1_KNOCK_API",
+          "source_ids": {
+            "knock_unit_id": "8bca6e55-3a2c-4d13-83c9-cc91ec1c14c2",
+            "knock_layout_id": "8dfc73bb-c67a-4494-a505-71845132090f",
+            "knock_property_id": "2017709",
+            "knock_community_id": "11ed3548d8dabea8"
+          },
+          "source_property_id": "2017709",
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "unit_id": "knock_unit_id-8bca6e55-3a2c-4d13-83c9-cc91ec1c14c2"
+        }
+      ],
+      "strict_gates": {
+        "exact_current_property_identity": true,
+        "exact_knock_public_key_and_community_id_on_property_page": true,
+        "community_metadata_exact_name_address_zip_website": true,
+        "numeric_knock_property_id_2017709": true,
+        "all_rows_exact_property_id_2017709": true,
+        "all_rows_unique_native_knock_uuid": true,
+        "all_rows_native_unit_number": true,
+        "all_rows_positive_row_level_rent": true,
+        "full_pipeline_current_root_21_native_positive_rent_rows": true,
+        "full_pipeline_and_direct_api_unit_rent_plan_date_match": true,
+        "one_unpriced_raw_row_explicitly_excluded": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true
+      },
+      "knock_direct_probe": {
+        "public_key": "dff7e918938011ed9e6812fdb3809b4f",
+        "community_id": "11ed3548d8dabea8",
+        "property_id": "2017709",
+        "community_url": "https://doorway-api.knockrentals.com/v1/property/community/11ed3548d8dabea8",
+        "community_fetch": {
+          "requested_url": "https://doorway-api.knockrentals.com/v1/property/community/11ed3548d8dabea8",
+          "status": 200,
+          "final_url": "https://doorway-api.knockrentals.com/v1/property/community/11ed3548d8dabea8",
+          "body_bytes": 24998,
+          "body_sha256": "810d41908e10bc79dc0824751254688dc7ead5b2b7661ccb1c7a58a86aa782ba",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          }
+        },
+        "units_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+        "units_fetch": {
+          "requested_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "status": 200,
+          "final_url": "https://doorway-api.knockrentals.com/v1/property/2017709/units",
+          "body_bytes": 20662,
+          "body_sha256": "df7bdabb6cf470373c88cc554af5defb4c2d69313ae29e6a7eb7638a35eb039b",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          }
+        },
+        "raw_units": 22,
+        "raw_layouts": 9,
+        "strict_native_positive_rent_rows": 21,
+        "excluded_raw_rows": [
+          {
+            "unit_number": "1622A",
+            "knock_unit_id": "1fa4c715-6ea0-4a40-9fad-5b89c0f756f8",
+            "knock_layout_id": "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+            "floor_plan_name": "2 Bed 2 Bath SR/Loft",
+            "availability_date": "2026-11-20",
+            "price": null,
+            "displayPrice": null,
+            "knockPrice": null,
+            "strict_exclusion_reason": "no published positive rent"
+          }
+        ]
+      },
+      "floorplan_name_and_date_semantics": {
+        "exact_published_floorplan_names": [
+          "1 Bed 1 Bath",
+          "2 Bed 1 Bath",
+          "2 Bed 2 Bath",
+          "2 Bed 2 Bath SR",
+          "2 Bed 2 Bath SR/Loft",
+          "2 Bed 2 Bath w/Loft",
+          "3 Bed 2 Bath"
+        ],
+        "exact_native_layout_ids": [
+          "32e37dfd-e35c-4de8-9b12-5ab95b370f5c",
+          "5d729406-2199-4fdb-8159-87eba14fc665",
+          "8174a1d0-becb-4f67-b416-b70ab8bc0923",
+          "83911603-7e01-404e-885b-55810f7272cb",
+          "8d5c220b-6b78-41d9-8b99-a0e7cfa2bc09",
+          "8dfc73bb-c67a-4494-a505-71845132090f",
+          "fc42ac30-4aa1-498e-ad5e-5613a6d3c1ad"
+        ],
+        "explicit_availability_date_rows": 21,
+        "names_are_native_knock_layoutName_values": true,
+        "dates_are_native_knock_availableOn_values": true
+      },
+      "contamination_negative_checks": {
+        "community_api_exact_property_id": "2017709",
+        "all_raw_unit_property_ids": [
+          "2017709"
+        ],
+        "sibling_rows_admitted": 0,
+        "unpriced_rows_admitted": 0,
+        "direct_vs_full_pipeline_row_set_difference": []
+      },
+      "current_capture": {
+        "configured_route": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/42977_configured_route.html.gz",
+          "compressed_sha256": "f1a7129750f1d458edad894282245490255495933554894e46c8e484ab0cfbb1",
+          "raw_sha256": "18822bee6c7e71f77fac982d88a71837b44947bf3671574670f6d5933c068169",
+          "raw_bytes": 10177
+        },
+        "current_official_root": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/42977_current_official_root.html.gz",
+          "compressed_sha256": "72104c39a9d73615ba027d09256e48dcb3dfe6a5e72edcbaaf2c115f89cfd3fb",
+          "raw_sha256": "8527ad5b99ec9ad47262fdcbdb77bf47609e1512529a58a7c63533e027e229db",
+          "raw_bytes": 207445
+        },
+        "knock_community_payload": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/stoney_run_knock_community.json.gz",
+          "compressed_sha256": "1bbbdeff175ff09ba9f07d1f3f5d4f50ffd63747cce22dbfc22712f4cbf53021",
+          "raw_sha256": "fc3807d420604ae656465ff298e3c7895d6f861bfa9028851e02148be07a22db",
+          "raw_bytes": 23856
+        },
+        "knock_units_payload": {
+          "path": "/private/tmp/propai-fnd-vBkmT9/current_official_migrations_three/stoney_run_knock_units.json.gz",
+          "compressed_sha256": "4fc2fbb5dba3b7192c565e79fe5be2c112d5b373c4ee3ab145c47d47ea942087",
+          "raw_sha256": "16d3e3cdbfc242d36578afcf600d69e1c7537b7e75cb91b2b121076118d2c58b",
+          "raw_bytes": 19110
+        }
+      }
+    }
+  ],
+  "provenance": {
+    "validation_scope": "local exact-current validation; not a canary",
+    "critical_source_files_before": {
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/scraper.py": "2548c63156d664610771594680838fa435fced47f7320ac03c62deb7bef98c8e",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/marketapts.py": "b415f2ddffb107e92d770ddffedc089b3a8cd0e6df686d13e2e827f30913897f",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/g5.py": "cf32d2a3955ea639f0bc0f7a65052db1a4ab7b63b4e39bc9acce42e15b723d97",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/knock.py": "903b1bd8219911354f46fe61ae3d3329a3dc344b7c27c5a56bb89c42c63ec7f0"
+    },
+    "critical_source_files_after": {
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/scraper.py": "2548c63156d664610771594680838fa435fced47f7320ac03c62deb7bef98c8e",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/marketapts.py": "b415f2ddffb107e92d770ddffedc089b3a8cd0e6df686d13e2e827f30913897f",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/g5.py": "cf32d2a3955ea639f0bc0f7a65052db1a4ab7b63b4e39bc9acce42e15b723d97",
+      "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/pms/adapters/knock.py": "903b1bd8219911354f46fe61ae3d3329a3dc344b7c27c5a56bb89c42c63ec7f0"
+    },
+    "critical_source_files_unchanged": true,
+    "ledger_snapshot_before": {
+      "ledger": "85289c2d97f8590c1810f756f913fc81fdb11b616aa8e329641d03b655a6e6de",
+      "summary": "955a9b1cab90d69141464d543f886ec053b2fc7dcdb58fc74ba701f344c2467d",
+      "remaining": "a64e01c684a619a4d8e92918ccaa81601b78a236e522ec172596e340868a82da"
+    },
+    "ledger_snapshot_after": {
+      "ledger": "85289c2d97f8590c1810f756f913fc81fdb11b616aa8e329641d03b655a6e6de",
+      "summary": "955a9b1cab90d69141464d543f886ec053b2fc7dcdb58fc74ba701f344c2467d",
+      "remaining": "a64e01c684a619a4d8e92918ccaa81601b78a236e522ec172596e340868a82da"
+    },
+    "ledger_unchanged_during_materialization": true,
+    "transport_policy": {
+      "compliance_mode": true,
+      "llm_calls": 0,
+      "web_unlocker_calls": 0,
+      "captcha_interactions": 0,
+      "flaresolverr": false,
+      "fingerprint_rotation": false,
+      "paid_canary_run": false
+    }
+  }
+}

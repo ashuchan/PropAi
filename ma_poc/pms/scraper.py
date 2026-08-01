@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import time
 import urllib.parse
@@ -61,6 +62,24 @@ if TYPE_CHECKING:
     pass  # Playwright Page type used only in type annotations
 
 log = logging.getLogger(__name__)
+
+
+def _tier4_llm_enabled() -> bool:
+    """Return the shared Tier-4/LLM rescue gate at call time."""
+    return os.getenv("ENABLE_TIER4_LLM", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+# Page-local generic text recovery is a precision fallback, not a portfolio
+# scraper. Very large plan sets on an otherwise-empty property page are usually
+# cross-property search/map cards (measured: the same 36 Atlanta Camden cards
+# appeared on two unrelated property URLs; a KRC directory yielded 78 rows).
+# Keep those pages FAILED_NO_DATA rather than publishing another property's
+# rents. PMS/unit-anchored recovery is not subject to this plan-row cap.
+_PAGE_LOCAL_GENERIC_MAX_ROWS = 24
 
 # Network errors that indicate the site is unreachable — no point retrying
 # or running any extraction tiers.
@@ -165,6 +184,150 @@ def _hop_url_key(url: str) -> str:
         return f"{host}{path}{tail}".lower()
     except Exception:  # pragma: no cover — defensive; urlsplit is total
         return raw.lower()
+
+
+def _hop_surface_key(url: str) -> str:
+    """Canonical host/path identity for deciding whether a WPU is distinct.
+
+    Unlike :func:`_hop_url_key`, this intentionally drops query and fragment:
+    a profile URL that differs from the already-scraped entry page only by a
+    tracking/filter query is not a second inventory surface worth another
+    fetch.  Query-bearing API routes remain eligible when their path differs
+    from the entry page, which is the normal roster shape.
+    """
+    try:
+        parts = urllib.parse.urlsplit((url or "").strip())
+        host = (parts.hostname or "").lower().removeprefix("www.")
+        if not host:
+            return ""
+        port = parts.port
+        if port and port not in (80, 443):
+            host = f"{host}:{port}"
+        path = (urllib.parse.unquote(parts.path or "/").rstrip("/") or "/").lower()
+        return f"{host}{path}"
+    except Exception:  # pragma: no cover - defensive; malformed profile URL
+        return ""
+
+
+def _profile_wpu_prefers_get(profile: Any, url: str, anchor: str) -> bool:
+    """Return whether one profile WPU is a proven static API replay route.
+
+    The normal link-hop uses a browser render because arbitrary navigation
+    pages may need JavaScript.  A persisted high-quality field mapping is a
+    narrower contract: it names an exact captured API URL and maps both a real
+    apartment identity and rent.  Re-rendering such a JSON endpoint is slower,
+    can tarpit in Chromium, and hides its top-level response from the mapping
+    replay tier.  For that exact shape only, use the normal fetcher's DIRECT
+    GET path (called without a profile, so no escalation/proxy ladder).
+
+    This helper does not trust historical unit counts or floor-plan IDs.  The
+    response still traverses ``scrape()`` and canonical post-processing, and a
+    row is useful only if the mapped live payload carries identity + rent.
+    """
+    if anchor != "profile:winning_page_url" or profile is None:
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.username or parsed.password:
+        return False
+
+    try:
+        wpu = getattr(profile.navigation, "winning_page_url", None) or ""
+    except Exception:
+        return False
+    if _hop_url_key(wpu) != _hop_url_key(url):
+        return False
+
+    url_surface = _hop_surface_key(url)
+    if not url_surface:
+        return False
+    try:
+        mappings = list(getattr(profile.api_hints, "llm_field_mappings", []) or [])
+    except Exception:
+        return False
+
+    for mapping in mappings:
+        if isinstance(mapping, dict):
+            pattern = mapping.get("api_url_pattern") or ""
+            json_paths = mapping.get("json_paths") or {}
+            quality = mapping.get("quality_score", 1.0)
+        else:
+            pattern = getattr(mapping, "api_url_pattern", "") or ""
+            json_paths = getattr(mapping, "json_paths", {}) or {}
+            quality = getattr(mapping, "quality_score", 1.0)
+        try:
+            if float(quality) < 0.7:
+                continue
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(json_paths, dict):
+            continue
+        _unit_number_token = re.sub(r"[^a-z0-9]", "", str(json_paths.get("unit_number") or "").lower())
+        _explicit_unit_number = _unit_number_token.endswith(
+            (
+                "unitnumber",
+                "unitnum",
+                "unitno",
+                "apartmentnumber",
+                "apartmentnum",
+                "apartmentno",
+                "homenumber",
+                "homenum",
+                "homeno",
+            )
+        )
+        has_identity = bool(json_paths.get("unit_id") or _explicit_unit_number)
+        has_rent = bool(json_paths.get("rent_low") or json_paths.get("rent_high"))
+        if not (has_identity and has_rent):
+            continue
+
+        pattern_s = str(pattern).strip()
+        pattern_surface = _hop_surface_key(pattern_s)
+        if pattern_surface:
+            matches = pattern_surface == url_surface
+        else:
+            # Persisted legacy patterns may be path-only.  Keep the match
+            # directional so a short incoming URL cannot match a broader
+            # unrelated saved pattern.
+            pattern_path = pattern_s.split("?", 1)[0].strip().lower()
+            matches = bool(pattern_path and pattern_path in url_surface)
+        if matches:
+            return True
+    return False
+
+
+def _strict_profile_wpu_units(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Admit profile-WPU rows only with live identity and numeric rent."""
+    import math
+
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    rent_fields = (
+        "asking_rent",
+        "market_rent_low",
+        "market_rent_high",
+        "rent_low",
+        "rent_high",
+        "price",
+    )
+    accepted: list[dict[str, Any]] = []
+    for row in rows or []:
+        if not isinstance(row, dict) or not unit_has_real_anchor(row):
+            continue
+        has_rent = any(
+            isinstance(row.get(field), (int, float))
+            and not isinstance(row.get(field), bool)
+            and math.isfinite(float(row[field]))
+            and float(row[field]) > 0
+            for field in rent_fields
+        )
+        if has_rent:
+            accepted.append(row)
+    return accepted
 
 
 def _hop_fetch_allowance(remaining_s: float, per_fetch_cap_s: float) -> float:
@@ -297,6 +460,273 @@ def checkpoint_partial(
         pass
 
 
+def _try_page_local_static_recovery(
+    ctx: AdapterContext,
+    previous: AdapterResult,
+) -> tuple[AdapterResult, str] | None:
+    """Recover deterministic rows already present in the fetched HTML.
+
+    A PMS-specific adapter can legitimately return zero when its API/XHR is
+    absent while the same response body contains a server-rendered roster or
+    floor-plan catalogue. Path-B only retries detector candidates, and the
+    generic adapter does not include ``generic_plan_text``; consequently a
+    page can contain rows that our existing deterministic parser accepts and
+    still leave ``scrape()`` empty.
+
+    This seam is deliberately page-local and cost-free: it performs no fetch,
+    browser action, LLM call, solver, or identity change. It first recognises
+    the narrow RentManager WordPress card shape (real unit anchors), then an
+    exact-identity server-rendered residence table, and finally the
+    conservative generic plan-text parser whose own anti-noise gate requires
+    at least two rent-bearing plan rows. A zero-row recovery never replaces
+    *previous*.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None or bool(getattr(fr, "captcha_detected", False)):
+        return None
+    raw = getattr(fr, "body", None)
+    if isinstance(raw, bytes):
+        html = raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        html = raw
+    else:
+        return None
+    if not html:
+        return None
+
+    winning_url = str(getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or "")
+    rows: list[dict[str, Any]] = []
+    adapter_name = "generic_plan_text"
+    tier = "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK"
+
+    # RentManager's WordPress roster is a stronger, unit-anchored shape than
+    # flattened plan text. Without this ordering, apartment number 103 in
+    # ``The Ruby #103, 1 Bed`` is misread as "103 Bedroom" and demoted to a
+    # synthetic plan row even though the source publishes the real unit id.
+    low = html.lower()
+    if "individual-item" in low and "data-rent" in low and ("rentmanager" in low or "rm12filereader" in low):
+        try:
+            from ma_poc.pms.adapters.rentmanager import (
+                parse_rentmanager_wp_cards,
+            )
+
+            rows = parse_rentmanager_wp_cards(html, winning_url)
+        except Exception:
+            rows = []
+        if rows:
+            adapter_name = "rentmanager"
+            tier = "TIER_1_DOM_RENTMANAGER_WP_CARDS_EMPTY_FALLBACK"
+
+    # Independent rental sites can expose a mixed availability table where
+    # exact residences (``101``) sit beside plan/stack ranges (``205-805``).
+    # The helper requires exact configured property identity plus one precise
+    # labelled DOM shape and omits only numeric-to-numeric stack ranges. It
+    # fails closed on malformed/duplicate/ambiguous rows and performs no I/O.
+    if not rows:
+        try:
+            from ma_poc.pms.adapters._static_residence_table import (
+                recover_static_residence_table,
+            )
+
+            rows = recover_static_residence_table(ctx)
+        except Exception:
+            rows = []
+        if rows:
+            adapter_name = "static_residence_table"
+            tier = "TIER_1_DOM_STATIC_RESIDENCE_TABLE"
+
+    if not rows:
+        try:
+            from ma_poc.pms.adapters._static_team_unit_roster import (
+                has_static_team_unit_roster_shape,
+                recover_static_team_unit_roster,
+            )
+
+            has_team_roster = has_static_team_unit_roster_shape(ctx)
+            rows = recover_static_team_unit_roster(ctx) if has_team_roster else []
+        except Exception:
+            has_team_roster = False
+            rows = []
+        if rows:
+            adapter_name = "static_team_unit_roster"
+            tier = "TIER_1_DOM_STATIC_TEAM_UNIT_ROSTER"
+        elif has_team_roster:
+            # Never let the flat UNIT_STREET text pattern bypass a failed
+            # configured-property or card-local identity check.
+            return None
+
+    if not rows:
+        try:
+            from ma_poc.pms.adapters.generic_plan_text import (
+                _bodytext_from_fetch_result,
+                parse_generic_plan_text,
+            )
+
+            body_text = _bodytext_from_fetch_result(ctx)
+            rows = parse_generic_plan_text(body_text, winning_url)
+        except Exception:
+            rows = []
+        if len(rows) > _PAGE_LOCAL_GENERIC_MAX_ROWS:
+            log.info(
+                "page-local generic recovery rejected portfolio-shaped roster property=%s rows=%d",
+                getattr(ctx, "property_id", "unknown"),
+                len(rows),
+            )
+            return None
+    if not rows:
+        return None
+
+    try:
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(rows, property_id=getattr(ctx, "property_id", None))
+    except Exception:
+        return None
+    if pp.n_admitted <= 0:
+        return None
+
+    recovered = AdapterResult(
+        units=pp.admitted,
+        plan_summaries=pp.plan_summaries,
+        tier_used=tier,
+        winning_url=winning_url or None,
+        errors=list(previous.errors or [])
+        + [f"page-local static recovery: {adapter_name} admitted {pp.n_admitted} row(s)"],
+        confidence=min(0.90, 0.65 + 0.03 * pp.n_admitted),
+    )
+    return recovered, adapter_name
+
+
+async def _try_page_published_native_recovery(
+    ctx: AdapterContext,
+    previous: AdapterResult,
+) -> tuple[AdapterResult, str] | None:
+    """Recover a strictly property-scoped native source from fetched HTML.
+
+    This is intentionally narrower than enabling the full universal recovery
+    chain for every ``page=None`` scrape.  BetterNOI pages publish one client
+    UUID plus floor-plan UUIDs in the exact property's HTML.  A separate
+    ShowMojo route requires exact first-party identity, an explicit
+    ``Managed by`` link, reciprocal manager/property links, one manager-wide
+    ShowMojo iframe, and per-row name/city/state/ZIP/native-UID checks.  Both
+    recoveries reject mixed or ambiguous provider boundaries.  NestHub's
+    route starts on one native detail page, proves one same-host community and
+    published property filter, parses a bounded same-host Available Rentals
+    roster, and detail-revalidates only exact-address candidates.
+
+    The bridge matters on link-hop sub-pages: those are deliberately extracted
+    through :func:`scrape` with ``page=None`` to prevent recursive navigation,
+    while ``ENABLE_BODY_RESOLVER`` is off in the production configuration.
+    A verified native roster should therefore not be hidden behind that broad
+    experimental flag.  No portfolio-wide provider parser is activated here.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None or bool(getattr(fr, "captcha_detected", False)):
+        return None
+    raw = getattr(fr, "body", None)
+    if isinstance(raw, bytes):
+        html = raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        html = raw
+    else:
+        return None
+    low = html.casefold()
+    has_betternoi_markers = "data-property" in low and "data-fpcode" in low
+    has_showmojo_chain_markers = "managed by" in low and "rhris.com" in low
+    has_nesthub_detail_markers = bool(
+        "/_system/listings/"
+        in str(getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or "").casefold()
+        and "resources.nesthub.com" in low
+        and "nesthub-property-detail-view" in low
+        and "nhw-details" in low
+    )
+    # Cost/precision prefilter.  Each recovery performs authoritative identity
+    # and provider-payload gates before accepting anything.
+    if not has_betternoi_markers and not has_showmojo_chain_markers and not has_nesthub_detail_markers:
+        return None
+
+    rows: list[dict[str, Any]] = []
+    adapter_name = ""
+    tier = ""
+    if has_betternoi_markers:
+        try:
+            from ma_poc.pms.adapters._betternoi_public import (
+                recover_betternoi_public,
+            )
+
+            rows = await recover_betternoi_public(ctx)
+        except Exception:
+            rows = []
+        if rows:
+            adapter_name = "betternoi_public"
+            tier = "TIER_1_PUBLIC_BETTERNOI_API"
+    if not rows and has_showmojo_chain_markers:
+        try:
+            from ma_poc.pms.adapters._showmojo_public import (
+                recover_showmojo_public,
+            )
+
+            rows = await recover_showmojo_public(ctx)
+        except Exception:
+            rows = []
+        if rows:
+            adapter_name = "showmojo_public"
+            tier = "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN"
+    if not rows and has_nesthub_detail_markers:
+        try:
+            from ma_poc.pms.adapters._nesthub_public import (
+                recover_nesthub_public,
+            )
+
+            rows = await recover_nesthub_public(ctx)
+        except Exception:
+            rows = []
+        if rows:
+            adapter_name = "nesthub_public"
+            tier = "TIER_1_PUBLIC_NESTHUB_SSR_EXACT_PROPERTY"
+    if not rows:
+        return None
+
+    try:
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(rows, property_id=getattr(ctx, "property_id", None))
+    except Exception:
+        return None
+    if pp.n_admitted <= 0 or rows_are_plan_level(pp.admitted):
+        return None
+
+    # Keep any legitimate plan catalogue the primary adapter already found;
+    # the native available-unit roster upgrades it rather than erasing it.
+    plan_summaries: list[dict[str, Any]] = []
+    # A NestHub native detail is not a floor-plan catalogue.  On the exact
+    # Annaberg stale listing, generic_plan_text interprets the $500 deposit as
+    # a plan rent.  The detail-revalidated native row carries the provider's
+    # real plan name and rent, so retaining that synthetic predecessor would
+    # knowingly reintroduce contaminated plan data.
+    previous_plans = [] if adapter_name == "nesthub_public" else list(previous.plan_summaries or [])
+    if adapter_name != "nesthub_public" and rows_are_plan_level(previous.units):
+        # Legacy adapters still place plan rows in ``units``.  This bridge is
+        # entered precisely because that channel is plan-only; retain those
+        # official plan cards beside the newly recovered native roster.
+        previous_plans.extend(previous.units)
+    for plan in previous_plans + list(pp.plan_summaries or []):
+        if isinstance(plan, dict) and plan not in plan_summaries:
+            plan_summaries.append(plan)
+    winning_url = str(
+        rows[0].get("source_portal_url") or getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or ""
+    )
+    recovered = AdapterResult(
+        units=pp.admitted,
+        plan_summaries=plan_summaries,
+        tier_used=tier,
+        winning_url=winning_url or None,
+        errors=list(previous.errors or []),
+        confidence=min(0.94, 0.78 + 0.03 * pp.n_admitted),
+    )
+    return recovered, adapter_name
+
+
 def _merge_post_hop_telemetry(
     result: dict[str, Any],
     hop_result: dict[str, Any],
@@ -343,6 +773,7 @@ def _merge_post_hop_telemetry(
     for k in ("_winning_page_url", "_adapter_used"):
         if hop_result.get(k) and not result.get(k):
             result[k] = hop_result[k]
+
 
 _HTTPS_RE = re.compile(r"^http://", re.IGNORECASE)
 
@@ -402,6 +833,211 @@ def rows_are_plan_level(units: list[dict[str, Any]] | None) -> bool:
     from ma_poc.core.identity import unit_has_real_anchor
 
     return bool(units) and not any(unit_has_real_anchor(u) for u in units)
+
+
+def _retry_real_unit_count(result: AdapterResult) -> int:
+    """Count canonical apartments; malformed rows are never identities."""
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    return sum(1 for row in (result.units or []) if isinstance(row, dict) and unit_has_real_anchor(row))
+
+
+def _retry_result_is_plan_level(result: AdapterResult) -> bool:
+    """True when either result channel has plan data but no real apartment."""
+    has_plan_evidence = bool(result.units or result.plan_summaries)
+    return has_plan_evidence and _retry_real_unit_count(result) == 0
+
+
+def _retry_plan_rows(result: AdapterResult) -> list[dict[str, Any]]:
+    """Plan fallback rows across the legacy and channel-split result shapes."""
+    if not _retry_result_is_plan_level(result):
+        return []
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, ...]] = set()
+    for row in [*(result.plan_summaries or []), *(result.units or [])]:
+        if not isinstance(row, dict):
+            continue
+        identity = _hop_plan_identity(row)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        rows.append(row)
+    return rows
+
+
+_PLAN_SOURCE_ID_KEY_RE = re.compile(
+    r"(?:floor.?plan|fpid|layout)",
+    re.IGNORECASE,
+)
+
+
+def _plan_source_ids(row: dict[str, Any]) -> set[str]:
+    """Return identifiers that the producer explicitly scoped to a plan."""
+    values: set[str] = set()
+    for field in (
+        "floor_plan_id",
+        "floorplan_id",
+        "floorPlanId",
+        "plan_id",
+        "planId",
+        "layout_id",
+        "layoutId",
+    ):
+        value = str(row.get(field) or "").strip()
+        if value:
+            values.add(value.casefold())
+    source_ids = row.get("source_ids")
+    if isinstance(source_ids, dict):
+        for field, raw_value in source_ids.items():
+            if not _PLAN_SOURCE_ID_KEY_RE.search(str(field)):
+                continue
+            value = str(raw_value or "").strip()
+            if value:
+                values.add(value.casefold())
+    return values
+
+
+def _normalized_comparable_value(row: dict[str, Any], fields: tuple[str, ...]) -> str:
+    for field in fields:
+        value = row.get(field)
+        if value in (None, "", [], {}):
+            continue
+        return re.sub(r"[^a-z0-9.]+", "", str(value).casefold())
+    return ""
+
+
+def _generic_fallback_relabels_primary_plan_ids(
+    primary: AdapterResult,
+    fallback: AdapterResult,
+) -> bool:
+    """Detect a plan catalogue whose IDs were relabelled as apartments.
+
+    Detected-PMS adapters such as Entrata already retain a plan catalogue in
+    ``plan_summaries``.  The generic fallback can then walk the same response,
+    treat each bare plan ``id`` as ``unit_number``, and appear to be a strict
+    unit-level improvement.  Andante (PID 39378) and Brownstone (PID 218853)
+    demonstrated that exact sequence on 2026-07-31.
+
+    The decline is deliberately double-locked: at least two fallback rows must
+    form a one-to-one cover of the primary's explicitly plan-scoped source IDs,
+    and each pair must agree on at least two published plan attributes.  Any
+    apartment-specific date/floor/building evidence fails open to the fallback.
+    """
+    primary_plans = _retry_plan_rows(primary)
+    fallback_units = [row for row in (fallback.units or []) if isinstance(row, dict)]
+    if len(primary_plans) < 2 or len(fallback_units) < 2:
+        return False
+
+    by_plan_id: dict[str, dict[str, Any]] = {}
+    ambiguous_ids: set[str] = set()
+    for plan in primary_plans:
+        for plan_id in _plan_source_ids(plan):
+            if plan_id in by_plan_id:
+                ambiguous_ids.add(plan_id)
+            else:
+                by_plan_id[plan_id] = plan
+    for plan_id in ambiguous_ids:
+        by_plan_id.pop(plan_id, None)
+    if len(by_plan_id) != len(fallback_units):
+        return False
+
+    field_groups = (
+        ("floor_plan_name", "floorplan_name", "name"),
+        ("bedrooms", "beds"),
+        ("bathrooms", "baths"),
+        ("sqft", "area", "square_feet"),
+        ("market_rent_low", "rent_low", "min_rent", "rent"),
+        ("market_rent_high", "rent_high", "max_rent"),
+    )
+    matched_ids: set[str] = set()
+    for row in fallback_units:
+        if any(
+            row.get(field) not in (None, "", [], {})
+            for field in (
+                "availability_date",
+                "available_date",
+                "floor",
+                "building",
+                "unit_name",
+            )
+        ):
+            return False
+        anchor = str(row.get("unit_number") or row.get("unit_id") or "").strip()
+        anchor_key = anchor.casefold()
+        plan = by_plan_id.get(anchor_key)
+        if not anchor_key or plan is None or anchor_key in matched_ids:
+            return False
+        comparable = 0
+        for fields in field_groups:
+            fallback_value = _normalized_comparable_value(row, fields)
+            plan_value = _normalized_comparable_value(plan, fields)
+            if not fallback_value or not plan_value:
+                continue
+            if fallback_value != plan_value:
+                return False
+            comparable += 1
+        if comparable < 2:
+            return False
+        matched_ids.add(anchor_key)
+    return len(matched_ids) == len(by_plan_id)
+
+
+def _should_adopt_generic_fallback(
+    primary: AdapterResult,
+    fallback: AdapterResult,
+) -> bool:
+    """Return whether generic fallback strictly improves the primary result.
+
+    Canonical apartments always win. A plan-only fallback is admitted only
+    over a truly empty primary; it must never replace an existing PMS-native
+    plan catalog merely because that catalog lives in ``plan_summaries``.
+    """
+    if _retry_real_unit_count(fallback) > 0:
+        if _generic_fallback_relabels_primary_plan_ids(primary, fallback):
+            return False
+        return True
+    primary_has_evidence = bool(primary.units or primary.plan_summaries)
+    return not primary_has_evidence and _retry_result_is_plan_level(fallback)
+
+
+def _promote_context_portal_hints(
+    ctx: AdapterContext,
+    adapter_result: AdapterResult,
+) -> None:
+    """Move recovery-discovered portal routes onto the adapter result.
+
+    Universal recovery shares an :class:`AdapterContext` across its bounded
+    sub-recoveries, while the existing link-hop handoff is serialized from the
+    final :class:`AdapterResult`.  Keep that transport seam explicit and
+    de-duplicate it so an embedded-JSON hint and a failed code-only portal
+    probe cannot spend two render slots on the same URL.
+    """
+    try:
+        from ma_poc.pms.adapters._pms_portal_hop import get_portal_hints
+
+        discovered = get_portal_hints(ctx)
+    except Exception:  # pragma: no cover - observability must never sink scrape
+        return
+    if not discovered:
+        return
+
+    existing = getattr(adapter_result, "_embedded_portal_hints", None) or []
+    merged: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in [*existing, *discovered]:
+        try:
+            url, portal = item
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(url, str) or not url or not isinstance(portal, str):
+            continue
+        key = (url.casefold(), portal.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append((url, portal))
+    if merged:
+        adapter_result._embedded_portal_hints = merged  # type: ignore[attr-defined]
 
 
 _SCALAR_SQFT_RE = re.compile(
@@ -512,9 +1148,7 @@ def backfill_sqft_from_public_plan_context(adapter_result: AdapterResult) -> int
     return filled
 
 
-def promote_verified_unit_rows(
-    adapter_result: AdapterResult, *, property_id: str | None = None
-) -> int:
+def promote_verified_unit_rows(adapter_result: AdapterResult, *, property_id: str | None = None) -> int:
     """Keep anchored apartments separate from plan and recovery rows.
 
     Some PMS responses contain a genuine unit roster beside floor-plan cards,
@@ -612,9 +1246,7 @@ def promote_verified_unit_rows(
                 # identity has not run yet at this point in the pipeline, so
                 # unit_id is still None on every row here.
                 n_with_unit_number=sum(
-                    1
-                    for _row, _ in processed.rejected
-                    if str((_row or {}).get("unit_number") or "").strip()
+                    1 for _row, _ in processed.rejected if str((_row or {}).get("unit_number") or "").strip()
                 ),
             )
         except Exception:  # pragma: no cover - telemetry must never break emit
@@ -654,17 +1286,12 @@ def promote_verified_unit_rows(
     def _has_numeric_sqft(row: dict[str, Any]) -> bool:
         """Return whether a row carries a positive scalar sqft value."""
         return any(
-            _is_positive_numeric(row.get(field))
-            for field in ("sqft", "area", "square_feet", "squareFeet")
+            _is_positive_numeric(row.get(field)) for field in ("sqft", "area", "square_feet", "squareFeet")
         )
 
     def _append_quality_flag(row: dict[str, Any], flag: str) -> None:
         """Append one pipe-delimited quality flag without duplicating it."""
-        flags = [
-            part.strip()
-            for part in str(row.get("data_quality_flag") or "").split("|")
-            if part.strip()
-        ]
+        flags = [part.strip() for part in str(row.get("data_quality_flag") or "").split("|") if part.strip()]
         if flag not in flags:
             flags.append(flag)
         row["data_quality_flag"] = "|".join(flags)
@@ -680,9 +1307,7 @@ def promote_verified_unit_rows(
                 promoted["extraction_tier"] = row_tier[: -len("_PLAN_LEVEL")]
             row_flag = str(promoted.get("data_quality_flag") or "")
             if "PLAN_LEVEL" in row_flag.upper():
-                retained_flags = [
-                    part for part in row_flag.split("|") if "PLAN_LEVEL" not in part.upper()
-                ]
+                retained_flags = [part for part in row_flag.split("|") if "PLAN_LEVEL" not in part.upper()]
                 promoted["data_quality_flag"] = "|".join(retained_flags)
             if promoted.get("unit_number"):
                 gaps = promoted.get("data_gaps")
@@ -883,7 +1508,7 @@ _RICH_HOP_MIN_BODY_BYTES = 50_000
 
 # Cheap content markers that suggest unit-bearing structured data is present.
 # Either marker + body size threshold qualifies the hop as "rich."
-_RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
+_RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", 'Apartment"')
 # Heuristic: at least N rent-shaped tokens ($1234 or $1234/mo) anywhere in
 # the body. Five distinct hits is uncommon outside an actual pricing page.
 _RICH_HOP_RENT_TOKEN_RE = re.compile(r"\$\d{3,4}")
@@ -1150,11 +1775,16 @@ def _empty_exit_subpage_plan_text(base_url: str) -> list[dict[str, Any]]:
     if not base_url:
         return []
     for _path in (
-        "/floorplans/", "/floorplans",
-        "/floor-plans/", "/floor-plans",
-        "/availability/", "/availability",
-        "/apartments/", "/apartments",
-        "/pricing/", "/pricing",
+        "/floorplans/",
+        "/floorplans",
+        "/floor-plans/",
+        "/floor-plans",
+        "/availability/",
+        "/availability",
+        "/apartments/",
+        "/apartments",
+        "/pricing/",
+        "/pricing",
     ):
         try:
             _r = probe_get(base_url + _path, timeout=12, unlocker=False)
@@ -1167,9 +1797,7 @@ def _empty_exit_subpage_plan_text(base_url: str) -> list[dict[str, Any]]:
             pass
 
         _stub = _Stub()
-        _stub.fetch_result = type(
-            "_FR", (), {"body": _r.text.encode("utf-8", "replace")}
-        )()
+        _stub.fetch_result = type("_FR", (), {"body": _r.text.encode("utf-8", "replace")})()
         _body = _bodytext_from_fetch_result(_stub)  # type: ignore[arg-type]
         if not _body:
             continue
@@ -1198,9 +1826,7 @@ def _crawl_get_gate_should_skip(url: str) -> bool:
         from ma_poc.pms.adapters._probe import probe_get
 
         r = probe_get(url, timeout=10, unlocker=False)
-        return getattr(r, "status_code", 0) in (404, 410) and (
-            len(getattr(r, "text", "") or "") < 10_000
-        )
+        return getattr(r, "status_code", 0) in (404, 410) and (len(getattr(r, "text", "") or "") < 10_000)
     except Exception:
         return False
 
@@ -1336,13 +1962,11 @@ async def scrape(
                 page_html,
                 flags=re.IGNORECASE | re.DOTALL,
             )
-            _flat = re.sub(
-                r"\s+", " ", re.sub(r"<[^>]+>", " ", _no_code)
-            )
+            _flat = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", _no_code))
             _cm = _PROPERTY_CONCESSION_RE.search(_flat)
             if _cm:
                 _s, _e = _cm.span()
-                _win = _flat[max(0, _s - 200):_e + 200]
+                _win = _flat[max(0, _s - 200) : _e + 200]
                 _off = _s - max(0, _s - 200)
                 # 2026-05-20 (header-only fix): the matched sentence is
                 # often a banner header — "Limited Time Offer!",
@@ -1437,19 +2061,15 @@ async def scrape(
                 elif isinstance(_body, (str, bytes)):
                     try:
                         import json as _json_a
-                        _txt = (
-                            _body.decode("utf-8", "replace")
-                            if isinstance(_body, bytes) else _body
-                        )
+
+                        _txt = _body.decode("utf-8", "replace") if isinstance(_body, bytes) else _body
                         _parsed = _json_a.loads(_txt)
                     except Exception:
                         _parsed = None
                 if _parsed is None:
                     continue
                 _candidate = extract_api_concession(_parsed)
-                if _candidate and (
-                    _api_conc is None or len(_candidate) > len(_api_conc)
-                ):
+                if _candidate and (_api_conc is None or len(_candidate) > len(_api_conc)):
                     _api_conc = _candidate
             if _api_conc:
                 result["concessions_text"] = _api_conc[:300]
@@ -1490,9 +2110,7 @@ async def scrape(
                 scan_rendered_dom_for_concession,
             )
 
-            _rendered = await scan_rendered_dom_for_concession(
-                page, _PROPERTY_CONCESSION_RE
-            )
+            _rendered = await scan_rendered_dom_for_concession(page, _PROPERTY_CONCESSION_RE)
             if _rendered:
                 result["concessions_text"] = _rendered[:300]
                 result["concession_source"] = "DOM_POPUP_RENDERED"
@@ -1515,7 +2133,33 @@ async def scrape(
     # proxy-independent) and re-detect on that. Recovers the misclassified-
     # but-adapter-exists clusters (RealPage/OneSite, Funnel, Spherexx,
     # ResMan, Entrata, securecafe, …) the 842 probe surfaced.
-    if initial_detection.pms in ("unknown", "custom"):
+    # A profile-proven DIRECT GET of a JSON WPU is already on the data-bearing
+    # endpoint.  Running the legacy homepage detection rescue here would fire
+    # up to seven unrelated curl-cffi probes before the generic mapping replay
+    # sees the payload.  Besides wasting the bounded WPU attempt, those probes
+    # add an impersonated transport to a path intentionally scoped to plain
+    # public HTTP.  Let the generic adapter consume the JSON directly.
+    _fetch_mode = getattr(fetch_result, "render_mode", None)
+    _fetch_mode_value = getattr(_fetch_mode, "value", _fetch_mode)
+    _fetch_headers = getattr(fetch_result, "headers", None) or {}
+    _fetch_content_type = str(_fetch_headers.get("content-type", ""))
+    _fetch_body = getattr(fetch_result, "body", None)
+    _is_direct_json_get = bool(
+        _fetch_mode_value == "GET"
+        and _fetch_body
+        and (
+            "json" in _fetch_content_type.lower()
+            or (
+                isinstance(_fetch_body, (bytes, str))
+                and (
+                    _fetch_body.lstrip().startswith((b"{", b"["))
+                    if isinstance(_fetch_body, bytes)
+                    else _fetch_body.lstrip().startswith(("{", "["))
+                )
+            )
+        )
+    )
+    if initial_detection.pms in ("unknown", "custom") and not _is_direct_json_get:
         try:
             from urllib.parse import urlparse as _up
 
@@ -1548,17 +2192,10 @@ async def scrape(
                         continue
                     if _rr.status_code != 200 or not _rr.text:
                         continue
-                    _rd = detect_pms(
-                        _effective_url, csv_row=csv_row, page_html=_rr.text
-                    )
-                    if (
-                        _rd.pms not in ("unknown", "custom")
-                        and _rd.confidence > initial_detection.confidence
-                    ):
+                    _rd = detect_pms(_effective_url, csv_row=csv_row, page_html=_rr.text)
+                    if _rd.pms not in ("unknown", "custom") and _rd.confidence > initial_detection.confidence:
                         initial_detection = _rd
-                        result["_detected_pms"] = _detection_to_dict(
-                            initial_detection
-                        )
+                        result["_detected_pms"] = _detection_to_dict(initial_detection)
                         result["_detection_rescued"] = {
                             "via": f"curl_cffi_refetch:{_suffix}",
                             "pms": _rd.pms,
@@ -1694,6 +2331,7 @@ async def scrape(
         # still applies on the no-profile path. compute_budget below also
         # injects it; this keeps both branches consistent.
         from ma_poc.services.source_planner import get_property_llm_cost_cap_usd
+
         budget = {
             "llm_api_calls": 3,
             "llm_dom_calls": 1,
@@ -1705,6 +2343,7 @@ async def scrape(
             try:
                 from ma_poc.models.scrape_profile import ProfileMaturity
                 from ma_poc.services.source_planner import compute_budget
+
                 is_cold = profile.confidence.maturity == ProfileMaturity.COLD
                 budget = compute_budget(profile, is_cold=is_cold)
             except Exception:
@@ -1718,9 +2357,7 @@ async def scrape(
     # the wall again. Unconditional set (empty when no challenge solved)
     # so a recursive link-hop scrape can't leave stale clearance behind;
     # reset before every return below.
-    _clr_token = set_clearance_cookies(
-        getattr(fetch_result, "clearance_cookies", None)
-    )
+    _clr_token = set_clearance_cookies(getattr(fetch_result, "clearance_cookies", None))
 
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
@@ -1789,6 +2426,58 @@ async def scrape(
                     "captcha_detected": bool(entry.get("captcha_detected", False)),
                 }
             )
+
+        # A DIRECT GET of a profile-proven API WPU has no browser network log:
+        # the top-level response *is* the API response.  Surface JSON bodies to
+        # the existing mapping replay tier instead of sending a 200-byte JSON
+        # document through HTML/LLM extraction.  This is read-only plumbing;
+        # eligibility for the GET is decided by the strict saved-mapping gate
+        # in ``_profile_wpu_prefers_get``.
+        _render_mode = getattr(fetch_result, "render_mode", None)
+        _render_mode_value = getattr(_render_mode, "value", _render_mode)
+        _status = getattr(fetch_result, "status", None)
+        _headers = getattr(fetch_result, "headers", None) or {}
+        _content_type = str(_headers.get("content-type", ""))
+        _body = getattr(fetch_result, "body", None)
+        if (
+            _render_mode_value == "GET"
+            and isinstance(_status, int)
+            and 200 <= _status < 300
+            and _body
+            and (
+                "json" in _content_type.lower()
+                or (
+                    isinstance(_body, (bytes, str))
+                    and (
+                        _body.lstrip().startswith((b"{", b"["))
+                        if isinstance(_body, bytes)
+                        else _body.lstrip().startswith(("{", "["))
+                    )
+                )
+            )
+        ):
+            try:
+                _decoded = _body.decode("utf-8", errors="replace") if isinstance(_body, bytes) else _body
+                _parsed_get_body = _json.loads(_decoded)
+            except Exception:
+                _parsed_get_body = None
+            _get_url = str(
+                getattr(fetch_result, "final_url", None)
+                or getattr(fetch_result, "url", None)
+                or resolved.resolved_url
+            )
+            if _parsed_get_body is not None and not any(
+                str(item.get("url") or "") == _get_url for item in prepared
+            ):
+                prepared.append(
+                    {
+                        "url": _get_url,
+                        "body": _parsed_get_body,
+                        "status": _status,
+                        "content_type": _content_type,
+                        "captcha_detected": False,
+                    }
+                )
         ctx._api_responses = prepared  # type: ignore[attr-defined]
 
     # --- Step 6b: Router invariant (API adapters only) ---------------------
@@ -1864,6 +2553,131 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
+    # --- Fast body recovery before broad adapter retries --------------------
+    # The late universal-recovery net is deliberately comprehensive, but the
+    # Path-B/C adapter retries before it can consume most of a property's
+    # budget.  Run only body/signal-gated arms here: no navigation-dependent
+    # SightMap or generic-DOM probing is reachable in ``body_only`` mode.
+    #
+    # A blocked SecureCafe URL is especially valuable.  The portal resolver
+    # canonicalises it and records a strict render handoff; broad retries and
+    # generic fallback then yield their budget to the existing bounded
+    # link-hop, where the normal fetcher may use Hyperbrowser.  No CAPTCHA
+    # solver, unlocker, FlareSolverr, or fingerprint rotation is introduced.
+    _fast_portal_handoff = False
+    _fast_body_recovery_allowed = bool(page_html)
+    if page is None:
+        try:
+            from ma_poc.config.feature_flags import ENABLE_BODY_RESOLVER
+
+            _fast_body_recovery_allowed = bool(ENABLE_BODY_RESOLVER and page_html)
+        except Exception:
+            _fast_body_recovery_allowed = False
+
+    if _retry_real_unit_count(adapter_result) == 0 and _fast_body_recovery_allowed:
+        try:
+            from ma_poc.pms.adapters._pms_portal_hop import (
+                has_strict_securecafe_handoff as _fast_has_portal_handoff,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                already_attempted as _fast_ur_attempted,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                get_blocks as _fast_ur_get_blocks,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                get_notes as _fast_ur_get_notes,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                recover_universal_embed as _fast_ur_recover,
+            )
+
+            _fast_units: list[dict[str, Any]] = []
+            _fast_tier = ""
+            _fast_winner = ""
+            _fast_original_fetch_result = getattr(ctx, "fetch_result", None)
+            _fast_body = getattr(_fast_original_fetch_result, "body", None)
+            _fast_body_overlay_installed = False
+            if not _fast_body and page_html:
+                # Page-driven callers do not necessarily have an L1
+                # FetchResult. Give body-only arms a minimal, temporary view of
+                # the rendered body; restore the exact original object before
+                # normal orchestration resumes.
+                from types import SimpleNamespace
+
+                ctx.fetch_result = SimpleNamespace(
+                    body=page_html,
+                    final_url=resolved.resolved_url,
+                )
+                _fast_body_overlay_installed = True
+            try:
+                if not _fast_ur_attempted(ctx):
+                    (
+                        _fast_units,
+                        _fast_tier,
+                        _fast_winner,
+                    ) = await _fast_ur_recover(
+                        page,
+                        ctx,
+                        body_only=True,
+                    )
+            finally:
+                if _fast_body_overlay_installed:
+                    ctx.fetch_result = _fast_original_fetch_result
+
+            if _fast_units:
+                from ma_poc.extraction.post_process import (
+                    post_process as _fast_ur_pp,
+                )
+
+                _fast_post = _fast_ur_pp(
+                    _fast_units,
+                    property_id=getattr(ctx, "property_id", None),
+                )
+                if _fast_post.n_admitted > 0 and not rows_are_plan_level(_fast_post.admitted):
+                    adapter_result.units = _fast_post.admitted
+                    adapter_result.plan_summaries = _fast_post.plan_summaries
+                    adapter_result.tier_used = _fast_tier
+                    adapter_result.confidence = min(
+                        0.92,
+                        0.65 + 0.04 * _fast_post.n_admitted,
+                    )
+                    fallback_chain.append(f"fast_universal_recovery:{_fast_winner}")
+
+            _fast_portal_handoff = bool(
+                _retry_real_unit_count(adapter_result) == 0 and _fast_has_portal_handoff(ctx)
+            )
+            if _fast_portal_handoff:
+                fallback_chain.append("fast_securecafe_render_handoff")
+
+            # When this pass wins or redirects the remaining budget, the late
+            # full chain will not necessarily run. Preserve its operational
+            # evidence here; misses without a handoff defer telemetry to the
+            # ordinary late pass to avoid duplicate entries.
+            if _fast_units or _fast_portal_handoff:
+                _seen_fast_blocks: set[tuple[str, int]] = set()
+                for _block in _fast_ur_get_blocks(ctx):
+                    _recovery = str(_block.get("recovery") or "")
+                    _status = int(_block.get("status") or 0)
+                    _block_key = (_recovery, _status)
+                    if not _recovery or not _status or _block_key in _seen_fast_blocks:
+                        continue
+                    _seen_fast_blocks.add(_block_key)
+                    fallback_chain.append(f"universal_recovery_blocked:{_recovery}:{_status}")
+                _seen_fast_notes: set[tuple[str, str]] = set()
+                for _note in _fast_ur_get_notes(ctx):
+                    _recovery = str(_note.get("recovery") or "")
+                    _reason = str(_note.get("reason") or "")
+                    _note_key = (_recovery, _reason)
+                    if not _recovery or not _reason or _note_key in _seen_fast_notes:
+                        continue
+                    _seen_fast_notes.add(_note_key)
+                    fallback_chain.append(f"universal_recovery_declined:{_recovery}:{_reason}")
+        except Exception as exc:
+            # This is an optimization only. The existing Path-B/C and late
+            # universal paths remain authoritative on any unexpected failure.
+            adapter_result.errors.append(f"fast-universal-recovery-error: {exc}")
+
     # --- Path B/C: empty-exit + quality-gate retry with next-best PMS ---------
     # Three retry triggers, same mechanism:
     #   * Path B (``empty_exit``): adapter self-reports an empty-exit label
@@ -1881,15 +2695,16 @@ async def scrape(
     # On trigger: find the next PMS candidate and re-dispatch on the
     # same page. Bounded by ``PATH_B_MAX_RETRIES`` (default 2).
     #
-    # Win condition: retry result must have units AND pass the dimension
-    # gate AND have a rent signal. Retries with same-or-worse quality
-    # are not promoted.
+    # Win condition: retry result must contain at least one canonically
+    # identified apartment AND pass the dimension + rent gates. Plan cards are
+    # fallback evidence, never RETRY_SUCCESS, regardless of the trigger.
     #
-    # **Plan-level fallback**: when the BASELINE adapter returned
-    # plan-level rows (units with dims but no rent) and all retries
-    # failed, the baseline is restored and the result is marked with a
-    # ``_PLAN_LEVEL`` tier suffix + ``_verdict_quality=SUCCESS_PLAN_LEVEL``
-    # so the data isn't lost — just honestly flagged. Per the
+    # **Plan-level fallback**: when the baseline is empty/plan-only and every
+    # retry misses real units, the richest plan catalog seen across the
+    # baseline and retries is retained. Both legacy ``units`` plan rows and the
+    # split ``plan_summaries`` channel participate. The selected result gets a
+    # ``_PLAN_LEVEL`` tier suffix + ``_verdict_quality=SUCCESS_PLAN_LEVEL`` so
+    # the data isn't lost — just honestly flagged. Per the
     # project_jsonld_recovery memo: "getting floor plan level data is
     # okay but just should be flagged".
     #
@@ -1907,9 +2722,7 @@ async def scrape(
     # One shared id for the episode and its dispatch events. The three existing
     # emits used ``getattr(ctx, "property_id", "") or ""``; an empty id makes an
     # event invisible to both run aggregators, so fall back to the result dict.
-    _retry_property_id = (
-        getattr(ctx, "property_id", "") or result.get("_property_id") or "unknown"
-    )
+    _retry_property_id = getattr(ctx, "property_id", "") or result.get("_property_id") or "unknown"
     _ep_baseline_pms = adapter_name
     # Snapshot the tier NOW: the plan-level fallback below mutates
     # ``adapter_result.tier_used`` in place (appending ``_PLAN_LEVEL``), and
@@ -1919,7 +2732,7 @@ async def scrape(
     _ep_baseline_unit_count = len(adapter_result.units or [])
     _ep_baseline_error_count = len(adapter_result.errors or [])
     try:
-        _ep_baseline_plan_level = rows_are_plan_level(adapter_result.units)
+        _ep_baseline_plan_level = _retry_result_is_plan_level(adapter_result)
     except Exception:  # pragma: no cover — predicate must never break telemetry
         _ep_baseline_plan_level = False
     # Config echoes. Defaulted here so the setup_error payload is never
@@ -1945,20 +2758,25 @@ async def scrape(
             property_passes_quality_gate as _retry_quality_gate,
         )
 
-        _PATH_B_RETRY_ENABLED = (
-            _retry_os.environ.get("PATH_B_RETRY_ENABLED", "1").lower()
-            not in {"0", "false", "no", ""}
-        )
-        _PATH_B_MAX_RETRIES = int(
-            _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
-        )
+        _PATH_B_RETRY_ENABLED = _retry_os.environ.get("PATH_B_RETRY_ENABLED", "1").lower() not in {
+            "0",
+            "false",
+            "no",
+            "",
+        }
+        _PATH_B_MAX_RETRIES = int(_retry_os.environ.get("PATH_B_MAX_RETRIES", "2"))
+        _PATH_B_EFFECTIVE_MAX_RETRIES = 0 if _fast_portal_handoff else _PATH_B_MAX_RETRIES
         _ep_retry_enabled = _PATH_B_RETRY_ENABLED
-        _ep_max_retries = _PATH_B_MAX_RETRIES
+        _ep_max_retries = _PATH_B_EFFECTIVE_MAX_RETRIES
 
         def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
             / ``"no_area"`` / ``"plan_level_only"`` / None. None means the
             adapter is fine."""
+            # A channel-split adapter can correctly return zero physical units
+            # plus a useful plan catalog.  That is plan-level, not empty.
+            if res.plan_summaries and _retry_result_is_plan_level(res):
+                return "plan_level_only"
             if is_empty_exit(res.tier_used) and not res.units:
                 return "empty_exit"
             if res.units:
@@ -1992,37 +2810,109 @@ async def scrape(
             return None
 
         def _retry_win_condition(res: AdapterResult) -> bool:
-            """A retry winner must have units AND pass dimension gate AND
-            have a rent signal. Same-or-worse quality is not promoted."""
+            """True only for a quality-qualified, canonical unit roster.
+
+            Plan cards can pass both the dimension and rent gates.  They are
+            useful fallback data, but never a unit recovery: at least one row
+            must carry the per-apartment identity recognised by
+            :func:`rows_are_plan_level` / ``unit_has_real_anchor``.
+            """
             return bool(
                 res.units
                 and _retry_quality_gate(res.units)
                 and _retry_rent_signal(res.units)
+                and _retry_real_unit_count(res) > 0
             )
 
+        _baseline_has_native_units = bool(
+            adapter_result.units and not rows_are_plan_level(adapter_result.units)
+        )
+
         def _retry_win_condition_for(res: AdapterResult, trigger: str | None) -> bool:
-            """Win condition, tightened for the plan_level_only trigger.
+            """Win condition, tightened to preserve native-unit baselines.
 
             Swapping one plan-level result for another plan-level result is
             not a win — it changes the tier label without adding a single
             apartment, and it would discard a baseline that may well be the
             better of the two. When plan-level is what triggered the retry,
             the replacement must be genuinely unit-level.
+
+            The same invariant applies when a real apartment roster triggered
+            enrichment because it lacks sqft (or another optional field). A
+            generic plan catalogue cannot replace published unit numbers. It
+            may still be used later as exact plan context for enrichment, but
+            it is not a retry winner over native units.
             """
             if not _retry_win_condition(res):
+                return False
+            if _baseline_has_native_units and rows_are_plan_level(res.units):
                 return False
             if trigger == "plan_level_only":
                 return not rows_are_plan_level(res.units)
             return True
 
-        # Preserve the baseline (initial-adapter) result so plan-level
-        # data isn't lost if all retries fail. Only relevant when the
-        # baseline HAS units — for empty_exit triggers there's nothing
-        # to preserve.
+        _PLAN_FALLBACK_FIELDS: tuple[str, ...] = (
+            "floor_plan_name",
+            "floorplan_name",
+            "floor_plan",
+            "name",
+            "beds",
+            "bedrooms",
+            "baths",
+            "bathrooms",
+            "sqft",
+            "area",
+            "rent_low",
+            "rent_high",
+            "asking_rent",
+            "market_rent_low",
+            "market_rent_high",
+            "availability_date",
+            "available_date",
+        )
+
+        def _retry_plan_fallback_score(
+            res: AdapterResult,
+        ) -> tuple[int, int] | None:
+            """Return a coverage-first score for a plan-only fallback."""
+            plan_rows = _retry_plan_rows(res)
+            if not plan_rows:
+                return None
+            populated = sum(
+                1
+                for row in plan_rows
+                for field in _PLAN_FALLBACK_FIELDS
+                if row.get(field) not in (None, "", [], {})
+            )
+            return (len(plan_rows), populated)
+
+        # Preserve any baseline evidence while retries run. An empty baseline
+        # can still acquire a plan fallback from a retry candidate; a split
+        # baseline can carry all its plans in plan_summaries with units=[].
         _baseline_result: AdapterResult | None = (
-            adapter_result if adapter_result.units else None
+            adapter_result if adapter_result.units or adapter_result.plan_summaries else None
         )
         _baseline_adapter_name = adapter_name
+        _baseline_adapter = adapter
+        _baseline_detection = ctx.detected
+        # A real (but incomplete) baseline must never be replaced by plan
+        # cards.  Plan fallback selection is allowed only when the baseline is
+        # empty or itself has no canonical apartment identity.
+        # Finalised after the initial trigger predicate runs inside the inner
+        # try.  Calling the canonical identity predicate here would misclassify
+        # malformed per-property rows as a run-wide setup error.
+        _plan_fallback_allowed = _baseline_result is None
+        _best_plan_fallback: (
+            tuple[
+                tuple[int, int],
+                AdapterResult,
+                Any,
+                str,
+                DetectedPMS,
+                bool,
+            ]
+            | None
+        ) = None
         _retry_tried_pms: set[str] = {adapter_name}
         _retry_attempt = 0
         _retry_won = False
@@ -2079,10 +2969,21 @@ async def scrape(
             _initial_trigger_reason = _trigger_reason
             _ep_final_trigger_reason = _trigger_reason or ""
             _ep_in_trigger_eval = False
-            while (
-                _trigger_reason is not None
-                and _retry_attempt < _PATH_B_MAX_RETRIES
-            ):
+            _plan_fallback_allowed = bool(
+                _baseline_result is None or _retry_result_is_plan_level(_baseline_result)
+            )
+            if _plan_fallback_allowed and _baseline_result is not None:
+                _baseline_plan_score = _retry_plan_fallback_score(_baseline_result)
+                if _baseline_plan_score is not None:
+                    _best_plan_fallback = (
+                        _baseline_plan_score,
+                        _baseline_result,
+                        _baseline_adapter,
+                        _baseline_adapter_name,
+                        _baseline_detection,
+                        True,
+                    )
+            while _trigger_reason is not None and _retry_attempt < _PATH_B_EFFECTIVE_MAX_RETRIES:
                 _next_candidates = detect_pms_candidates(
                     url=getattr(ctx, "base_url", "") or "",
                     csv_row=None,
@@ -2097,11 +2998,7 @@ async def scrape(
                     # all, which is why a 1,127-property canary could not tell
                     # "the trigger never fired" from "it fired every time and
                     # always dead-ended right here".
-                    _ep_outcome = (
-                        "no_candidate"
-                        if _retry_attempt == 0
-                        else "lost_candidates_exhausted"
-                    )
+                    _ep_outcome = "no_candidate" if _retry_attempt == 0 else "lost_candidates_exhausted"
                     break
                 _next_cand = _next_candidates[0]
                 _previous_tier = _current_result.tier_used or ""
@@ -2156,22 +3053,34 @@ async def scrape(
                 except Exception as _retry_exc:
                     _ep_outcome = "lost_adapter_error"
                     _ep_error_type = type(_retry_exc).__name__
-                    fallback_chain.append(
-                        f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
-                    )
+                    fallback_chain.append(f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}")
                     break
 
                 fallback_chain.append(f"retry:{_new_adapter_name}")
-                # Trigger-aware: a plan_level_only retry must come back genuinely
-                # unit-level to be promoted, otherwise we would swap one
-                # plan-level result for another and discard a baseline that may
-                # be the better of the two.
+                # Keep useful plan catalogs out of the unit-success channel,
+                # but remember the richest one in case no candidate recovers a
+                # canonical apartment.  A real-but-incomplete baseline remains
+                # authoritative and disables this fallback replacement.
+                if _plan_fallback_allowed:
+                    _new_plan_score = _retry_plan_fallback_score(_new_result)
+                    if _new_plan_score is not None and (
+                        _best_plan_fallback is None or _new_plan_score > _best_plan_fallback[0]
+                    ):
+                        _best_plan_fallback = (
+                            _new_plan_score,
+                            _new_result,
+                            _new_adapter,
+                            _new_adapter_name,
+                            _next_cand,
+                            False,
+                        )
                 if _retry_win_condition_for(_new_result, _initial_trigger_reason):
                     # WIN — promote
+                    _new_real_unit_count = _retry_real_unit_count(_new_result)
                     _ep_outcome = "won"
                     _ep_won_pms = _new_adapter_name
                     _ep_won_tier = _new_result.tier_used or ""
-                    _ep_won_unit_count = len(_new_result.units)
+                    _ep_won_unit_count = _new_real_unit_count
                     _retry_emit(
                         _RetryEventKind.RETRY_SUCCESS,
                         property_id=_retry_property_id,
@@ -2183,7 +3092,7 @@ async def scrape(
                         initial_trigger_reason=_initial_trigger_reason or "",
                         won_pms=_new_adapter_name,
                         won_tier=_new_result.tier_used or "",
-                        unit_count=len(_new_result.units),
+                        unit_count=_new_real_unit_count,
                     )
                     adapter_result = _new_result
                     adapter = _new_adapter
@@ -2212,38 +3121,39 @@ async def scrape(
             if not _ep_outcome:
                 if _initial_trigger_reason is None:
                     _ep_outcome = "not_triggered"
-                elif _PATH_B_MAX_RETRIES <= 0:
+                elif _PATH_B_EFFECTIVE_MAX_RETRIES <= 0:
                     _ep_outcome = "no_budget"
-                elif _retry_attempt >= _PATH_B_MAX_RETRIES:
+                elif _retry_attempt >= _PATH_B_EFFECTIVE_MAX_RETRIES:
                     _ep_outcome = "lost_max_retries"
                 else:
                     _ep_outcome = "lost_dead_end"
 
-            # Plan-level fallback: all retries failed AND we had baseline
-            # plan-level rows. Per the project_jsonld_recovery memo:
+            # Plan-level fallback: all retries failed, and neither the baseline
+            # nor any retry produced a canonical apartment. Per the
+            # project_jsonld_recovery memo:
             # "getting floor plan level data is okay but just should be
             # flagged and one another path should be retried ... if unit
             # then pick that ... else floor plan".
-            if (
-                not _retry_won
-                and _baseline_result is not None
-                and _baseline_result.units
-                and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
-                # A missing optional field (notably sqft) is a reason to try
-                # enrichment, never a reason to relabel an already anchored
-                # unit roster as floor-plan data.  Only restore-and-stamp an
-                # actual plan-level baseline when every recovery path loses.
-                and rows_are_plan_level(_baseline_result.units)
-            ):
-                adapter_result = _baseline_result
+            if not _retry_won and _best_plan_fallback is not None:
+                (
+                    _plan_score,
+                    adapter_result,
+                    adapter,
+                    adapter_name,
+                    _plan_detection,
+                    _plan_is_baseline,
+                ) = _best_plan_fallback
+                ctx.detected = _plan_detection
+                result["_adapter_used"] = adapter_name
+                result["_detected_pms"] = _detection_to_dict(_plan_detection)
                 # Stamp the tier with a _PLAN_LEVEL suffix and surface the
                 # honest verdict on the property result dict.
-                _baseline_tier = _baseline_result.tier_used or ""
-                if _baseline_tier and "_PLAN_LEVEL" not in _baseline_tier:
-                    adapter_result.tier_used = f"{_baseline_tier}_PLAN_LEVEL"
+                _plan_tier = adapter_result.tier_used or ""
+                if _plan_tier and "_PLAN_LEVEL" not in _plan_tier:
+                    adapter_result.tier_used = f"{_plan_tier}_PLAN_LEVEL"
                 result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
-                result["_plan_level_reason"] = _initial_trigger_reason
-                _ep_baseline_restored = True
+                result["_plan_level_reason"] = _initial_trigger_reason or "retry_plan_only"
+                _ep_baseline_restored = _plan_is_baseline
         except BaseException as _ep_exc:
             # CLASSIFY, DO NOT CATCH. The bare ``raise`` below preserves the
             # existing semantics exactly: an Exception still lands in the outer
@@ -2385,13 +3295,9 @@ async def scrape(
                 _ee_origin = str(getattr(_ee_fr, "final_url", "") or "")
             _ee_origin = _ee_origin or getattr(ctx, "base_url", "") or ""
             _eep = _ee_urlparse(_ee_origin)
-            _ee_base = (
-                f"{_eep.scheme}://{_eep.netloc}" if _eep.scheme and _eep.netloc else ""
-            )
+            _ee_base = f"{_eep.scheme}://{_eep.netloc}" if _eep.scheme and _eep.netloc else ""
 
-            _ee_rows = (
-                _empty_exit_subpage_plan_text(_ee_base) if _ee_base else []
-            )
+            _ee_rows = _empty_exit_subpage_plan_text(_ee_base) if _ee_base else []
             if _ee_rows:
                 # Preserve the empty-exit adapter's provenance, mark plan-level.
                 _ee_prior_tier = adapter_result.tier_used or ""
@@ -2431,14 +3337,14 @@ async def scrape(
         units_now = adapter_result.units or []
         if units_now:
             n_with_rent = sum(
-                1 for u in units_now
-                if u.get("market_rent_low") or u.get("market_rent_high")
-                or u.get("rent_low") or u.get("rent_high")
+                1
+                for u in units_now
+                if u.get("market_rent_low")
+                or u.get("market_rent_high")
+                or u.get("rent_low")
+                or u.get("rent_high")
             )
-            n_with_area = sum(
-                1 for u in units_now
-                if u.get("sqft") or u.get("area")
-            )
+            n_with_area = sum(1 for u in units_now if u.get("sqft") or u.get("area"))
             # Decide which dimension to enrich. Skip when units already
             # have both (no benefit) or have neither (the F1.5 sub-
             # probe can't synthesize fields from nothing).
@@ -2451,16 +3357,19 @@ async def scrape(
             # have the other. Trigger when fewer than half have both.
             elif n_with_rent > 0 and n_with_area > 0:
                 _both = sum(
-                    1 for u in units_now
-                    if (u.get("market_rent_low") or u.get("rent_low"))
-                    and (u.get("sqft") or u.get("area"))
+                    1
+                    for u in units_now
+                    if (u.get("market_rent_low") or u.get("rent_low")) and (u.get("sqft") or u.get("area"))
                 )
                 if _both < len(units_now) * 0.5:
                     # Pick the dimension fewer units have — that's the
                     # one most worth probing for.
                     _missing = "sqft" if n_with_area < n_with_rent else "rent"
 
-            if _missing:
+            # A top-level JSON GET is already the profile-proven roster API.
+            # Appending guessed HTML paths to that API host violates the
+            # one-attempt WPU bound and cannot enrich the response reliably.
+            if _missing and not _is_direct_json_get:
                 from urllib.parse import urlparse as _enrich_urlparse
 
                 _enrich_origin = ""
@@ -2469,24 +3378,25 @@ async def scrape(
                     _enrich_origin = str(getattr(_enrich_fr, "final_url", "") or "")
                 _enrich_origin = _enrich_origin or getattr(ctx, "base_url", "") or ""
                 _ep = _enrich_urlparse(_enrich_origin)
-                _enrich_base = (
-                    f"{_ep.scheme}://{_ep.netloc}" if _ep.scheme and _ep.netloc else ""
-                )
+                _enrich_base = f"{_ep.scheme}://{_ep.netloc}" if _ep.scheme and _ep.netloc else ""
 
                 if _enrich_base:
                     # Probe common subpages and build a per-name map of
                     # the MISSING dimension. The map value tuple holds
                     # (rent_low, rent_high, sqft) — only the slot we
                     # actually need is consulted at merge time.
-                    _name_map: dict[
-                        str, tuple[int | None, int | None, str | None]
-                    ] = {}
+                    _name_map: dict[str, tuple[int | None, int | None, str | None]] = {}
                     for _path in (
-                        "/floorplans/", "/floorplans",
-                        "/floor-plans/", "/floor-plans",
-                        "/availability/", "/availability",
-                        "/apartments/", "/apartments",
-                        "/pricing/", "/pricing",
+                        "/floorplans/",
+                        "/floorplans",
+                        "/floor-plans/",
+                        "/floor-plans",
+                        "/availability/",
+                        "/availability",
+                        "/apartments/",
+                        "/apartments",
+                        "/pricing/",
+                        "/pricing",
                     ):
                         if _name_map:
                             break  # got something, stop probing
@@ -2495,25 +3405,23 @@ async def scrape(
                             # (sqft/rent FK on /floorplans/ etc.) drove 52% of
                             # WU spend. These are best-effort lookups on
                             # publicly accessible plan pages — no WU needed.
-                            _r = _enrich_probe(
-                                _enrich_base + _path, timeout=12, unlocker=False
-                            )
+                            _r = _enrich_probe(_enrich_base + _path, timeout=12, unlocker=False)
                         except Exception:
                             continue
                         if _r.status_code != 200 or not _r.text:
                             continue
                         _sub_text = _r.text
+
                         # Synthesise bodyText (script/style strip + tag drop)
                         class _StubCtx:
                             pass
+
                         _stub = _StubCtx()
                         _stub.fetch_result = type("_FR", (), {"body": _sub_text.encode("utf-8", "replace")})()
                         _body_text = _bodytext_from_fetch_result(_stub)  # type: ignore[arg-type]
                         if not _body_text:
                             continue
-                        _sub_rows = parse_generic_plan_text(
-                            _body_text, _enrich_base + _path
-                        )
+                        _sub_rows = parse_generic_plan_text(_body_text, _enrich_base + _path)
                         for _row in _sub_rows:
                             _rname = (_row.get("floor_plan_name") or "").strip().lower()
                             if not _rname:
@@ -2532,7 +3440,9 @@ async def scrape(
                                 )
                             elif _missing == "sqft" and _rsq:
                                 _name_map[_rname] = (
-                                    None, None, str(_rsq).strip(),
+                                    None,
+                                    None,
+                                    str(_rsq).strip(),
                                 )
 
                     # Merge by exact-name OR substring match (floor plan
@@ -2542,13 +3452,9 @@ async def scrape(
                         _merged = 0
                         for _u in units_now:
                             # Skip units that already have the dim we'd merge.
-                            if _missing == "rent" and (
-                                _u.get("market_rent_low") or _u.get("rent_low")
-                            ):
+                            if _missing == "rent" and (_u.get("market_rent_low") or _u.get("rent_low")):
                                 continue
-                            if _missing == "sqft" and (
-                                _u.get("sqft") or _u.get("area")
-                            ):
+                            if _missing == "sqft" and (_u.get("sqft") or _u.get("area")):
                                 continue
                             _uname = str(_u.get("floor_plan_name") or "").strip().lower()
                             if not _uname:
@@ -2616,7 +3522,7 @@ async def scrape(
         from ma_poc.services.llm_api_rescue import SUPPORTED_ADAPTERS
 
         captcha_detected = bool(getattr(fetch_result, "captcha_detected", False))
-        needs_rescue = (
+        rescue_candidate = (
             not property_passes_quality_gate(adapter_result.units)
             and bool(raw_api_responses)
             and adapter_name in SUPPORTED_ADAPTERS
@@ -2624,6 +3530,17 @@ async def scrape(
             and not page_unreachable
             and not captcha_detected
         )
+        llm_rescue_enabled = _tier4_llm_enabled()
+        needs_rescue = llm_rescue_enabled and rescue_candidate
+
+        if rescue_candidate and not llm_rescue_enabled:
+            emit(
+                EventKind.LLM_RESCUE_SKIPPED,
+                ctx.property_id,
+                source_adapter=adapter_name,
+                reason="ENABLE_TIER4_LLM=false",
+            )
+            result["_rescue_skipped_reason"] = "ENABLE_TIER4_LLM=false"
 
         if not needs_rescue and captcha_detected and bool(raw_api_responses):
             # F1.2: surface the bot-block separately from FAILED_NO_DATA so
@@ -2759,11 +3676,7 @@ async def scrape(
     # Delegate actual discovery to SightMapAdapter — it already handles
     # captured-response parsing + iframe + direct-API fallback and
     # self-gates (SIGHTMAP_NO_RESPONSE) when there's genuinely nothing.
-    if (
-        not adapter_result.units
-        and pms_name == "entrata"
-        and page_html
-    ):
+    if not adapter_result.units and pms_name == "entrata" and page_html:
         try:
             from ma_poc.pms.adapters.sightmap import (
                 SightMapAdapter,
@@ -2878,9 +3791,7 @@ async def scrape(
                                     if isinstance(_r.text, str)
                                     else (_r.text or b"")
                                 )
-                                ctx.fetch_result = _dc.replace(
-                                    _fr2, body=_new_body
-                                )
+                                ctx.fetch_result = _dc.replace(_fr2, body=_new_body)
                             sm_signal = True
                             fallback_chain.append("entrata:fp_subpage_fetched")
                     except Exception as _sub_exc:  # pragma: no cover
@@ -2904,8 +3815,16 @@ async def scrape(
                 _sm_exc,
             )
 
-    # --- Step 8: Fallback to generic if adapter returned empty ---
-    if not adapter_result.units and pms_name != "unknown" and adapter_name != "generic":
+    # --- Step 8: Fallback to generic if no physical apartment was recovered ---
+    # A channel-split plan result has ``units=[]`` and useful
+    # ``plan_summaries``. It should still open unit recovery, but a second set
+    # of generic plan cards must not overwrite the better PMS-native catalog.
+    if (
+        _retry_real_unit_count(adapter_result) == 0
+        and not _fast_portal_handoff
+        and pms_name != "unknown"
+        and adapter_name != "generic"
+    ):
         generic = get_adapter("unknown")  # resolves to generic
         generic_name = getattr(generic, "pms_name", "generic")
         fallback_chain.append(generic_name)
@@ -2931,14 +3850,13 @@ async def scrape(
         fallback_ctx._api_responses = getattr(ctx, "_api_responses", [])  # type: ignore[attr-defined]
         # F12: surface the upstream adapter's unit count so generic.extract
         # can decide whether the gate should stay shut. We're inside the
-        # ``not adapter_result.units`` branch so this is always 0 here, but
-        # we set it explicitly for clarity and to keep the contract obvious
-        # to anyone reading.
-        fallback_ctx.adapter_unit_count = len(adapter_result.units)  # type: ignore[attr-defined]
+        # The branch is keyed on canonical apartments, not raw rows: legacy
+        # plan cards may still occupy ``adapter_result.units`` here.
+        fallback_ctx.adapter_unit_count = _retry_real_unit_count(adapter_result)  # type: ignore[attr-defined]
 
         try:
             fallback_result = await generic.extract(page, fallback_ctx)  # type: ignore[arg-type]
-            if fallback_result.units:
+            if _should_adopt_generic_fallback(adapter_result, fallback_result):
                 adapter_result = fallback_result
                 result["_adapter_used"] = generic_name
             # Always promote portal hints from the generic fallback even when
@@ -2946,23 +3864,46 @@ async def scrape(
             # found a leasing-portal pointer (SightMap embed URL, RealPage OLL
             # config) inside an SSR blob — those hints must reach link-hop
             # regardless of whether the fallback recovered any units here.
-            _fallback_portal_hints = getattr(
-                fallback_result, "_embedded_portal_hints", None
-            )
+            _fallback_portal_hints = getattr(fallback_result, "_embedded_portal_hints", None)
             if _fallback_portal_hints:
-                _existing_portal = getattr(
-                    adapter_result, "_embedded_portal_hints", None
-                ) or []
+                _existing_portal = getattr(adapter_result, "_embedded_portal_hints", None) or []
                 adapter_result._embedded_portal_hints = (  # type: ignore[attr-defined]
                     _existing_portal + _fallback_portal_hints
                 )
         except Exception as exc:
             adapter_result.errors.append(f"generic-fallback-error: {exc}")
 
-    # --- Step 8b: Universal embed-recovery as the cross-vendor misroute net ---
+    # --- Step 8a: exact page-published native API recovery -----------------
+    # Link-hop sub-pages are extracted through scrape(page=None) so navigation
+    # cannot recurse.  Keep the broad body-resolver experiment flag off, but do
+    # not hide a fail-closed BetterNOI native roster behind it: the exact page
+    # publishes the provider client/floor-plan UUIDs and the recovery enforces
+    # configured identity on both the page and every returned provider row.
+    if not adapter_result.units or rows_are_plan_level(adapter_result.units):
+        _page_native = await _try_page_published_native_recovery(ctx, adapter_result)
+        if _page_native is not None:
+            adapter_result, adapter_name = _page_native
+            result["_adapter_used"] = adapter_name
+            fallback_chain.append(f"page_published_native:{adapter_name}")
+
+    # --- Step 8b: page-local static recovery -------------------------------
+    # The generic adapter above does not run GenericPlanTextAdapter, and
+    # Path-B can only dispatch candidates the detector offered. That left
+    # deterministic rows stranded in the already-fetched body whenever a
+    # strong-but-empty PMS detector won (RentManager, RentCafe layout-tab,
+    # OneSite, etc.) or the detector returned unknown. Recover those rows
+    # without another request. Never replace any non-empty channel.
+    if not adapter_result.units and not adapter_result.plan_summaries:
+        _page_local = _try_page_local_static_recovery(ctx, adapter_result)
+        if _page_local is not None:
+            adapter_result, adapter_name = _page_local
+            result["_adapter_used"] = adapter_name
+            fallback_chain.append(f"page_local_static:{adapter_name}")
+
+    # --- Step 8c: Universal embed-recovery as the cross-vendor misroute net ---
     # Closes the "detector picked the wrong primary, generic also returned 0,
     # but the site really has an AppFolio iframe / LeaseLeads embed / ResMan
-    # portal / generic SSR plan grid one nav-hop deep" gap. The four
+    # portal / generic SSR plan grid one nav-hop deep" gap. The recovery
     # recoveries are the same chain wired into wix/squarespace_nopms; here we
     # also fire them when ANY non-syndication primary mis-routed.
     # Idempotent: ``recover_universal_embed`` sets
@@ -2998,8 +3939,8 @@ async def scrape(
     #
     # Same defect shape as the Path-B retry trigger (d33cd42): "has units"
     # was being treated as "done", when plan rows are not done.
-    _ur_plan_level_only = rows_are_plan_level(adapter_result.units)
-    if (not adapter_result.units or _ur_plan_level_only) and (
+    _ur_plan_level_only = _retry_result_is_plan_level(adapter_result)
+    if (_retry_real_unit_count(adapter_result) == 0 and not _fast_portal_handoff) and (
         page is not None or _ur_page_none_ok
     ):
         try:
@@ -3023,9 +3964,7 @@ async def scrape(
                         post_process as _ur_pp,
                     )
 
-                    _ur_post = _ur_pp(
-                        _ur_units, property_id=getattr(ctx, "property_id", None)
-                    )
+                    _ur_post = _ur_pp(_ur_units, property_id=getattr(ctx, "property_id", None))
                     # 2026-07-26 — DO NOT DESTROY A GOOD BASELINE. Now that
                     # this path also fires on plan-level results (not just
                     # empty ones), the assignment below would OVERWRITE real
@@ -3036,23 +3975,18 @@ async def scrape(
                     # EMPTY baseline keeps the original rule — anything beats
                     # nothing.
                     _ur_accept = _ur_post.n_admitted > 0 and (
-                        not _ur_plan_level_only
-                        or not rows_are_plan_level(_ur_post.admitted)
+                        not _ur_plan_level_only or not rows_are_plan_level(_ur_post.admitted)
                     )
                     if _ur_accept:
                         adapter_result.units = _ur_post.admitted
                         adapter_result.plan_summaries = _ur_post.plan_summaries
                         adapter_result.tier_used = _ur_tier
-                        adapter_result.confidence = min(
-                            0.92, 0.65 + 0.04 * _ur_post.n_admitted
-                        )
+                        adapter_result.confidence = min(0.92, 0.65 + 0.04 * _ur_post.n_admitted)
                         fallback_chain.append(f"universal_recovery:{_ur_winner}")
                     elif _ur_post.n_admitted > 0 and _ur_plan_level_only:
                         # Visible in triage: the route ran and returned rows,
                         # but they were no better than what we already had.
-                        fallback_chain.append(
-                            f"universal_recovery_plan_level_declined:{_ur_winner}"
-                        )
+                        fallback_chain.append(f"universal_recovery_plan_level_declined:{_ur_winner}")
 
             # Bot-block telemetry: when a recovery sub-fetch hit a wall
             # (401/403/429/503), record it on the fallback chain so DLQ/
@@ -3072,9 +4006,7 @@ async def scrape(
                     if not _rec or not _st or (_rec, _st) in _seen:
                         continue
                     _seen.add((_rec, _st))
-                    fallback_chain.append(
-                        f"universal_recovery_blocked:{_rec}:{_st}"
-                    )
+                    fallback_chain.append(f"universal_recovery_blocked:{_rec}:{_st}")
 
             # Decline telemetry (2026-07-28): a recovery that REACHED a data
             # surface and refused it — an AppFolio account roster it could not
@@ -3088,22 +4020,24 @@ async def scrape(
                 if not _rec or not _why or (_rec, _why) in _seen_notes:
                     continue
                 _seen_notes.add((_rec, _why))
-                fallback_chain.append(
-                    f"universal_recovery_declined:{_rec}:{_why}"
-                )
+                fallback_chain.append(f"universal_recovery_declined:{_rec}:{_why}")
                 adapter_result.errors.append(
-                    f"universal-recovery-declined: {_rec} reason={_why} "
-                    f"{_n.get('detail') or ''}".rstrip()
+                    f"universal-recovery-declined: {_rec} reason={_why} {_n.get('detail') or ''}".rstrip()
                 )
         except Exception as exc:
             adapter_result.errors.append(f"universal-recovery-error: {exc}")
 
+    # ``recover_pms_portal`` records a strict SecureCafe URL on the shared
+    # context when its cheap code-only probe cannot parse a canonical roster.
+    # Promote that route after the universal chain so Step 9 can forward it to
+    # the existing bounded render link-hop. This adds no fetch or bypass here;
+    # it only connects two already-existing transport channels.
+    _promote_context_portal_hints(ctx, adapter_result)
+
     # A winning adapter can still carry legacy ``_PLAN_LEVEL`` metadata even
     # though its final rows contain native unit IDs and numeric rents. Promote
     # only those strictly verified rows; inferred / plan rows remain separate.
-    if promote_verified_unit_rows(
-        adapter_result, property_id=getattr(ctx, "property_id", None)
-    ):
+    if promote_verified_unit_rows(adapter_result, property_id=getattr(ctx, "property_id", None)):
         # Path-C's marker is only valid while the final roster remains
         # plan-level. A verified native unit roster supersedes it.
         result.pop("_verdict_quality", None)
@@ -3211,10 +4145,8 @@ async def scrape(
                 elif isinstance(_body, (str, bytes)):
                     try:
                         import json as _json_9b
-                        _txt = (
-                            _body.decode("utf-8", "replace")
-                            if isinstance(_body, bytes) else _body
-                        )
+
+                        _txt = _body.decode("utf-8", "replace") if isinstance(_body, bytes) else _body
                         _parsed = _json_9b.loads(_txt)
                     except Exception:
                         _parsed = None
@@ -3246,13 +4178,12 @@ async def scrape(
         _property_text = result.get("concessions_text")
         for _u in result.get("units") or []:
             if isinstance(_u, dict):
-                enrich_unit_concession_fields(
-                    _u, property_concession_text=_property_text
-                )
+                enrich_unit_concession_fields(_u, property_concession_text=_property_text)
     except Exception as _enrich_exc:  # pragma: no cover — defensive
         log.debug(
             "Unit concession enrichment failed for %s: %s",
-            property_id, _enrich_exc,
+            property_id,
+            _enrich_exc,
         )
 
     if adapter_result.winning_url:
@@ -3270,11 +4201,23 @@ async def scrape(
     # records the winner on ctx for every route; surface it centrally, once,
     # so no call site can forget.
     _emb_winner = str(getattr(ctx, "_embed_recovery_winner", "") or "")
-    if _emb_winner and not any(
-        e.startswith("universal_recovery:") for e in fallback_chain
-    ):
+    if _emb_winner and not any(e.startswith("universal_recovery:") for e in fallback_chain):
         fallback_chain.append(f"universal_recovery:{_emb_winner}")
     result["_fallback_chain"] = fallback_chain
+    _showmojo_chain = getattr(ctx, "_showmojo_official_chain", None)
+    if isinstance(_showmojo_chain, dict):
+        # The mixed manager roster is intentionally filtered rather than
+        # treated as a property-wide feed. Surface the chain and row-level
+        # rejection reasons so a successful count is independently auditable
+        # (especially the same-account wrong-brand / wrong-ZIP controls).
+        result["_showmojo_official_chain"] = dict(_showmojo_chain)
+    _nesthub_chain = getattr(ctx, "_nesthub_official_chain", None)
+    if isinstance(_nesthub_chain, dict):
+        # The Available Rentals page is a mixed manager portfolio.  Surface
+        # page bounds, the stale configured listing, exact-address candidates,
+        # accepted native IDs, and every rejection reason for independent
+        # contamination auditing.
+        result["_nesthub_official_chain"] = dict(_nesthub_chain)
     # Surface per-sub-tier attempts for the report. GenericAdapter attaches
     # these as ``_tier_attempts``; PMS-specific adapters don't currently, so
     # an empty list is fine.
@@ -3414,11 +4357,11 @@ def _count_rent_signals(page_html: str) -> int:
         # markup lets a neighbouring element poison a real rent:
         # "<p>Studio $1,295/mo</p><p>Save $500 today</p>" put "Save" 16 chars
         # from "$1,295" and discarded a genuine asking rent.
-        before = page_html[lo:m.start()]
-        after = page_html[m.end():hi]
+        before = page_html[lo : m.start()]
+        after = page_html[m.end() : hi]
         cut = max(before.rfind(">"), before.rfind("<"))
         if cut != -1:
-            before = before[cut + 1:]
+            before = before[cut + 1 :]
         cut = min(
             (i for i in (after.find("<"), after.find(">")) if i != -1),
             default=-1,
@@ -3429,6 +4372,8 @@ def _count_rent_signals(page_html: str) -> int:
             continue
         n += 1
     return n
+
+
 _FRAMEWORK_HINTS: tuple[tuple[str, str], ...] = (
     ("__NEXT_DATA__", "next"),
     ("__NUXT__", "nuxt"),
@@ -3515,7 +4460,7 @@ _EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
 # Module-level so tests can import rather than redefine.
 _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
     "EMPTY_BODY": "FAILED_FETCH_EMPTY",
-    "DEAD_URL":   "FAILED_DEAD_URL",
+    "DEAD_URL": "FAILED_DEAD_URL",
 }
 
 
@@ -3555,9 +4500,7 @@ def _augment_ranked_with_hints(
         if abs_url in hinted_urls:
             continue
         hinted_urls.add(abs_url)
-        augmented.append(
-            (abs_url, _LLM_HINT_SCORE, f"{_LLM_HINT_ANCHOR_PREFIX}{raw_s[:60]}")
-        )
+        augmented.append((abs_url, _LLM_HINT_SCORE, f"{_LLM_HINT_ANCHOR_PREFIX}{raw_s[:60]}"))
     rest = [(u, s, a) for (u, s, a) in ranked if u not in hinted_urls]
     return augmented + rest
 
@@ -3616,6 +4559,502 @@ def _pms_priors_for(
     return out
 
 
+_GSC_LEGACY_PROPERTY_PATH_RE = re.compile(
+    r"^/apartments/[^/]+/zip_\d{5}(?:-\d{4})?/gsc/\d+/?$",
+    re.IGNORECASE,
+)
+
+_WIMMER_STALE_PROPERTY_PATH_RE = re.compile(
+    r"^/apartments/(?P<city>[a-z0-9-]+)/(?P<slug>[a-z0-9-]+)/?$",
+    re.IGNORECASE,
+)
+_WIMMER_CURRENT_FLOORPLANS_PATH_RE = re.compile(
+    r"^/apartments/wi/(?P<city>[a-z0-9-]+)/(?P<slug>[a-z0-9-]+)/floorplans/?$",
+    re.IGNORECASE,
+)
+_WIMMER_REDISCOVERY_ANCHOR = "rediscovery:wimmer_state_path"
+
+
+_LIVEBH_PROPERTY_PATH_RE = re.compile(
+    r"^/apartments/[^/]+/?$",
+    re.IGNORECASE,
+)
+_LIVEBH_CITY_LANDING_PATH_RE = re.compile(
+    r"^/apartments-in/[^/]+/?$",
+    re.IGNORECASE,
+)
+_PROPERTY_NAME_STOPWORDS = {
+    "the",
+    "at",
+    "of",
+    "apartments",
+    "apartment",
+    "homes",
+    "home",
+    "community",
+}
+_STREET_IDENTITY_STOPWORDS = {
+    "n",
+    "s",
+    "e",
+    "w",
+    "north",
+    "south",
+    "east",
+    "west",
+    "st",
+    "street",
+    "rd",
+    "road",
+    "ave",
+    "avenue",
+    "blvd",
+    "boulevard",
+    "pkwy",
+    "parkway",
+    "dr",
+    "drive",
+    "ln",
+    "lane",
+    "ct",
+    "court",
+    "hwy",
+    "highway",
+    "way",
+    "pl",
+    "place",
+    "cir",
+    "circle",
+}
+
+
+def _identity_tokens(value: object) -> list[str]:
+    return re.findall(r"[a-z0-9]+", str(value or "").casefold())
+
+
+def _livebh_retired_property_redirect_identity_rejected(
+    entry_url: str,
+    fetch_result: Any,
+    csv_row: dict[str, Any] | None,
+) -> bool:
+    """Reject a retired LiveBH property URL before portfolio link traversal.
+
+    LiveBH keeps retired ``/apartments/<property>/`` URLs alive by redirecting
+    them to a generic ``/apartments-in/<city>/`` search page.  That destination
+    publishes many sibling property cards and leasing portals, so ordinary
+    link-hop can select the first rent-bearing sibling and attribute its units
+    to the retired property.  The 2026-08-01 configured cohort probe covered
+    all 32 LiveBH rows: the two city-landing redirects (Flintridge and The
+    Crossings at Bramblewood) lacked both configured name and street identity;
+    all 30 property-scoped controls retained exact property pages.
+
+    Keep this deliberately provider- and path-specific.  A same-host property
+    rename still proceeds, as does a city landing that visibly contains the
+    configured property's name or street.  Missing canonical metadata fails
+    open because there is no identity boundary to evaluate.
+    """
+    try:
+        entry = urllib.parse.urlparse(entry_url)
+        final_url = str(getattr(fetch_result, "final_url", "") or entry_url)
+        final = urllib.parse.urlparse(final_url)
+    except Exception:
+        return False
+
+    entry_host = (entry.hostname or "").casefold().removeprefix("www.")
+    final_host = (final.hostname or "").casefold().removeprefix("www.")
+    if (
+        entry_host != "livebh.com"
+        or final_host != entry_host
+        or _LIVEBH_PROPERTY_PATH_RE.fullmatch(entry.path or "") is None
+        or _LIVEBH_CITY_LANDING_PATH_RE.fullmatch(final.path or "") is None
+        or (entry.path or "").rstrip("/").casefold() == (final.path or "").rstrip("/").casefold()
+    ):
+        return False
+
+    row = csv_row or {}
+    property_name = str(
+        row.get("name") or row.get("Name") or row.get("Property Name") or row.get("proj_name") or ""
+    ).strip()
+    address = str(row.get("address") or row.get("Address") or row.get("street_address") or "").strip()
+    if not property_name and not address:
+        return False
+
+    raw = getattr(fetch_result, "body", None)
+    if isinstance(raw, bytes):
+        html = raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        html = raw
+    else:
+        return False
+    if not html:
+        return False
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        for node in soup(["script", "style", "noscript", "template"]):
+            node.decompose()
+        visible_tokens = set(_identity_tokens(soup.get_text(" ", strip=True)))
+    except Exception:
+        return False
+
+    name_tokens = [
+        token for token in _identity_tokens(property_name) if token not in _PROPERTY_NAME_STOPWORDS
+    ]
+    name_match = bool(
+        name_tokens
+        and any(len(token) >= 4 for token in name_tokens)
+        and all(token in visible_tokens for token in name_tokens)
+    )
+
+    address_tokens = _identity_tokens(address)
+    street_number = address_tokens[0] if address_tokens else ""
+    street_words = [
+        token
+        for token in address_tokens[1:]
+        if token not in _STREET_IDENTITY_STOPWORDS and not token.isdigit()
+    ]
+    address_match = bool(
+        street_number
+        and street_number in visible_tokens
+        and street_words
+        and all(token in visible_tokens for token in street_words)
+    )
+    return not (name_match or address_match)
+
+
+def _entrata_cross_property_redirect_identity_rejected(
+    entry_url: str,
+    fetch_result: Any,
+    csv_row: dict[str, Any] | None,
+) -> bool:
+    """Reject an Entrata vanity-domain redirect to a different property.
+
+    Retired vanity domains can redirect to another Entrata property while
+    leaving a fully functional conventional grid behind.  Native unit ids and
+    rents from that destination are real, but they belong to the destination,
+    not the configured property.  Reject only a cross-host redirect whose
+    Entrata-shaped destination body contains neither the configured property
+    name nor its street identity.  Legitimate domain migrations remain
+    eligible when either identity survives on the destination page.
+
+    Live verification (2026-08-01): Revive Apartments at 2341 58th Ave E
+    redirects to The Lakes at 2301 58th Ave E and was wrongly admitting 14
+    The Lakes units.  Three legitimate Sequoia vanity migrations (Reserve at
+    Capital Center, Shore Park at Riverlake, and River Oaks) retained both
+    configured name and street identity and therefore pass this gate.
+    """
+    try:
+        entry = urllib.parse.urlparse(entry_url)
+        final_url = str(getattr(fetch_result, "final_url", "") or entry_url)
+        final = urllib.parse.urlparse(final_url)
+    except Exception:
+        return False
+
+    entry_host = (entry.hostname or "").casefold().removeprefix("www.")
+    final_host = (final.hostname or "").casefold().removeprefix("www.")
+    if not entry_host or not final_host or entry_host == final_host:
+        return False
+
+    raw = getattr(fetch_result, "body", None)
+    if isinstance(raw, bytes):
+        html = raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        html = raw
+    else:
+        return False
+    if not html:
+        return False
+
+    html_folded = html.casefold()
+    if not any(
+        marker in html_folded
+        for marker in (
+            "/apartments/module/",
+            "entrata.com",
+            "prospectportal.com",
+            "entrata-widget",
+        )
+    ):
+        return False
+
+    row = csv_row or {}
+    property_name = str(
+        row.get("name") or row.get("Name") or row.get("Property Name") or row.get("proj_name") or ""
+    ).strip()
+    address = str(row.get("address") or row.get("Address") or row.get("street_address") or "").strip()
+    if not property_name and not address:
+        return False
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        for node in soup(["script", "style", "noscript", "template"]):
+            node.decompose()
+        visible_tokens = set(_identity_tokens(soup.get_text(" ", strip=True)))
+    except Exception:
+        return False
+
+    name_tokens = [
+        token for token in _identity_tokens(property_name) if token not in _PROPERTY_NAME_STOPWORDS
+    ]
+    name_match = bool(
+        name_tokens
+        and any(len(token) >= 4 for token in name_tokens)
+        and all(token in visible_tokens for token in name_tokens)
+    )
+
+    address_tokens = _identity_tokens(address)
+    street_number = address_tokens[0] if address_tokens else ""
+    street_words = [
+        token
+        for token in address_tokens[1:]
+        if token not in _STREET_IDENTITY_STOPWORDS and not token.isdigit()
+    ]
+    address_match = bool(
+        street_number
+        and street_number in visible_tokens
+        and street_words
+        and all(token in visible_tokens for token in street_words)
+    )
+    return not (name_match or address_match)
+
+
+def _wimmer_row_value(row: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, "", "null", "None"):
+            return str(value).strip()
+    return ""
+
+
+def _wimmer_normalize(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+
+def _wimmer_property_name_core(value: str) -> str:
+    """Normalize harmless brand suffix drift on Wimmer property names."""
+    core = re.sub(
+        r"\s+(?:apartments?|phase\s*[ivx\d]+|[ivx]+|\d+)\s*$",
+        "",
+        str(value or "").strip(),
+        flags=re.IGNORECASE,
+    )
+    return _wimmer_normalize(core)
+
+
+def _rediscover_stale_wimmer_floorplans_url(
+    entry_url: str,
+    entry_page_html: str,
+    csv_row: dict[str, Any] | None,
+) -> str:
+    """Return the exact state-scoped Wimmer inventory path, or ``""``.
+
+    Wimmer retired its old ``/apartments/<city>/<property>`` URLs when its
+    RentCafe sites moved under ``/apartments/wi/...``.  The old path serves a
+    branded, link-rich 404; ordinary link ranking then walks sibling community
+    cards and can publish their units under the stale property.  Keep the
+    repair deterministic and property-local: exact host/path, Wisconsin CSV
+    identity, and configured property name absent from the entry body.
+    """
+    try:
+        parsed = urllib.parse.urlparse(entry_url)
+    except Exception:
+        return ""
+    host = (parsed.hostname or "").casefold().removeprefix("www.")
+    match = _WIMMER_STALE_PROPERTY_PATH_RE.fullmatch(parsed.path or "")
+    if host != "wimmercommunities.com" or match is None:
+        return ""
+
+    row = csv_row or {}
+    state = _wimmer_row_value(row, "state", "State").upper()
+    name = _wimmer_row_value(row, "name", "Name", "Property Name", "proj_name")
+    name_core = _wimmer_property_name_core(name)
+    if state != "WI" or not name_core:
+        return ""
+
+    # A live old-shape property page must win over this migration heuristic.
+    # The measured retired pages contain no configured property identity.
+    if name_core in _wimmer_normalize(entry_page_html):
+        return ""
+
+    city = match.group("city").casefold()
+    slug = match.group("slug").casefold()
+    scheme = parsed.scheme if parsed.scheme in {"http", "https"} else "https"
+    return urllib.parse.urlunparse(
+        (
+            scheme,
+            parsed.netloc,
+            f"/apartments/wi/{city}/{slug}/floorplans",
+            "",
+            "",
+            "",
+        )
+    )
+
+
+def _wimmer_floorplans_identity_matches(
+    candidate_url: str,
+    fetch_result: Any,
+    csv_row: dict[str, Any] | None,
+) -> bool:
+    """Fail closed unless a transformed Wimmer page proves exact identity."""
+    try:
+        expected = urllib.parse.urlparse(candidate_url)
+        final_url = str(getattr(fetch_result, "final_url", "") or candidate_url)
+        final = urllib.parse.urlparse(final_url)
+    except Exception:
+        return False
+    expected_host = (expected.hostname or "").casefold().removeprefix("www.")
+    final_host = (final.hostname or "").casefold().removeprefix("www.")
+    expected_path = (expected.path or "").rstrip("/")
+    final_path = (final.path or "").rstrip("/")
+    if (
+        expected_host != "wimmercommunities.com"
+        or final_host != expected_host
+        or expected_path != final_path
+        or _WIMMER_CURRENT_FLOORPLANS_PATH_RE.fullmatch(expected.path or "") is None
+    ):
+        return False
+
+    status = getattr(fetch_result, "status", None)
+    if status is None:
+        status = getattr(fetch_result, "status_code", None)
+    raw = getattr(fetch_result, "body", None)
+    if status != 200 or not isinstance(raw, (bytes, str)) or len(raw) < 20_000:
+        return False
+    html = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+    row = csv_row or {}
+    name_core = _wimmer_property_name_core(
+        _wimmer_row_value(row, "name", "Name", "Property Name", "proj_name")
+    )
+    city = _wimmer_normalize(_wimmer_row_value(row, "city", "City"))
+    zip_code = re.sub(r"\D", "", _wimmer_row_value(row, "zip", "Zip", "ZIP"))[:5]
+    title_match = re.search(
+        r"<title\b[^>]*>(.*?)</title>",
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    title_identity = _wimmer_normalize(title_match.group(1) if title_match is not None else "")
+    normalized_html = _wimmer_normalize(html)
+    if (
+        not name_core
+        # Do not let the transformed URL itself satisfy identity: its slug is
+        # present in the canonical tag even when a wrong community body is
+        # returned.  Wimmer's measured current template names both the
+        # property and city in <title>; require that property-local surface.
+        or name_core not in title_identity
+        or not city
+        or city not in title_identity
+        or len(zip_code) != 5
+        or zip_code not in normalized_html
+    ):
+        return False
+
+    # The page's canonical tag is the final same-property boundary.  Merely
+    # seeing a matching name in site-wide navigation is not sufficient.
+    canonical_urls: list[str] = []
+    for tag in re.findall(r"<link\b[^>]*>", html, flags=re.IGNORECASE):
+        if (
+            re.search(
+                r"\brel\s*=\s*['\"][^'\"]*\bcanonical\b[^'\"]*['\"]",
+                tag,
+                flags=re.IGNORECASE,
+            )
+            is None
+        ):
+            continue
+        href = re.search(r"\bhref\s*=\s*['\"]([^'\"]+)['\"]", tag, flags=re.IGNORECASE)
+        if href is not None:
+            canonical_urls.append(urllib.parse.urljoin(candidate_url, href.group(1)))
+    for canonical_url in canonical_urls:
+        try:
+            canonical = urllib.parse.urlparse(canonical_url)
+        except Exception:
+            continue
+        canonical_host = (canonical.hostname or "").casefold().removeprefix("www.")
+        canonical_path = (canonical.path or "").rstrip("/")
+        if canonical_host == expected_host and canonical_path == expected_path:
+            return True
+    return False
+
+
+async def _rediscover_stale_gsc_property_url(
+    entry_url: str,
+    detected: DetectedPMS | None,
+    property_id: str,
+    csv_row: dict[str, Any] | None,
+) -> str:
+    """Return a current GSC property URL for the exact legacy-redirect shape.
+
+    GSC retired its numeric ``/apartments/<city>/zip_<zip>/gsc/<id>`` routes;
+    they now return HTTP 200 after redirecting to the portfolio homepage.  A
+    normal link-hop then explores portfolio navigation instead of the named
+    property.  Reuse the existing precision-gated sitemap rediscovery engine,
+    but only for this exact host/path + Jonah-template combination.
+    """
+    try:
+        parsed = urllib.parse.urlparse(entry_url)
+    except Exception:
+        return ""
+    host = (parsed.hostname or "").lower().removeprefix("www.")
+    if host != "gscapts.com" or not _GSC_LEGACY_PROPERTY_PATH_RE.match(parsed.path or ""):
+        return ""
+
+    pms = getattr(detected, "pms", "") if detected is not None else ""
+    pms_name = str(getattr(pms, "value", pms) or "").lower()
+    if pms_name != "encoreskyline_template":
+        return ""
+
+    row = csv_row or {}
+    property_name = ""
+    for key in ("name", "Name", "Property Name", "proj_name"):
+        value = row.get(key)
+        if value not in (None, "", "null", "None"):
+            property_name = str(value).strip()
+            break
+    if not property_name:
+        return ""
+
+    try:
+        from ma_poc.discovery.rediscovery import (
+            RediscoveryEngine,
+            RediscoveryEntry,
+            RediscoveryMethod,
+            RediscoveryStatus,
+        )
+
+        resolved = await RediscoveryEngine().rediscover(
+            RediscoveryEntry(
+                property_id=str(property_id or ""),
+                name=property_name,
+                original_url=entry_url,
+                city=str(row.get("city") or row.get("City") or ""),
+                state=str(row.get("state") or row.get("State") or ""),
+            )
+        )
+    except Exception as exc:
+        log.debug("GSC stale-scope rediscovery failed property=%s err=%s", property_id, exc)
+        return ""
+
+    if (
+        resolved.status is not RediscoveryStatus.RESOLVED
+        or resolved.method not in {RediscoveryMethod.MGMT_SITEMAP, RediscoveryMethod.MGMT_HOMEPAGE}
+        or resolved.confidence < 0.9
+        or not resolved.rediscovered_url
+    ):
+        return ""
+    try:
+        new_host = (
+            (urllib.parse.urlparse(resolved.rediscovered_url).hostname or "").lower().removeprefix("www.")
+        )
+    except Exception:
+        return ""
+    return resolved.rediscovered_url if new_host == host else ""
+
+
 # Phase 2: _LINK_ANCHOR_KEYWORDS, _LINK_PATH_KEYWORDS, _LINK_HOST_KEYWORDS
 # are now imported from signal_engine.defaults above. Definitions removed.
 
@@ -3660,22 +5099,33 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
 #
 # Detection is host-substring against the entry URL. Keep this list tight:
 # every entry forces the ranker to spend a hop slot on an off-site link.
-_PARENT_LANDLORD_HOSTS: tuple[str, ...] = (
-    "streetlights.com",
-)
+_PARENT_LANDLORD_HOSTS: tuple[str, ...] = ("streetlights.com",)
 
 # Junk hosts that show up in parent-landlord pages but aren't property sites
 # (analytics, portfolio investor portals, subcontractor portals, social).
 # Used only when the entry host matched _PARENT_LANDLORD_HOSTS.
-_PARENT_LANDLORD_EXTERNAL_JUNK: frozenset[str] = frozenset({
-    "google.com", "googletagmanager.com", "developers.google.com",
-    "facebook.com", "instagram.com", "twitter.com", "x.com",
-    "linkedin.com", "youtube.com", "tiktok.com",
-    "monsterinsights.com", "teamupdraft.com", "wpforms.com",
-    "smartbidnet.com", "securecc.smartbidnet.com",
-    # Streetlights' own investor portal — not the property site.
-    "streetlightsres.com", "investors.streetlightsres.com",
-})
+_PARENT_LANDLORD_EXTERNAL_JUNK: frozenset[str] = frozenset(
+    {
+        "google.com",
+        "googletagmanager.com",
+        "developers.google.com",
+        "facebook.com",
+        "instagram.com",
+        "twitter.com",
+        "x.com",
+        "linkedin.com",
+        "youtube.com",
+        "tiktok.com",
+        "monsterinsights.com",
+        "teamupdraft.com",
+        "wpforms.com",
+        "smartbidnet.com",
+        "securecc.smartbidnet.com",
+        # Streetlights' own investor portal — not the property site.
+        "streetlightsres.com",
+        "investors.streetlightsres.com",
+    }
+)
 
 
 def _is_parent_landlord_entry(entry_host: str) -> bool:
@@ -3794,16 +5244,33 @@ def _rank_internal_links(
             or base_host.endswith("." + link_host)
         )
         is_portal = any(link_host.endswith(suf) for suf, _ in _LINK_HOST_KEYWORDS)
+        # A page-published MRI ProspectConnect URL is already scoped to one
+        # community code (``/<code>`` or ``/Search/Index/<code>``).  It used to
+        # survive the external-host filter but score only ~145, below seven
+        # guessed same-site priors; the bounded queue therefore never fetched
+        # the exact provider route.  Elevate only this syntactically exact MRI
+        # property route.  The adapter still requires full name/address/code
+        # identity before accepting any provider row.
+        is_exact_mri_property_portal = False
+        if is_portal and not is_same_site and link_host.endswith(".mriprospectconnect.com"):
+            try:
+                from ma_poc.pms.adapters.mri_prospectconnect import (
+                    extract_mri_property_route,
+                )
+
+                _mri_index, _mri_community = extract_mri_property_route(resolved)
+                is_exact_mri_property_portal = bool(_mri_index and _mri_community)
+            except Exception:
+                is_exact_mri_property_portal = False
         # 2026-06-27: Parent-landlord aggregators (streetlights.com etc)
         # publish per-property landing pages that ONLY link to the property's
         # own external site. Allow off-site .com hops in that narrow case so
         # the link-hop tier can recover the real site (verified live:
         # streetlights.com/properties/the-beverly/ → thebeverlyonescottsdale.com
         # gives 68 units once the hop is allowed through).
-        is_external_property = (
-            _is_parent_landlord_entry(base_host)
-            and _is_parent_landlord_external_candidate(link_host)
-        )
+        is_external_property = _is_parent_landlord_entry(
+            base_host
+        ) and _is_parent_landlord_external_candidate(link_host)
         if not (is_same_site or is_portal or is_external_property):
             continue
         # Boost external-property candidates so the hop budget actually
@@ -3812,6 +5279,9 @@ def _rank_internal_links(
         # property name, not "floor plans").
         if is_external_property and not is_same_site:
             score = max(score, _PMS_PRIOR_SCORE + 200)
+        if is_exact_mri_property_portal:
+            score = max(score, _EMBEDDED_PORTAL_SCORE)
+            anchor = f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}mri_published_link:{anchor}"
 
         # Skip the base URL itself
         if resolved.rstrip("/") == base_url.rstrip("/"):
@@ -3886,9 +5356,7 @@ def _is_priced_sightmap_result(result: dict[str, Any]) -> bool:
         return False
     from ma_poc.pms.adapters.sightmap import _sightmap_unit_has_rent
 
-    priced = sum(
-        1 for u in units if isinstance(u, dict) and _sightmap_unit_has_rent(u)
-    )
+    priced = sum(1 for u in units if isinstance(u, dict) and _sightmap_unit_has_rent(u))
     return priced >= max(1, (len(units) + 1) // 2)
 
 
@@ -3914,6 +5382,7 @@ def _hop_plan_identity(row: dict[str, Any]) -> tuple[str, ...]:
     Returns:
         A tuple usable as a dict key; equal tuples mean the same published plan.
     """
+
     def first(*names: str) -> str:
         for n in names:
             v = row.get(n)
@@ -3931,9 +5400,7 @@ def _hop_plan_identity(row: dict[str, Any]) -> tuple[str, ...]:
     )
 
 
-def _attach_hop_plans(
-    result: dict[str, Any], harvested: list[dict[str, Any]]
-) -> None:
+def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -> None:
     """Merge plan rows harvested from plan-only hops into *result*.
 
     A no-op when nothing was harvested, so a hop that found real units is left
@@ -3959,6 +5426,97 @@ def _attach_hop_plans(
         merged.append(row)
     result["plan_summaries"] = merged
     result["_hop_plan_harvest"] = len(harvested)
+
+
+# The two precise ProspectPortal per-plan URL shapes handled by the Entrata
+# adapter.  Keep this deliberately narrower than a generic ``/floorplans/X``
+# check: a persisted property-wide floor-plan URL remains authoritative and
+# must retain the normal winning-page priority.
+_ENTRATA_PLAN_DETAIL_LEAF_RE = re.compile(
+    r"(?:^|/)floorplans/(?:"
+    r"[^/]+/[^/]+/[a-z0-9][a-z0-9-]*-\d{2,9}-\d+"
+    r"|[a-z0-9][a-z0-9-]*-\d{3,9}/fp_name"
+    r"(?:/occupancy_type/(?:conventional|affordable))?"
+    r")/?$",
+    re.IGNORECASE,
+)
+
+_ENTRATA_INVENTORY_INDEX_NAMES: frozenset[str] = frozenset(
+    {
+        "conventional",
+        "affordable",
+        "floorplans",
+        "floor-plans",
+        "floorplans.aspx",
+        "floor-plans.aspx",
+        "floor-plans-and-pricing",
+    }
+)
+
+
+def _entrata_inventory_index_above_plan_leaf(
+    *,
+    detected: DetectedPMS | None,
+    winning_page_url: str | None,
+    entry_url: str,
+    entry_ranked: list[tuple[str, int, str]],
+) -> tuple[str, int, str] | None:
+    """Return an explicit Entrata inventory index that should precede WPU.
+
+    ProspectPortal profiles can remember the one plan-detail page that happened
+    to have units yesterday.  When another plan becomes available, starting at
+    that stale leaf can return a plan-only result and stop before the property's
+    inventory index is tried.  Prefer the page-authored index only when all of
+    these narrow signals agree:
+
+    * the current detector says Entrata;
+    * WPU matches one of Entrata's precise, ID-bearing plan-detail templates;
+    * the entry page explicitly linked a same-host property inventory index.
+
+    ``entry_ranked`` contains only links extracted from the entry HTML, so PMS
+    template guesses and LLM hints cannot trigger the override.  A property-wide
+    WPU (for example ``/floorplans/`` or ``/{city}/{slug}/conventional/``) does
+    not match the leaf regex and therefore keeps its normal top priority.
+    """
+    if detected is None or detected.pms != "entrata" or not winning_page_url:
+        return None
+    try:
+        leaf_path = urllib.parse.unquote(urllib.parse.urlparse(winning_page_url).path or "")
+    except Exception:
+        return None
+    if not _ENTRATA_PLAN_DETAIL_LEAF_RE.search(leaf_path):
+        return None
+
+    try:
+        entry_host = (urllib.parse.urlparse(entry_url).hostname or "").lower()
+    except Exception:
+        return None
+    entry_host = entry_host.removeprefix("www.")
+    if not entry_host:
+        return None
+
+    for url, score, anchor in entry_ranked:
+        try:
+            parsed = urllib.parse.urlparse(url)
+            candidate_host = (parsed.hostname or "").lower().removeprefix("www.")
+            path_parts = [part.lower() for part in urllib.parse.unquote(parsed.path or "").split("/") if part]
+        except Exception:
+            continue
+        # Known ProspectPortal inventory paths are root-level or carry at most
+        # the city/property prefix.  The segment bound prevents an Aria-style
+        # plan leaf ending in ``.../occupancy_type/conventional/`` from being
+        # mistaken for the inventory index it came from.
+        if (
+            candidate_host == entry_host
+            and 1 <= len(path_parts) <= 3
+            and path_parts[-1] in _ENTRATA_INVENTORY_INDEX_NAMES
+        ):
+            return (
+                url,
+                max(score, _LLM_HINT_SCORE + 2),
+                f"entry:entrata_inventory_index:{anchor[:60]}",
+            )
+    return None
 
 
 async def _try_link_hop(
@@ -4001,7 +5559,11 @@ async def _try_link_hop(
     visited: set[str] = set(visited_urls) if visited_urls else set()
     visited.add(entry_url)
 
-    ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
+    # Preserve the entry-page-only candidates before LLM hints are merged.  A
+    # narrow Entrata stale-leaf correction below must be backed by an explicit
+    # page-authored inventory link, never by a guessed prior or model hint.
+    entry_ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
+    ranked = list(entry_ranked)
     if llm_navigation_hints:
         ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
         # Cap to keep budget bounded even with hints merged in.
@@ -4019,7 +5581,9 @@ async def _try_link_hop(
     explored_skip: set[str] = set()
     if profile is not None:
         try:
-            from services.profile_updater import _is_infra_api_url as _infra_check
+            from ma_poc.services.profile_updater import (
+                _is_infra_api_url as _infra_check,
+            )
         except Exception:
             _infra_check = None  # type: ignore[assignment]
         try:
@@ -4031,9 +5595,26 @@ async def _try_link_hop(
             # prevents wasting hop #1 on an endpoint that hard-fails (HTTP
             # 400/401) before the actual floor-plans page is ever reached.
             _wpu_is_infra = bool(_infra_check and isinstance(wpu, str) and _infra_check(wpu))
-            if isinstance(wpu, str) and wpu and wpu not in visited and not _wpu_is_infra:
-                # Highest possible score so it always lands first.
+            _wpu_is_distinct = bool(
+                isinstance(wpu, str)
+                and _hop_surface_key(wpu)
+                and _hop_surface_key(wpu) != _hop_surface_key(entry_url)
+            )
+            if isinstance(wpu, str) and wpu and wpu not in visited and not _wpu_is_infra and _wpu_is_distinct:
+                # Ordinary top score.  The narrow stale Entrata plan-leaf
+                # exception immediately below may place an explicit property
+                # inventory index one point above it.
                 profile_top.append((wpu, _LLM_HINT_SCORE + 1, "profile:winning_page_url"))
+            _entrata_index = _entrata_inventory_index_above_plan_leaf(
+                detected=detected,
+                winning_page_url=wpu if isinstance(wpu, str) else None,
+                entry_url=entry_url,
+                entry_ranked=entry_ranked,
+            )
+            if _entrata_index is not None and _entrata_index[0] not in visited:
+                # 10_002: one point above WPU's 10_001, but only for the
+                # narrowly-proven stale Entrata single-plan leaf shape.
+                profile_top.append(_entrata_index)
             for link in getattr(nav, "availability_links", []) or []:
                 if isinstance(link, str) and link and link not in visited:
                     profile_top.append((link, _LLM_HINT_SCORE, "profile:availability_link"))
@@ -4046,6 +5627,8 @@ async def _try_link_hop(
             _priority_urls: set[str] = set()
             if isinstance(wpu, str) and wpu:
                 _priority_urls.add(wpu)
+            if _entrata_index is not None:
+                _priority_urls.add(_entrata_index[0])
             for link in getattr(nav, "availability_links", []) or []:
                 if isinstance(link, str) and link:
                     _priority_urls.add(link)
@@ -4062,6 +5645,37 @@ async def _try_link_hop(
     # 2026-05-11 Bug B shape), this guarantees at least one well-typed
     # candidate to try. See docs/2026_05_11_regressions_fix_design.md.
     pms_priors = _pms_priors_for(detected, entry_url)
+
+    # Retired GSC numeric property URLs silently 200-redirect to the portfolio
+    # homepage. The current page therefore has no property links to rank. A
+    # deterministic, name-matched sitemap result is a stronger navigation
+    # signal than guessed root-level priors and enters the ordinary bounded
+    # hop/fetch/extract path below.
+    rediscovery_candidates: list[tuple[str, int, str]] = []
+    rediscovered_url = await _rediscover_stale_gsc_property_url(entry_url, detected, property_id, csv_row)
+    if rediscovered_url and rediscovered_url not in visited:
+        rediscovery_candidates.append(
+            (
+                rediscovered_url,
+                _LLM_HINT_SCORE + 2,
+                "rediscovery:mgmt_sitemap",
+            )
+        )
+
+    # Wimmer's retired missing-state URLs serve a branded 404 with global
+    # community links.  Transform the exact path to its state-scoped
+    # floorplans page and, critically, make this lane fail closed: if the exact
+    # page has no units, sibling portfolio links must never become fallbacks.
+    wimmer_floorplans_url = _rediscover_stale_wimmer_floorplans_url(entry_url, entry_page_html, csv_row)
+    if wimmer_floorplans_url and wimmer_floorplans_url not in visited:
+        rediscovery_candidates.append(
+            (
+                wimmer_floorplans_url,
+                _LLM_HINT_SCORE + 3,
+                _WIMMER_REDISCOVERY_ANCHOR,
+            )
+        )
+    wimmer_fail_closed = bool(wimmer_floorplans_url)
 
     # Leasing-portal pointers from embedded JSON (Jonah Digital widget
     # config etc. point at SightMap / RealPage OLL). High-confidence —
@@ -4102,7 +5716,8 @@ async def _try_link_hop(
 
     # Merge all candidate sources and rank by SCORE, not source-list order.
     # Sources contribute candidates at their own confidence levels:
-    #   profile.winning_page_url     → 10_001 (highest — yesterday's win)
+    #   explicit Entrata inventory index above stale per-plan WPU → 10_002
+    #   profile.winning_page_url     → 10_001 (ordinary highest priority)
     #   profile.availability_links   → 10_000
     #   LLM navigation_hint          → 10_000 (Phase 5 cross-tier signal)
     #   embedded leasing-portal hint → 10_000 (embedded-JSON cross-tier signal)
@@ -4114,9 +5729,17 @@ async def _try_link_hop(
     # two LLM hints both score 10_000, they keep their emission order).
     # Dedup is first-seen-after-sort, so highest-scored entry for any
     # given URL keeps the slot.
-    if profile_top or pms_priors or portal_candidates:
+    if wimmer_fail_closed:
+        # Do not augment this exact migration with profile memory, guessed PMS
+        # subpaths, embedded portals, or link-rich branded-404 navigation.
+        # The deterministic candidate is the complete bounded search space.
+        ranked = [
+            candidate for candidate in rediscovery_candidates if candidate[2] == _WIMMER_REDISCOVERY_ANCHOR
+        ]
+    elif profile_top or pms_priors or portal_candidates or rediscovery_candidates:
         combined: list[tuple[str, int, str]] = (
             list(profile_top)
+            + list(rediscovery_candidates)
             + list(portal_candidates)
             + list(pms_priors)
             + list(ranked)
@@ -4159,15 +5782,20 @@ async def _try_link_hop(
         for u, s, a in ranked:
             _kind = _anchor_to_kind(a)
             # Signals whose score was set by a trusted source (profile layer,
-            # LLM hint, or an anchor link elevated above PMS_PRIOR_SCORE by
-            # keyword matching in _rank_internal_links) must have their score
-            # preserved. If we hand them to the SourceRanker without an
-            # override, the ranker would re-score them from scratch — for
+            # LLM/embedded-portal hint, or an anchor link elevated above
+            # PMS_PRIOR_SCORE by keyword matching in _rank_internal_links) must
+            # have their score preserved. If we hand them to SourceRanker
+            # without an override, the ranker would re-score them from scratch — for
             # INTERNAL_LINK that means base=4_000 + keyword bonus, which is
             # below PMS_PRIOR (5_000) and causes real page anchors to lose
             # to guessed template priors.
-            _is_profile_scored = (
-                _kind == _SK.PROFILE_WINNING
+            _has_trusted_score = (
+                _kind
+                in {
+                    _SK.PROFILE_WINNING,
+                    _SK.LLM_HINT,
+                    _SK.EXTERNAL_PORTAL,
+                }
                 or a.lower().startswith("profile:availability_link")
                 # Anchor links that _rank_internal_links boosted above the
                 # PMS_PRIOR threshold carry a meaningful score: preserve it
@@ -4179,24 +5807,20 @@ async def _try_link_hop(
                     kind=_kind,
                     url=u,
                     anchor_text=a,
-                    profile_score_override=(s if _is_profile_scored else None),
+                    profile_score_override=(s if _has_trusted_score else None),
                 )
             )
         _ranked_signals = _ranker.rank(_signals)
         # Reconstruct (url, score, anchor) format for the rest of _try_link_hop
         ranked = [
-            (rs.signal.url or "", rs.composite_score, rs.signal.anchor_text or "")
-            for rs in _ranked_signals
+            (rs.signal.url or "", rs.composite_score, rs.signal.anchor_text or "") for rs in _ranked_signals
         ]
     except Exception:
         pass  # Degrade gracefully — existing score-based sort already in ranked
 
     # Phase 9: drop URLs already visited (cycle break) — and skip the
     # profile's recorded dead ends so we don't re-pay for them.
-    ranked = [
-        (u, s, a) for (u, s, a) in ranked
-        if u not in visited and u not in explored_skip
-    ]
+    ranked = [(u, s, a) for (u, s, a) in ranked if u not in visited and u not in explored_skip]
     # Phase 9: hard-cap at max_hops (defensive — _rank_internal_links has
     # its own limit, but enforcing here protects against augment-with-hints
     # bypassing the limit). Bumped slightly when profile candidates are
@@ -4302,9 +5926,7 @@ async def _try_link_hop(
     #   test_hop_deadline_does_not_survive_scrape_jugnu_reentry_KNOWN_HOLE.
     _hop_deadline: float
     _deadline_source: str
-    if shared_budget is not None and isinstance(
-        shared_budget.get("_hop_deadline"), (int, float)
-    ):
+    if shared_budget is not None and isinstance(shared_budget.get("_hop_deadline"), (int, float)):
         _hop_deadline = float(shared_budget["_hop_deadline"])
         _deadline_source = "inherited"
     else:
@@ -4320,9 +5942,7 @@ async def _try_link_hop(
     # instead of requiring artifact archaeology to find it (3 of 18 hop
     # properties in the 2026-07-27 run).
     _hop_session_index = 1
-    _ext_ref = (
-        shared_budget.get("_external_partial_ref") if shared_budget is not None else None
-    )
+    _ext_ref = shared_budget.get("_external_partial_ref") if shared_budget is not None else None
     if isinstance(_ext_ref, dict):
         try:
             if _deadline_source == "fresh":
@@ -4355,6 +5975,11 @@ async def _try_link_hop(
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
         queue_idx += 1
+
+        # A saved, high-quality identity+rent mapping proves that this exact
+        # WPU is a static API replay route.  Fetch it once through the normal
+        # DIRECT GET path; arbitrary WPUs retain the existing browser render.
+        _wpu_direct_get = _profile_wpu_prefers_get(profile, sub_url, anchor)
 
         # Hop wall-clock guard (see _hop_deadline above). Checked before the
         # RENDER sub-fetch so an in-flight hop always completes, but no NEW hop
@@ -4426,7 +6051,7 @@ async def _try_link_hop(
         _gate_budget_s = _hop_deadline - time.monotonic()
         _gate_skip = False
         _gate_started_at = time.monotonic()
-        if ENABLE_CRAWL_GET_GATE and _gate_budget_s > 0.0:
+        if ENABLE_CRAWL_GET_GATE and _gate_budget_s > 0.0 and not _wpu_direct_get:
             try:
                 _gate_skip = await asyncio.wait_for(
                     asyncio.to_thread(_crawl_get_gate_should_skip, sub_url),
@@ -4452,7 +6077,7 @@ async def _try_link_hop(
             priority=0,
             budget_ms=35000,
             reason=TaskReason.SCHEDULED,
-            render_mode=RenderMode.RENDER,
+            render_mode=(RenderMode.GET if _wpu_direct_get else RenderMode.RENDER),
             parent_task_id=None,
         )
         # Bound the IN-FLIGHT hop to whatever budget remains. The deadline
@@ -4482,9 +6107,7 @@ async def _try_link_hop(
         from ma_poc.config.feature_flags import LINK_HOP_PER_FETCH_S
 
         _raw_remaining = _hop_deadline - time.monotonic()
-        _hop_remaining = _hop_fetch_allowance(
-            _raw_remaining, float(LINK_HOP_PER_FETCH_S)
-        )
+        _hop_remaining = _hop_fetch_allowance(_raw_remaining, float(LINK_HOP_PER_FETCH_S))
         # True only when the PER-FETCH cap bound this hop, i.e. budget
         # genuinely survives the timeout. False when the DEADLINE bound it
         # (or the cap is disabled) — then nothing is left to continue with.
@@ -4497,19 +6120,14 @@ async def _try_link_hop(
         _queue_wait_ms = int((time.monotonic() - _hop_started_at) * 1000)
         _fetch_admitted_at = time.monotonic()
         try:
-            sub_fetch = await asyncio.wait_for(
-                jugnu_fetch(sub_task), timeout=_hop_remaining
-            )
+            sub_fetch = await asyncio.wait_for(jugnu_fetch(sub_task), timeout=_hop_remaining)
         except TimeoutError:
             _budget_left_s = _hop_deadline - time.monotonic()
             emit(
                 EventKind.LINK_HOP_FETCHED,
                 property_id,
                 url=sub_url,
-                outcome=(
-                    "HOP_FETCH_CAP_EXCEEDED" if _cap_bound
-                    else "HOP_FETCH_BUDGET_EXCEEDED"
-                ),
+                outcome=("HOP_FETCH_CAP_EXCEEDED" if _cap_bound else "HOP_FETCH_BUDGET_EXCEEDED"),
                 hop_index=idx,
                 allowance_s=round(_hop_remaining, 1),
                 # ACTUAL wall time the "bounded" fetch consumed. allowance_s
@@ -4537,9 +6155,7 @@ async def _try_link_hop(
             # 48389 44.0s) are the only measurably-rescuable properties in the
             # run. Require headroom, so the `continue` only ever buys a
             # genuine attempt.
-            _continue_min_s = _MIN_HOP_FETCH_S + (
-                _CRAWL_GET_GATE_BUDGET_S if ENABLE_CRAWL_GET_GATE else 0.0
-            )
+            _continue_min_s = _MIN_HOP_FETCH_S + (_CRAWL_GET_GATE_BUDGET_S if ENABLE_CRAWL_GET_GATE else 0.0)
             if _cap_bound and _budget_left_s > _continue_min_s:
                 # Do not spend it re-fetching a variant of the URL that just
                 # tarpitted (see _hop_url_key).
@@ -4628,6 +6244,20 @@ async def _try_link_hop(
                 shared_budget["_winning_page_url_hop_outcome"] = "profile:winning_page_url:failed"
             continue
 
+        if anchor == _WIMMER_REDISCOVERY_ANCHOR and not _wimmer_floorplans_identity_matches(
+            sub_url, sub_fetch, csv_row
+        ):
+            # A same-host 200 is insufficient on a portfolio site.  Require
+            # the transformed page's canonical URL and configured name/city/
+            # ZIP before any adapter sees the body, then stop this exact lane
+            # rather than falling through to sibling-community navigation.
+            explored[sub_url] = False
+            return {
+                "_units_empty": True,
+                "_explored_links": dict(explored),
+                "_wimmer_stale_path_identity_rejected": True,
+            }
+
         # Bug 5 alignment (2026-05-09 deep-dive): if this hop's body looks
         # rich (≥50KB AND JSON-LD FloorPlan/Apartment OR ≥5 rent tokens),
         # raise the cost cap on the shared budget so the sub-page's LLM
@@ -4636,12 +6266,9 @@ async def _try_link_hop(
         # CF interstitials don't silently buy themselves more budget.
         is_portal_hint = anchor.startswith(_EMBEDDED_PORTAL_ANCHOR_PREFIX)
         is_llm_hint = (
-            (anchor.startswith(_LLM_HINT_ANCHOR_PREFIX) or score == _LLM_HINT_SCORE)
-            and not is_portal_hint
-        )
-        if shared_budget is not None and (
-            _link_hop_is_rich(sub_fetch) or is_llm_hint or is_portal_hint
-        ):
+            anchor.startswith(_LLM_HINT_ANCHOR_PREFIX) or score == _LLM_HINT_SCORE
+        ) and not is_portal_hint
+        if shared_budget is not None and (_link_hop_is_rich(sub_fetch) or is_llm_hint or is_portal_hint):
             _refresh_cost_cap_for_hop(
                 shared_budget,
                 property_id=property_id,
@@ -4659,9 +6286,7 @@ async def _try_link_hop(
         try:
             _entry_parsed = urllib.parse.urlparse(entry_url)
             _sub_final_parsed = urllib.parse.urlparse(_sub_final_url)
-            _same_host = (
-                (_sub_final_parsed.hostname or "") == (_entry_parsed.hostname or "")
-            )
+            _same_host = (_sub_final_parsed.hostname or "") == (_entry_parsed.hostname or "")
             _entry_path = (_entry_parsed.path or "/").rstrip("/") or "/"
             _sub_path = (_sub_final_parsed.path or "/").rstrip("/") or "/"
             _redirected_to_entry = _same_host and _sub_path in (_entry_path, "/", "")
@@ -4674,7 +6299,8 @@ async def _try_link_hop(
             explored[sub_url] = False
             log.debug(
                 "link-hop %s: silent redirect to homepage (%s) — skipping extraction",
-                sub_url, _sub_final_url,
+                sub_url,
+                _sub_final_url,
             )
             continue
 
@@ -4697,8 +6323,14 @@ async def _try_link_hop(
             # an auth/login endpoint (oportal/users/log_in, /sign_in, etc.).
             _sub_path_lower = _parsed_sub.path.lower()
             _LOGIN_PATH_SIGNATURES = (
-                "/log_in", "/login", "/sign_in", "/signin", "/auth/", "/oauth/",
-                "/users/log_in", "/users/sign_in",
+                "/log_in",
+                "/login",
+                "/sign_in",
+                "/signin",
+                "/auth/",
+                "/oauth/",
+                "/users/log_in",
+                "/users/sign_in",
             )
             _is_login_path = any(sig in _sub_path_lower for sig in _LOGIN_PATH_SIGNATURES)
             _sub_url_no_query = urllib.parse.urlunparse(
@@ -4708,6 +6340,7 @@ async def _try_link_hop(
                 len(_hop_path_parts) >= 3
                 and dynamic_appended < max_dynamic_appends
                 and not _is_login_path
+                and not wimmer_fail_closed
             ):
                 # 2026-05-20: extended set of property-level sub-paths the
                 # dynamic appender queues when link-hop is already at a
@@ -4778,6 +6411,22 @@ async def _try_link_hop(
             explored[sub_url] = False
             continue
 
+        # A profile-proven static API route is allowed to bypass browser
+        # rendering only because its persisted mapping names both apartment
+        # identity and rent. Re-check that contract against the *live* mapped
+        # rows: a provider response such as "Call for rent" must not turn the
+        # historical WPU into unit-level success.
+        if _wpu_direct_get and sub_result.get("units"):
+            sub_result["units"] = _strict_profile_wpu_units(list(sub_result.get("units") or []))
+
+        if wimmer_fail_closed:
+            sub_result["_wimmer_stale_path_recovery"] = {
+                "entry_url": entry_url,
+                "exact_floorplans_url": sub_url,
+                "identity_match": True,
+                "portfolio_fallbacks_disabled": True,
+            }
+
         # 2026-07-12: a hopped page carried the operator-published
         # zero-availability statement. Checkpoint the flag into the
         # cancellation-surviving partial state so a later mid-hop timeout
@@ -4799,6 +6448,35 @@ async def _try_link_hop(
         has_plan_evidence = bool(sub_result.get("plan_summaries"))
         has_inventory_evidence = had_data or has_plan_evidence
         explored[sub_url] = has_inventory_evidence
+
+        # Dynamic portal discovery must happen before any inventory branch
+        # returns or continues.  A plan-only /floorplans page is exactly where
+        # a SightMap or SecureCafe pointer commonly lives; the old placement
+        # below this block made that pointer unreachable because plan evidence
+        # takes the ``not had_data`` continue path.
+        if dynamic_appended < max_dynamic_appends:
+            sub_portal_hints = sub_result.get("_embedded_portal_hints") or []
+            for hint in sub_portal_hints:
+                if dynamic_appended >= max_dynamic_appends:
+                    break
+                try:
+                    url_s, portal_name = hint
+                except Exception:
+                    continue
+                url_s = str(url_s or "").strip()
+                if not url_s or url_s in visited or url_s in explored_skip:
+                    continue
+                if any(u == url_s for u, _, _ in queue):
+                    continue
+                queue.append(
+                    (
+                        url_s,
+                        _EMBEDDED_PORTAL_SCORE,
+                        f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}",
+                    )
+                )
+                dynamic_appended += 1
+
         if has_inventory_evidence:
             sub_result["_link_hop_from"] = entry_url
             sub_result["_link_hop_depth"] = 1
@@ -4822,11 +6500,7 @@ async def _try_link_hop(
             # the last 3 days by proxy), skip lower-scored priors.
             # Cold profiles or profiles with consecutive failures must still
             # explore — their winning_page_url may be stale.
-            if (
-                had_data
-                and anchor.startswith("profile:winning_page_url")
-                and unit_count > 1
-            ):
+            if had_data and anchor.startswith("profile:winning_page_url") and unit_count > 1:
                 # Only apply the skip for WARM/HOT profiles whose last run
                 # succeeded (consecutive_failures == 0) — a reliable proxy
                 # for "winning_page_url is valid within the last 3 days".
@@ -4850,10 +6524,8 @@ async def _try_link_hop(
             # Prefer embedded hints (pre-scroll, JSON blob still present)
             # and fall back to HTML link discovery (post-scroll, JS has
             # rendered the card links but consumed the JSON config).
-            fp_hints = list(
-                sub_result.get("_embedded_floorplan_subpage_hints") or []
-            )
-            if not fp_hints and not _in_floorplan_accumulation:
+            fp_hints = list(sub_result.get("_embedded_floorplan_subpage_hints") or [])
+            if not fp_hints and not _in_floorplan_accumulation and not wimmer_fail_closed:
                 # Generic card links are just as valuable as explicit Jonah
                 # JSON hints.  Run this before the looser ranker fallback so
                 # we only fan out to same-origin linked plan cards carrying
@@ -4870,13 +6542,16 @@ async def _try_link_hop(
                             detect_floorplan_subpage_urls,
                         )
 
-                        fp_hints = detect_floorplan_subpage_urls(
-                            [], sub_html, sub_url
-                        )
+                        fp_hints = detect_floorplan_subpage_urls([], sub_html, sub_url)
                     except Exception:
                         fp_hints = []
 
-            if not fp_hints and not _in_floorplan_accumulation:
+            if wimmer_fail_closed:
+                # The transformed page is already the exact inventory page.
+                # Per-plan/global navigation can only widen its boundary.
+                fp_hints = []
+
+            if not fp_hints and not _in_floorplan_accumulation and not wimmer_fail_closed:
                 # HTML fallback: look for same-host sub-page links that
                 # score highly from the page's rendered anchor tags.
                 sub_html = (
@@ -4886,6 +6561,7 @@ async def _try_link_hop(
                 )
                 if sub_html:
                     import re as _re_fp
+
                     # Hash-based URL pattern: /floorplans/unit-{32+hex}/
                     # These are single-unit detail pages, not plan-type
                     # sub-pages. Skip them — they waste hops for 1 unit
@@ -4908,14 +6584,13 @@ async def _try_link_hop(
                         parsed_sub = None
                         try:
                             import urllib.parse as _up
+
                             parsed_sub = _up.urlparse(lnk_url)
                         except Exception:
                             pass
                         if parsed_sub is not None:
                             sub_path_l = (parsed_sub.path or "").lower()
-                            base_path_l = (
-                                _up.urlparse(sub_url).path or ""
-                            ).lower()
+                            base_path_l = (_up.urlparse(sub_url).path or "").lower()
                             # Same-prefix check: only follow links that
                             # are sub-paths of the current URL (avoids
                             # collecting site-wide nav links like
@@ -4937,11 +6612,19 @@ async def _try_link_hop(
                                 _path_kw_match = any(
                                     kw in sub_path_l
                                     for kw, _ in _LINK_PATH_KEYWORDS
-                                    if kw in ("/floorplan", "/floor-plan",
-                                              "/availability", "/units",
-                                              "/conventional", "/apartments",
-                                              "/apartment/", "/home/",
-                                              "/property/", "/communities/")
+                                    if kw
+                                    in (
+                                        "/floorplan",
+                                        "/floor-plan",
+                                        "/availability",
+                                        "/units",
+                                        "/conventional",
+                                        "/apartments",
+                                        "/apartment/",
+                                        "/home/",
+                                        "/property/",
+                                        "/communities/",
+                                    )
                                 )
                                 if not _path_kw_match:
                                     continue
@@ -4990,9 +6673,9 @@ async def _try_link_hop(
                         # mid-hop timeout salvage can stamp it (else the salvage
                         # ships tier_used=None and a real Tier-1 recovery is not
                         # counted as gold — the 231-prop link-hop NONE cohort).
-                        _ext_ref["tier_used"] = (
-                            _first_successful_result or sub_result
-                        ).get("extraction_tier_used")
+                        _ext_ref["tier_used"] = (_first_successful_result or sub_result).get(
+                            "extraction_tier_used"
+                        )
                 # Cache the LLM DOM selectors from this index page so
                 # sub-pages can replay them without another LLM call.
                 if _fp_llm_selectors is None:
@@ -5008,8 +6691,7 @@ async def _try_link_hop(
                     if fp_url in visited or any(u == fp_url for u, _, _ in queue):
                         continue
                     queue.append(
-                        (fp_url, _EMBEDDED_PORTAL_SCORE,
-                         f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{fp_kind}")
+                        (fp_url, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{fp_kind}")
                     )
                     dynamic_appended += 1
                 emit(
@@ -5034,9 +6716,9 @@ async def _try_link_hop(
                     _ext_ref = shared_budget.get("_external_partial_ref")
                     if isinstance(_ext_ref, dict):
                         _ext_ref["units"] = list(_accumulated_units)
-                        _ext_ref["tier_used"] = (
-                            _first_successful_result or sub_result
-                        ).get("extraction_tier_used")
+                        _ext_ref["tier_used"] = (_first_successful_result or sub_result).get(
+                            "extraction_tier_used"
+                        )
                 # Cache selectors from first sub-page that has them.
                 if _fp_llm_selectors is None:
                     _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
@@ -5086,7 +6768,7 @@ async def _try_link_hop(
         # leasing-portal pointers (e.g. /floorplans/ inlines a SightMap
         # embed URL). Harvest them into the queue so they're fetched in
         # the same link-hop pass instead of waiting for the next run.
-        if dynamic_appended < max_dynamic_appends:
+        if not wimmer_fail_closed and dynamic_appended < max_dynamic_appends:
             sub_portal_hints = sub_result.get("_embedded_portal_hints") or []
             for hint in sub_portal_hints:
                 if dynamic_appended >= max_dynamic_appends:
@@ -5102,8 +6784,7 @@ async def _try_link_hop(
                 if any(u == url_s for u, _, _ in queue):
                     continue
                 queue.append(
-                    (url_s, _EMBEDDED_PORTAL_SCORE,
-                     f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
+                    (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
                 )
                 dynamic_appended += 1
 
@@ -5205,6 +6886,7 @@ async def scrape_jugnu(
     # F0.1: env-driven _cost_cap_usd injected via the fallback dict and
     # via compute_budget() so both code paths agree on the cap.
     from ma_poc.services.source_planner import get_property_llm_cost_cap_usd
+
     _jugnu_budget: dict = {
         "llm_api_calls": 3,
         "llm_dom_calls": 1,
@@ -5216,6 +6898,7 @@ async def scrape_jugnu(
         try:
             from ma_poc.models.scrape_profile import ProfileMaturity as _PM
             from ma_poc.services.source_planner import compute_budget as _cb
+
             _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
         except Exception:
             pass
@@ -5316,6 +6999,7 @@ async def scrape_jugnu(
                     import dataclasses as _dcr
 
                     from ma_poc.fetch.contracts import FetchOutcome as _FOr
+
                     _ob = getattr(fetch_result, "body", None)
                     _os = (
                         _ob.decode("utf-8", "replace")
@@ -5372,6 +7056,7 @@ async def scrape_jugnu(
                     from curl_cffi import requests as _cc
 
                     from ma_poc.fetch.contracts import FetchOutcome
+
                     _r = _cc.get(
                         base_url,
                         impersonate="chrome120",
@@ -5457,10 +7142,7 @@ async def scrape_jugnu(
         # 2026-05-25 canary 1ef1060: Sucuri uses both URL variants
         # — /.well-known/sgcaptcha/ (the original) AND /.well-known/captcha/
         # (observed on Belvedere). Detect both.
-        if (
-            "/.well-known/sgcaptcha/" in _lower_url
-            or "/.well-known/captcha/" in _lower_url
-        ):
+        if "/.well-known/sgcaptcha/" in _lower_url or "/.well-known/captcha/" in _lower_url:
             _sgcaptcha_walled = True
     if _sgcaptcha_walled:
         result = _empty_result(base_url)
@@ -5487,6 +7169,105 @@ async def scrape_jugnu(
             winning_url=None,
             confidence=0.0,
             errors=[f"sgcaptcha_wall: final_url={_final_url[:80]}"],
+        )
+        return result
+
+    # 2026-08-01 — retired LiveBH property URLs can 200-redirect to a generic
+    # city search page.  That portfolio page contains multiple sibling
+    # inventory links; feeding it to detection/link-hop has produced two
+    # verified cross-property contaminations (Flintridge -> Mateo Apartment
+    # Homes, Crossings at Bramblewood -> Tuckahoe Creek).  Reject the exact
+    # redirect shape before any adapter or partial-state checkpoint sees the
+    # sibling body.  The helper requires same-provider paths plus absence of
+    # both configured name and street identity.
+    if _livebh_retired_property_redirect_identity_rejected(
+        base_url,
+        fetch_result,
+        csv_row,
+    ):
+        rejected_final_url = str(getattr(fetch_result, "final_url", "") or base_url)
+        result = _empty_result(base_url)
+        result["_property_id"] = property_id
+        result["plan_summaries"] = []
+        result["extraction_tier_used"] = "generic:portfolio_redirect_identity_rejected"
+        result["_portfolio_redirect_identity_rejected"] = {
+            "provider": "livebh",
+            "configured_url": base_url,
+            "final_url": rejected_final_url,
+            "configured_name": str((csv_row or {}).get("name") or ""),
+            "configured_address": str((csv_row or {}).get("address") or ""),
+            "adapters_skipped": True,
+            "link_hop_skipped": True,
+        }
+        error = (
+            "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property "
+            f"redirected to identity-mismatched city landing {rejected_final_url[:160]}"
+        )
+        result["errors"].append(error)
+        try:
+            fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+            body = getattr(fetch_result, "body", None)
+            fd["body_bytes"] = len(body) if body else 0
+            fd["identity_rejected"] = True
+            result["_fetch_diagnostic"] = fd
+        except Exception:
+            pass
+        result["_extract_result"] = ExtractResult(
+            property_id=property_id,
+            records=[],
+            tier_used="generic:portfolio_redirect_identity_rejected",
+            adapter_name="none",
+            winning_url=None,
+            confidence=0.0,
+            errors=[error],
+        )
+        return result
+
+    # Retired Entrata vanity domains may redirect straight to a different
+    # property's fully functional site.  Reject before detection, adapters,
+    # profile reuse, or link-hop can convert that sibling roster into
+    # strict-looking native units for the configured property.
+    if _entrata_cross_property_redirect_identity_rejected(
+        base_url,
+        fetch_result,
+        csv_row,
+    ):
+        rejected_final_url = str(getattr(fetch_result, "final_url", "") or base_url)
+        result = _empty_result(base_url)
+        result["_property_id"] = property_id
+        result["plan_summaries"] = []
+        result["extraction_tier_used"] = "generic:entrata_redirect_identity_rejected"
+        result["_entrata_redirect_identity_rejected"] = {
+            "provider": "entrata",
+            "configured_url": base_url,
+            "final_url": rejected_final_url,
+            "configured_name": str((csv_row or {}).get("name") or ""),
+            "configured_address": str((csv_row or {}).get("address") or ""),
+            "adapters_skipped": True,
+            "link_hop_skipped": True,
+        }
+        error = (
+            "ENTRATA_REDIRECT_IDENTITY_REJECTED: configured property "
+            "redirected to an Entrata destination with neither configured "
+            f"name nor street identity: {rejected_final_url[:160]}"
+        )
+        result["errors"].append(error)
+        try:
+            fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+            body = getattr(fetch_result, "body", None)
+            fd["body_bytes"] = len(body) if body else 0
+            fd["identity_rejected"] = True
+            result["_fetch_diagnostic"] = fd
+        except Exception:
+            pass
+        result["_extract_result"] = ExtractResult(
+            property_id=property_id,
+            records=[],
+            tier_used="generic:entrata_redirect_identity_rejected",
+            adapter_name="none",
+            winning_url=None,
+            confidence=0.0,
+            errors=[error],
         )
         return result
 
@@ -5563,13 +7344,20 @@ async def scrape_jugnu(
     # Budget cap: _jugnu_budget["link_hop"] == 0 → never hop.
     should_hop = False
     if fetch_result is not None and _jugnu_budget.get("link_hop", 0) > 0:
-        if not result.get("units"):
+        # A validated embedded portal pointer is stronger navigation evidence
+        # than the current row channel.  Plan-level rows are non-empty, which
+        # previously left strict SecureCafe handoffs stranded and allowed the
+        # per-property timeout to expire before the normal renderer saw them.
+        if result.get("_embedded_portal_hints"):
+            should_hop = True
+        elif not result.get("units"):
             should_hop = True
         else:
             # Phase G2: consult planner when main has units
             try:
                 from ma_poc.models.source import SourceId, from_legacy_unit
                 from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+
                 _pu = [
                     from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
                     for u in (result.get("units") or [])
@@ -5644,6 +7432,7 @@ async def scrape_jugnu(
                             to_legacy_unit,
                         )
                         from ma_poc.services.source_merger import merge_sources
+
                         main_h = envelope_hash_of(main_units)
                         sub_h = envelope_hash_of(sub_units)
                         main_src = ExtractedSource(
@@ -5657,13 +7446,17 @@ async def scrape_jugnu(
                             has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in main_units),
                             is_floor_plan_level=False,
                         )
-                        sub_url_winner = hop_result.get("_winning_page_url") or hop_result.get("_link_hop_from") or ""
+                        sub_url_winner = (
+                            hop_result.get("_winning_page_url") or hop_result.get("_link_hop_from") or ""
+                        )
                         sub_src = ExtractedSource(
                             source_id=SourceId.API_GENERIC_NARROW,
                             source_url=str(sub_url_winner),
                             envelope_hash=sub_h,
                             units=[
-                                from_legacy_unit(u, SourceId.API_GENERIC_NARROW, str(sub_url_winner), sub_h, 0.85)
+                                from_legacy_unit(
+                                    u, SourceId.API_GENERIC_NARROW, str(sub_url_winner), sub_h, 0.85
+                                )
                                 for u in sub_units
                             ],
                             has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in sub_units),
@@ -5778,13 +7571,15 @@ async def scrape_jugnu(
             # keeps it a single implementation rather than a fourth copy of the
             # same rule.
             if hop_result:
+                for key in (
+                    "_wimmer_stale_path_recovery",
+                    "_wimmer_stale_path_identity_rejected",
+                ):
+                    if key in hop_result:
+                        result[key] = hop_result[key]
                 _attach_hop_plans(
                     result,
-                    [
-                        p
-                        for p in (hop_result.get("plan_summaries") or [])
-                        if isinstance(p, dict)
-                    ],
+                    [p for p in (hop_result.get("plan_summaries") or []) if isinstance(p, dict)],
                 )
 
     # Phase 3 — post-extraction CSV snap. Runs *after* extraction (H4) so
@@ -5834,9 +7629,7 @@ async def scrape_jugnu(
 
         units_now = result.get("units") or []
         explicit = (
-            result.get("property_amenities")
-            if isinstance(result.get("property_amenities"), list)
-            else None
+            result.get("property_amenities") if isinstance(result.get("property_amenities"), list) else None
         )
         amenities = aggregate_property_amenities(units_now, explicit)
         result["property_amenities"] = amenities

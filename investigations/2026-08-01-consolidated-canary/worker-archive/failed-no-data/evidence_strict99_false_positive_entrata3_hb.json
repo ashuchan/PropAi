@@ -1,0 +1,135 @@
+{
+  "results": [
+    {
+      "attempted": true,
+      "complete": false,
+      "contamination_verdict": "no_native_units",
+      "elapsed_session_seconds": 25.81,
+      "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+      "matched_url": "https://www.avanacourt.com/duluth/avana-court/conventional/",
+      "native_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 9,
+      "property_id": 3169,
+      "property_identity_match": true,
+      "property_name": "Avana Court",
+      "session_calls": 1,
+      "source_urls": [],
+      "units": 0,
+      "website": "https://www.avanacourt.com/",
+      "winning_url": "https://www.avanacourt.com/duluth/avana-court/conventional/"
+    },
+    {
+      "attempted": true,
+      "complete": true,
+      "contamination_verdict": "pass_strict_property_boundary_and_native_positive_rent",
+      "elapsed_session_seconds": 20.45,
+      "failure_reason": "",
+      "matched_url": "https://www.parkcrestatthelakesapts.com/fort-myers/park-crest-at-the-lakes/conventional/",
+      "native_samples": [
+        {
+          "availability_date": "2026-09-04",
+          "floor_plan_name": "The Coral",
+          "identity": {
+            "floor_plan_id": "b8eee666410b",
+            "unit_number": "0625"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1630,
+            "market_rent_low": 1630
+          },
+          "source_api_url": "https://www.parkcrestatthelakesapts.com/floorplans/fort-myers-FL/park-crest-at-the-lakes/the-coral-581165-1/",
+          "source_ids": {
+            "entrata_fpid": "581165",
+            "entrata_uid": "4948788"
+          }
+        },
+        {
+          "availability_date": "2026-09-11",
+          "floor_plan_name": "The Coral",
+          "identity": {
+            "floor_plan_id": "b8eee666410b",
+            "unit_number": "0131"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1375,
+            "market_rent_low": 1375
+          },
+          "source_api_url": "https://www.parkcrestatthelakesapts.com/floorplans/fort-myers-FL/park-crest-at-the-lakes/the-coral-581165-1/",
+          "source_ids": {
+            "entrata_fpid": "581165",
+            "entrata_uid": "4948686"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 2,
+      "property_id": 35683,
+      "property_identity_match": true,
+      "property_name": "Parkcrest at the Lakes",
+      "session_calls": 1,
+      "source_urls": [
+        "https://www.parkcrestatthelakesapts.com/floorplans/fort-myers-FL/park-crest-at-the-lakes/the-coral-581165-1/",
+        "https://www.parkcrestatthelakesapts.com/floorplans/fort-myers-FL/park-crest-at-the-lakes/the-harbor-581167-1/",
+        "https://www.parkcrestatthelakesapts.com/floorplans/fort-myers-FL/park-crest-at-the-lakes/the-seabreeze-581169-1/"
+      ],
+      "units": 20,
+      "website": "www.parkcrestatthelakesapts.com",
+      "winning_url": "https://www.parkcrestatthelakesapts.com/fort-myers/park-crest-at-the-lakes/conventional/"
+    },
+    {
+      "attempted": true,
+      "complete": false,
+      "contamination_verdict": "pass_strict_property_boundary_and_native_positive_rent",
+      "elapsed_session_seconds": 24.0,
+      "failure_reason": "",
+      "matched_url": "https://www.whitefurniturelofts.com/mebane/the-lofts-at-white-furniture/conventional/",
+      "native_samples": [
+        {
+          "availability_date": "2026-08-05",
+          "floor_plan_name": "S1",
+          "identity": {
+            "floor_plan_id": "4dfe72b9aabd",
+            "unit_number": "207"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1245,
+            "market_rent_low": 1245
+          },
+          "source_api_url": "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126662&cached_rate_available=1&min_rent=1245&max_rent=1495&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "2026-09-08",
+          "floor_plan_name": "S4a",
+          "identity": {
+            "floor_plan_id": "694afddb61cb",
+            "unit_number": "259"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1182,
+            "market_rent_low": 1182
+          },
+          "source_api_url": "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126657&cached_rate_available=1&min_rent=1182&max_rent=1432&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 43,
+      "property_id": 64545,
+      "property_identity_match": true,
+      "property_name": "The Lofts at White Furniture",
+      "session_calls": 1,
+      "source_urls": [
+        "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126657&cached_rate_available=1&min_rent=1182&max_rent=1432&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+        "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126659&cached_rate_available=1&min_rent=1477&max_rent=1702&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+        "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126662&cached_rate_available=1&min_rent=1245&max_rent=1495&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+        "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126666&cached_rate_available=1&min_rent=1596&max_rent=1846&min_deposit=400.0000&max_deposit=400.0000&move_in_date=2026-08-03&occupancy_type=conventional",
+        "https://www.whitefurniturelofts.com/?module=check_availability&is_secure=1&property[id]=1112431&action=view_unit_spaces&property_floorplan[id]=1126669&cached_rate_available=1&min_rent=1400&max_rent=1649&min_deposit=300.0000&max_deposit=300.0000&move_in_date=2026-08-03&occupancy_type=conventional"
+      ],
+      "units": 9,
+      "website": "https://www.whitefurniturelofts.com/",
+      "winning_url": "https://www.whitefurniturelofts.com/mebane/the-lofts-at-white-furniture/conventional/"
+    }
+  ]
+}

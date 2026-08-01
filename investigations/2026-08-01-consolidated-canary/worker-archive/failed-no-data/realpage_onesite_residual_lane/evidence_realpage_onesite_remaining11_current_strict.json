@@ -1,0 +1,1528 @@
+{
+  "cohort_snapshot": {
+    "ledger_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "ledger_csv_sha256": "28baf78746f21c552e6c80666a1a0ad9d9f9de4484993a58bf790e3d9c49879d",
+    "ledger_rows_before_lane": 174,
+    "remaining_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+    "remaining_csv_sha256": "04f59744bea6e5ad0ebaba5311376a76dfd53d6dba5cb5aa12d84f3c9514138f",
+    "target_adapters": [
+      "onesite",
+      "realpage_oll"
+    ],
+    "target_count": 11,
+    "target_ids": [
+      2948,
+      14295,
+      16172,
+      18194,
+      38677,
+      39995,
+      43520,
+      67154,
+      253326,
+      265143,
+      291774
+    ]
+  },
+  "generated_at_utc": "2026-08-01T10:13:01.592858+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "fixed_tls_fingerprint": "chrome116 for public OneSite workflow only",
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_files_modified_by_lane": false,
+    "web_unlocker": false
+  },
+  "lane": "failed_no_data_realpage_onesite_current_residual",
+  "results": [
+    {
+      "canonical_address": "4905 Southland Ave",
+      "configured_fetch": {
+        "body_bytes": 115772,
+        "final_url": "https://crystalwoodsapts.com/",
+        "requested_url": "https://www.crystalwoodsapts.com",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "4905 Southland Ave",
+        "canonical_name": "Crystal Woods of Alexandria",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "southland"
+        ]
+      },
+      "configured_website": "www.crystalwoodsapts.com",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_native_units_but_current_pipeline_misroutes",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "encoreskyline_template",
+        "errors": [
+          "no /floorplans/{slug}/ anchors found"
+        ],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 80940,
+        "final_url": "https://crystalwoodsapts.com/floorplans/",
+        "requested_url": "https://crystalwoodsapts.com/floorplans/",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "4905 Southland Ave",
+        "canonical_name": "Crystal Woods of Alexandria",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "southland"
+        ]
+      },
+      "ledger_current_detected_adapter": "realpage_oll",
+      "native_workflow_probe": {
+        "available_floorplan_count": 4,
+        "available_unit_id_count": 12,
+        "distinct_available_unit_id_count": 12,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 6,
+        "payload_site_id": "4845783",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "4845783",
+        "sample_available_unit_ids": [
+          "57",
+          "69",
+          "82",
+          "59",
+          "105",
+          "108",
+          "126",
+          "131",
+          "250",
+          "276"
+        ],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 12,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 12,
+        "plan_summary_rows": 2,
+        "sample_units": [
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4845783",
+            "unit_id": "",
+            "unit_number": "57"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4845783",
+            "unit_id": "",
+            "unit_number": "69"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4845783",
+            "unit_id": "",
+            "unit_number": "82"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4845783",
+            "unit_id": "",
+            "unit_number": "59"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4845783",
+            "unit_id": "",
+            "unit_number": "105"
+          }
+        ],
+        "source_property_ids": [
+          "4845783"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>"
+        ],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 14
+      },
+      "outcome": "ADAPTER_E2E_NATIVE_DATA_ROUTING_MISS",
+      "property_id": 2948,
+      "property_identity_match": true,
+      "property_name": "Crystal Woods of Alexandria",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "4845783"
+        ],
+        "configured_final_url": "https://crystalwoodsapts.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [
+          "4845783"
+        ],
+        "expected_site_id": "4845783",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://crystalwoodsapts.com/floorplans/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "direct_widget_site_id_on_current_inventory_page"
+      },
+      "rejection_reasons": [
+        "current_full_pipeline_e2e_returned_zero_native_priced_units",
+        "routing_miss_before_onesite_adapter",
+        "excluded_from_strict_207_gate_until_current_pipeline_routes_this_page_to_onesite"
+      ],
+      "rp_oracle_native_unit_rows": 14
+    },
+    {
+      "canonical_address": "1025 Adams Cir",
+      "configured_fetch": {
+        "body_bytes": 141250,
+        "final_url": "https://www.myboulderapartment.com/",
+        "requested_url": "https://www.myboulderapartment.com",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "1025 Adams Cir",
+        "canonical_name": "Timber Ridge Apartment Homes",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "adams"
+        ]
+      },
+      "configured_website": "www.myboulderapartment.com",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_but_zero_native_unit_ids",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "onesite",
+        "errors": [],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 8,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 141250,
+        "final_url": "https://www.myboulderapartment.com/",
+        "requested_url": "https://www.myboulderapartment.com",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "1025 Adams Cir",
+        "canonical_name": "Timber Ridge Apartment Homes",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "adams"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": {
+        "available_floorplan_count": 0,
+        "available_unit_id_count": 0,
+        "distinct_available_unit_id_count": 0,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 8,
+        "payload_site_id": "1101338",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "1101338",
+        "sample_available_unit_ids": [],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1101338/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 8,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 8
+      },
+      "outcome": "NO_CURRENT_NATIVE_UNIT_INVENTORY",
+      "property_id": 14295,
+      "property_identity_match": true,
+      "property_name": "Timber Ridge Apartment Homes",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "1101338"
+        ],
+        "configured_final_url": "https://www.myboulderapartment.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "1101338",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.myboulderapartment.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": {
+          "body_bytes": 32771,
+          "final_url": "https://1736093.onlineleasing.realpage.com/",
+          "requested_url": "https://1736093.onlineleasing.realpage.com/",
+          "status": 200
+        },
+        "portal_shell_widget_site_ids": [
+          "1101338"
+        ],
+        "published_portal_urls": [
+          "https://1736093.onlineleasing.realpage.com/"
+        ],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "sole_current_configured_page_portal_to_shell_widget_site_id"
+      },
+      "rejection_reasons": [
+        "native_current_inventory_zero",
+        "workflow_reports_no_available_unit_ids",
+        "plan_level_rows_do_not_count_as_unit_level_conversion"
+      ],
+      "rp_oracle_native_unit_rows": 8
+    },
+    {
+      "canonical_address": "17500 Towne Crest Dr",
+      "configured_fetch": {
+        "body_bytes": 88264,
+        "final_url": "https://townecrest.com/",
+        "requested_url": "http://www.townecrest.com/",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "17500 Towne Crest Dr",
+        "canonical_name": "Towne Crest",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "towne",
+          "crest"
+        ]
+      },
+      "configured_website": "http://www.townecrest.com/",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_native_units_but_current_pipeline_misroutes",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "generic",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 69970,
+        "final_url": "https://townecrest.com/floorplans/",
+        "requested_url": "https://townecrest.com/floorplans/",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "17500 Towne Crest Dr",
+        "canonical_name": "Towne Crest",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "towne",
+          "crest"
+        ]
+      },
+      "ledger_current_detected_adapter": "realpage_oll",
+      "native_workflow_probe": {
+        "available_floorplan_count": 2,
+        "available_unit_id_count": 2,
+        "distinct_available_unit_id_count": 2,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 4,
+        "payload_site_id": "5194917",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "5194917",
+        "sample_available_unit_ids": [
+          "3",
+          "94"
+        ],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 2,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 2,
+        "plan_summary_rows": 2,
+        "sample_units": [
+          {
+            "floor_plan_name": "One Bedroom One Bath",
+            "market_rent_high": 1648,
+            "market_rent_low": 1648,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "5194917",
+            "unit_id": "",
+            "unit_number": "3"
+          },
+          {
+            "floor_plan_name": "Three Bedroom Two and a Half Bath",
+            "market_rent_high": 2459,
+            "market_rent_low": 2459,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "5194917",
+            "unit_id": "",
+            "unit_number": "94"
+          }
+        ],
+        "source_property_ids": [
+          "5194917"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>"
+        ],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 4
+      },
+      "outcome": "ADAPTER_E2E_NATIVE_DATA_ROUTING_MISS",
+      "property_id": 16172,
+      "property_identity_match": true,
+      "property_name": "Towne Crest",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "5194917"
+        ],
+        "configured_final_url": "https://townecrest.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [
+          "5194917"
+        ],
+        "expected_site_id": "5194917",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://townecrest.com/floorplans/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "direct_widget_site_id_on_current_inventory_page"
+      },
+      "rejection_reasons": [
+        "current_full_pipeline_e2e_returned_zero_native_priced_units",
+        "routing_miss_before_onesite_adapter",
+        "excluded_from_strict_207_gate_until_current_pipeline_routes_this_page_to_onesite"
+      ],
+      "rp_oracle_native_unit_rows": 4
+    },
+    {
+      "canonical_address": "44 New Zealand Rd",
+      "configured_fetch": {
+        "body_bytes": 10648,
+        "final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+        "requested_url": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "44 New Zealand Rd",
+        "canonical_name": "Parke Place Townhomes",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "new",
+          "zealand"
+        ]
+      },
+      "configured_website": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_native_units_but_current_pipeline_misroutes",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "realpage_oll",
+        "errors": [
+          "No RealPage OLL data found in captured API responses"
+        ],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_REALPAGE_OLL",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 10648,
+        "final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+        "requested_url": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "44 New Zealand Rd",
+        "canonical_name": "Parke Place Townhomes",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "new",
+          "zealand"
+        ]
+      },
+      "ledger_current_detected_adapter": "realpage_oll",
+      "native_workflow_probe": {
+        "available_floorplan_count": 1,
+        "available_unit_id_count": 7,
+        "distinct_available_unit_id_count": 7,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 1,
+        "payload_site_id": "1046774",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "1046774",
+        "sample_available_unit_ids": [
+          "37",
+          "50",
+          "56",
+          "52",
+          "33",
+          "4",
+          "38"
+        ],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 7,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 7,
+        "plan_summary_rows": 0,
+        "sample_units": [
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "1046774",
+            "unit_id": "",
+            "unit_number": "37"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "1046774",
+            "unit_id": "",
+            "unit_number": "50"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "1046774",
+            "unit_id": "",
+            "unit_number": "56"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "1046774",
+            "unit_id": "",
+            "unit_number": "52"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "1046774",
+            "unit_id": "",
+            "unit_number": "33"
+          }
+        ],
+        "source_property_ids": [
+          "1046774"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>"
+        ],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 7
+      },
+      "outcome": "ADAPTER_E2E_NATIVE_DATA_ROUTING_MISS",
+      "property_id": 18194,
+      "property_identity_match": true,
+      "property_name": "Parke Place Townhomes",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "1046774"
+        ],
+        "configured_final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [
+          "1046774"
+        ],
+        "expected_site_id": "1046774",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "direct_widget_site_id_on_current_inventory_page"
+      },
+      "rejection_reasons": [
+        "current_full_pipeline_e2e_returned_zero_native_priced_units",
+        "routing_miss_before_onesite_adapter",
+        "excluded_from_strict_207_gate_until_current_pipeline_routes_this_page_to_onesite"
+      ],
+      "rp_oracle_native_unit_rows": 7
+    },
+    {
+      "canonical_address": "1 Kensington Cir",
+      "configured_fetch": {
+        "body_bytes": 101741,
+        "final_url": "https://www.torviewvillageapts.com/",
+        "requested_url": "https://www.torviewvillageapts.com",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "1 Kensington Cir",
+        "canonical_name": "Tor View Village",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kensington"
+        ]
+      },
+      "configured_website": "www.torviewvillageapts.com",
+      "contamination_verdict": "pass_exact_published_welcomehome_site_id_but_native_workflow_empty",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "onesite",
+        "errors": [
+          "No RealPage/OneSite floorplan data found in captured API responses"
+        ],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 101741,
+        "final_url": "https://www.torviewvillageapts.com/",
+        "requested_url": "https://www.torviewvillageapts.com",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "1 Kensington Cir",
+        "canonical_name": "Tor View Village",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kensington"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": {
+        "available_floorplan_count": 0,
+        "available_unit_id_count": 0,
+        "distinct_available_unit_id_count": 0,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 0,
+        "payload_site_id": "",
+        "payload_site_id_matches_requested": false,
+        "requested_site_id": "1321537",
+        "sample_available_unit_ids": [],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1321537/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [
+          "No RealPage/OneSite floorplan data found in captured API responses"
+        ],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 0,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+        "unit_rows": 0
+      },
+      "outcome": "NO_CURRENT_NATIVE_WORKFLOW_DATA",
+      "property_id": 38677,
+      "property_identity_match": true,
+      "property_name": "Tor View Village",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "1321537"
+        ],
+        "configured_final_url": "https://www.torviewvillageapts.com/",
+        "direct_welcomehome_site_ids": [
+          "1321537"
+        ],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "1321537",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.torviewvillageapts.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "direct_welcomehome_site_id_on_current_configured_page"
+      },
+      "rejection_reasons": [
+        "published_welcomehome_site_id_has_no_usable_current_workflow_payload",
+        "workflow_payload_does_not_bind_back_to_requested_site_id",
+        "onesite_adapter_e2e_returned_zero_native_priced_units"
+      ],
+      "rp_oracle_native_unit_rows": 5
+    },
+    {
+      "canonical_address": "6220 N Murray Dr",
+      "configured_fetch": {
+        "body_bytes": 47712,
+        "final_url": "https://www.southpointehanahan.com/",
+        "requested_url": "https://www.southpointehanahan.com/",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "6220 N Murray Dr",
+        "canonical_name": "South Pointe",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "murray"
+        ]
+      },
+      "configured_website": "https://www.southpointehanahan.com/",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_but_zero_native_unit_ids",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "onesite",
+        "errors": [],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 2,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 47712,
+        "final_url": "https://www.southpointehanahan.com/",
+        "requested_url": "https://www.southpointehanahan.com/",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "6220 N Murray Dr",
+        "canonical_name": "South Pointe",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "murray"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": {
+        "available_floorplan_count": 0,
+        "available_unit_id_count": 0,
+        "distinct_available_unit_id_count": 0,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 2,
+        "payload_site_id": "5272798",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "5272798",
+        "sample_available_unit_ids": [],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 2,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 2
+      },
+      "outcome": "NO_CURRENT_NATIVE_UNIT_INVENTORY",
+      "property_id": 39995,
+      "property_identity_match": true,
+      "property_name": "South Pointe",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "5272798"
+        ],
+        "configured_final_url": "https://www.southpointehanahan.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "5272798",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.southpointehanahan.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": {
+          "body_bytes": 47243,
+          "final_url": "https://9067331.onlineleasing.realpage.com/",
+          "requested_url": "http://9067331.onlineleasing.realpage.com/",
+          "status": 200
+        },
+        "portal_shell_widget_site_ids": [
+          "5272798"
+        ],
+        "published_portal_urls": [
+          "http://9067331.onlineleasing.realpage.com"
+        ],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "sole_current_configured_page_portal_to_shell_widget_site_id"
+      },
+      "rejection_reasons": [
+        "native_current_inventory_zero",
+        "workflow_reports_no_available_unit_ids",
+        "plan_level_rows_do_not_count_as_unit_level_conversion"
+      ],
+      "rp_oracle_native_unit_rows": 2
+    },
+    {
+      "canonical_address": "222 Blairmore Blvd E",
+      "configured_fetch": {
+        "body_bytes": 91591,
+        "final_url": "https://theparkatblanding.com/",
+        "requested_url": "http://www.parkatblanding.com/",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "222 Blairmore Blvd E",
+        "canonical_name": "Park at Blanding",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "blairmore"
+        ]
+      },
+      "configured_website": "http://www.parkatblanding.com/",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_but_zero_native_unit_ids",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "onesite",
+        "errors": [],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 9,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 91591,
+        "final_url": "https://theparkatblanding.com/",
+        "requested_url": "http://www.parkatblanding.com/",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "222 Blairmore Blvd E",
+        "canonical_name": "Park at Blanding",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "blairmore"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": {
+        "available_floorplan_count": 0,
+        "available_unit_id_count": 0,
+        "distinct_available_unit_id_count": 0,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 9,
+        "payload_site_id": "5586626",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "5586626",
+        "sample_available_unit_ids": [],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5586626/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 9,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 9
+      },
+      "outcome": "NO_CURRENT_NATIVE_UNIT_INVENTORY",
+      "property_id": 43520,
+      "property_identity_match": true,
+      "property_name": "Park at Blanding",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "5586626"
+        ],
+        "configured_final_url": "https://theparkatblanding.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "5586626",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://theparkatblanding.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": {
+          "body_bytes": 38525,
+          "final_url": "https://9259508.onlineleasing.realpage.com/",
+          "requested_url": "https://9259508.onlineleasing.realpage.com/",
+          "status": 200
+        },
+        "portal_shell_widget_site_ids": [
+          "5586626"
+        ],
+        "published_portal_urls": [
+          "https://9259508.onlineleasing.realpage.com/"
+        ],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "sole_current_configured_page_portal_to_shell_widget_site_id"
+      },
+      "rejection_reasons": [
+        "native_current_inventory_zero",
+        "workflow_reports_no_available_unit_ids",
+        "plan_level_rows_do_not_count_as_unit_level_conversion"
+      ],
+      "rp_oracle_native_unit_rows": 9
+    },
+    {
+      "canonical_address": "2520 Allie Nicole Cir",
+      "configured_fetch": {
+        "body_bytes": 167,
+        "final_url": "https://www.southernpineapts.com/",
+        "requested_url": "https://www.southernpineapts.com",
+        "status": 202
+      },
+      "configured_page_identity": {
+        "canonical_address": "2520 Allie Nicole Cir",
+        "canonical_name": "Southern Pine Apartments",
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "allie",
+          "nicole"
+        ]
+      },
+      "configured_website": "www.southernpineapts.com",
+      "contamination_verdict": "reject_current_configured_site_refresh_shell_no_property_scoped_native_route",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "",
+        "errors": [],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 167,
+        "final_url": "https://www.southernpineapts.com/",
+        "requested_url": "https://www.southernpineapts.com",
+        "status": 202
+      },
+      "inventory_page_identity": {
+        "canonical_address": "2520 Allie Nicole Cir",
+        "canonical_name": "Southern Pine Apartments",
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "allie",
+          "nicole"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": null,
+      "onesite_adapter_e2e": {
+        "executed": false,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 0,
+        "reason": "inventory_fetch_not_200_status_202",
+        "sample_units": [],
+        "tier": "",
+        "unit_rows": 0
+      },
+      "outcome": "CURRENT_SITE_FETCH_NOT_USABLE",
+      "property_id": 67154,
+      "property_identity_match": false,
+      "property_name": "Southern Pine Apartments",
+      "published_native_route": {
+        "all_published_site_ids": [],
+        "configured_final_url": "https://www.southernpineapts.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "",
+        "expected_site_id_is_sole_published_id": false,
+        "inventory_final_url": "https://www.southernpineapts.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "none"
+      },
+      "rejection_reasons": [
+        "configured_site_returns_http_202_refresh_shell",
+        "no_current_property_published_onesite_site_id_or_inventory_route",
+        "stale_profile_only_routes_are_not_counted"
+      ],
+      "rp_oracle_native_unit_rows": 0
+    },
+    {
+      "canonical_address": "1925 Roland Clarke Pl",
+      "configured_fetch": {
+        "body_bytes": 145072,
+        "final_url": "https://www.thepointatreston.com/",
+        "requested_url": "https://www.thepointatreston.com/",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "1925 Roland Clarke Pl",
+        "canonical_name": "The Point at Reston",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "roland",
+          "clarke"
+        ]
+      },
+      "configured_website": "https://www.thepointatreston.com/",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_native_units_but_current_pipeline_misroutes",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "entrata",
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ENTRATA_NO_RESPONSE",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 136107,
+        "final_url": "https://www.thepointatreston.com/floor-plans",
+        "requested_url": "https://www.thepointatreston.com/floor-plans",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "1925 Roland Clarke Pl",
+        "canonical_name": "The Point at Reston",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "roland",
+          "clarke"
+        ]
+      },
+      "ledger_current_detected_adapter": "realpage_oll",
+      "native_workflow_probe": {
+        "available_floorplan_count": 11,
+        "available_unit_id_count": 18,
+        "distinct_available_unit_id_count": 18,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 14,
+        "payload_site_id": "4843024",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "4843024",
+        "sample_available_unit_ids": [
+          "248",
+          "275",
+          "265",
+          "267",
+          "224",
+          "227",
+          "231",
+          "9",
+          "75",
+          "46"
+        ],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 18,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 18,
+        "plan_summary_rows": 3,
+        "sample_units": [
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4843024",
+            "unit_id": "",
+            "unit_number": "248"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4843024",
+            "unit_id": "",
+            "unit_number": "275"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4843024",
+            "unit_id": "",
+            "unit_number": "265"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4843024",
+            "unit_id": "",
+            "unit_number": "267"
+          },
+          {
+            "floor_plan_name": "S01",
+            "market_rent_high": 3972,
+            "market_rent_low": 2165,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_ids": {},
+            "source_property_id": "4843024",
+            "unit_id": "",
+            "unit_number": "224"
+          }
+        ],
+        "source_property_ids": [
+          "4843024"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>"
+        ],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 21
+      },
+      "outcome": "ADAPTER_E2E_NATIVE_DATA_ROUTING_MISS",
+      "property_id": 253326,
+      "property_identity_match": true,
+      "property_name": "The Point at Reston",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "4843024"
+        ],
+        "configured_final_url": "https://www.thepointatreston.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [
+          "4843024"
+        ],
+        "expected_site_id": "4843024",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.thepointatreston.com/floor-plans",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "direct_widget_site_id_on_current_inventory_page"
+      },
+      "rejection_reasons": [
+        "current_full_pipeline_e2e_returned_zero_native_priced_units",
+        "routing_miss_before_onesite_adapter",
+        "excluded_from_strict_207_gate_until_current_pipeline_routes_this_page_to_onesite"
+      ],
+      "rp_oracle_native_unit_rows": 26
+    },
+    {
+      "canonical_address": "1 Kingston Collection Way",
+      "configured_fetch": {
+        "body_bytes": 143279,
+        "final_url": "https://www.thepointatkingston.com/",
+        "requested_url": "https://www.thepointatkingston.com/",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "1 Kingston Collection Way",
+        "canonical_name": "The Point at Kingston",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kingston",
+          "collection"
+        ]
+      },
+      "configured_website": "https://www.thepointatkingston.com/",
+      "contamination_verdict": "pass_exact_current_configured_page_identity_same_host_native_entrata_units",
+      "counts_toward_strict_207_gate": true,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "entrata",
+        "errors": [],
+        "native_positive_rent_rows": 5,
+        "native_samples": [
+          {
+            "floor_plan_name": "A2 Grays",
+            "identity": {
+              "unit_number": "363"
+            },
+            "positive_rent_evidence": {
+              "market_rent_high": 2528,
+              "market_rent_low": 2510
+            },
+            "source_api_url": "https://www.thepointatkingston.com/kingston/the-point-at-kingston/floorplans/a2-grays-791908/fp_name/occupancy_type/conventional/",
+            "source_ids": {
+              "entrata_fpid": "791908",
+              "entrata_uid": "4593430"
+            },
+            "source_property_id": ""
+          },
+          {
+            "floor_plan_name": "A2 Grays",
+            "identity": {
+              "unit_number": "441"
+            },
+            "positive_rent_evidence": {
+              "market_rent_high": 2603,
+              "market_rent_low": 2585
+            },
+            "source_api_url": "https://www.thepointatkingston.com/kingston/the-point-at-kingston/floorplans/a2-grays-791908/fp_name/occupancy_type/conventional/",
+            "source_ids": {
+              "entrata_fpid": "791908",
+              "entrata_uid": "4593441"
+            },
+            "source_property_id": ""
+          },
+          {
+            "floor_plan_name": "A3 Fisher",
+            "identity": {
+              "unit_number": "212"
+            },
+            "positive_rent_evidence": {
+              "market_rent_high": 2443,
+              "market_rent_low": 2425
+            },
+            "source_api_url": "https://www.thepointatkingston.com/kingston/the-point-at-kingston/floorplans/a3-fisher-791910/fp_name/occupancy_type/conventional/",
+            "source_ids": {
+              "entrata_fpid": "791910",
+              "entrata_uid": "4593449"
+            },
+            "source_property_id": ""
+          }
+        ],
+        "plan_summary_rows": 0,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+        "unit_rows": 5
+      },
+      "inventory_fetch": {
+        "body_bytes": 143279,
+        "final_url": "https://www.thepointatkingston.com/",
+        "requested_url": "https://www.thepointatkingston.com/",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "1 Kingston Collection Way",
+        "canonical_name": "The Point at Kingston",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kingston",
+          "collection"
+        ]
+      },
+      "ledger_current_detected_adapter": "realpage_oll",
+      "native_workflow_probe": null,
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [
+          "No RealPage/OneSite floorplan data found in captured API responses"
+        ],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 0,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+        "unit_rows": 0
+      },
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 265143,
+      "property_identity_match": true,
+      "property_name": "The Point at Kingston",
+      "published_native_route": {
+        "all_published_site_ids": [],
+        "configured_final_url": "https://www.thepointatkingston.com/",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "",
+        "expected_site_id_is_sole_published_id": false,
+        "inventory_final_url": "https://www.thepointatkingston.com/",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": null,
+        "portal_shell_widget_site_ids": [],
+        "published_portal_urls": [],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "none"
+      },
+      "rejection_reasons": [],
+      "rp_oracle_native_unit_rows": 19
+    },
+    {
+      "canonical_address": "20190 Murphy Rd",
+      "configured_fetch": {
+        "body_bytes": 162265,
+        "final_url": "https://www.123taylor.com/gallatin-village",
+        "requested_url": "https://www.123taylor.com/gallatin-village",
+        "status": 200
+      },
+      "configured_page_identity": {
+        "canonical_address": "20190 Murphy Rd",
+        "canonical_name": "Gallatin Village",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "murphy"
+        ]
+      },
+      "configured_website": "https://www.123taylor.com/gallatin-village",
+      "contamination_verdict": "pass_exact_published_route_payload_binding_but_zero_native_unit_ids",
+      "counts_toward_strict_207_gate": false,
+      "current_full_pipeline_e2e": {
+        "adapter_used": "onesite",
+        "errors": [],
+        "native_positive_rent_rows": 0,
+        "native_samples": [],
+        "plan_summary_rows": 5,
+        "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/baseline_current_direct_e2e.json",
+        "source_artifact_sha256": "e7b20c4486258a46b461291f256db3bad7964291a0ab4d4997923a500d0a16d7",
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 0
+      },
+      "inventory_fetch": {
+        "body_bytes": 162265,
+        "final_url": "https://www.123taylor.com/gallatin-village",
+        "requested_url": "https://www.123taylor.com/gallatin-village",
+        "status": 200
+      },
+      "inventory_page_identity": {
+        "canonical_address": "20190 Murphy Rd",
+        "canonical_name": "Gallatin Village",
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "murphy"
+        ]
+      },
+      "ledger_current_detected_adapter": "onesite",
+      "native_workflow_probe": {
+        "available_floorplan_count": 0,
+        "available_unit_id_count": 0,
+        "distinct_available_unit_id_count": 0,
+        "fixed_tls_fingerprint": "chrome116",
+        "floorplan_count": 5,
+        "payload_site_id": "4645221",
+        "payload_site_id_matches_requested": true,
+        "requested_site_id": "4645221",
+        "sample_available_unit_ids": [],
+        "sanitized_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4645221/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+        "status": 200,
+        "workflow_present": true
+      },
+      "onesite_adapter_e2e": {
+        "adapter": "onesite",
+        "distinct_unit_numbers": 0,
+        "errors": [],
+        "executed": true,
+        "native_positive_rent_rows": 0,
+        "plan_summary_rows": 5,
+        "sample_units": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "unit_rows": 5
+      },
+      "outcome": "NO_CURRENT_NATIVE_UNIT_INVENTORY",
+      "property_id": 291774,
+      "property_identity_match": true,
+      "property_name": "Gallatin Village",
+      "published_native_route": {
+        "all_published_site_ids": [
+          "4645221"
+        ],
+        "configured_final_url": "https://www.123taylor.com/gallatin-village",
+        "direct_welcomehome_site_ids": [],
+        "direct_widget_site_ids": [],
+        "expected_site_id": "4645221",
+        "expected_site_id_is_sole_published_id": true,
+        "inventory_final_url": "https://www.123taylor.com/gallatin-village",
+        "inventory_path_published_by_configured_page": true,
+        "no_conflicting_site_ids": true,
+        "portal_shell_fetch": {
+          "body_bytes": 40908,
+          "final_url": "https://8169363.onlineleasing.realpage.com/",
+          "requested_url": "https://8169363.onlineleasing.realpage.com/",
+          "status": 200
+        },
+        "portal_shell_widget_site_ids": [
+          "4645221"
+        ],
+        "published_portal_urls": [
+          "https://8169363.onlineleasing.realpage.com"
+        ],
+        "same_origin_inventory_page": true,
+        "site_id_provenance": "sole_current_configured_page_portal_to_shell_widget_site_id"
+      },
+      "rejection_reasons": [
+        "native_current_inventory_zero",
+        "workflow_reports_no_available_unit_ids",
+        "plan_level_rows_do_not_count_as_unit_level_conversion"
+      ],
+      "rp_oracle_native_unit_rows": 5
+    }
+  ],
+  "strict_policy": {
+    "current_full_pipeline_required_to_count": true,
+    "direct_adapter_e2e_without_current_pipeline_routing_counts": false,
+    "exact_current_property_binding_required": true,
+    "native_unit_id_or_number_required": true,
+    "plan_level_rows_count": false,
+    "positive_numeric_rent_required": true
+  },
+  "summary": {
+    "adapter_e2e_native_data_routing_near_miss_count": 4,
+    "adapter_e2e_native_data_routing_near_miss_ids": [
+      2948,
+      16172,
+      18194,
+      253326
+    ],
+    "audited_properties": 11,
+    "current_pipeline_qualified_count": 1,
+    "current_pipeline_qualified_ids": [
+      265143
+    ],
+    "rejected_or_near_miss_count": 10,
+    "strict_net_new_count_vs_current_ledger": 1,
+    "strict_net_new_ids_vs_current_ledger": [
+      265143
+    ]
+  }
+}

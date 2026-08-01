@@ -13,9 +13,12 @@ Verified-live ground-truth (rendered text captured after the per-plan
 
 from __future__ import annotations
 
+import json
+
 from ma_poc.pms.adapters._encoreskyline_units import (
     is_encoreskyline_template_page,
     parse_encoreskyline_units,
+    parse_jonah_resource_json,
 )
 
 # --- is_encoreskyline_template_page (detection) ---------------------------
@@ -161,3 +164,133 @@ def test_slash_date_format_supported() -> None:
     units = parse_encoreskyline_units(rendered, "https://x.com/")
     assert len(units) == 1
     assert units[0]["availability_date"] == "5/20"
+
+
+# --- modern Jonah server-rendered resource JSON -------------------------
+
+
+def _jonah_html(resource: dict, *, script_id: str = "jd-fp-data-script-resource") -> str:
+    return (
+        "<html><script type='application/json' id='"
+        + script_id
+        + "'>"
+        + json.dumps(resource)
+        + "</script></html>"
+    )
+
+
+def test_jonah_resource_prefers_base_rent_and_selected_iso_date() -> None:
+    """Duke Manor shape: total monthly price includes fees; ship base rent."""
+    resource = {
+        "type": "floorplan",
+        "title": "Arthur",
+        "bedrooms": "1",
+        "bathrooms": "1",
+        "square_feet": "525",
+        "units": [
+            {
+                "type": "unit",
+                "id": 2313124,
+                "id_value": "10777718",
+                "apartment_number": "B",
+                "title": "#B",
+                "availability_count": 1,
+                "floorplan_title": "Arthur",
+                "bedrooms": "1",
+                "bathrooms": "1",
+                "square_feet": "525",
+                "building": "0026",
+                "rent_min": "1020.11",
+                "rent_max": "1020.11",
+                "available_date": "1786942800",
+                "price_entity": {
+                    "date": "2026-08-17",
+                    "termDisplay": "5 months",
+                    "priceDisplayNoFees": "$1,000 Base Rent",
+                    "adjusted": {
+                        "low_no_fees": "1000",
+                        "high_no_fees": "1000",
+                        "low": "1020.11",
+                        "high": "1020.11",
+                    },
+                },
+                "engrain_data": {"unit_id": "10777718", "floor_name": "1"},
+            }
+        ],
+    }
+    units = parse_jonah_resource_json(_jonah_html(resource), "https://gsc/x/arthur/")
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["unit_number"] == "B"
+    assert unit["floor_plan_name"] == "Arthur"
+    assert unit["bedrooms"] == "1"
+    assert unit["bathrooms"] == "1"
+    assert unit["sqft"] == "525"
+    assert unit["building"] == "0026"
+    assert unit["floor"] == "1"
+    assert unit["market_rent_low"] == 1000
+    assert unit["market_rent_high"] == 1000
+    assert unit["availability_date"] == "2026-08-17"
+    assert unit["lease_term"] == "5 months"
+    assert unit["source_ids"] == {"sightmap_unit_id": "10777718"}
+    assert unit["unit_id"] == "sightmap_unit_id-10777718"
+    assert unit["extraction_tier"] == "TIER_1_DOM_JONAH_RESOURCE_JSON"
+
+
+def test_jonah_resource_uses_epoch_and_visible_price_fallbacks() -> None:
+    """Older resource shape still preserves the published date and roster id."""
+    resource = {
+        "type": "floorplan",
+        "title": "Cayman",
+        "bedrooms": "1",
+        "bathrooms": "1",
+        "square_feet": "700",
+        "units": [
+            {
+                "type": "unit",
+                "id_value": "4133820",
+                "title": "#016",
+                "availability_count": 1,
+                "rent_min": "1345",
+                "rent_max": "1395",
+                "available_date": "1786338000",
+            }
+        ],
+    }
+    units = parse_jonah_resource_json(_jonah_html(resource), "https://gsc/x/cayman/")
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["unit_number"] == "016"
+    assert unit["floor_plan_name"] == "Cayman"
+    assert (unit["market_rent_low"], unit["market_rent_high"]) == (1345, 1395)
+    assert unit["availability_date"] == "2026-08-10"
+
+
+def test_jonah_resource_exact_script_gate_and_malformed_payload_are_safe() -> None:
+    resource = {
+        "type": "floorplan",
+        "units": [{"type": "unit", "apartment_number": "101"}],
+    }
+    assert parse_jonah_resource_json(
+        _jonah_html(resource, script_id="some-other-json"), "https://x/"
+    ) == []
+    assert parse_jonah_resource_json(
+        "<script id='jd-fp-data-script-resource'>{oops</script>", "https://x/"
+    ) == []
+    assert parse_jonah_resource_json(
+        _jonah_html({"type": "property", "units": resource["units"]}),
+        "https://x/",
+    ) == []
+
+
+def test_jonah_resource_skips_explicitly_unavailable_rows() -> None:
+    resource = {
+        "type": "floorplan",
+        "title": "A1",
+        "units": [
+            {"type": "unit", "apartment_number": "101", "availability_count": 0},
+            {"type": "unit", "apartment_number": "102", "availability_count": 1},
+        ],
+    }
+    units = parse_jonah_resource_json(_jonah_html(resource), "https://x/")
+    assert [unit["unit_number"] for unit in units] == ["102"]

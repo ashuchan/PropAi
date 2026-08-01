@@ -44,12 +44,36 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
 )
+from ma_poc.pms.adapters._rentcafe_availability import (
+    availability_by_applyga_unit,
+)
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
 log = logging.getLogger(__name__)
+
+
+def is_rentcafe_layout_tab_html(html: str | bytes | None) -> bool:
+    """Return whether *html* carries the exact RentCafe layout-tab marker.
+
+    Both class tokens are required.  Either token by itself appears on other
+    RentCafe themes and is not sufficient authority to spend the bounded
+    ``/availableunits`` / detail-page recovery probes.
+    """
+    if isinstance(html, bytes):
+        text = html.decode("utf-8", errors="replace")
+    elif isinstance(html, str):
+        text = html
+    else:
+        return False
+    lowered = text.lower()
+    return (
+        "page-content-floorplans" in lowered
+        and "floorplans-layout-tab" in lowered
+    )
+
 
 # Identifies a /floorplans/{slug} drill URL on the SAME origin.
 _DRILL_HREF_RE = re.compile(r"^/floorplans/[^/?#][^/?#]*/?$")
@@ -110,6 +134,18 @@ async () => {
         // Prefer the main content area when present; fall back to body.
         const main = drillDoc.querySelector('main, .page-content-availableunits, .page-content-floorplans');
         bodyText = T(main || drillDoc.body);
+        const seenScopes = new Set();
+        const unitScopes = [];
+        for (const el of drillDoc.querySelectorAll('[onclick*="applyGAClick"]')) {
+          const scope = el.closest(
+            'tr, .unit-container, .available-unit, .available-unit-card, .unit-card, .card-body, .card'
+          ) || el.parentElement;
+          if (scope && !seenScopes.has(scope)) {
+            seenScopes.add(scope);
+            unitScopes.push(scope.outerHTML);
+          }
+        }
+        item.unitHtml = unitScopes.join('\n');
       }
     } catch (e) { /* skip */ }
     plans.push({
@@ -117,6 +153,7 @@ async () => {
       anchorText: item.anchorText,
       h1: h1Text,
       bodyText: bodyText.slice(0, 50000),
+      unitHtml: item.unitHtml || '',
     });
   }
   return {ok: true, plans: plans};
@@ -160,11 +197,19 @@ def _ga_int(s: str) -> int | None:
         return None
 
 
+def _lt_unit_from_applyga(onclick: str, _element: object) -> str:
+    match = _APPLY_GA_RE.search(onclick or "")
+    return match.group(6).strip() if match else ""
+
+
 def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
     """Parse applyGAClick(plan,beds,sqft,rentLow,rentHigh,unit#) handlers from
     RAW drill HTML. Returns one row per handler (NO dedup — the caller applies
     a run-global dedup because a drill page can render the full roster)."""
     out: list[dict] = []
+    unit_dates = availability_by_applyga_unit(
+        raw_html or "", unit_from_element=_lt_unit_from_applyga
+    )
     for m in _APPLY_GA_RE.finditer(raw_html or ""):
         plan, beds_lbl, sqft_raw, rlo_raw, rhi_raw, unit = (
             g.strip() for g in m.groups()
@@ -188,6 +233,7 @@ def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
                 rent_high=(rhi or rlo),
                 rent_range=format_rent_range(rlo, rhi or rlo),
                 availability_status="AVAILABLE",
+                availability_date=unit_dates.get(unit.upper(), ""),
                 available_units="1",
                 source_api_url=drill_url,
                 extraction_tier="TIER_1_DOM_RENTCAFE_LT",
@@ -275,7 +321,20 @@ def parse_rentcafe_layout_tab(plans: list[dict], url: str) -> list[dict]:
         anchor = str(p.get("anchorText") or "").strip()
         h1 = str(p.get("h1") or "").strip()
         body = str(p.get("bodyText") or "")
+        unit_html = str(p.get("unitHtml") or "")
         plan_name = h1 or anchor or slug or ""
+
+        # Browser extraction returns only the bounded per-unit snippets, not
+        # a page-sized HTML blob.  Reuse the exact static applyGAClick parser
+        # so browser and code-only paths preserve availability identically.
+        if unit_html:
+            applyga_rows = parse_rentcafe_lt_applyga(
+                unit_html, url + drill if drill else url
+            )
+            if applyga_rows:
+                out.extend(applyga_rows)
+                continue
+
         beds, baths, sqft = _parse_plan_specs(body)
         units_parsed = _parse_drill_units(body)
         avail_match = _AVAIL_COUNT_RE.search(body)
@@ -449,16 +508,34 @@ class RentCafeLayoutTabAdapter:
         # about. Guarded structurally by ``test_no_blocking_probe_in_async_def``.
         avail_url = origin + "/availableunits"
         roster_units: list[dict] = []
-        try:
-            ra = await asyncio.to_thread(probe_get, avail_url, timeout=20)
-            if getattr(ra, "status_code", 0) == 200:
-                roster_units = parse_rentcafe_lt_applyga(
-                    getattr(ra, "text", "") or "", avail_url
+        _attempted_attr = "_rentcafe_vanity_availableunits_attempted"
+        if not bool(getattr(ctx, _attempted_attr, False)):
+            try:
+                setattr(ctx, _attempted_attr, True)
+            except Exception:
+                pass
+            try:
+                ra = await asyncio.to_thread(
+                    probe_get,
+                    avail_url,
+                    timeout=20,
+                    unlocker=False,
+                    proxies={},
+                    verify=True,
+                    retries=1,
                 )
-                if roster_units:
-                    return self._finish_code_only(ctx, result, roster_units, avail_url)
-        except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
-            result.errors.append(f"rentcafe_lt: /availableunits probe failed: {exc}")
+                if getattr(ra, "status_code", 0) == 200:
+                    roster_units = parse_rentcafe_lt_applyga(
+                        getattr(ra, "text", "") or "", avail_url
+                    )
+                    if roster_units:
+                        return self._finish_code_only(
+                            ctx, result, roster_units, avail_url
+                        )
+            except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+                result.errors.append(
+                    f"rentcafe_lt: /availableunits probe failed: {exc}"
+                )
 
         # Always fetch the RAW /floorplans server HTML via curl: the
         # Playwright-rendered fetch_result.body drops the raw root-relative

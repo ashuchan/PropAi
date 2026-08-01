@@ -1,0 +1,19 @@
+{
+  "solve_captchas": false,
+  "results": [
+    {
+      "property_id": 43995,
+      "url": "https://hamiltonhall.scullycompany.com/Apartments/module/application_authentication/action/view_quotes/property[id]/100003046/",
+      "status": 200,
+      "body_bytes": 222345,
+      "saved": true
+    },
+    {
+      "property_id": 63191,
+      "url": "https://avenir.scullycompany.com/Apartments/module/application_authentication/action/view_quotes/property[id]/100002834/",
+      "status": 200,
+      "body_bytes": 223853,
+      "saved": true
+    }
+  ]
+}

@@ -36,7 +36,7 @@ import string
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
     realpage_units_to_adapter_shape as _dr_realpage_units,
@@ -87,7 +87,7 @@ _ONESITE_SITEID_FROM_WIDGET_RE = re.compile(
 # ~16 timeout/generic-family props link to this surface and previously fell to
 # generic because neither the detector nor the SiteId parser recognised it.
 _ONESITE_SITEID_FROM_WELCOMEHOME_RE = re.compile(
-    r"onesite\.realpage\.com/welcomehome\?[^\"'\\\s]*siteId=(\d+)",
+    r"onesite\.realpage\.com/welcomehome/?\?[^\"'\\\s]*siteId=(\d+)",
     re.IGNORECASE,
 )
 _ONESITE_SUBDOMAIN_RE = re.compile(
@@ -102,6 +102,54 @@ _ONESITE_G5_PARTNER_RE = re.compile(
     r'"partnerName"\s*:\s*"OneSite"[^}]*?"partnerpropertyId"\s*:\s*"(\d+)"',
     re.IGNORECASE,
 )
+_ONESITE_WORKFLOW_SITEID_RE = re.compile(
+    r"/workflowstartup/v1/(\d+)/English(?:[/?]|$)",
+    re.IGNORECASE,
+)
+
+# LeaseStar/RealPage floor-plan widgets publish an RPFP_config block on the
+# property's own floor-plan page.  Unlike the OLL workflow surface above, CWS
+# exposes unit inventory through api.ws.realpage.com using the public widget
+# credential.  These patterns intentionally require the complete identity
+# tuple; a loose propertyId+apiKey match is not enough to attribute inventory.
+_RPFP_PROPERTY_ID_RE = re.compile(
+    r"\bpropertyId\s*(?:=|:)\s*['\"]?(\d+)['\"]?",
+    re.IGNORECASE,
+)
+_RPFP_PROPERTY_KEY_RE = re.compile(
+    r"\bpropertyKey\s*(?:=|:)\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+_RPFP_API_KEY_RE = re.compile(
+    r"\bapiKey\s*:\s*['\"]([0-9a-f-]{36})['\"]",
+    re.IGNORECASE,
+)
+_RPFP_API_URL_RE = re.compile(
+    r"\bapiUrl\s*:\s*['\"]https://c-leasestar-api\.realpage\.com/?['\"]",
+    re.IGNORECASE,
+)
+_RPFP_PARTNER_PROPERTY_ID_RE = re.compile(
+    r"\bPartnerPropertyId['\"]?\s*:\s*['\"](\d+)['\"]",
+    re.IGNORECASE,
+)
+_RPFP_HREF_RE = re.compile(r"\bhref\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
+
+_STREET_TOKEN_ALIASES = {
+    "avenue": "ave",
+    "boulevard": "blvd",
+    "circle": "cir",
+    "court": "ct",
+    "drive": "dr",
+    "east": "e",
+    "highway": "hwy",
+    "lane": "ln",
+    "north": "n",
+    "parkway": "pkwy",
+    "road": "rd",
+    "south": "s",
+    "street": "st",
+    "west": "w",
+}
 
 
 def _extract_onesite_site_ids(body: str, base_url: str) -> list[str]:
@@ -185,9 +233,7 @@ def _onesite_workflowstartup_url(site_id: str) -> str:
 #
 # X-AuthToken + X-Phased headers are empty for unauthenticated probes
 # (workflowstartup doesn't require them — only logged-in user flows do).
-_XYZ_CHARGEN_POOL = (
-    string.ascii_uppercase + string.ascii_lowercase + string.digits
-)
+_XYZ_CHARGEN_POOL = string.ascii_uppercase + string.ascii_lowercase + string.digits
 # Chrome 116 UA — chosen for DataDome bypass. Live validation
 # 2026-05-24 across all curl_cffi impersonations: chrome120/119/124
 # get blocked by DataDome (403), but chrome116/110/107/104/101 plus
@@ -289,9 +335,7 @@ def _collapse_huge_rent_range(
     return rent_lo, rent_hi, False
 
 
-def parse_onesite_workflowstartup(
-    body: dict[str, Any], url: str
-) -> list[dict[str, str]]:
+def parse_onesite_workflowstartup(body: dict[str, Any], url: str) -> list[dict[str, str]]:
     """Parse a ``workflowstartup/v1/{SITE_ID}/English`` response into
     standard unit dicts.
 
@@ -312,6 +356,18 @@ def parse_onesite_workflowstartup(
     if not isinstance(body, dict):
         return []
     workflow = body.get("Workflow") or {}
+    if not isinstance(workflow, dict):
+        return []
+    url_site_match = _ONESITE_WORKFLOW_SITEID_RE.search(url or "")
+    url_site_id = url_site_match.group(1) if url_site_match else ""
+    payload_site_id = str(workflow.get("SiteId") or "").strip()
+    # A cross-host RealPage response is property-scoped only when the native
+    # SiteId in the payload agrees with the exact SiteId requested.  Older
+    # fixtures omit Workflow.SiteId, so URL-only provenance remains accepted;
+    # an explicit disagreement always fails closed.
+    if url_site_id and payload_site_id and url_site_id != payload_site_id:
+        return []
+    source_site_id = payload_site_id or url_site_id
     activity_groups = workflow.get("ActivityGroups") or []
     if not isinstance(activity_groups, list):
         return []
@@ -389,9 +445,7 @@ def parse_onesite_workflowstartup(
                     rent_hi_i = rent_lo_i
 
                 # Collapse implausibly wide ranges (short-term-lease leak).
-                rent_lo_i, rent_hi_i, _clamped = _collapse_huge_rent_range(
-                    rent_lo_i, rent_hi_i
-                )
+                rent_lo_i, rent_hi_i, _clamped = _collapse_huge_rent_range(rent_lo_i, rent_hi_i)
 
                 beds_i: int | None = None
                 if isinstance(beds, (int, float)):
@@ -401,9 +455,7 @@ def parse_onesite_workflowstartup(
 
                 baths_str = ""
                 if isinstance(baths, (int, float)):
-                    baths_str = (
-                        str(int(baths)) if float(baths).is_integer() else str(baths)
-                    )
+                    baths_str = str(int(baths)) if float(baths).is_integer() else str(baths)
                 elif isinstance(baths, str):
                     baths_str = baths
 
@@ -432,23 +484,24 @@ def parse_onesite_workflowstartup(
                     _rows = [("", "UNAVAILABLE", "0")]
 
                 for _unit_no, _status, _avail in _rows:
-                    units.append(
-                        make_unit_dict(
-                            floor_plan_name=name,
-                            bed_label=bed_label_from(beds_i, name),
-                            bedrooms=str(beds_i) if beds_i is not None else "",
-                            bathrooms=baths_str,
-                            sqft=str(sqft_i) if sqft_i else "",
-                            unit_number=_unit_no,
-                            rent_range=format_rent_range(rent_lo_i, rent_hi_i),
-                            rent_low=rent_lo_i,
-                            rent_high=rent_hi_i,
-                            availability_status=_status,
-                            available_units=_avail,
-                            source_api_url=url,
-                            extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
-                        )
+                    unit = make_unit_dict(
+                        floor_plan_name=name,
+                        bed_label=bed_label_from(beds_i, name),
+                        bedrooms=str(beds_i) if beds_i is not None else "",
+                        bathrooms=baths_str,
+                        sqft=str(sqft_i) if sqft_i else "",
+                        unit_number=_unit_no,
+                        rent_range=format_rent_range(rent_lo_i, rent_hi_i),
+                        rent_low=rent_lo_i,
+                        rent_high=rent_hi_i,
+                        availability_status=_status,
+                        available_units=_avail,
+                        source_api_url=url,
+                        extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
                     )
+                    if source_site_id:
+                        unit["source_property_id"] = source_site_id
+                    units.append(unit)
     return units
 
 
@@ -484,6 +537,7 @@ async def _probe_onesite_workflowstartup(
 
     base_url = getattr(ctx, "base_url", "") or ""
     site_ids = _extract_onesite_site_ids(raw_body, base_url)
+    site_id_provenance: dict[str, tuple[str, str]] = {sid: ("marketing_page_site_id", "") for sid in site_ids}
 
     # Path C: try fetching the leasing subdomain to find SiteId in ITS body
     # (the marketing site might just have a link to {prefix}.onlineleasing
@@ -497,21 +551,59 @@ async def _probe_onesite_workflowstartup(
         import html as _html
 
         _sub_hay = _html.unescape(raw_body).replace("\\/", "/").replace("\\", "")
-        sub_match = _ONESITE_SUBDOMAIN_RE.search(
-            raw_body
-        ) or _ONESITE_SUBDOMAIN_RE.search(_sub_hay)
-        if sub_match:
+        sub_hosts: list[str] = []
+        for sub_match in _ONESITE_SUBDOMAIN_RE.finditer(_sub_hay):
             sub_host = sub_match.group(0).rstrip("/") + "/"
+            if sub_host not in sub_hosts:
+                sub_hosts.append(sub_host)
+        # A marketing page with multiple distinct OneSite tenant links is a
+        # portfolio surface, not a property-scoped proof.  Never pick the first
+        # sibling by source order.
+        if len(sub_hosts) == 1:
+            sub_host = sub_hosts[0]
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
                 # Off-loaded for the same reason as the web_unlocker_get leg
                 # below — blocking urlopen inside an `async def` parks the loop.
-                r = await asyncio.to_thread(probe_get, sub_host, timeout=15)
+                r = await asyncio.to_thread(
+                    probe_get,
+                    sub_host,
+                    timeout=15,
+                    unlocker=False,
+                    retries=1,
+                )
                 if r.status_code == 200 and r.text:
                     site_ids = _extract_onesite_site_ids(r.text, sub_host)
+                    site_id_provenance.update({sid: ("published_portal_shell", sub_host) for sid in site_ids})
             except Exception:
                 pass
+
+            # Exact-URL Hyperbrowser fallback.  The marketing page published
+            # this numeric onlineleasing.realpage.com URL verbatim, but that
+            # shell can intermittently 403 the direct probe under load.  Use
+            # at most one clean HB session to read the same public shell and
+            # recover its widgetLoader SiteId.  hb_raw_get shares the global
+            # per-property cap, never retries, always closes, and its session
+            # hard-disables CAPTCHA solving; production sets useStealth=false.
+            if not site_ids:
+                try:
+                    from ma_poc.config.feature_flags import hb_enabled
+
+                    if hb_enabled():
+                        from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                        hb_status, hb_body = await hb_raw_get(
+                            sub_host,
+                            str(getattr(ctx, "property_id", "") or ""),
+                        )
+                        if hb_status == 200 and hb_body:
+                            site_ids = _extract_onesite_site_ids(hb_body, sub_host)
+                            site_id_provenance.update(
+                                {sid: ("published_portal_shell", sub_host) for sid in site_ids}
+                            )
+                except Exception:
+                    pass
 
     # Path D: G5-managed sites — partnerpropertyId in g5devops summary
     if not site_ids:
@@ -525,6 +617,10 @@ async def _probe_onesite_workflowstartup(
                     pm = _ONESITE_G5_PARTNER_RE.search(r.text)
                     if pm:
                         site_ids = [pm.group(1)]
+                        site_id_provenance[site_ids[0]] = (
+                            "g5_partner_property",
+                            g5_match.group(1),
+                        )
             except Exception:
                 pass
 
@@ -540,11 +636,7 @@ async def _probe_onesite_workflowstartup(
         base_url = str(getattr(fr, "final_url", "") or "") or base_url
     try:
         _bp = urlparse(base_url)
-        origin_host = (
-            f"{_bp.scheme}://{_bp.netloc}"
-            if _bp.scheme and _bp.netloc
-            else ""
-        )
+        origin_host = f"{_bp.scheme}://{_bp.netloc}" if _bp.scheme and _bp.netloc else ""
     except Exception:
         origin_host = ""
 
@@ -582,7 +674,15 @@ async def _probe_onesite_workflowstartup(
         # path. Fall through on transport error or 403/datadome; stop
         # on first 200 with parseable Workflow.
         body_text = ""
-        for imp in _XYZ_IMPERSONATE_CHAIN if _cc is not None else ():
+        # The normal chain predates COMPLIANCE_MODE and rotates through four
+        # browser TLS fingerprints after a block.  Fingerprint rotation is not
+        # allowed in production.  Keep one stable, previously validated
+        # browser fingerprint under compliance mode; separately authorised
+        # research runs retain the legacy chain.
+        from ma_poc.config.feature_flags import compliance_mode
+
+        _impersonations = _XYZ_IMPERSONATE_CHAIN[:1] if compliance_mode() else _XYZ_IMPERSONATE_CHAIN
+        for imp in _impersonations if _cc is not None else ():
             try:
                 r = _cc.get(
                     url,
@@ -591,9 +691,7 @@ async def _probe_onesite_workflowstartup(
                     impersonate=imp,
                 )
             except Exception as exc:
-                log.debug(
-                    "onesite workflowstartup imp=%s err: %s", imp, exc
-                )
+                log.debug("onesite workflowstartup imp=%s err: %s", imp, exc)
                 continue
             if r.status_code == 200 and r.text:
                 # Quick sanity check: server returns 200 with
@@ -608,10 +706,7 @@ async def _probe_onesite_workflowstartup(
                     continue
                 body_text = r.text
                 break
-            if (
-                r.status_code == 403
-                and "datadome" in (r.text or "").lower()[:600]
-            ):
+            if r.status_code == 403 and "datadome" in (r.text or "").lower()[:600]:
                 # This impersonation gets DD'd; try the next.
                 log.debug(
                     "onesite.workflow.datadome_block imp=%s sid=%s",
@@ -630,7 +725,7 @@ async def _probe_onesite_workflowstartup(
         # Last-resort: Web Unlocker. Only fires when every TLS
         # fingerprint got blocked. Cap-protected via
         # WEB_UNLOCKER_MAX_CALLS_PER_JOB.
-        if not body_text:
+        if not body_text and not compliance_mode():
             try:
                 # 2026-07-27: OFF-LOADED to a thread — identical fix to
                 # rentcafe.py's SecureCafe Attempt-3 leg. ``web_unlocker_get``
@@ -648,9 +743,7 @@ async def _probe_onesite_workflowstartup(
                         url[:80],
                     )
             except Exception as exc:
-                log.debug(
-                    "onesite workflowstartup WU err sid=%s: %s", sid, exc
-                )
+                log.debug("onesite workflowstartup WU err sid=%s: %s", sid, exc)
 
         if not body_text:
             continue
@@ -662,9 +755,295 @@ async def _probe_onesite_workflowstartup(
             continue
         units = parse_onesite_workflowstartup(body, url)
         if units:
+            provenance, portal_url = site_id_provenance.get(sid, ("", ""))
+            for unit in units:
+                unit["source_property_id"] = sid
+                unit["source_property_provenance"] = provenance
+                unit["source_portal_url"] = portal_url
             return units
 
     return []
+
+
+def _normalise_identity_words(value: Any, *, drop_name_noise: bool = False) -> str:
+    """Canonicalise roster/API identity text without fuzzy matching."""
+    words = re.findall(r"[a-z0-9]+", str(value or "").lower())
+    if drop_name_noise:
+        words = [word for word in words if word not in {"the", "apartments", "apartment", "homes", "home"}]
+    else:
+        words = [_STREET_TOKEN_ALIASES.get(word, word) for word in words]
+    return " ".join(words)
+
+
+def _same_property_identity(details: Any, ctx: AdapterContext, property_id: str) -> bool:
+    """Require CWS PropertyDetails to match both page config and roster.
+
+    This is deliberately fail-closed: incomplete roster identity is not enough
+    to adopt an unfiltered unit payload, even when the public credential works.
+    """
+    if not isinstance(details, dict) or str(details.get("id") or "") != property_id:
+        return False
+    if details.get("active") is not True:
+        return False
+
+    expected_name = _normalise_identity_words(ctx.property_name, drop_name_noise=True)
+    actual_name = _normalise_identity_words(details.get("name"), drop_name_noise=True)
+    expected_address = _normalise_identity_words(ctx.address)
+    address = details.get("address")
+    if not isinstance(address, dict):
+        return False
+    actual_address = _normalise_identity_words(address.get("address1"))
+    expected_city = _normalise_identity_words(ctx.city)
+    actual_city = _normalise_identity_words(address.get("cityName"))
+    expected_state = str(ctx.state or "").strip().upper()
+    actual_state = str(address.get("stateCode") or "").strip().upper()
+    expected_zip = re.sub(r"\D", "", str(ctx.zip_code or ""))[:5]
+    actual_zip = re.sub(r"\D", "", str(address.get("postalCode") or ""))[:5]
+
+    return bool(
+        expected_name
+        and actual_name == expected_name
+        and expected_address
+        and actual_address == expected_address
+        and expected_city
+        and actual_city == expected_city
+        and expected_state
+        and actual_state == expected_state
+        and len(expected_zip) == 5
+        and actual_zip == expected_zip
+    )
+
+
+def _published_same_origin_rpfp_pages(body: str, base_url: str) -> list[str]:
+    """Return explicitly linked same-origin floor-plan pages, never guesses."""
+    try:
+        base = urlparse(base_url)
+    except Exception:
+        return []
+    if base.scheme not in {"http", "https"} or not base.hostname:
+        return []
+
+    def _host(value: str) -> str:
+        return (value or "").lower().removeprefix("www.")
+
+    candidates: list[str] = []
+    for match in _RPFP_HREF_RE.finditer(body or ""):
+        absolute = urljoin(base_url, match.group(1).replace("&amp;", "&"))
+        parsed = urlparse(absolute)
+        if parsed.scheme not in {"http", "https"} or _host(parsed.hostname or "") != _host(base.hostname):
+            continue
+        path = parsed.path.lower()
+        if "floor-plan" not in path and "floorplan" not in path:
+            continue
+        clean = parsed._replace(fragment="").geturl()
+        if clean not in candidates:
+            candidates.append(clean)
+    return candidates[:3]
+
+
+def _extract_rpfp_config(body: str) -> dict[str, str] | None:
+    """Extract a complete RPFP identity tuple from one property page."""
+    values = {
+        "property_id": set(_RPFP_PROPERTY_ID_RE.findall(body or "")),
+        "property_key": set(_RPFP_PROPERTY_KEY_RE.findall(body or "")),
+        "api_key": set(_RPFP_API_KEY_RE.findall(body or "")),
+        "partner_property_id": set(_RPFP_PARTNER_PROPERTY_ID_RE.findall(body or "")),
+    }
+    # Repetition of one value is normal in CMS HTML; multiple distinct
+    # values indicate a portfolio/multi-property surface and must not be
+    # resolved by source order.
+    if not _RPFP_API_URL_RE.search(body or "") or any(len(items) != 1 for items in values.values()):
+        return None
+    return {key: next(iter(items)) for key, items in values.items()}
+
+
+async def _fetch_rpfp_json(url: str, api_key: str, origin: str) -> Any:
+    """Fetch one public CWS JSON endpoint with no proxy or retry chain."""
+    import httpx
+
+    headers = {
+        "Accept": "application/json",
+        "Origin": origin,
+        "Referer": origin + "/",
+        "x-ws-authkey": api_key,
+    }
+    async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
+        response = await client.get(url, headers=headers)
+    if response.status_code != 200:
+        return None
+    try:
+        return response.json()
+    except Exception:
+        return None
+
+
+def _parse_strict_rpfp_units(
+    units_body: Any,
+    floorplans_body: Any,
+    *,
+    property_id: str,
+    property_key: str,
+    partner_property_id: str,
+    source_url: str,
+    source_page_url: str,
+) -> list[dict[str, Any]]:
+    """Join and admit only native, ready, positive-rent CWS unit rows."""
+    if not isinstance(floorplans_body, dict) or floorplans_body.get("status") != 200:
+        return []
+    fp_response = floorplans_body.get("response")
+    if not isinstance(fp_response, dict) or str(fp_response.get("propertyKey") or "") != property_key:
+        return []
+    floorplans = fp_response.get("floorplans")
+    if not isinstance(floorplans, list):
+        return []
+    floorplan_map = {
+        str(row.get("id")): row
+        for row in floorplans
+        if isinstance(row, dict) and str(row.get("id") or "")
+    }
+    if not floorplan_map:
+        return []
+
+    if not isinstance(units_body, dict) or units_body.get("status") != 200:
+        return []
+    units_response = units_body.get("response")
+    if not isinstance(units_response, dict) or not isinstance(units_response.get("units"), list):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for raw in units_response["units"]:
+        if not isinstance(raw, dict):
+            continue
+        native_id = str(raw.get("id") or "").strip()
+        unit_number = str(raw.get("unitNumber") or "").strip()
+        floorplan_id = str(raw.get("floorplanId") or "").strip()
+        floorplan = floorplan_map.get(floorplan_id)
+        try:
+            rent = int(float(raw.get("rent") or 0))
+        except (TypeError, ValueError):
+            rent = 0
+        if not (
+            raw.get("active") is True
+            and raw.get("leaseStatus") == "AVAILABLE_READY"
+            and native_id
+            and unit_number
+            and rent > 0
+            and floorplan is not None
+            and str(raw.get("propertyId") or "") == property_id
+            and str(raw.get("partnerPropertyId") or "") == partner_property_id
+        ):
+            continue
+        dedupe_key = (native_id, unit_number)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+
+        beds = floorplan.get("bedRooms")
+        baths = floorplan.get("bathRooms")
+        try:
+            beds_label_value = int(float(beds)) if beds is not None else None
+        except (TypeError, ValueError):
+            beds_label_value = None
+        sqft = raw.get("squareFeet") or floorplan.get("minimumSquareFeet") or ""
+        available_date = str(raw.get("internalAvailableDate") or "")[:10]
+        row = make_unit_dict(
+            floor_plan_name=str(floorplan.get("name") or ""),
+            bed_label=bed_label_from(beds_label_value, str(floorplan.get("name") or "")),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=str(sqft),
+            unit_number=unit_number,
+            rent_range=format_rent_range(rent, rent),
+            rent_low=rent,
+            rent_high=rent,
+            availability_status="AVAILABLE",
+            available_units="1",
+            availability_date=available_date,
+            source_api_url=source_url,
+            extraction_tier="TIER_1_API_ONESITE_RPFP_CWS",
+        )
+        row.update(
+            {
+                "source_native_unit_id": native_id,
+                "source_floorplan_id": floorplan_id,
+                "source_property_id": property_id,
+                "source_partner_property_id": partner_property_id,
+                "source_property_provenance": "same_origin_rpfp_property_details",
+                "source_portal_url": source_page_url,
+            }
+        )
+        rows.append(row)
+    return rows
+
+
+async def _probe_same_origin_rpfp_cws(ctx: AdapterContext) -> list[dict[str, Any]]:
+    """Recover exact-property CWS inventory from a published floor-plan link."""
+    fetch_result = getattr(ctx, "fetch_result", None)
+    raw_body = getattr(fetch_result, "body", None) if fetch_result is not None else None
+    if isinstance(raw_body, bytes):
+        raw_body = raw_body.decode("utf-8", errors="replace")
+    if not isinstance(raw_body, str) or not raw_body:
+        return []
+    base_url = str(getattr(fetch_result, "final_url", "") or ctx.base_url or "")
+    pages: list[tuple[str, str]] = []
+    if _extract_rpfp_config(raw_body):
+        pages.append((base_url, raw_body))
+    else:
+        published = _published_same_origin_rpfp_pages(raw_body, base_url)
+        if len(published) != 1:
+            return []
+        try:
+            from ma_poc.pms.adapters._probe import probe_get
+
+            page_response = await asyncio.to_thread(
+                probe_get,
+                published[0],
+                timeout=15,
+                unlocker=False,
+                retries=1,
+            )
+        except Exception:
+            return []
+        if page_response.status_code != 200 or not page_response.text:
+            return []
+        final_page_url = str(getattr(page_response, "url", "") or published[0])
+        # Redirects may not cross to another property/portfolio host.
+        if not _published_same_origin_rpfp_pages(
+            f'<a href="{final_page_url}">floor-plans</a>', base_url
+        ):
+            return []
+        pages.append((final_page_url, page_response.text))
+
+    page_url, page_body = pages[0]
+    config = _extract_rpfp_config(page_body)
+    if config is None:
+        return []
+    property_id = config["property_id"]
+    origin_bits = urlparse(page_url)
+    origin = f"{origin_bits.scheme}://{origin_bits.netloc}"
+    api_base = f"https://api.ws.realpage.com/v2/property/{property_id}"
+    details_body, floorplans_body, units_body = await asyncio.gather(
+        _fetch_rpfp_json(f"{api_base}/PropertyDetails", config["api_key"], origin),
+        _fetch_rpfp_json(f"{api_base}/floorplans", config["api_key"], origin),
+        _fetch_rpfp_json(f"{api_base}/units", config["api_key"], origin),
+    )
+    if not isinstance(details_body, dict) or details_body.get("status") != 200:
+        return []
+    details = details_body.get("response")
+    if not _same_property_identity(details, ctx, property_id):
+        return []
+    if str(details.get("propertyKey") or "") != config["property_key"]:
+        return []
+    return _parse_strict_rpfp_units(
+        units_body,
+        floorplans_body,
+        property_id=property_id,
+        property_key=config["property_key"],
+        partner_property_id=config["partner_property_id"],
+        source_url=f"{api_base}/units",
+        source_page_url=page_url,
+    )
 
 
 def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, str]]:
@@ -726,7 +1105,7 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
                 bedrooms=str(beds) if beds is not None else "",
                 bathrooms=str(baths) if baths is not None else "",
                 sqft=sqft,
-                unit_number=str(fp.get("id") or ""),
+                unit_number="",
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 deposit=deposit,
                 availability_status="AVAILABLE",
@@ -734,6 +1113,9 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
                 available_units=num_units,
                 source_api_url=url,
                 extraction_tier="TIER_1_API_ONESITE",
+                source_ids={"floorplan_id": fp.get("id")}
+                if fp.get("id") is not None
+                else None,
             )
         )
     return units
@@ -790,11 +1172,51 @@ class OneSiteAdapter:
         bare success label even on no-data, blocking both recovery paths.
         """
         result = AdapterResult(tier_used="TIER_1_API_ONESITE")
-        all_units: list[dict[str, str]] = []
+        all_units: list[dict[str, Any]] = []
         # Track whether any RealPage-shaped response was seen at all so
         # we can distinguish "page is an empty OLL shell" from "data was
         # there but everything failed validity".
         saw_any_realpage_response = False
+
+        async def _try_rpfp_cws() -> bool:
+            """Try the identity-bound CWS fallback and populate ``result``."""
+            try:
+                cws_units = await _probe_same_origin_rpfp_cws(ctx)
+            except Exception as exc:  # noqa: BLE001
+                result.errors.append(
+                    f"onesite-rpfp-cws-error: {type(exc).__name__}: {str(exc)[:90]}"
+                )
+                return False
+            if not cws_units:
+                return False
+
+            from ma_poc.extraction.post_process import post_process
+
+            processed = post_process(cws_units, property_id=getattr(ctx, "property_id", None))
+            if processed.n_admitted <= 0:
+                result.errors.append(
+                    f"ONESITE_RPFP_VALIDITY_REJECTED: {len(cws_units)} strict rows failed post_process"
+                )
+                return False
+            result.units = list(processed.units)
+            existing_plans = list(result.plan_summaries)
+            result.plan_summaries = existing_plans + [
+                row
+                for row in processed.plan_summaries
+                if row not in existing_plans
+            ]
+            result.tier_used = "TIER_1_API_ONESITE_RPFP_CWS"
+            result.winning_url = cws_units[0].get("source_portal_url")
+            result.confidence = min(0.96, 0.82 + 0.01 * processed.n_admitted)
+            result.api_responses.append(
+                {
+                    "url": cws_units[0].get("source_api_url", ""),
+                    "status": 200,
+                    "body": "<identity-bound-rpfp-cws>",
+                    "via": "same_origin_rpfp_property_details",
+                }
+            )
+            return True
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -824,23 +1246,112 @@ class OneSiteAdapter:
 
             _pp_parsed = len(all_units)
             _pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
-            if _pp.n_admitted > 0:
-                result.units = _pp.admitted
-                result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
-                result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+            if _pp.units:
+                result.units = list(_pp.units)
+                result.plan_summaries = list(_pp.plan_summaries)
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(0.95, 0.7 + 0.05 * len(_pp.units))
             else:
-                # Responses were captured but every row failed the validity
-                # gate. Mark as empty-exit so retry / Step 8 generic can try.
-                result.tier_used = "TIER_1_API_ONESITE_EMPTY"
-                result.confidence = 0.0
-                result.errors.append(
-                    f"ONESITE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                    f"failed unit_validity (no numeric dimension)"
+                if _pp.plan_summaries:
+                    # ``/floorplans`` ids are plan identifiers, not apartment
+                    # numbers. Retain the catalogue as context and continue
+                    # through the native unit routes below.
+                    result.plan_summaries = list(_pp.plan_summaries)
+                    result.tier_used = "TIER_1_API_ONESITE_PLAN_LEVEL"
+                    result.winning_url = (
+                        result.api_responses[0].get("url")
+                        if result.api_responses
+                        else None
+                    )
+                    result.confidence = min(
+                        0.85,
+                        0.6 + 0.04 * len(_pp.plan_summaries),
+                    )
+                    result.errors.append(
+                        f"ONESITE_PLAN_CATALOGUE: {_pp_parsed} plan rows "
+                        "retained; continuing to unit-level recoveries"
+                    )
+                else:
+                    # Responses were captured but every row failed the
+                    # validity gate. Let the recovery cascade and retry path
+                    # try a property-scoped native roster.
+                    result.tier_used = "TIER_1_API_ONESITE_EMPTY"
+                    result.confidence = 0.0
+                    result.errors.append(
+                        f"ONESITE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                        f"failed unit_validity (no numeric dimension)"
+                    )
+
+        if not result.units:
+            # Numeric Online Leasing roots expose a public, property-scoped
+            # GetUnits roster. Prefer it to the workflowstartup floor-plan
+            # route, which may require gated session mechanics and often
+            # publishes only aggregates.
+            try:
+                from ma_poc.pms.adapters.realpage_oll import (
+                    recover_onlineleasing_getunits,
                 )
-        else:
+
+                portal_units = await recover_onlineleasing_getunits(ctx)
+            except Exception as exc:  # noqa: BLE001 - existing workflow survives
+                portal_units = None
+                result.errors.append(
+                    "onlineleasing-getunits-error: "
+                    f"{type(exc).__name__}: {str(exc)[:90]}"
+                )
+            if portal_units is not None:
+                existing_plans = list(result.plan_summaries)
+                portal_units.plan_summaries = existing_plans + [
+                    row
+                    for row in portal_units.plan_summaries
+                    if row not in existing_plans
+                ]
+                portal_units.api_responses = list(result.api_responses) + list(
+                    portal_units.api_responses
+                )
+                return portal_units
+            # Swifty-hosted marketing sites publish an exact same-origin
+            # apartment roster through signed-by-page WordPress AJAX actions.
+            # Prefer that native unit table when present: workflowstartup may
+            # expose only plan-level UnitIds and no dates (946 MLK), while the
+            # visible roster carries the actual unit number, price, floor, and
+            # future availability date.  The helper is exact-marker gated and
+            # returns [] on every non-Swifty OneSite property.
+            try:
+                from ma_poc.pms.adapters._swifty_floorplans import (
+                    SWIFTY_TIER,
+                    recover_swifty_floorplans,
+                )
+
+                swifty_units = await recover_swifty_floorplans(ctx)
+            except Exception as exc:  # noqa: BLE001
+                swifty_units = []
+                result.errors.append(f"onesite-swifty-probe-error: {type(exc).__name__}: {str(exc)[:90]}")
+            if swifty_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pps = post_process(swifty_units, property_id=getattr(ctx, "property_id", None))
+                if _pps.units:
+                    result.units = list(_pps.units)
+                    existing_plans = list(result.plan_summaries)
+                    result.plan_summaries = existing_plans + [
+                        row
+                        for row in _pps.plan_summaries
+                        if row not in existing_plans
+                    ]
+                    result.tier_used = SWIFTY_TIER
+                    result.winning_url = str(swifty_units[0].get("source_api_url") or "")
+                    result.confidence = min(0.94, 0.74 + 0.04 * len(_pps.units))
+                    result.api_responses.append(
+                        {
+                            "url": result.winning_url,
+                            "status": 200,
+                            "body": "<swifty-unit-ajax>",
+                            "via": "onesite_swifty_native_unit_recovery",
+                        }
+                    )
+                    return result
+
             # 2026-05-24 HAR-driven fallback: try the workflowstartup
             # endpoint directly via curl_cffi. Marketing-shell OneSite
             # sites don't fire the OLL XHRs from the homepage; this
@@ -854,18 +1365,23 @@ class OneSiteAdapter:
                 wf_units = await _probe_onesite_workflowstartup(ctx)
             except Exception as exc:  # noqa: BLE001
                 wf_units = []
-                result.errors.append(
-                    f"onesite-workflow-probe-error: {type(exc).__name__}: {str(exc)[:90]}"
-                )
+                result.errors.append(f"onesite-workflow-probe-error: {type(exc).__name__}: {str(exc)[:90]}")
             if wf_units:
                 from ma_poc.extraction.post_process import post_process
 
-                _ppw = post_process(
-                    wf_units, property_id=getattr(ctx, "property_id", None)
-                )
-                if _ppw.n_admitted > 0:
-                    result.units = _ppw.admitted
-                    result.plan_summaries = _ppw.plan_summaries
+                _ppw = post_process(wf_units, property_id=getattr(ctx, "property_id", None))
+                # Plan-only workflow rows are routed to plan_summaries by
+                # post_process.  They are useful metadata, but are not a
+                # terminal unit-level success and must not block the exact
+                # same-origin RPFP/CWS native-unit fallback below.
+                if _ppw.units:
+                    result.units = list(_ppw.units)
+                    existing_plans = list(result.plan_summaries)
+                    result.plan_summaries = existing_plans + [
+                        row
+                        for row in _ppw.plan_summaries
+                        if row not in existing_plans
+                    ]
                     result.tier_used = "TIER_1_API_ONESITE_WORKFLOW"
                     result.confidence = min(0.92, 0.7 + 0.04 * _ppw.n_admitted)
                     result.api_responses.append(
@@ -877,6 +1393,16 @@ class OneSiteAdapter:
                         }
                     )
                     return result
+                if len(_ppw.plan_summaries) > len(result.plan_summaries):
+                    result.plan_summaries = list(_ppw.plan_summaries)
+                    result.tier_used = "TIER_1_API_ONESITE_WORKFLOW_PLAN_LEVEL"
+                    result.confidence = min(
+                        0.85,
+                        0.6 + 0.04 * len(_ppw.plan_summaries),
+                    )
+
+            if await _try_rpfp_cws():
+                return result
 
             # No usable RealPage data at all. Two flavors:
             #   _NO_RESPONSE — no RealPage-shaped responses captured (cluster
@@ -884,14 +1410,15 @@ class OneSiteAdapter:
             #                  OneSite floorplans API never fired)
             #   _EMPTY       — RealPage responses captured but floorplans/
             #                  units lists were all empty
-            if saw_any_realpage_response:
-                result.tier_used = "TIER_1_API_ONESITE_EMPTY"
-            else:
-                result.tier_used = "TIER_1_API_ONESITE_NO_RESPONSE"
-            result.confidence = 0.0
-            result.errors.append(
-                "No RealPage/OneSite floorplan data found in captured API responses"
-            )
+            if not result.plan_summaries:
+                if saw_any_realpage_response:
+                    result.tier_used = "TIER_1_API_ONESITE_EMPTY"
+                else:
+                    result.tier_used = "TIER_1_API_ONESITE_NO_RESPONSE"
+                result.confidence = 0.0
+                result.errors.append(
+                    "No RealPage/OneSite floorplan data found in captured API responses"
+                )
 
         return result
 

@@ -1,0 +1,568 @@
+property_id,property_name,website,unit_id,unit_key,rp_date,sx_date,sx_date_provenance,extraction_tier,comparison
+1084,Black Hawk,https://www.theblackhawkapartments.com/,2824,2824,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+1084,Black Hawk,https://www.theblackhawkapartments.com/,2950,2950,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+14397,Kennedy-Warren (South Wing),https://www.kennedywarren.com/,0921,0921,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+14397,Kennedy-Warren (South Wing),https://www.kennedywarren.com/,0930,0930,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+14397,Kennedy-Warren (South Wing),https://www.kennedywarren.com/,2307,2307,2026-09-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+14397,Kennedy-Warren (South Wing),https://www.kennedywarren.com/,2512,2512,2026-08-26,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16078,San Cervantes,https://www.mark-taylor.com/apartments/az/chandler/san-cervantes/,2001,2001,2026-08-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16078,San Cervantes,https://www.mark-taylor.com/apartments/az/chandler/san-cervantes/,2099,2099,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+161,Hickory Mill,https://www.morgan-properties.com/apartments/oh/hilliard/hickory-mill,02572,02572,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+161,Hickory Mill,https://www.morgan-properties.com/apartments/oh/hilliard/hickory-mill,05566,05566,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+161,Hickory Mill,https://www.morgan-properties.com/apartments/oh/hilliard/hickory-mill,05585,05585,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,652-2A,652-2A,2026-08-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,682-3A,682-3A,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,690-3D,690-3D,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,690-4D,690-4D,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,694-2C,694-2C,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,702-1C,702-1C,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,706-2A,706-2A,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,708-3B,708-3B,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,732-2D,732-2D,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,738-3D,738-3D,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,738-4A,738-4A,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+16373,The Villages At Montpelier,https://www.morgan-properties.com/apartments/md/laurel/villages-at-montpelier/,762-3A,762-3A,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG106,CG106,2026-09-26,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG116,CG116,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG406,CG406,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG501,CG501,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG503,CG503,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,CG618,CG618,2026-09-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,MB421,MB421,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,MB519,MB519,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,MB617,MB617,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,MB717,MB717,2026-09-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+18351,Maiden Bridge & Canongate Apartments,https://www.morgan-properties.com/apartments/pa/pittsburgh/maiden-bridge-and-canongate-apartments/,MB720,MB720,2026-09-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1034SP-D,1034SP-D,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1036TG-A,1036TG-A,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1058,1058,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1083,1083,2026-09-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1132,1132,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1146,1146,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1148,1148,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,1181,1181,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+217358,Webster Green Phase 1&2,http://www.webstergreen.com/,989,989,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,18,18,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,243,243,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,245,245,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,307,307,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,337,337,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,58,58,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,73,73,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+222719,Penbrooke Meadows,https://www.morgan-properties.com/apartments/ny/penfield/penbrooke-meadows-apartments/,79,79,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,003,003,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,021,021,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,091,091,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,127,127,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,168,168,2026-10-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,170,170,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+224728,Oak Place,https://www.morgan-properties.com/apartments/ok/oklahoma-city/oak-place/,176,176,2026-08-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0227,0227,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0308,0308,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0313,0313,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0407,0407,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0408,0408,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0419,0419,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0501,0501,2026-08-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0504,0504,2026-08-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0708,0708,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0717,0717,2026-10-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0819,0819,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,0911,0911,2026-10-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,1005,1005,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,1022,1022,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,1026,1026,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+227790,The Charles,https://thecharlesslc.com/,1111,1111,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+228399,Gull Prairie/Gull Run Apartments & Townhomes,https://www.gullprairieapartments.com/,4028-3B,4028-3B,2026-08-02,2026-07-31,available_now,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+228399,Gull Prairie/Gull Run Apartments & Townhomes,https://www.gullprairieapartments.com/,5777-3A,5777-3A,2026-08-01,2026-07-31,available_now,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+230755,Park Guilderland,http://www.parkguilderland.com,004-107,004-107,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+230755,Park Guilderland,http://www.parkguilderland.com,004-211,004-211,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+230755,Park Guilderland,http://www.parkguilderland.com,005-404,005-404,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,1424,1424,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,1426,1426,2026-10-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,211,211,2026-09-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,3-1002,3-1002,2026-10-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,3-1207,3-1207,2026-09-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,303,303,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,315,315,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,4-1002,4-1002,2026-10-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,4-1211,4-1211,2026-10-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,406,406,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,605,605,2026-10-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,612,612,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+235398,Bell Rock Springs,https://www.bellrocksprings.com/,725,725,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,1402-104,1402-104,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,1430-104,1430-104,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,1450-202,1450-202,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,1452-204,1452-204,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5603-011,5603-011,2026-10-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5631-021,5631-021,2026-08-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5641-203,5641-203,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5651-021,5651-021,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5665-102,5665-102,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5681-202,5681-202,2026-10-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5701-021,5701-021,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5731-233,5731-233,2026-10-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5741-123,5741-123,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5753-130,5753-130,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5753-131,5753-131,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5753-230,5753-230,2026-09-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+23745,Brookdale at Mark Center,https://www.morgan-properties.com/apartments/va/alexandria/brookdale/,5763-220,5763-220,2026-08-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+237587,Vernola Marketplace I,https://www.livevernola.com/,01103,01103,2036-07-19,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,E67,E67,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,F83,F83,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,F87,F87,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,H114,H114,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,K155,K155,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+239369,Easton,https://eastonapartmentstn.com/,N204,N204,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,10-205,10-205,2026-08-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,10-211,10-211,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,12-202,12-202,2026-09-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,2-212,2-212,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,2-303,2-303,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,2-305,2-305,2026-09-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,3-102,3-102,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,3-304,3-304,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,4-102,4-102,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,5-103,5-103,2026-10-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,5-204,5-204,2026-09-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,6-302,6-302,2026-09-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,6-310,6-310,2026-10-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,8-103,8-103,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,8-201,8-201,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+241189,Reserve at Southpointe,http://www.reserveatsouthpointe.com/,9-210,9-210,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+242349,Reveal on the Lake,https://www.revealonthelake.com/,14006,14006,2026-10-02,2026-07-31,available_now,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G01F,G01F,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G01J,G01J,2026-11-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G08I,G08I,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G10E,G10E,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G1VRG,G1VRG,2026-10-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G1VRJ,G1VRJ,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G2VRK,G2VRK,2026-09-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G4VRH,G4VRH,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G5VRA,G5VRA,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,G8240I,G8240I,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T107,T107,2026-08-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T117,T117,2026-11-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T204,T204,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T319,T319,2026-09-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T407,T407,2026-11-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T615,T615,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T712,T712,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T802,T802,2026-10-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,T814,T814,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,V2707,V2707,2026-11-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,V28A08,V28A08,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,V28B04,V28B04,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,V30B10,V30B10,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+244361,Cedar Gardens & Towers,https://www.morgan-properties.com/apartments/md/windsor-mill/cedar-gardens-and-towers/,V3110,V3110,2026-09-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+246591,Kendry,https://kendryliving.com/,2-401,2-401,2026-09-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+246591,Kendry,https://kendryliving.com/,210,210,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+246591,Kendry,https://kendryliving.com/,311,311,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+246591,Kendry,https://kendryliving.com/,410,410,2026-08-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+246591,Kendry,https://kendryliving.com/,6-115,6-115,2026-09-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1105,1105,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1113,1113,2026-10-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1406,1406,2026-09-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1809,1809,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1903,1903,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,1910,1910,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,2207,2207,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,2310,2310,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,2406,2406,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,2502,2502,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,413,413,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250124,One Clinton Park,https://oneclintonpark.com/,PH7,PH7,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250459,Village Square,https://villagesquareny.com/,221,221,2026-08-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+250459,Village Square,https://villagesquareny.com/,323,323,2026-09-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+254583,Montreux,https://www.rentmontreux.com/,173,173,2026-08-05,2026-07-31,available_now,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,323,323,2026-11-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,333,333,2026-09-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,341,341,2026-09-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,448,448,2026-10-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,543,543,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,551,551,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,641,641,2026-10-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,643,643,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,649,649,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,650,650,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,653,653,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,747,747,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,751,751,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,839,839,2026-11-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+257593,Church & Henley,https://www.churchandhenley.com/,854,854,2026-11-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+25930,Edgewater Gardens,https://www.morgan-properties.com/apartments/nj/long-branch/edgewater-gardens/,07A,07A,2026-09-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+25930,Edgewater Gardens,https://www.morgan-properties.com/apartments/nj/long-branch/edgewater-gardens/,14B,14B,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+25930,Edgewater Gardens,https://www.morgan-properties.com/apartments/nj/long-branch/edgewater-gardens/,34A,34A,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,0410,0410,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,0633,0633,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,0933,0933,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1030,1030,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1108,1108,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1123,1123,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1205,1205,2026-08-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1211,1211,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1530,1530,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1714,1714,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1829,1829,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,1934,1934,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,2301,2301,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,2330,2330,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,2429,2429,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+261530,Waterline Square,https://www.waterlinesquare.com/,2904,2904,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,09-312,09-312,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,1-206,1-206,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,10-203,10-203,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,10-306,10-306,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,11-202,11-202,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,3-200,3-200,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+263919,Vue21 II,https://liveatvue21.com/,3-204,3-204,2100-01-07,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,1002,1002,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,1015,1015,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,1016,1016,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,1075,1075,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,1083,1083,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2005,2005,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2015,2015,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2031,2031,2026-09-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2034,2034,2026-09-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2035,2035,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2057,2057,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2061,2061,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,2088,2088,2026-09-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,3016,3016,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,3034,3034,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,3069,3069,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5004,5004,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5033,5033,2026-08-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5036,5036,2026-08-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5061,5061,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5067,5067,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5083,5083,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+265098,Smith & Rio,https://www.smithandrio.com/,5088,5088,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,B102,B102,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,B107,B107,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,B208,B208,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,B304,B304,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,C301,C301,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,D103,D103,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,D204,D204,2026-08-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,E110,E110,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,E201,E201,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,E309,E309,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,E310,E310,2026-08-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,F113,F113,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,G113,G113,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,G114,G114,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,G316,G316,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,H206,H206,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,I212,I212,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,I214,I214,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,I310,I310,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+266700,FlatZ 520,https://flatz520.com/,I311,I311,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,A108,A108,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,A205,A205,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,B103,B103,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,B201,B201,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,B308,B308,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,C206,C206,2026-09-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,C301,C301,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,C302,C302,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,D202,D202,2026-08-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,E203,E203,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,E204,E204,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,E206,E206,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,G102,G102,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,G202,G202,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,J107,J107,2026-09-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,J205,J205,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,J303,J303,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,J305,J305,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,K203,K203,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268338,Solace at Cimarron Hills,https://www.livesolacecimarron.com/,K304,K304,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,231,231,2026-08-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,260,260,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,328,328,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,332,332,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,428,428,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,452,452,2026-10-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,5206,5206,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+268951,Logic,https://www.logicwhiteoak.com/,531,531,2026-08-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+273919,Avon Commons,https://www.morgan-properties.com/apartments/ny/avon/avon-commons/,206,206,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+273919,Avon Commons,https://www.morgan-properties.com/apartments/ny/avon/avon-commons/,511,511,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+278305,Salerno,https://www.salernoliving.com/,06-106,06-106,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+282142,Mews at Annandale,https://www.morgan-properties.com/apartments/nj/annandale/mews-at-annandale/,0721,0721,2026-09-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+282142,Mews at Annandale,https://www.morgan-properties.com/apartments/nj/annandale/mews-at-annandale/,0832,0832,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+282142,Mews at Annandale,https://www.morgan-properties.com/apartments/nj/annandale/mews-at-annandale/,1010,1010,2026-08-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+282142,Mews at Annandale,https://www.morgan-properties.com/apartments/nj/annandale/mews-at-annandale/,1929,1929,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+282142,Mews at Annandale,https://www.morgan-properties.com/apartments/nj/annandale/mews-at-annandale/,1938,1938,2026-09-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0535-102,0535-102,2026-09-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0630-106,0630-106,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0630-203,0630-203,2026-08-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0665-208,0665-208,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0665-303,0665-303,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0665-306,0665-306,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0680-203,0680-203,2026-09-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0695-305,0695-305,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0710-203,0710-203,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0710-304,0710-304,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0710-306,0710-306,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0720-201,0720-201,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0725-202,0725-202,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0725-204,0725-204,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,0725-207,0725-207,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,8949-201,8949-201,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,8949-205,8949-205,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9001-108,9001-108,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9021-204,9021-204,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9025-103,9025-103,2026-10-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9025-106,9025-106,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9041-201,9041-201,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9060-203,9060-203,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9061-102,9061-102,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9061-207,9061-207,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9075-106,9075-106,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9078-106,9078-106,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9078-204,9078-204,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+296175,Compass Meridian,https://www.sheaapartments.com/apartments/compass-meridian/?utm_source=gmb&utm_medium=organic&utm_campaign=compass,9081-205,9081-205,2026-08-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,H205,H205,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,L1405,L1405,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,L407,L407,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,L606,L606,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,L613,L613,2026-11-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+32340,Lakewood I & II,https://www.morgan-properties.com/apartments/nc/salisbury/lakewood/,L705,L705,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,04-203,04-203,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,07-201,07-201,2026-10-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,09-149,09-149,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,12-139,12-139,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,13-203,13-203,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,17-201,17-201,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,22-301,22-301,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,25-202,25-202,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,25-203,25-203,2026-10-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+33125,Madison Rockwood-Ballwin,www.madisonrockwood.com,25-304,25-304,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,B003621,B003621,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,B34713A,B34713A,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,B34713B,B34713B,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,B34753B,B34753B,2026-10-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,B35391A,B35391A,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,C72372B,C72372B,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,C72431A,C72431A,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,C72432A,C72432A,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,C72541A,C72541A,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H71432C,H71432C,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H71511C,H71511C,2026-09-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H71522C,H71522C,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H71541B,H71541B,2026-09-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H72151B,H72151B,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,H72152B,H72152B,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,W71562A,W71562A,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,W72703A,W72703A,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35566,Astoria Park,https://www.morgan-properties.com/apartments/in/indianapolis/astoria-park/,W72803A,W72803A,2026-10-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,3210,3210,2026-10-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,3319,3319,2026-09-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,6108,6108,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,6308,6308,2026-09-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,7206,7206,2026-09-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,7208,7208,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,7302,7302,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+35585,The Docks,https://www.morgan-properties.com/apartments/pa/pittsburgh/the-docks/,7306,7306,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+37394,Mandalay Villas,http://www.mandalayvillasapartments.com/,0305,0305,2100-01-06,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+37394,Mandalay Villas,http://www.mandalayvillasapartments.com/,0810,0810,2100-01-06,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+37394,Mandalay Villas,http://www.mandalayvillasapartments.com/,2001,2001,2100-01-06,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+37394,Mandalay Villas,http://www.mandalayvillasapartments.com/,2104,2104,2100-01-06,2026-07-31,explicit_future,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+39961,88 Leonard Street,http://www.88leonard.com,0503,0503,2026-08-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+39961,88 Leonard Street,http://www.88leonard.com,0520,0520,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+39961,88 Leonard Street,http://www.88leonard.com,0718,0718,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+39961,88 Leonard Street,http://www.88leonard.com,0723,0723,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+39961,88 Leonard Street,http://www.88leonard.com,1214,1214,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,11122T,11122T,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,1145T,1145T,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,1147T,1147T,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,3191T,3191T,2026-12-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,3193T,3193T,2026-08-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,4211T,4211T,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,4213T,4213T,2026-08-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,7220T,7220T,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,7308T,7308T,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,9156T,9156T,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,C36OL,C36OL,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,K49FH,K49FH,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+40582,Kinwood,https://kinwoodny.com/,S105RC,S105RC,2026-10-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,1110,1110,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,1178,1178,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,1208,1208,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,1210,1210,2026-08-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2221,2221,2026-09-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2225,2225,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2226,2226,2026-10-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2238,2238,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2249,2249,2026-10-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2258,2258,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2267,2267,2026-10-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2280,2280,2026-08-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+4293,Mountain View,https://www.missionrockresidential.com/apartments/co/colorado-springs/mountain-view/,2320,2320,2026-08-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,1317,1317,2026-09-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,1321,1321,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,1609,1609,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,1924,1924,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,2004,2004,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,57306,57306,2026-10-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,69208,69208,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43364,Villas At Bailey Ranch,https://www.morgan-properties.com/apartments/ok/owasso/villas-at-bailey-ranch/,81303,81303,2026-10-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43927,The Arbors at Edenbridge,https://www.morgan-properties.com/apartments/md/parkville/arbors-at-edenbridge/,8307E,8307E,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43927,The Arbors at Edenbridge,https://www.morgan-properties.com/apartments/md/parkville/arbors-at-edenbridge/,8391G,8391G,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+43927,The Arbors at Edenbridge,https://www.morgan-properties.com/apartments/md/parkville/arbors-at-edenbridge/,8397,8397,2026-09-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,0203,0203,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,A207,A207,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,D502,D502,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,E102,E102,2026-08-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,F405,F405,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+48198,Regency Lakeside,https://www.morgan-properties.com/apartments/ne/omaha/regency-lakeside/,H502,H502,2026-08-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,00-304,00-304,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,04-202,04-202,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,07-102,07-102,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,09-203,09-203,2026-08-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,13-202,13-202,2026-08-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5157,The Sycamores,https://www.wm-thesycamores.com/,21-204,21-204,2026-08-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-1005,34-1005,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-1207,34-1207,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-1212,34-1212,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-204,34-204,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-304,34-304,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-402,34-402,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-503,34-503,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-506,34-506,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-507,34-507,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-610,34-610,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-614,34-614,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-707,34-707,2026-10-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-709,34-709,2026-10-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-808,34-808,2026-10-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-903,34-903,2026-08-26,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-911,34-911,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+51767,Lake Pointe,https://www.morgan-properties.com/apartments/in/portage/lake-pointe/,34-913,34-913,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5356,The Pointe at Stafford,https://www.morgan-properties.com/apartments/va/stafford/the-pointe-at-stafford/,202304,202304,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5356,The Pointe at Stafford,https://www.morgan-properties.com/apartments/va/stafford/the-pointe-at-stafford/,303204,303204,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5356,The Pointe at Stafford,https://www.morgan-properties.com/apartments/va/stafford/the-pointe-at-stafford/,400101,400101,2026-08-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19234,19234,2026-10-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19256,19256,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19446,19446,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19626,19626,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19644,19644,2026-08-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19702,19702,2026-09-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+5974,Promenade at Aventura Apartments,https://www.promenadeataventuraapartments.com/,19730,19730,2026-08-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,221,221,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,332,332,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,352,352,2026-10-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,368,368,2026-10-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,411,411,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,451,451,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,459,459,2026-08-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,543,543,2026-08-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+60750,The Meyden,http://www.themeydenbellevue.com/,570,570,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,1-206,1-206,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,2-101,2-101,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,2-301,2-301,2026-08-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,3-204,3-204,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,3-301,3-301,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,5-101,5-101,2026-11-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,5-203,5-203,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,5-214,5-214,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,5-312,5-312,2026-09-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,6-306,6-306,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,7-202,7-202,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,9-212,9-212,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,9-302,9-302,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62784,Waterford on Mainstreet,https://www.waterfordonmainstreet.com,9-309,9-309,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,A005,A005,2026-09-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,D127,D127,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,E157,E157,2026-10-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,E159,E159,2026-09-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,F179,F179,2026-10-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,K349,K349,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,Q224,Q224,2026-10-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,R184,R184,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,S158,S158,2026-10-21,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,T136,T136,2026-10-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,U110,U110,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+62865,The Preserve at Milltown,https://www.morgan-properties.com/apartments/pa/downingtown/preserve-at-milltown/,W044,W044,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+65659,Point at Waterford Crossing,http://www.pointatwaterfordapartments.com/,H304,H304,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,0710,0710,2026-09-15,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,0809,0809,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,0912,0912,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1103,1103,2026-10-18,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1104,1104,2026-08-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1112,1112,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1201,1201,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1203,1203,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1604,1604,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1611,1611,2026-10-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+67527,Griffin Center City,https://griffinphilly.com/,1705,1705,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68334,The Standard,http://thestandardsanjose.com/,205,205,2026-08-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68334,The Standard,http://thestandardsanjose.com/,439,439,2026-08-26,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68334,The Standard,http://thestandardsanjose.com/,441,441,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,161,161,2026-09-09,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,186,186,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,206,206,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,233,233,2026-10-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,272,272,2026-10-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,282,282,2026-09-17,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,312,312,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,318,318,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,323,323,2026-09-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,362,362,2026-10-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,373,373,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,414,414,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,420,420,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,424,424,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,444,444,2026-10-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+68716,The Harrison Collection 330 Angelo Cifelli,https://ironstate.com/property/330-angelo-cifelli/,487,487,2026-09-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70586,Links at Forest Creek,www.rentforestcreek.com,1703,1703,2026-10-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70586,Links at Forest Creek,www.rentforestcreek.com,3604,3604,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70904,Place One,https://www.morgan-properties.com/apartments/pa/plymouth-meeting/place-one/,1017,1017,2026-08-07,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70904,Place One,https://www.morgan-properties.com/apartments/pa/plymouth-meeting/place-one/,105,105,2026-10-19,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70904,Place One,https://www.morgan-properties.com/apartments/pa/plymouth-meeting/place-one/,106,106,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70904,Place One,https://www.morgan-properties.com/apartments/pa/plymouth-meeting/place-one/,128,128,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+70904,Place One,https://www.morgan-properties.com/apartments/pa/plymouth-meeting/place-one/,522,522,2026-08-03,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,111-A,111-A,2026-08-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,117-C,117-C,2026-09-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,121-F,121-F,2026-08-20,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,146-C,146-C,2026-08-14,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,360-C,360-C,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,360-E,360-E,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7370,Morganton Place,https://www.morgan-properties.com/apartments/nc/fayetteville/morganton-place/,5646-F,5646-F,2026-08-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,16-6387,16-6387,2026-08-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,16-6389,16-6389,2026-09-02,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,22-6495,22-6495,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,28-6196,28-6196,2026-08-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,41-1145,41-1145,2026-09-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,47-1100,47-1100,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,57-6440,57-6440,2026-08-31,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,59-6500,59-6500,2026-09-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,6406,6406,2026-09-08,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,6410,6410,2026-08-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+77054,Saratoga Crossing,https://www.morgan-properties.com/apartments/ny/farmington/saratoga-crossing/,6412,6412,2026-08-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7744,Ascent Apartment Homes,https://www.ascentapthomesut.com/,110921,110921,2026-08-13,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7744,Ascent Apartment Homes,https://www.ascentapthomesut.com/,113722,113722,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7744,Ascent Apartment Homes,https://www.ascentapthomesut.com/,113912,113912,2026-08-06,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7744,Ascent Apartment Homes,https://www.ascentapthomesut.com/,114321,114321,2026-08-10,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+7744,Ascent Apartment Homes,https://www.ascentapthomesut.com/,114322,114322,2026-08-24,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,4116,4116,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,4139,4139,2026-09-29,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,5223,5223,2026-10-27,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,5233,5233,2026-10-04,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,8519G,8519G,2026-09-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,8531F,8531F,2026-08-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,9584S,9584S,2026-09-05,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,9622K,9622K,2026-09-16,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+78956,Redwood Tipp City,https://www.byredwood.com/apartments/oh/tipp-city/redwood-tipp-city/index.aspx?_yTrackUser=NjIxNjkzMzg5IzE0NTYxODg2MjI%3d-kHnq9BpWo8I%3d&_yTrackVisit=MTE0MTU4NTEwMyMxNzI5MDU1OTEx-vgtN9tu3XkY%3d&_yTrackReqDT=54121520192609,9641B,9641B,2026-09-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,215-09,215-09,2026-08-22,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,216-15,216-15,2026-09-11,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,217-07,217-07,2026-08-28,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,217-20,217-20,2026-09-25,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,217-25,217-25,2026-09-30,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,218-24,218-24,2026-09-01,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,310-21,310-21,2026-08-23,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+97588,The Landings at Meadowood I,https://www.morgan-properties.com/apartments/ny/baldwinsville/the-landings-at-meadowood/,312-18,312-18,2026-10-12,2026-07-31,capture_date_default,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date
+98191,Timber,https://www.sparkboulderapts.com/timber,325,325,2026-08-18,2026-07-31,available_now,TIER_1_API_RENTCAFE_SECURECAFE,rp_future_to_capture_date

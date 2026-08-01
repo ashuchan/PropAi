@@ -73,6 +73,22 @@ def test_discover_filters_cross_host() -> None:
     assert not any("other.com" in a for a in anchors)
 
 
+def test_discover_rejects_other_properties_on_shared_rentcafe_host() -> None:
+    base = (
+        "https://www.rentcafe.com/apartments/mi/kalamazoo/"
+        "coopers-landing-apartments/default.aspx"
+    )
+    html = (
+        f'<a href="{base}?view=units">own property</a>'
+        '<a href="/apartments/mi/kalamazoo/winchell-way0/default.aspx">'
+        "recommended property</a>"
+        '<a href="/apartments-for-rent/mi/">regional search</a>'
+    )
+    assert _discover_rentcafe_anchors(
+        html, "https://www.rentcafe.com", base
+    ) == [f"{base}?view=units"]
+
+
 def test_discover_skips_module_and_applic_paths() -> None:
     html = (
         '<a href="/module/floorplans">m</a>'
@@ -136,6 +152,45 @@ async def test_anchor_walk_uses_hosted_table_parser_on_fp_unit_response(
     units = await _try_rentcafe_anchor_walk(None, ctx, result)  # type: ignore[arg-type]
     assert units == sentinel_units
     assert result.winning_url and result.winning_url.endswith("/availability")
+
+
+@pytest.mark.asyncio
+async def test_anchor_walk_rejects_hosted_property_id_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    homepage = (
+        '<a href="/availability">Find availability</a>'
+        '<button onclick="go(\'x?myOlePropertyId=480033\')">Apply</button>'
+    )
+    ctx = _make_ctx("https://example.com/", homepage)
+    result = AdapterResult(tier_used="TIER_1_API_RENTCAFE")
+    candidate = "<html>" + "x" * 2000 + "<tr class='fp-unit'>x</tr></html>"
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda url, **kw: SimpleNamespace(status_code=200, text=candidate),
+    )
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe.parse_rentcafe_hosted_table",
+        lambda html, src: [
+            {
+                "unit_number": "04-P308",
+                "market_rent_low": 1183,
+                "source_property_id": "1682177",
+            }
+        ],
+    )
+
+    async def fake_get_page_html(page: Any, ctx: Any) -> str:
+        return homepage
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.generic._get_page_html", fake_get_page_html
+    )
+
+    units = await _try_rentcafe_anchor_walk(None, ctx, result)  # type: ignore[arg-type]
+    assert units == []
+    assert any("property-mismatch" in error for error in result.errors)
 
 
 @pytest.mark.asyncio

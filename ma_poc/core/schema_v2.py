@@ -203,10 +203,7 @@ def build_v2_property(
         "website": csv_website or scrape_result.get("base_url") or None,
         # Separate, additive URL provenance (capture-first; do not feed
         # identity/dedup off these — they vary run-to-run).
-        "winning_url": _raw_str(
-            scrape_result.get("_winning_page_url")
-            or scrape_result.get("_winning_url")
-        ),
+        "winning_url": _raw_str(scrape_result.get("_winning_page_url") or scrape_result.get("_winning_url")),
         "resolved_url": _raw_str(
             (scrape_result.get("_resolved_target") or {}).get("resolved_url")
             if isinstance(scrape_result.get("_resolved_target"), dict)
@@ -293,9 +290,7 @@ def property_is_plan_level(scrape_result: Any) -> bool:
     return str(getter("_verdict_quality") or "").upper() == "SUCCESS_PLAN_LEVEL"
 
 
-def _is_floor_plan_level(
-    unit: dict[str, Any], *, property_plan_level: bool = False
-) -> bool:
+def _is_floor_plan_level(unit: dict[str, Any], *, property_plan_level: bool = False) -> bool:
     """True if the unit is a plan-LEVEL placeholder, not a real individual unit.
 
     Stamped explicitly on the output so downstream (and our own audits) can
@@ -411,9 +406,7 @@ AREA_SURFACE_NO_SQFT_KEY = "_area_surface_publishes_no_sqft"
 
 #: Field-labels ``extraction.sanity._sanitize_field`` records when it nulls a
 #: square footage for being out of bounds.
-_SANITY_AREA_LABELS: frozenset[str] = frozenset(
-    {"area", "area_implausible_for_beds"}
-)
+_SANITY_AREA_LABELS: frozenset[str] = frozenset({"area", "area_implausible_for_beds"})
 
 
 def _sanity_nulled_area(unit: dict[str, Any]) -> bool:
@@ -463,8 +456,7 @@ def property_publishes_area(units: Any) -> bool:
     for u in units:
         if not isinstance(u, dict):
             continue
-        val = _first(u, "_sqft", "sqft", "area", "squareFeet",
-                     "square_feet", "size", "sq_ft")
+        val = _first(u, "_sqft", "sqft", "area", "squareFeet", "square_feet", "size", "sq_ft")
         if _format_area(val) > 0:
             return True
     return False
@@ -527,6 +519,8 @@ def classify_area_absence(
 
     # (d) We could not tell. Say so.
     return (AREA_ABSENCE_UNKNOWN, "no_evidence")
+
+
 def resolve_plan_row_availability(
     status: str | None,
     *,
@@ -585,6 +579,27 @@ def resolve_plan_row_availability(
     return status
 
 
+AVAILABILITY_DATE_KEYS = (
+    "available_date",
+    "availability_date",
+    "internalAvailableDate",
+    "availableDate",
+    "date_available",
+    "dateAvailable",
+)
+
+
+def _availability_date_value(unit: dict[str, Any]) -> Any:
+    """Return the first populated availability-date alias.
+
+    ``available_date`` is the output-schema spelling, while several direct
+    adapter paths (notably Knock, G5, and the generic API walker) emit
+    ``availability_date`` or a vendor camelCase spelling. Keeping the alias
+    order here prevents the production formatter from drifting again.
+    """
+    return _first(unit, *AVAILABILITY_DATE_KEYS)
+
+
 def _row_has_availability_date(unit: dict[str, Any]) -> bool:
     """True when the raw row carries a parseable availability date.
 
@@ -593,20 +608,7 @@ def _row_has_availability_date(unit: dict[str, Any]) -> bool:
     spellings the ``available_date`` formatter reads (see ``_format_v2_unit``)
     so the two never disagree about whether a date exists.
     """
-    return (
-        _format_date(
-            _first(
-                unit,
-                "available_date",
-                "availability_date",
-                "internalAvailableDate",
-                "availableDate",
-                "date_available",
-                "dateAvailable",
-            )
-        )
-        is not None
-    )
+    return _format_date(_availability_date_value(unit)) is not None
 
 
 def withdraw_unsupported_available(
@@ -740,14 +742,8 @@ def enforce_zero_inventory_contract(units: Any) -> int:
         # one the coercion still stands.
         if row.get("rent_low") is None and row.get("rent_high") is None:
             continue
-        source = (
-            _norm_status(row["availability_status_raw"])
-            if "availability_status_raw" in row
-            else current
-        )
-        resolved = resolve_plan_row_availability(
-            source, plan_level=True, has_rent=True, has_anchor=False
-        )
+        source = _norm_status(row["availability_status_raw"]) if "availability_status_raw" in row else current
+        resolved = resolve_plan_row_availability(source, plan_level=True, has_rent=True, has_anchor=False)
         if resolved != current:
             row["availability_status"] = resolved
             changed += 1
@@ -907,25 +903,33 @@ def _format_v2_unit(
     # ``or``-chains missed → silent loss of beds/baths/sqft/unit_id/
     # floor-plan for those FORMATS even though the value was surfaced.
     # _first() = alias-tolerant, additive, zero-risk when absent.
-    beds_raw = _first(unit, "_bedrooms", "bedrooms", "beds",
-                      "numberOfBeds", "bedroom", "bed", "num_beds")
-    baths_raw = _first(unit, "_bathrooms", "bathrooms", "baths",
-                       "numberOfBaths", "bathroom", "bath", "num_baths")
-    fp_name = _first(unit, "_floor_plan", "floor_plan_name",
-                     "floorplan_name", "floorPlanName", "floorplanName",
-                     "fp_name", "floorplan", "plan_name")
+    beds_raw = _first(unit, "_bedrooms", "bedrooms", "beds", "numberOfBeds", "bedroom", "bed", "num_beds")
+    baths_raw = _first(
+        unit, "_bathrooms", "bathrooms", "baths", "numberOfBaths", "bathroom", "bath", "num_baths"
+    )
+    fp_name = _first(
+        unit,
+        "_floor_plan",
+        "floor_plan_name",
+        "floorplan_name",
+        "floorPlanName",
+        "floorplanName",
+        "fp_name",
+        "floorplan",
+        "plan_name",
+    )
     # Name hygiene (2026-07-31 data-audit #4/#5): strip a trailing concession %
     # ("A1 80%" -> "A1") and null a bare-number name (a leaked sqft / code).
     # Applied before inference + floor_plan_id so both use the clean value.
     from ma_poc.pms.adapters._parsing import clean_floor_plan_name
 
     fp_name = clean_floor_plan_name(fp_name)
-    sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet",
-                  "square_feet", "size", "sq_ft")
+    sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet", "square_feet", "size", "sq_ft")
 
     # unit_id alias (adapters emit unit_number / camelCase / uid)
-    uid = _first(unit, "unit_id", "unit_number", "_unit_number",
-                 "unitNumber", "unitId", "uid", "apartment_number")
+    uid = _first(
+        unit, "unit_id", "unit_number", "_unit_number", "unitNumber", "unitId", "uid", "apartment_number"
+    )
     # #3-tail: scrub a unit_id that is a scraped field label ("856c8776-Baths: 1")
     # — a generic-DOM mis-parse. None lets identity synthesise an honest
     # inferred_ id rather than shipping a corrupt "real" anchor.
@@ -950,13 +954,30 @@ def _format_v2_unit(
 
     # rent: numeric fields first (alias-tolerant — generic/_merge emit
     # rent/minRent/totalRent/price camelCase), then parse rent_range.
-    rent_lo = _first(unit, "market_rent_low", "rent_low", "asking_rent",
-                     "minRent", "min_rent", "rent", "totalRent", "price")
-    rent_hi = _first(unit, "market_rent_high", "rent_high", "asking_rent",
-                     "maxRent", "max_rent", "rent", "totalRent", "price")
+    rent_lo = _first(
+        unit,
+        "market_rent_low",
+        "rent_low",
+        "asking_rent",
+        "minRent",
+        "min_rent",
+        "rent",
+        "totalRent",
+        "price",
+    )
+    rent_hi = _first(
+        unit,
+        "market_rent_high",
+        "rent_high",
+        "asking_rent",
+        "maxRent",
+        "max_rent",
+        "rent",
+        "totalRent",
+        "price",
+    )
     if rent_lo is None and rent_hi is None:
-        rent_range = _first(unit, "rent_range", "_rent_range", "rentRange",
-                            "priceRange", "price_range")
+        rent_range = _first(unit, "rent_range", "_rent_range", "rentRange", "priceRange", "price_range")
         if rent_range:
             try:
                 from ma_poc.pms.adapters._parsing import parse_rent_range
@@ -984,10 +1005,24 @@ def _format_v2_unit(
         # any string variant into the canonical field; dicts/lists fall
         # through to _extra (capture-everything net) so nothing is lost.
         legacy = _first(
-            unit, "concession", "concessions", "specials_description",
-            "special", "specials", "promotion", "promo", "offer",
-            "offers", "incentive", "incentives", "deal", "savings",
-            "discount", "free_rent", "look_and_lease", "move_in_special",
+            unit,
+            "concession",
+            "concessions",
+            "specials_description",
+            "special",
+            "specials",
+            "promotion",
+            "promo",
+            "offer",
+            "offers",
+            "incentive",
+            "incentives",
+            "deal",
+            "savings",
+            "discount",
+            "free_rent",
+            "look_and_lease",
+            "move_in_special",
         )
         if isinstance(legacy, str) and legacy.strip():
             concession_text = legacy
@@ -1004,19 +1039,12 @@ def _format_v2_unit(
     # to ``None`` (honest "missing") instead of emitting an impossible number.
     # ``> beds + 2`` never clamps a legitimate N-bed/N-bath layout; the ``>= 4``
     # floor protects a small unit's real 2–2.5-bath count.
-    if (
-        norm_baths is not None
-        and norm_beds is not None
-        and norm_baths >= 4
-        and norm_baths > norm_beds + 2
-    ):
+    if norm_baths is not None and norm_beds is not None and norm_baths >= 4 and norm_baths > norm_beds + 2:
         norm_baths = None
     try:
         from ma_poc.pms.adapters._parsing import compute_floor_plan_id
 
-        floor_plan_id = compute_floor_plan_id(
-            property_id, fp_name, norm_beds, norm_baths
-        )
+        floor_plan_id = compute_floor_plan_id(property_id, fp_name, norm_beds, norm_baths)
     except Exception:
         floor_plan_id = None
 
@@ -1066,9 +1094,7 @@ def _format_v2_unit(
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
     _has_anchor = unit_has_real_anchor(unit)
     _availability_status = resolve_plan_row_availability(
-        _norm_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        _norm_status(unit.get("availability_status") or unit.get("_availability_status")),
         plan_level=_plan_level,
         has_rent=_has_rent,
         has_anchor=_has_anchor,
@@ -1083,6 +1109,21 @@ def _format_v2_unit(
         has_rent=_has_rent,
         has_anchor=_has_anchor,
         has_date=_row_has_availability_date(unit),
+    )
+
+    _available_date_raw = _availability_date_value(unit)
+    _available_date_parsed = _format_date(_available_date_raw, scrape_ts)
+    _available_date_resolved = _resolve_available_date(
+        _available_date_parsed,
+        _availability_status,
+        scrape_ts,
+        has_rent=(_has_rent and uid not in (None, "", "null")),
+    )
+    _available_date_provenance = _classify_availability_date_provenance(
+        _available_date_raw,
+        _available_date_parsed,
+        _available_date_resolved,
+        scrape_ts,
     )
 
     return {
@@ -1111,9 +1152,7 @@ def _format_v2_unit(
         # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
         # plan-level placeholder). Captured on the internal unit dict but was
         # dropped by this transform until now.
-        "extraction_tier": (
-            unit.get("extraction_tier") or unit.get("_extraction_tier") or None
-        ),
+        "extraction_tier": (unit.get("extraction_tier") or unit.get("_extraction_tier") or None),
         "rent_low": _rent_lo_fmt,
         "rent_high": _rent_hi_fmt,
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1160,28 +1199,17 @@ def _format_v2_unit(
         # categories (TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL,
         # TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL, etc.) from getting
         # a fabricated scrape-date stamp.
-        "available_date": _resolve_available_date(
-            _format_date(_first(
-                unit, "available_date", "availability_date",
-                "internalAvailableDate", "availableDate",
-                "date_available", "dateAvailable")),
-            # 2026-07-29: the RESOLVED status, not a second independent
-            # _norm_status() call. A zero-inventory plan row now reads
-            # UNAVAILABLE here, so the AVAILABLE branch below cannot stamp
-            # today's scrape date onto a plan with no inventory and no price.
-            _availability_status,
-            scrape_ts,
-            has_rent=(_has_rent and uid not in (None, "", "null")),
-        ),
+        "available_date": _available_date_resolved,
+        # First-class lineage: source-backed future dates and manufactured
+        # capture-date defaults must never look equivalent downstream.
+        "availability_date_provenance": _available_date_provenance,
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
         # Data has value; cleaning can be done later off the raw. Clean
         # consumers keep using ``available_date`` (ISO-or-None) unchanged;
         # this never drops a value. Underscore = private passthrough
         # (same convention as _inferred_id / _date_placeholder).
-        "_available_date_raw": _raw_str(_first(
-            unit, "available_date", "availability_date", "internalAvailableDate",
-            "availableDate", "date_available", "dateAvailable")),
+        "_available_date_raw": _raw_str(_available_date_raw),
         # 2026-05-18: availability_status is emitted by many parsers
         # ("AVAILABLE"/"UNAVAILABLE") via make_unit_dict but the v2
         # transform never mapped it -> 99.7% missing in output. Capture
@@ -1198,17 +1226,24 @@ def _format_v2_unit(
         # name them differently); raw passthrough, clean later. Additive,
         # None when unset (F10/underscore precedent; validation is
         # required-field-based, no unknown-key rejection).
-        "floor": _raw_str(_first(unit, "floor", "_floor", "floor_number",
-                                 "floorNumber", "floor_no")),
-        "building": _raw_str(_first(unit, "building", "_building",
-                                    "building_name", "buildingName",
-                                    "building_id", "bldg")),
-        "available_units": _raw_str(_first(
-            unit, "available_units", "_available_units", "availableUnits",
-            "units_available", "available_unit_count", "numberOfUnits",
-            "availableUnitsCount", "availableunitscount")),
-        "_rent_range_raw": _raw_str(_first(unit, "rent_range",
-                                           "_rent_range", "rentRange")),
+        "floor": _raw_str(_first(unit, "floor", "_floor", "floor_number", "floorNumber", "floor_no")),
+        "building": _raw_str(
+            _first(unit, "building", "_building", "building_name", "buildingName", "building_id", "bldg")
+        ),
+        "available_units": _raw_str(
+            _first(
+                unit,
+                "available_units",
+                "_available_units",
+                "availableUnits",
+                "units_available",
+                "available_unit_count",
+                "numberOfUnits",
+                "availableUnitsCount",
+                "availableunitscount",
+            )
+        ),
+        "_rent_range_raw": _raw_str(_first(unit, "rent_range", "_rent_range", "rentRange")),
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
@@ -1219,12 +1254,8 @@ def _format_v2_unit(
         # ``concession_text`` field above; consumers that prefer a
         # display-ready version can read ``concession_text_clean``.
         # See ma_poc/core/concession_clean.py for the classifier.
-        "concession_text_clean": (
-            _concession_clean(concession_text) if concession_text else None
-        ),
-        "_concession_quality": (
-            _concession_quality(concession_text) if concession_text else None
-        ),
+        "concession_text_clean": (_concession_clean(concession_text) if concession_text else None),
+        "_concession_quality": (_concession_quality(concession_text) if concession_text else None),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
         # 2026-05-24 offer-taxonomy fields (xlsx reference schema parity).
@@ -1260,9 +1291,7 @@ def _format_v2_unit(
     }
 
 
-def _format_v2_floor_plan(
-    plan: dict, scrape_ts: datetime, property_id: str = ""
-) -> dict:
+def _format_v2_floor_plan(plan: dict, scrape_ts: datetime, property_id: str = "") -> dict:
     """Format public plan evidence without publishing a synthetic unit ID.
 
     The shared unit formatter gives the plan the normal schema shape, then
@@ -1296,15 +1325,9 @@ def _format_v2_floor_plan(
     # manufactured by definition (``_resolve_available_date`` only invents one
     # when the parsed source date is falsy), so dropping it loses nothing the
     # source published.
-    if out.get("availability_status") == "UNAVAILABLE" and not out.get(
-        "_available_date_raw"
-    ):
+    if out.get("availability_status") == "UNAVAILABLE" and not out.get("_available_date_raw"):
         out["available_date"] = None
-    flags = [
-        part.strip()
-        for part in str(out.get("data_quality_flag") or "").split("|")
-        if part.strip()
-    ]
+    flags = [part.strip() for part in str(out.get("data_quality_flag") or "").split("|") if part.strip()]
     if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
         flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
     out["data_quality_flag"] = "|".join(flags)
@@ -1665,21 +1688,109 @@ def field_is_absent(field: str, value: Any) -> bool:
 # authoritative signal anyway; the date-text recognizer just rescues
 # rows where the operator wrote a phrase instead of a date.
 _AVAILABLE_NOW_RE = re.compile(
-    r"\bavail"                                   # available / availability / availabilities
-    r"|\bapply\s+(?:now|today|by)\b"             # CTAs in date field
+    r"\bavail"  # available / availability / availabilities
+    r"|\bapply\s+(?:now|today|by)\b"  # CTAs in date field
     r"|\blease\s+(?:now|today|by)\b"
-    r"|\bmove[\s-]?in"                           # Move-in / Move In / Movein
-    r"|\bmoves?[\s-]?in\b"                       # Move In Now / Moves In
+    r"|\bmove[\s-]?in"  # Move-in / Move In / Movein
+    r"|\bmoves?[\s-]?in\b"  # Move In Now / Moves In
     r"|\bready\b"
     r"|\bvacant\b"
-    r"|\bcurrently\b"                            # "Currently Vacant" / "Currently Leasing"
+    r"|\bcurrently\b"  # "Currently Vacant" / "Currently Leasing"
     r"|\b(?:now|today|immediate|immediately)\b"  # standalone time tokens
-    r"|\bcall\s+(?:for|us|today|now)\b"          # "Call For Details" — operator-gated
-    r"|\b(?:tba|tbd)\b"                          # to be announced / determined
+    r"|\bcall\s+(?:for|us|today|now)\b"  # "Call For Details" — operator-gated
+    r"|\b(?:tba|tbd)\b"  # to be announced / determined
     r"|\bto\s+be\s+(?:announced|determined|set)\b"
-    r"|\binquire\b",                             # "Inquire For Details" — operator-gated
+    r"|\binquire\b",  # "Inquire For Details" — operator-gated
     re.IGNORECASE,
 )
+
+_NEGATIVE_AVAILABILITY_TOKENS = (
+    "not available",
+    "not avail",
+    "unavailable",
+    "leased",
+    "occupied",
+    "rented",
+    "off market",
+    "off-market",
+    "no availability",
+    "call for avail",
+    "contact for avail",
+    "inquire for avail",
+    "call about avail",
+    "email for avail",
+)
+
+_EXPLICIT_AVAILABILITY_DATE_RE = re.compile(
+    r"(?:"
+    r"\b\d{8}\b"
+    r"|\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b"
+    r"|\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b"
+    r"|\b(?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\d|3[01])\b"
+    r"|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+    r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+    r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}"
+    r"(?:,?\s+\d{2,4})?\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _availability_text_is_negative(raw_value: Any) -> bool:
+    text = str(raw_value or "").strip().lower()
+    return bool(text) and any(token in text for token in _NEGATIVE_AVAILABILITY_TOKENS)
+
+
+def _availability_text_is_available_now(raw_value: Any) -> bool:
+    """True only for relative availability text, never an explicit date."""
+    text = str(raw_value or "").strip()
+    if not text or _availability_text_is_negative(text):
+        return False
+    if _EXPLICIT_AVAILABILITY_DATE_RE.search(text):
+        return False
+    return bool(_AVAILABLE_NOW_RE.search(text))
+
+
+def _classify_availability_date_provenance(
+    raw_value: Any,
+    parsed_date: str | None,
+    resolved_date: str | None,
+    scrape_ts: datetime,
+) -> str:
+    """Classify where an emitted availability date came from.
+
+    Names mirror the July 31 fleet audit so a post-fix canary can be compared
+    directly with that baseline.
+    """
+    raw_text = _raw_str(raw_value)
+    capture_date = scrape_ts.strftime("%Y-%m-%d")
+
+    if raw_text:
+        if _availability_text_is_negative(raw_text):
+            return "negative_or_unpublished"
+        if _EXPLICIT_AVAILABILITY_DATE_RE.search(raw_text):
+            if not parsed_date:
+                return "sentinel_clamped"
+            if parsed_date > capture_date:
+                return "explicit_future"
+            if parsed_date == capture_date:
+                return "explicit_capture_date"
+            return "historical_embedded"
+        if _availability_text_is_available_now(raw_text):
+            return "available_now"
+        if parsed_date:
+            if parsed_date > capture_date:
+                return "explicit_future"
+            if parsed_date == capture_date:
+                return "explicit_capture_date"
+            return "historical_embedded"
+        if resolved_date == capture_date:
+            return "capture_date_default"
+        return "unparsed_raw"
+
+    if resolved_date == capture_date:
+        return "capture_date_default"
+    return "missing"
 
 
 def _resolve_available_date(
@@ -1731,7 +1842,10 @@ def _resolve_available_date(
 _DATE_SANITY_YEARS = 5  # ±5 years from today is the acceptance window
 
 
-def _is_date_in_sane_range(iso_date: str) -> bool:
+def _is_date_in_sane_range(
+    iso_date: str,
+    reference_ts: datetime | None = None,
+) -> bool:
     """True when the ISO date is within ±_DATE_SANITY_YEARS of today.
 
     Operators sometimes leave decade-old ``available_date`` values on
@@ -1744,12 +1858,15 @@ def _is_date_in_sane_range(iso_date: str) -> bool:
         d = datetime.strptime(iso_date, "%Y-%m-%d").date()
     except (ValueError, TypeError):
         return False
-    today = datetime.now(UTC).date()
+    today = (reference_ts or datetime.now(UTC)).date()
     delta_days = (d - today).days
     return -_DATE_SANITY_YEARS * 365 <= delta_days <= _DATE_SANITY_YEARS * 365
 
 
-def _format_date(val: Any) -> str | None:
+def _format_date(
+    val: Any,
+    reference_ts: datetime | None = None,
+) -> str | None:
     """Normalize date to YYYY-MM-DD. Returns None if unparseable.
 
     2026-05-18: widened. The prior version accepted only ISO and
@@ -1766,13 +1883,14 @@ def _format_date(val: Any) -> str | None:
     through _is_date_in_sane_range — operator-emitted garbage like
     "2009-07-08" returns None.
     """
+
     def _accept(iso: str | None) -> str | None:
         """Inner-helper: apply the ±5yr sanity bound to every parsed
         output. Calls that return today's date for relative tokens
         (Available Now / etc.) are safe — today is within range."""
         if iso is None:
             return None
-        return iso if _is_date_in_sane_range(iso) else None
+        return iso if _is_date_in_sane_range(iso, reference_ts) else None
 
     if val is None or val == "":
         return None
@@ -1791,24 +1909,7 @@ def _format_date(val: Any) -> str | None:
     # today (wrong: implies the unit IS available now). 14 cases in
     # 87b837b's canary output.
     _s_low = s.lower()
-    _NEGATIVE_TOKENS = (
-        "not available", "not avail", "unavailable",
-        "leased", "occupied", "rented", "off market", "off-market",
-        "no availability",
-        # 2026-07-12: "Call/Contact/Inquire FOR availability" means the
-        # operator does NOT publish a date — letting it reach the CTA
-        # fallback below fabricates an "available now" stamp. Distinct
-        # from "Call For Details"/"Call Now" CTAs, which stay
-        # available-now per the 2026-05-24 rule. Prefix forms cover the
-        # full words ("call for avail" ⊂ "call for availability").
-        # 0 units in the 2026-07-11 canary carry these in the date
-        # field — this closes the path (and the long-failing
-        # "call for availability"→None test) before an operator
-        # exercises it.
-        "call for avail", "contact for avail", "inquire for avail",
-        "call about avail", "email for avail",
-    )
-    if any(tok in _s_low for tok in _NEGATIVE_TOKENS):
+    if any(tok in _s_low for tok in _NEGATIVE_AVAILABILITY_TOKENS):
         return None
     # Strip a leading availability label, e.g. "Available 6/25/26",
     # "Avail. 6/25/26", "Move-in 6/25/26", "Ready 6/25/26".
@@ -1820,7 +1921,7 @@ def _format_date(val: Any) -> str | None:
     ).strip()
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
-        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
+        return _accept((reference_ts or datetime.now(UTC)).strftime("%Y-%m-%d"))
     # 2026-05-26: YYYYMMDD numeric (no separator). 268 cases in 87b837b
     # — common from RentManager / older RealPage XMLs that emit dates
     # as packed 8-digit ints. Checked BEFORE the strptime cascade so
@@ -1833,16 +1934,27 @@ def _format_date(val: Any) -> str | None:
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
     for fmt in (
-        "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y",
-        "%m/%d/%y", "%m-%d-%y",
-        "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y",
-        "%b %d, %y", "%b %d %y",
+        "%m/%d/%Y",
+        "%d/%m/%Y",
+        "%Y/%m/%d",
+        "%m-%d-%Y",
+        "%d-%m-%Y",
+        "%m/%d/%y",
+        "%m-%d-%y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+        "%b %d %Y",
+        "%B %d %Y",
+        "%b %d, %y",
+        "%b %d %y",
     ):
         try:
             return _accept(datetime.strptime(s, fmt).strftime("%Y-%m-%d"))
         except ValueError:
             continue
-    # If it's a datetime string, take just the date part (unchanged)
+    # Preserve the source calendar-date prefix. Deliberately do not convert
+    # timezone-bearing timestamps to UTC: that can shift a visible operator
+    # move-in date forward or backward by one day.
     if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
         return _accept(s[:10])
     # 2026-05-19: no-year month-name forms ("May 19", "Jun. 7", "Jul. 18")
@@ -1855,7 +1967,20 @@ def _format_date(val: Any) -> str | None:
         try:
             return _accept(
                 datetime.strptime(s_no_year, fmt)
-                .replace(year=datetime.now(UTC).year)
+                .replace(year=(reference_ts or datetime.now(UTC)).year)
+                .strftime("%Y-%m-%d")
+            )
+        except ValueError:
+            continue
+    # Numeric no-year forms ("8/1", "9-03") are published by compact
+    # per-unit availability tables such as Cricket Flats.  Resolve them
+    # against the capture year, just like the month-name no-year forms above;
+    # using the supplied capture timestamp keeps historical replays stable.
+    for fmt in ("%m/%d", "%m-%d"):
+        try:
+            return _accept(
+                datetime.strptime(s, fmt)
+                .replace(year=(reference_ts or datetime.now(UTC)).year)
                 .strftime("%Y-%m-%d")
             )
         except ValueError:
@@ -1871,7 +1996,7 @@ def _format_date(val: Any) -> str | None:
     # date strings always win (e.g. "Available 6/25/26" parses 6/25/26
     # via earlier date-format pass, never reaches here).
     if _AVAILABLE_NOW_RE.search(s_orig.lower()):
-        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
+        return _accept((reference_ts or datetime.now(UTC)).strftime("%Y-%m-%d"))
     return None
 
 
@@ -1908,28 +2033,100 @@ _NOISE_TOKEN_RE = re.compile(
 )
 # Primary names already pulled by the transform — don't duplicate them.
 _MAPPED_SRC = {
-    "_bedrooms", "bedrooms", "beds", "numberofbeds", "bedroom", "bed",
-    "num_beds", "_bathrooms", "bathrooms", "baths", "numberofbaths",
-    "bathroom", "bath", "num_baths", "_floor_plan", "floor_plan_name",
-    "floorplan_name", "floorplanname", "fp_name", "floorplan",
-    "plan_name", "_sqft", "sqft", "area", "squarefeet", "square_feet",
-    "size", "sq_ft", "unit_id", "unit_number", "_unit_number",
-    "unitnumber", "unitid", "uid", "apartment_number",
-    "market_rent_low", "market_rent_high", "rent_low", "rent_high",
-    "asking_rent", "minrent", "min_rent", "rent", "totalrent", "price",
-    "maxrent", "max_rent", "rent_range", "_rent_range", "rentrange",
-    "pricerange", "price_range", "available_date", "availability_date",
-    "internalavailabledate", "availabledate", "date_available",
-    "dateavailable", "lease_term", "_lease_term", "move_in_date",
-    "_move_in_date", "availability_status", "_availability_status",
-    "deposit", "_deposit", "floor", "_floor", "floor_number",
-    "floornumber", "floor_no", "building", "_building", "building_name",
-    "buildingname", "building_id", "bldg", "available_units",
-    "_available_units", "availableunits", "units_available",
-    "available_unit_count", "numberofunits", "availableunitscount",
-    "concession", "concession_text", "concession_value",
-    "concession_source", "specials_description", "amenities",
-    "bed_label", "floor_plan_id", "source_api_url", "extraction_tier",
+    "_bedrooms",
+    "bedrooms",
+    "beds",
+    "numberofbeds",
+    "bedroom",
+    "bed",
+    "num_beds",
+    "_bathrooms",
+    "bathrooms",
+    "baths",
+    "numberofbaths",
+    "bathroom",
+    "bath",
+    "num_baths",
+    "_floor_plan",
+    "floor_plan_name",
+    "floorplan_name",
+    "floorplanname",
+    "fp_name",
+    "floorplan",
+    "plan_name",
+    "_sqft",
+    "sqft",
+    "area",
+    "squarefeet",
+    "square_feet",
+    "size",
+    "sq_ft",
+    "unit_id",
+    "unit_number",
+    "_unit_number",
+    "unitnumber",
+    "unitid",
+    "uid",
+    "apartment_number",
+    "market_rent_low",
+    "market_rent_high",
+    "rent_low",
+    "rent_high",
+    "asking_rent",
+    "minrent",
+    "min_rent",
+    "rent",
+    "totalrent",
+    "price",
+    "maxrent",
+    "max_rent",
+    "rent_range",
+    "_rent_range",
+    "rentrange",
+    "pricerange",
+    "price_range",
+    "available_date",
+    "availability_date",
+    "internalavailabledate",
+    "availabledate",
+    "date_available",
+    "dateavailable",
+    "lease_term",
+    "_lease_term",
+    "move_in_date",
+    "_move_in_date",
+    "availability_status",
+    "_availability_status",
+    "deposit",
+    "_deposit",
+    "floor",
+    "_floor",
+    "floor_number",
+    "floornumber",
+    "floor_no",
+    "building",
+    "_building",
+    "building_name",
+    "buildingname",
+    "building_id",
+    "bldg",
+    "available_units",
+    "_available_units",
+    "availableunits",
+    "units_available",
+    "available_unit_count",
+    "numberofunits",
+    "availableunitscount",
+    "concession",
+    "concession_text",
+    "concession_value",
+    "concession_source",
+    "specials_description",
+    "amenities",
+    "bed_label",
+    "floor_plan_id",
+    "source_api_url",
+    "extraction_tier",
     # Adapter-set evidence flag consumed by ``classify_area_absence``. Ends
     # in "sqft" so the attribute-token net would otherwise republish it into
     # ``_extra`` as if it were an unmapped square-footage column.
@@ -1983,19 +2180,13 @@ def _norm_status(val: Any) -> str | None:
     if not s:
         return None
     u = s.upper()
-    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
-             "LEASED", "PENDING", "UNKNOWN"):
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED", "LEASED", "PENDING", "UNKNOWN"):
         return u
     if "PENDING" in u or "APPLICATION" in u:
         return "PENDING"
     if "WAITLIST" in u or "WAIT LIST" in u or "WAIT-LIST" in u:
         return "WAITLIST"
-    if (
-        "NOT AVAILABLE" in u
-        or "UNAVAILABLE" in u
-        or "SOLD OUT" in u
-        or "LEASED OUT" in u
-    ):
+    if "NOT AVAILABLE" in u or "UNAVAILABLE" in u or "SOLD OUT" in u or "LEASED OUT" in u:
         return "UNAVAILABLE"
     if "LEASED" in u or "OCCUPIED" in u:
         return "LEASED"

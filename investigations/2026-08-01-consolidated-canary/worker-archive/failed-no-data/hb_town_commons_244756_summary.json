@@ -1,0 +1,21 @@
+{
+  "property_id": 244756,
+  "property_name": "Town Commons",
+  "property_address": "1600 Town Commons Dr",
+  "url": "https://harvest-properties.com/project/town-commons-apartments/",
+  "status": 200,
+  "bytes": 391762,
+  "title": "Town Commons Apartments | Harvest Properties",
+  "target_host": "harvest-properties.com",
+  "candidate_links": [
+    "https://harvest-properties.securecafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+    "https://harvest-properties.com/wp-content/uploads/2022/05/Georgetown-Floorplan_2.jpg"
+  ],
+  "provider_markers": [
+    "securecafe"
+  ],
+  "captcha_or_challenge": true,
+  "address_present": true,
+  "text_prefix": "Town Commons Apartments | Harvest Properties Connecticut Massachusetts Michigan North Carolina Ohio Tennessee Properties Connecticut Massachusetts Michigan North Carolina Ohio Tennessee Contact Pay Rent Online Select Page Town Commons Apartments 1600 Town Commons Drive Suite 101, Howell, MI 48855 Leasing Office: 517-545-5930 \\ Apartments Available Jamestown (one-bedroom)- $1,375+ Amherst (two-bedroom, two bathroom)- $1,595+ Vicksburg (two-bedroom, two bathroom)- $1,650+ Savannah (two-bedroom, tw",
+  "raw_path": "/private/tmp/propai-fnd-vBkmT9/hb_town_commons_244756.html"
+}

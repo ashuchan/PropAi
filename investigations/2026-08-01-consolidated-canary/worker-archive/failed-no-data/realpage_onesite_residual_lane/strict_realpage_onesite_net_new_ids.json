@@ -1,0 +1,20 @@
+{
+  "adapter_e2e_native_data_routing_near_miss_ids": [
+    2948,
+    16172,
+    18194,
+    253326
+  ],
+  "current_pipeline_qualified_ids": [
+    265143
+  ],
+  "generated_at_utc": "2026-08-01T10:13:01.592858+00:00",
+  "ledger_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+  "ledger_csv_sha256": "28baf78746f21c552e6c80666a1a0ad9d9f9de4484993a58bf790e3d9c49879d",
+  "note": "Near-miss IDs expose exact current native unit data through the OneSite adapter but are excluded until full current pipeline routing passes.",
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/evidence_realpage_onesite_remaining11_current_strict.json",
+  "source_artifact_sha256": "f7150350fd46a49580abdd43971163c4af492da243a323f214e9a274577b136f",
+  "strict_net_new_ids_vs_current_ledger": [
+    265143
+  ]
+}

@@ -49,6 +49,7 @@ Distinct from:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -153,6 +154,27 @@ def _parse_card_text(text: str) -> dict:
 # across huntingtonwoods/keltonstation/thegarfield/capitalplace.
 _CWS_GETUNITS_QUERY = "act=Proxy/GetUnits&available=true&honordisplayorder=true"
 
+# Modern RealPage marketing sites expose a second public widget surface at
+# ``api.ws.realpage.com``.  The July 31 capture frequently stopped at its
+# ``/floorplans`` checkpoint even though the same page publishes the widget's
+# property id + browser-readable API key and its ``/units`` sibling carries
+# native ``internalAvailableDate`` values.  Keep this signature separate from
+# the property-hosted CWS callback above: both are RealPage, but they are
+# different public transports.
+_PUBLIC_WIDGET_PROPERTY_ID_RE = re.compile(
+    r"\bpropertyId\s*(?:=|:)\s*['\"]?(\d+)", re.IGNORECASE
+)
+_PUBLIC_WIDGET_API_KEY_RE = re.compile(
+    r"\bapiKey\s*:\s*['\"]"
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+    r"['\"]",
+    re.IGNORECASE,
+)
+_PUBLIC_REALPAGE_PROPERTY_URL_RE = re.compile(
+    r"api\.ws\.realpage\.com/v\d+/property/(\d+)/(?:floorplans|units)(?:[/?#]|$)",
+    re.IGNORECASE,
+)
+
 
 def cws_getunits_url(base_url: str) -> str | None:
     """Build the property-hosted GetUnits endpoint from a property URL.
@@ -196,7 +218,7 @@ def _cws_avail_status(lease_status: Any) -> str:
     return "AVAILABLE" if s.startswith("AVAILABLE") else "UNAVAILABLE"
 
 
-def parse_realpage_cws_getunits(body: str, url: str) -> list[dict[str, Any]]:
+def parse_realpage_cws_getunits(body: str | dict[str, Any], url: str) -> list[dict[str, Any]]:
     """Parse a CWS ``GetUnits`` JSON body into unit-level dicts.
 
     Body shape: ``{"units": [{unitNumber, rent, squareFeet, numberOfBeds,
@@ -207,13 +229,20 @@ def parse_realpage_cws_getunits(body: str, url: str) -> list[dict[str, Any]]:
     so LEASED units leak in and must be marked UNAVAILABLE. Returns ``[]`` on
     non-JSON / no units. Never raises.
     """
-    try:
-        data = json.loads(body)
-    except (json.JSONDecodeError, TypeError):
-        return []
+    if isinstance(body, dict):
+        data = body
+    else:
+        try:
+            data = json.loads(body)
+        except (json.JSONDecodeError, TypeError):
+            return []
     if not isinstance(data, dict):
         return []
     units = data.get("units")
+    if not isinstance(units, list):
+        response = data.get("response")
+        if isinstance(response, dict):
+            units = response.get("units")
     if not isinstance(units, list):
         return []
 
@@ -322,6 +351,23 @@ class RealPageCwsAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_REALPAGE_CWS")
 
+        # A captured public-widget /units response is already the deepest,
+        # cheapest source.  Consume it before the property-hosted callback or
+        # DOM fallback so the generic parser cannot collapse repeated unit
+        # numbers that are legitimately distinguished by building/floorplan.
+        captured = self._try_captured_public_units(ctx)
+        if captured is not None:
+            return captured
+
+        # A captured /floorplans response is a checkpoint, not terminal unit
+        # success.  If the same fetched HTML publishes the matching widget
+        # credentials, request its public /units sibling directly.  This is a
+        # single direct request: no unlocker, CAPTCHA solving, FlareSolverr,
+        # browser fingerprint rotation, or external model.
+        public = await self._try_public_widget_units(ctx)
+        if public is not None:
+            return public
+
         # GetUnits unit-level path (flag-gated). Property-hosted static JSON —
         # no live page needed. On success returns unit-level; on 0 available
         # units / error it falls through to the existing DOM plan-level parse.
@@ -373,6 +419,164 @@ class RealPageCwsAdapter:
             f"realpage_cws: {len(rows)} rows failed unit_validity post-process"
         )
         return result
+
+    @staticmethod
+    def _public_capture_identity(
+        ctx: AdapterContext,
+    ) -> tuple[list[dict[str, Any]], set[str]]:
+        responses = [
+            response
+            for response in list(getattr(ctx, "_api_responses", []) or [])
+            if isinstance(response, dict)
+        ]
+        captured_ids = {
+            match.group(1)
+            for response in responses
+            if (
+                match := _PUBLIC_REALPAGE_PROPERTY_URL_RE.search(
+                    str(response.get("url") or "")
+                )
+            )
+        }
+        return responses, captured_ids
+
+    @staticmethod
+    def _rows_result(
+        rows: list[dict[str, Any]],
+        *,
+        ctx: AdapterContext,
+        url: str,
+        status: int,
+        via: str,
+    ) -> AdapterResult | None:
+        if not rows:
+            return None
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(rows, property_id=getattr(ctx, "property_id", None))
+        if pp.n_unit_level <= 0:
+            return None
+        result = AdapterResult(tier_used="TIER_1_API_REALPAGE_CWS_UNITS")
+        result.units = pp.admitted
+        result.plan_summaries = pp.plan_summaries
+        result.winning_url = url
+        result.confidence = min(0.95, 0.7 + 0.05 * pp.n_unit_level)
+        result.api_responses.append(
+            {
+                "url": url,
+                "status": status,
+                "body": "<realpage-public-units>",
+                "via": via,
+            }
+        )
+        return result
+
+    def _try_captured_public_units(
+        self, ctx: AdapterContext
+    ) -> AdapterResult | None:
+        """Consume a property-scoped captured public ``/units`` envelope."""
+        try:
+            responses, captured_ids = self._public_capture_identity(ctx)
+            if len(captured_ids) != 1:
+                return None
+
+            from ma_poc.pms.adapters._probe import body_html_from_ctx
+
+            html = body_html_from_ctx(ctx)
+            html_id_match = _PUBLIC_WIDGET_PROPERTY_ID_RE.search(html or "")
+            html_id = html_id_match.group(1) if html_id_match else ""
+            captured_id = next(iter(captured_ids))
+            if html_id and html_id != captured_id:
+                return None
+
+            for response in responses:
+                url = str(response.get("url") or "")
+                match = _PUBLIC_REALPAGE_PROPERTY_URL_RE.search(url)
+                if not match or match.group(1) != captured_id or "/units" not in url.lower():
+                    continue
+                rows = parse_realpage_cws_getunits(response.get("body"), url)
+                parsed = self._rows_result(
+                    rows,
+                    ctx=ctx,
+                    url=url,
+                    status=int(response.get("status") or 200),
+                    via="captured_realpage_public_units",
+                )
+                if parsed is not None:
+                    return parsed
+        except Exception as exc:  # noqa: BLE001 - lossless fallback
+            log.debug("realpage_cws captured public-units parse failed err=%s", exc)
+        return None
+
+    async def _try_public_widget_units(
+        self, ctx: AdapterContext
+    ) -> AdapterResult | None:
+        """Depth-probe the public ``/units`` sibling with identity guards."""
+        try:
+            from ma_poc.pms.adapters._probe import body_html_from_ctx, probe_get
+
+            html = body_html_from_ctx(ctx)
+            if not html:
+                return None
+            key_match = _PUBLIC_WIDGET_API_KEY_RE.search(html)
+            html_id_match = _PUBLIC_WIDGET_PROPERTY_ID_RE.search(html)
+            if not key_match or not html_id_match:
+                return None
+
+            responses, captured_ids = self._public_capture_identity(ctx)
+            del responses
+            if len(captured_ids) > 1:
+                return None
+            property_id = html_id_match.group(1)
+            if captured_ids and next(iter(captured_ids)) != property_id:
+                return None
+
+            referer = ""
+            fetch_result = getattr(ctx, "fetch_result", None)
+            if fetch_result is not None:
+                referer = str(getattr(fetch_result, "final_url", "") or "")
+            referer = referer or str(getattr(ctx, "base_url", "") or "")
+            parsed_referer = urllib.parse.urlparse(referer)
+            origin = (
+                f"{parsed_referer.scheme}://{parsed_referer.netloc}"
+                if parsed_referer.scheme and parsed_referer.netloc
+                else ""
+            )
+            units_url = (
+                f"https://api.ws.realpage.com/v2/property/{property_id}/units"
+                "?available=true&honordisplayorder=true"
+            )
+            headers = {
+                "Accept": "application/json, text/plain, */*",
+                "x-ws-authkey": key_match.group(1).strip(),
+            }
+            if origin:
+                headers["Origin"] = origin
+            if referer:
+                headers["Referer"] = referer
+
+            response = await asyncio.to_thread(
+                probe_get,
+                units_url,
+                headers=headers,
+                timeout=20,
+                unlocker=False,
+            )
+            status = int(getattr(response, "status_code", 0) or 0)
+            if not 200 <= status < 300:
+                return None
+            body = json.loads(str(getattr(response, "text", "") or ""))
+            rows = parse_realpage_cws_getunits(body, units_url)
+            return self._rows_result(
+                rows,
+                ctx=ctx,
+                url=units_url,
+                status=status,
+                via="realpage_public_widget_units",
+            )
+        except Exception as exc:  # noqa: BLE001 - lossless fallback
+            log.debug("realpage_cws public-units enrichment failed err=%s", exc)
+            return None
 
     def _try_getunits(self, ctx: AdapterContext) -> AdapterResult | None:
         """Try the property-hosted CWS GetUnits endpoint (static, no render).

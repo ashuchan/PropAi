@@ -161,9 +161,22 @@ def _snap_one(
     # still adopted — that join is the point of the snap and is unaffected.
     # Only the human-facing NAME now prefers what the operator published.
     _extracted_str = str(extracted_name).strip() if extracted_name is not None else ""
+    gaps = unit.get("data_gaps")
+    provider_declares_name_gap = isinstance(gaps, (list, tuple, set)) and any(
+        str(gap).strip().casefold() == "floor_plan_name" for gap in gaps
+    )
     if _extracted_str:
         new_unit["floor_plan_name"] = _extracted_str
         new_unit["floor_plan_name_catalog"] = plan.description
+    elif provider_declares_name_gap:
+        # A provider-specific adapter can prove that its native unit roster
+        # publishes no floor-plan name.  The CSV match is still useful for a
+        # stable floor_plan_id, but exposing its description as though the
+        # operator published it launders a dimension-based inference into
+        # source data.  Keep the catalog label explicitly catalog-scoped.
+        new_unit["floor_plan_name"] = ""
+        new_unit["floor_plan_name_catalog"] = plan.description
+        new_unit["floor_plan_snap_name_suppressed"] = True
     else:
         new_unit["floor_plan_name"] = plan.description
     new_unit["floor_plan_id"] = plan.floor_plan_id

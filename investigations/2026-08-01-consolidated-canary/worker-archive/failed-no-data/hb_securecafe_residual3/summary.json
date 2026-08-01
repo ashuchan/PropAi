@@ -1,0 +1,36 @@
+{
+  "guardrails": {
+    "solve_captchas": false,
+    "web_unlocker": false,
+    "flaresolverr": false,
+    "fingerprint_rotation": false,
+    "paid_canary": false
+  },
+  "results": [
+    {
+      "property_id": 594,
+      "url": "https://harbinwoodbyelon.securecafe.com/onlineleasing/harbinwood/availableunits.aspx",
+      "status": 200,
+      "body_bytes": 65058,
+      "sha256": "464b83855f7db1224e57c782a26ca33d4d16b7435e7b1d1a77d9b41a38d93b7b",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 5782,
+      "url": "https://springfieldrenton.securecafe.com/onlineleasing/springfield-apartments-5/availableunits.aspx",
+      "status": 200,
+      "body_bytes": 101416,
+      "sha256": "38e7a6840dbde10e83002f21c28c262a4d1a8004d63764384ad6ff7ca214e7a3",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 241538,
+      "url": "https://block88apts.securecafe.com/onlineleasing/block-88/availableunits.aspx",
+      "status": 200,
+      "body_bytes": 69193,
+      "sha256": "a447eee8461a71919b04a18f0041a24ec5eada09f3b9a86d13f34f9813e095ce",
+      "hyperbrowser_sessions": 1
+    }
+  ],
+  "hyperbrowser_sessions": 3
+}

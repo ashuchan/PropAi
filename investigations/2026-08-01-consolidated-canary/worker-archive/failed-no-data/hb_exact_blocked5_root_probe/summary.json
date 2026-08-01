@@ -1,0 +1,52 @@
+{
+  "error": null,
+  "generated_at_utc": "2026-08-01T19:51:48.084247+00:00",
+  "guardrails": {
+    "basic_stealth": false,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "llm": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "hyperbrowser_sessions": 1,
+  "pages": [
+    {
+      "configured_name": "Crossing at Riverlake",
+      "error": "Error: Page.goto: net::ERR_TUNNEL_CONNECTION_FAILED at https://www.crossingatriverlake.com/\nCall log:\n  - navigating to \"https://www.crossingatriverlake.com/\", waiting until \"domcontentloaded\"\n",
+      "property_id": 1617,
+      "requested_url": "https://www.crossingatriverlake.com/"
+    },
+    {
+      "configured_name": "Brooklawn Gardens",
+      "error": "Error: Page.goto: Navigation to \"http://brooklawngardensapts.com/property/brooklawn/\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://brooklawngardensapts.com/property/brooklawn/\", waiting until \"domcontentloaded\"\n",
+      "property_id": 16509,
+      "requested_url": "http://brooklawngardensapts.com/property/brooklawn/"
+    },
+    {
+      "configured_name": "Country Club",
+      "error": "Error: Page.goto: Navigation to \"https://www.smdproperty.com/resident-properties/country-club-apartments/\" is interrupted by another navigation to \"http://brooklawngardensapts.com/property/brooklawn/\"\nCall log:\n  - navigating to \"https://www.smdproperty.com/resident-properties/country-club-apartments/\", waiting until \"domcontentloaded\"\n",
+      "property_id": 40733,
+      "requested_url": "https://www.smdproperty.com/resident-properties/country-club-apartments/"
+    },
+    {
+      "configured_name": "Rooftop 252",
+      "error": "Error: Page.goto: net::ERR_TIMED_OUT at http://www.rooftop252.com/\nCall log:\n  - navigating to \"http://www.rooftop252.com/\", waiting until \"domcontentloaded\"\n",
+      "property_id": 235473,
+      "requested_url": "http://www.rooftop252.com/"
+    },
+    {
+      "configured_name": "Fisher Building",
+      "error": "Error: Page.goto: Navigation to \"https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building/\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building/\", waiting until \"domcontentloaded\"\n",
+      "property_id": 24982,
+      "requested_url": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building/"
+    }
+  ],
+  "session_options": {
+    "adblock": true,
+    "solveCaptchas": false,
+    "useProxy": true,
+    "useStealth": false
+  }
+}

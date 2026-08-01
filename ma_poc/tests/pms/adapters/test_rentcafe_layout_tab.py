@@ -15,10 +15,11 @@ from ma_poc.pms.adapters.rentcafe_layout_tab import (
     RentCafeLayoutTabAdapter,
     _parse_drill_units,
     _parse_plan_specs,
+    is_rentcafe_layout_tab_html,
     parse_rentcafe_layout_tab,
+    parse_rentcafe_lt_applyga,
 )
 from ma_poc.pms.detector import detect_pms
-
 
 # Live-captured drill texts.
 _TUDORPLACE_DRILL_TEXT = (
@@ -36,6 +37,32 @@ _CAMPOBASSO_DRILL_TEXT = (
     "Available Units Apartment: # G_105 Starting at: $1,475.00 APPLY NOW "
     "Starting at $1,425.00 4 Apartments Available"
 )
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<div class="page-content-floorplans floorplans-layout-tab">x</div>',
+        b'<div class="FLOORPLANS-LAYOUT-TAB page-content-floorplans">x</div>',
+    ],
+)
+def test_exact_layout_tab_marker_accepts_str_and_bytes(html: str | bytes) -> None:
+    assert is_rentcafe_layout_tab_html(html)
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<div class="page-content-floorplans">x</div>',
+        '<div class="floorplans-layout-tab">x</div>',
+        "",
+        None,
+    ],
+)
+def test_exact_layout_tab_marker_requires_both_tokens(
+    html: str | None,
+) -> None:
+    assert not is_rentcafe_layout_tab_html(html)
 
 
 # ── _parse_drill_units tests ──
@@ -150,6 +177,85 @@ def test_parse_no_units_falls_back_to_plan_level() -> None:
     assert rows[0]["unit_number"] == ""  # plan-level
     assert rows[0]["floor_plan_name"] == "Penthouse"
     assert rows[0]["market_rent_low"] == 5000
+
+
+def test_applyga_preserves_visible_unit_date() -> None:
+    html = """
+    <tr class="unit-container">
+      <td class="td-card-available">Date: 9/25/2026</td>
+      <td><a id="1325"
+        href="/apply?UnitID=1&amp;MoveInDate=10/1/2026"
+        onclick="applyGAClick('A1R','1 Bed(s)','723','1419','1609','1325')">
+        Apply Now</a></td>
+    </tr>
+    """
+    rows = parse_rentcafe_lt_applyga(html, "https://x.test/availableunits")
+    assert len(rows) == 1
+    # Human-visible source date wins over a conflicting action parameter.
+    assert rows[0]["availability_date"] == "9/25/2026"
+
+
+def test_applyga_generic_available_falls_back_to_move_in_date() -> None:
+    html = """
+    <tr class="unit-container">
+      <td class="td-card-available">Date: Available</td>
+      <td><a id="10C"
+        href="/apply?UnitID=2&amp;MoveInDate=8%2F1%2F2026"
+        onclick="applyGAClick('A1','1 Bed(s)','760','635','635','10C')">
+        Apply Now</a></td>
+    </tr>
+    """
+    rows = parse_rentcafe_lt_applyga(html, "https://x.test/availableunits")
+    assert rows[0]["availability_date"] == "8/1/2026"
+
+
+def test_applyga_available_now_is_not_overwritten_by_action_date() -> None:
+    html = """
+    <div class="card-body">
+      <p class="available-date">Available Now</p>
+      <a id="100" href="/apply?MoveInDate=8/15/2026"
+        onclick="applyGAClick('S1','Studio','500','1200','1200','100')">
+        Apply Now</a>
+    </div>
+    """
+    rows = parse_rentcafe_lt_applyga(html, "https://x.test/availableunits")
+    assert rows[0]["availability_date"] == "Available Now"
+
+
+def test_applyga_date_does_not_bleed_between_unit_rows() -> None:
+    html = """
+    <table><tbody>
+      <tr class="unit-container">
+        <td class="td-card-available">Date: 9/5/2026</td>
+        <td><a id="A1" onclick="applyGAClick('A','1 Bed(s)','700','1400','1400','A1')">Apply</a></td>
+      </tr>
+      <tr class="unit-container">
+        <td class="td-card-available">Date: Available</td>
+        <td><a id="A2" onclick="applyGAClick('A','1 Bed(s)','700','1400','1400','A2')">Apply</a></td>
+      </tr>
+    </tbody></table>
+    """
+    rows = parse_rentcafe_lt_applyga(html, "https://x.test/availableunits")
+    dates = {row["unit_number"]: row["availability_date"] for row in rows}
+    assert dates == {"A1": "9/5/2026", "A2": ""}
+
+
+def test_browser_unit_snippets_use_same_applyga_date_parser() -> None:
+    plans = [
+        {
+            "drillPath": "/floorplans/a1",
+            "bodyText": "",
+            "unitHtml": """
+              <tr class="unit-container">
+                <td class="td-card-available">Date: Sep 5</td>
+                <td><a id="A1" onclick="applyGAClick('A1','1 Bed(s)','700','1400','1400','A1')">Apply</a></td>
+              </tr>
+            """,
+        }
+    ]
+    rows = parse_rentcafe_layout_tab(plans, "https://x.test")
+    assert len(rows) == 1
+    assert rows[0]["availability_date"] == "Sep 5"
 
 
 # ── adapter end-to-end ──

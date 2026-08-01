@@ -1,0 +1,27 @@
+{
+  "property_id": 594,
+  "property_name": "Harbinwood",
+  "property_address": "1295 Harbins Rd NW",
+  "url": "https://www.harbinwoodbyelon.com/floorplans.aspx",
+  "status": 200,
+  "bytes": 75046,
+  "title": "Floor Plans of Harbinwood in Norcross, GA",
+  "markers": {
+    "avail_unit_row": false,
+    "ysi_units_list": false,
+    "fp_unit": false,
+    "contact_for_availability": true,
+    "captcha": true
+  },
+  "parser_counts": {
+    "securecafe_availableunits": 0,
+    "rentcafe_hosted_table": 0,
+    "rentcafe_ysi_unitslist": 0
+  },
+  "strongest_parser": "securecafe_availableunits",
+  "native_positive_rent_rows": 0,
+  "distinct_native_units": 0,
+  "sample_rows": [],
+  "text_prefix": "Floor Plans of Harbinwood in Norcross, GA Skip Navigation Menu Home Amenities Floor Plans Photos Map eBrochure Contact Us Videos Schedule a Tour Return to Content Call us : (678) 364-7184 Floor Plans Additional Move-In Fee May Apply (based on rental criteria). All Move-In Fees are Non-Refundable. Refine: Studio 1 Bed 2 Beds Update Move-In Date View eBrochure List View Studio One Bed One Bath One B",
+  "raw_path": "/private/tmp/propai-fnd-vBkmT9/hb_harbinwood_594.html"
+}

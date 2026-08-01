@@ -1,0 +1,49 @@
+{
+  "rejections": [
+    {
+      "property_id": 48946,
+      "property_name": "Westfield Apartments",
+      "reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "current_knock_api_has_zero_eligible_native_priced_units"
+      ]
+    },
+    {
+      "property_id": 61459,
+      "property_name": "Oak Street Townhomes",
+      "reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "current_knock_api_has_zero_eligible_native_priced_units"
+      ]
+    },
+    {
+      "property_id": 68497,
+      "property_name": "Maya",
+      "reasons": [
+        "exact_route_http_404",
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_rentcafe_inventory_not_knock"
+      ]
+    },
+    {
+      "property_id": 224888,
+      "property_name": "The Cove at Overlake",
+      "reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_realpage_inventory_not_knock"
+      ]
+    },
+    {
+      "property_id": 261116,
+      "property_name": "Copper Pointe",
+      "reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_realpage_inventory_not_knock"
+      ]
+    }
+  ],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/encore_knock_lane/knock_agent/evidence_knock_residual6_current_strict.json"
+}

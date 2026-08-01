@@ -36,6 +36,11 @@ _OPERATOR_HTML = """
   </iframe>
 </body></html>
 """
+_LINDLEY_HTML = (
+    '<script>window.propertyConfig = {"spaces_asset_name":"The Lindley",'
+    '"sightmap_url":"https:\\/\\/sightmap.com\\/embed\\/60p7x5j3v7n"};'
+    "</script>"
+)
 
 # Embed page contains __APP_CONFIG__ with the API URL the JS would XHR.
 _API_URL = "https://sightmap.com/app/api/v1/CLIENT/sightmaps/9999"
@@ -125,7 +130,7 @@ def _install_mock_probe(
 
     def _probe_get(url: str, headers: dict[str, str] | None = None, **_kwargs):  # type: ignore[no-untyped-def]
         recorded.append(_RecordedRequest(url=url, headers=dict(headers or {})))
-        if url.endswith("/embed/abc123xy"):
+        if url.endswith(("/embed/abc123xy", "/embed/60p7x5j3v7n")):
             return _StubProbeResponse(200, _EMBED_HTML)
         if url == _API_URL:
             return _StubProbeResponse(200, json.dumps(_API_PAYLOAD))
@@ -169,6 +174,32 @@ async def test_iframe_fallback_sends_referer_and_chrome120_ua(
     assert {u["unit_number"] for u in units} == {"201", "202"}
     assert result.winning_url == _API_URL
     assert any(r.get("via") == "iframe_fallback" for r in result.api_responses)
+
+
+@pytest.mark.asyncio
+async def test_iframe_fallback_follows_lindley_sightmap_url_live_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded: list[_RecordedRequest] = []
+    _install_mock_probe(monkeypatch, recorded)
+    ctx = AdapterContext(
+        base_url="https://www.livethelindley.com/",
+        detected=detect_pms("https://www.livethelindley.com/floor-plans/"),
+        profile=None,
+        expected_total_units=None,
+        property_id="253393",
+        fetch_result=_StubFetchResult(body=_LINDLEY_HTML),
+    )
+    result = AdapterResult()
+
+    units = await _sm._try_sightmap_iframe_fallback(ctx, result)
+
+    assert [request.url for request in recorded] == [
+        "https://sightmap.com/embed/60p7x5j3v7n",
+        _API_URL,
+    ]
+    assert {unit["unit_number"] for unit in units} == {"201", "202"}
+    assert result.winning_url == _API_URL
 
 
 @pytest.mark.asyncio

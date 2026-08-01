@@ -1,0 +1,41 @@
+{
+  "adapter_rows_replayed": 396,
+  "by_category": {
+    "ASPENSQUARE_OPERATOR": {
+      "future_rows": 24,
+      "preserved_rows": 24
+    },
+    "ENTRATA_API": {
+      "future_rows": 29,
+      "preserved_rows": 29
+    },
+    "ONESITE_API": {
+      "future_rows": 23,
+      "preserved_rows": 23
+    },
+    "ONESITE_WORKFLOW": {
+      "future_rows": 2,
+      "missed_rows": 2
+    },
+    "REALPAGE_OLL": {
+      "future_rows": 20,
+      "preserved_rows": 20
+    },
+    "SQUARESPACE_UNIT_BLOCK": {
+      "future_rows": 3,
+      "preserved_rows": 3
+    }
+  },
+  "explicit_future_preserved_by_jugnu_rows": 99,
+  "explicit_future_rows": 101,
+  "guardrails": {
+    "captcha_solving": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "repository_edits": false
+  },
+  "input": "/private/tmp/propai-fnd-vBkmT9/availability_date_residual_tiers/with_hyperbrowser/current_live_unit_evidence.csv",
+  "result_type": "current_local_production_jugnu_formatter_replay_not_canary",
+  "source_rows": 402,
+  "trace_errors": 0
+}

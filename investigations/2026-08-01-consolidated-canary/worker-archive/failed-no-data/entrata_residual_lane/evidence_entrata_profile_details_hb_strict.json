@@ -1,0 +1,463 @@
+{
+  "summary": {
+    "result_type": "one_session_per_exact_profile_detail_hb_strict_audit",
+    "capture_timestamp_utc": "2026-08-01T08:44:43.384532+00:00",
+    "target_properties": 4,
+    "sessions_used": 4,
+    "strict_unit_qualified_properties": 3,
+    "strict_unit_qualified_property_ids": [
+      18764,
+      54936,
+      257761
+    ],
+    "native_positive_rent_rows": 5,
+    "captcha_solving": false
+  },
+  "results": [
+    {
+      "property_id": 18764,
+      "property_name": "Americana Palos Verdes",
+      "website": "https://www.americana-apts.com/",
+      "target_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+      "profile_provenance": {
+        "profile_path": "/private/tmp/propai-fnd-vBkmT9/profiles/18764.json",
+        "profile_sha256": "3b7d10259845c747d4caca6a30ff5580e459acb3d90b661f1f754ef1d86042dd",
+        "target_is_winning_url": true,
+        "target_is_known_endpoint": true,
+        "last_unit_count": 5,
+        "last_quality": "UNIT_LEVEL"
+      },
+      "outcome": "STRICT_UNIT_QUALIFIED",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+          "title": "Studios | Studio | Americana",
+          "body_bytes": 317536,
+          "body_sha256": "46b4f1bd3acefe9e06659e23d0433c0939120e12333e0a043cec70834ebe19a2",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "final_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+      "page_title": "Studios | Studio | Americana",
+      "property_identity_match": true,
+      "identity_evidence": {
+        "canonical_name": "Americana Palos Verdes",
+        "canonical_address": "4050 Palos Verdes St",
+        "canonical_city_state_zip": "Las Vegas NV 89119",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 1,
+        "pass": true
+      },
+      "parser_counts": {
+        "parse_entrata_pp_unit_cards": 3,
+        "parse_entrata_pp_jd_fp_cards": 0,
+        "parse_entrata_modern_units_data": 0,
+        "parse_entrata_floorplan_html_jsonld": 0,
+        "parse_entrata_available_units": 0,
+        "parse_prospectportal_unit_spaces": 0
+      },
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "contamination_verdict": "pass_exact_profile_url_same_origin_identity_native_positive_rent",
+      "source_urls": [
+        "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/"
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Studios",
+          "bed_label": "Studio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "413",
+          "unit_number": "100",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$899",
+          "market_rent_low": 899,
+          "market_rent_high": 899,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5084731",
+            "entrata_fpid": "850303"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Studios",
+          "bed_label": "Studio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "413",
+          "unit_number": "34",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$899",
+          "market_rent_low": 899,
+          "market_rent_high": 899,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5084665",
+            "entrata_fpid": "850303"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "Studios",
+          "bed_label": "Studio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "413",
+          "unit_number": "73",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$899",
+          "market_rent_low": 899,
+          "market_rent_high": 899,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.americana-apts.com/floorplans/las-vegas-NV/apv-americana/studios-850303-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5084704",
+            "entrata_fpid": "850303"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ]
+    },
+    {
+      "property_id": 35192,
+      "property_name": "Enclave on Golden Triangle",
+      "website": "http://www.enclaveongoldentriangle.com/",
+      "target_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-baltic-776780-1/",
+      "profile_provenance": {
+        "profile_path": "/private/tmp/propai-fnd-vBkmT9/profiles/35192.json",
+        "profile_sha256": "bb1e085d025b686890b948796db68c8e19c9302b1cc0743e0e4bdd7097eb5e9d",
+        "target_is_winning_url": true,
+        "target_is_known_endpoint": true,
+        "last_unit_count": 14,
+        "last_quality": "UNIT_LEVEL"
+      },
+      "outcome": "NO_NATIVE_POSITIVE_RENT_ROWS",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-baltic-776780-1/",
+          "title": "The Baltic: 1 Bed 1 Bath in Fort Worth | 798 sq ft",
+          "body_bytes": 573243,
+          "body_sha256": "d7877a25ecc3c04ec61c34f39271283da9f185b220d0e1ef7cfedeb0a312347d",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "final_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-baltic-776780-1/",
+      "page_title": "The Baltic: 1 Bed 1 Bath in Fort Worth | 798 sq ft",
+      "property_identity_match": true,
+      "identity_evidence": {
+        "canonical_name": "Enclave on Golden Triangle",
+        "canonical_address": "5001 Golden Triangle Boulevard",
+        "canonical_city_state_zip": "Fort Worth TX 76244",
+        "name_match": true,
+        "full_address_match": false,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 3,
+        "pass": true
+      },
+      "parser_counts": {
+        "parse_entrata_pp_unit_cards": 0,
+        "parse_entrata_pp_jd_fp_cards": 0,
+        "parse_entrata_modern_units_data": 0,
+        "parse_entrata_floorplan_html_jsonld": 0,
+        "parse_entrata_available_units": 0,
+        "parse_prospectportal_unit_spaces": 0
+      },
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "contamination_verdict": "strict_gate_not_satisfied",
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 54936,
+      "property_name": "Brentwood Square",
+      "website": "https://brentwoodsquareapts.prospectportal.com/",
+      "target_url": "https://brentwoodsquareapts.prospectportal.com/seattle/22-brentwood-square/floorplans/2-bed2-bath-839-1155597/fp_name/occupancy_type/conventional/",
+      "profile_provenance": {
+        "profile_path": "/private/tmp/propai-fnd-vBkmT9/profiles/54936.json",
+        "profile_sha256": "9bc13e54b3a1f2f2993e9552e8c03edd9e0ff7ce8d54dc3023468ed0f0e2c224",
+        "target_is_winning_url": true,
+        "target_is_known_endpoint": true,
+        "last_unit_count": 1,
+        "last_quality": "UNIT_LEVEL"
+      },
+      "outcome": "STRICT_UNIT_QUALIFIED",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://brentwoodsquareapts.prospectportal.com/seattle/22-brentwood-square/floorplans/2-bed2-bath-839-1155597/fp_name/occupancy_type/conventional/",
+          "title": "2 Bed/2 Bath-839 | 2 Bed Apartment | Brentwood Square",
+          "body_bytes": 196203,
+          "body_sha256": "f285484eee5ca97a030abe3b7e957c3fe49c2e7202abb7827da3cd1a34eebb2f",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "final_url": "https://brentwoodsquareapts.prospectportal.com/seattle/22-brentwood-square/floorplans/2-bed2-bath-839-1155597/fp_name/occupancy_type/conventional/",
+      "page_title": "2 Bed/2 Bath-839 | 2 Bed Apartment | Brentwood Square",
+      "property_identity_match": true,
+      "identity_evidence": {
+        "canonical_name": "Brentwood Square",
+        "canonical_address": "13433 Greenwood Ave N",
+        "canonical_city_state_zip": "Seattle WA 98133",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 2,
+        "pass": true
+      },
+      "parser_counts": {
+        "parse_entrata_pp_unit_cards": 1,
+        "parse_entrata_pp_jd_fp_cards": 0,
+        "parse_entrata_modern_units_data": 0,
+        "parse_entrata_floorplan_html_jsonld": 0,
+        "parse_entrata_available_units": 0,
+        "parse_prospectportal_unit_spaces": 0
+      },
+      "native_identity_rows": 1,
+      "native_positive_rent_rows": 1,
+      "contamination_verdict": "pass_exact_profile_url_same_origin_identity_native_positive_rent",
+      "source_urls": [
+        "https://brentwoodsquareapts.prospectportal.com/seattle/22-brentwood-square/floorplans/2-bed2-bath-839-1155597/fp_name/occupancy_type/conventional/"
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "2 Bed2 Bath 839",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "839",
+          "unit_number": "143D",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,969",
+          "market_rent_low": 1969,
+          "market_rent_high": 1969,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-05",
+          "available_date": "2026-08-05",
+          "lease_term": "12mo lease",
+          "move_in_date": "",
+          "source_api_url": "https://brentwoodsquareapts.prospectportal.com/seattle/22-brentwood-square/floorplans/2-bed2-bath-839-1155597/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5361379",
+            "entrata_fpid": "1155597"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ]
+    },
+    {
+      "property_id": 257761,
+      "property_name": "The Emory",
+      "website": "https://www.theemoryplano.com/",
+      "target_url": "https://www.theemoryplano.com/floorplans/plano-TX/the-emory/parkwood-1159180-1/",
+      "profile_provenance": {
+        "profile_path": "/private/tmp/propai-fnd-vBkmT9/profiles/257761.json",
+        "profile_sha256": "bc513dfefd01cbb21ee53bf85c1c117e241e516b5cdd904450717a6074ca4915",
+        "target_is_winning_url": false,
+        "target_is_known_endpoint": true,
+        "last_unit_count": 1,
+        "last_quality": "UNIT_LEVEL"
+      },
+      "outcome": "STRICT_UNIT_QUALIFIED",
+      "session_calls": 1,
+      "session_options": {
+        "solveCaptchas": false,
+        "useStealth": true,
+        "useProxy": true,
+        "adblock": true
+      },
+      "navigation_attempts": [
+        {
+          "attempt": 1,
+          "final_url": "https://www.theemoryplano.com/floorplans/plano-TX/the-emory/parkwood-1159180-1/",
+          "title": "Parkwood | 2 Bed Apartment | The Emory",
+          "body_bytes": 352738,
+          "body_sha256": "338e73f1b5acc22283813a49ca31d9f797f44aeed5cec0bb1688a9005467938a",
+          "challenge_detected": false,
+          "accepted": true
+        }
+      ],
+      "final_url": "https://www.theemoryplano.com/floorplans/plano-TX/the-emory/parkwood-1159180-1/",
+      "page_title": "Parkwood | 2 Bed Apartment | The Emory",
+      "property_identity_match": true,
+      "identity_evidence": {
+        "canonical_name": "The Emory",
+        "canonical_address": "1345 14th St",
+        "canonical_city_state_zip": "Plano TX 75074",
+        "name_match": true,
+        "full_address_match": true,
+        "street_number_and_zip_match": true,
+        "url_name_token_overlap": 1,
+        "pass": true
+      },
+      "parser_counts": {
+        "parse_entrata_pp_unit_cards": 1,
+        "parse_entrata_pp_jd_fp_cards": 0,
+        "parse_entrata_modern_units_data": 0,
+        "parse_entrata_floorplan_html_jsonld": 0,
+        "parse_entrata_available_units": 0,
+        "parse_prospectportal_unit_spaces": 0
+      },
+      "native_identity_rows": 1,
+      "native_positive_rent_rows": 1,
+      "contamination_verdict": "pass_exact_profile_url_same_origin_identity_native_positive_rent",
+      "source_urls": [
+        "https://www.theemoryplano.com/floorplans/plano-TX/the-emory/parkwood-1159180-1/"
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Parkwood",
+          "bed_label": "2 Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1348",
+          "unit_number": "451",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,201",
+          "market_rent_low": 1201,
+          "market_rent_high": 1201,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-21",
+          "available_date": "2026-09-21",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.theemoryplano.com/floorplans/plano-TX/the-emory/parkwood-1159180-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "5077303",
+            "entrata_fpid": "1159180"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ]
+    }
+  ]
+}

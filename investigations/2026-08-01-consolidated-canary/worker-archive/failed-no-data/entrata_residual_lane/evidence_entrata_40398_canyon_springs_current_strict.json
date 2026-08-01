@@ -1,0 +1,135 @@
+{
+  "result_type": "strict_current_canonical_route_direct_vus",
+  "capture_timestamp_utc": "2026-08-01T08:56:03.508539+00:00",
+  "property": {
+    "property_id": 40398,
+    "property_name": "Canyon Springs",
+    "website": "https://www.canyonspringsfresno.com/",
+    "address": "6185 N Figarden Dr",
+    "city": "Fresno",
+    "state": "CA",
+    "zip": "93722"
+  },
+  "provider": "entrata_prospectportal",
+  "hyperbrowser_sessions_used": 0,
+  "homepage": {
+    "requested_url": "https://www.canyonspringsfresno.com/",
+    "final_url": "https://www.canyonspringsfresno.com/",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://www.canyonspringsfresno.com/",
+        "body_bytes": 156703,
+        "body_sha256": "3ec2409ed932949e7f3f1e7f79204756cb0dca4521a9c59deb4d03c223d45125",
+        "accepted": true
+      }
+    ],
+    "published_conventional_urls": [
+      "https://www.canyonspringsfresno.com/fresno-ca-apartments/canyon-springs/conventional/"
+    ]
+  },
+  "index": {
+    "requested_url": "https://www.canyonspringsfresno.com/fresno-ca-apartments/canyon-springs/conventional/",
+    "final_url": "https://www.canyonspringsfresno.com/fresno-ca-apartments/canyon-springs/conventional/",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://www.canyonspringsfresno.com/fresno-ca-apartments/canyon-springs/conventional/",
+        "body_bytes": 165467,
+        "body_sha256": "6aa1bcbefabc0854b5e43f8d0d47dda45738571c77acc306846dea34f9c1ea6e",
+        "accepted": true
+      }
+    ],
+    "published_vus_urls": [
+      "https://www.canyonspringsfresno.com/?module=check_availability&is_secure=1&property[id]=673205&action=view_unit_spaces&property_floorplan[id]=777076&cached_rate_available=1&min_rent=$1,750&max_rent=$1,750&min_deposit=1100.0000&max_deposit=1100.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1"
+    ]
+  },
+  "detail": {
+    "url": "https://www.canyonspringsfresno.com/?module=check_availability&is_secure=1&property[id]=673205&action=view_unit_spaces&property_floorplan[id]=777076&cached_rate_available=1&min_rent=$1,750&max_rent=$1,750&min_deposit=1100.0000&max_deposit=1100.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://www.canyonspringsfresno.com/?module=check_availability&is_secure=1&property[id]=673205&action=view_unit_spaces&property_floorplan[id]=777076&cached_rate_available=1&min_rent=$1,750&max_rent=$1,750&min_deposit=1100.0000&max_deposit=1100.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+        "body_bytes": 16743,
+        "body_sha256": "e548f80fc42f7988893d8d94711f63956679ba872c9cba18660cf777f9588ff2",
+        "accepted": true
+      }
+    ],
+    "entrata_property_id": "673205",
+    "entrata_floorplan_id": "777076"
+  },
+  "property_identity_match": true,
+  "strict_gates": {
+    "canonical_name_match": true,
+    "canonical_address_match": true,
+    "canonical_zip_match": true,
+    "index_url_published_by_canonical_homepage": true,
+    "index_url_same_origin": true,
+    "detail_url_published_by_exact_current_grid": true,
+    "detail_url_same_origin": true,
+    "rows_with_native_unit_number": 1,
+    "rows_with_native_entrata_uid": 1,
+    "rows_with_positive_rent": 1,
+    "distinct_unit_numbers": 1,
+    "distinct_entrata_uids": 1,
+    "sibling_or_cross_property_rows": 0
+  },
+  "contamination_verdict": "pass_exact_property_published_vus_native_ids_positive_rents",
+  "native_identity_rows": 1,
+  "native_positive_rent_rows": 1,
+  "source_urls": [
+    "https://www.canyonspringsfresno.com/?module=check_availability&is_secure=1&property[id]=673205&action=view_unit_spaces&property_floorplan[id]=777076&cached_rate_available=1&min_rent=$1,750&max_rent=$1,750&min_deposit=1100.0000&max_deposit=1100.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1"
+  ],
+  "native_rows": [
+    {
+      "floor_plan_name": "2 Bedroom",
+      "bed_label": "",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "938",
+      "unit_number": "226",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$1,750",
+      "market_rent_low": 1750,
+      "market_rent_high": 1750,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-01",
+      "available_date": "2026-08-01",
+      "lease_term": "",
+      "move_in_date": "",
+      "source_api_url": "https://www.canyonspringsfresno.com/?module=check_availability&is_secure=1&property[id]=673205&action=view_unit_spaces&property_floorplan[id]=777076&cached_rate_available=1&min_rent=$1,750&max_rent=$1,750&min_deposit=1100.0000&max_deposit=1100.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+      "source_ids": {
+        "entrata_uid": "4476796",
+        "entrata_fpid": "777076",
+        "entrata_property_id": "673205"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    }
+  ],
+  "shared_ledger": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "sha256_before": "08d27e44831c17a30d1eb0cd726c4ad119b977342cb1b78b729feb8a6784fa30",
+    "rows_before": 147,
+    "property_present_before": false
+  }
+}

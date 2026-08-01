@@ -1,0 +1,52 @@
+{
+  "action": "propose_strict_admission_without_mutating_ledger_or_builder",
+  "availability_date_limitation": "blank in current OneSite workflow rows",
+  "configured_url": "https://www.edgefieldaptsva.com/",
+  "evidence": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/edgefield_48075_hb_lane/evidence_edgefield_48075_configured_e2e.json",
+    "sha256": "a2af8d4d44e574fff2633fef685d2424b3c42c920d01adaaea6f3c142a65c2a0"
+  },
+  "floor_plan_name": "Two Bedroom",
+  "guardrails": {
+    "compliance_mode": true,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_max_calls_per_property": 1,
+    "hyperbrowser_proxy": true,
+    "hyperbrowser_stealth": false,
+    "llm": false,
+    "paid_canary": false,
+    "solve_captchas": false,
+    "web_unlocker": false
+  },
+  "property": "Edgefield",
+  "property_id": 48075,
+  "read_only_rentpress_diagnostic_rows_with_dates": 9,
+  "rent": 1475,
+  "source_files": [
+    {
+      "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/fetch/fetcher.py",
+      "sha256": "d830c3ab1881f8f6f4eb7e47cb10122cb941c805a4815348ee8946b1098f093f"
+    },
+    {
+      "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/fetch/hyperbrowser_backend.py",
+      "sha256": "b6d2b462c377092736cf2bc6461a4dfcd8ecd5c22a0ee6ad38f3dcff2ff540d6"
+    },
+    {
+      "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/tests/fetch/test_fetcher_render_captcha_hb_rescue.py",
+      "sha256": "8e138eded8fc88607dd5edb2b6c10361f1f69afc5c5b987e436a7703bfbb9443"
+    },
+    {
+      "path": "/Users/ankur/PropAi-codex-failed-no-data/ma_poc/tests/fetch/test_hyperbrowser_raw_get_redirect.py",
+      "sha256": "e3df9c04154b3dc01be10bd9ad1d993721681643cba16107deccff46dfe81529"
+    }
+  ],
+  "source_property_id": "1060300",
+  "strict_rows": 3,
+  "unit_numbers": [
+    "13",
+    "38",
+    "108"
+  ],
+  "verdict": "pass_3_of_3_configured_e2e_strict_native_positive"
+}

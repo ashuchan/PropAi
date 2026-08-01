@@ -1,0 +1,743 @@
+{
+  "cohort": {
+    "fleet_marker_candidates": 9,
+    "ledger_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "ledger_csv_sha256": "28baf78746f21c552e6c80666a1a0ad9d9f9de4484993a58bf790e3d9c49879d",
+    "ledger_rows": 174,
+    "remaining_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+    "remaining_csv_sha256": "04f59744bea6e5ad0ebaba5311376a76dfd53d6dba5cb5aa12d84f3c9514138f",
+    "remaining_rows": 170
+  },
+  "generated_at_utc": "2026-08-01T10:29:53.680335+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "link_hop_test_fetch": "direct public curl_cffi GET, one fixed client",
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified_by_validation_lane": false,
+    "runtime_detector_monkeypatch": false,
+    "runtime_fetch_monkeypatch": true,
+    "shared_ledger_modified": false,
+    "web_unlocker": false
+  },
+  "lane": "ollr_widgetloader_detector_current_source_validation",
+  "results": [
+    {
+      "canonical_address": "4905 Southland Ave",
+      "configured_url": "https://www.crystalwoodsapts.com",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 12,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://crystalwoodsapts.com/",
+        "configured_status": 200,
+        "detected_pms": "encoreskyline_template",
+        "distinct_unit_numbers": 12,
+        "errors": [
+          "no /floorplans/{slug}/ anchors found"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "https://www.crystalwoodsapts.com",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4845783",
+            "unit_number": "57"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4845783",
+            "unit_number": "69"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4845783",
+            "unit_number": "82"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4845783",
+            "unit_number": "59"
+          },
+          {
+            "floor_plan_name": "The Valencia",
+            "market_rent_high": 2071,
+            "market_rent_low": 1764,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4845783/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4845783",
+            "unit_number": "105"
+          }
+        ],
+        "source_property_ids": [
+          "4845783"
+        ],
+        "strict_native_priced_rows": 12,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://crystalwoodsapts.com/floorplans/",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 2948,
+      "property_name": "Crystal Woods of Alexandria",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "4845783"
+    },
+    {
+      "canonical_address": "17500 Towne Crest Dr",
+      "configured_url": "http://www.townecrest.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 2,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://townecrest.com/",
+        "configured_status": 200,
+        "detected_pms": "onesite",
+        "distinct_unit_numbers": 2,
+        "errors": [
+          "No RealPage/OneSite floorplan data found in captured API responses"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "http://www.townecrest.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "One Bedroom One Bath",
+            "market_rent_high": 1648,
+            "market_rent_low": 1648,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5194917",
+            "unit_number": "3"
+          },
+          {
+            "floor_plan_name": "Three Bedroom Two and a Half Bath",
+            "market_rent_high": 2459,
+            "market_rent_low": 2459,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5194917/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5194917",
+            "unit_number": "94"
+          }
+        ],
+        "source_property_ids": [
+          "5194917"
+        ],
+        "strict_native_priced_rows": 2,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://townecrest.com/floorplans/",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 16172,
+      "property_name": "Towne Crest",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "5194917"
+    },
+    {
+      "canonical_address": "44 New Zealand Rd",
+      "configured_url": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 7,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+        "configured_status": 200,
+        "detected_pms": "onesite",
+        "distinct_unit_numbers": 7,
+        "errors": [],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "",
+        "link_hop_success": false,
+        "sample_units": [
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "1046774",
+            "unit_number": "37"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "1046774",
+            "unit_number": "50"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "1046774",
+            "unit_number": "56"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "1046774",
+            "unit_number": "52"
+          },
+          {
+            "floor_plan_name": "Two Bedroom",
+            "market_rent_high": 2570,
+            "market_rent_low": 2520,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046774/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "1046774",
+            "unit_number": "33"
+          }
+        ],
+        "source_property_ids": [
+          "1046774"
+        ],
+        "strict_native_priced_rows": 7,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 18194,
+      "property_name": "Parke Place Townhomes",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "1046774"
+    },
+    {
+      "canonical_address": "2300 Woodland Crossing Dr",
+      "configured_url": "https://www.thepointatmonroeplace.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 6,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.thepointatmonroeplace.com/",
+        "configured_status": 200,
+        "detected_pms": "entrata",
+        "distinct_unit_numbers": 6,
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "https://www.thepointatmonroeplace.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "A3",
+            "market_rent_high": 3030,
+            "market_rent_low": 2099,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4635196/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4635196",
+            "unit_number": "67"
+          },
+          {
+            "floor_plan_name": "A4",
+            "market_rent_high": 3105,
+            "market_rent_low": 2153,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4635196/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4635196",
+            "unit_number": "74"
+          },
+          {
+            "floor_plan_name": "A5",
+            "market_rent_high": 3119,
+            "market_rent_low": 2163,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4635196/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4635196",
+            "unit_number": "84"
+          },
+          {
+            "floor_plan_name": "A11",
+            "market_rent_high": 3422,
+            "market_rent_low": 2379,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4635196/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4635196",
+            "unit_number": "4"
+          },
+          {
+            "floor_plan_name": "B4",
+            "market_rent_high": 3424,
+            "market_rent_low": 2561,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4635196/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4635196",
+            "unit_number": "157"
+          }
+        ],
+        "source_property_ids": [
+          "4635196"
+        ],
+        "strict_native_priced_rows": 6,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.thepointatmonroeplace.com/floor-plans",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 36530,
+      "property_name": "The Point at Monroe Place",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "4635196"
+    },
+    {
+      "canonical_address": "12 Forsyth Dr",
+      "configured_url": "https://www.thepointatabington.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 6,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.thepointatabington.com/",
+        "configured_status": 200,
+        "detected_pms": "entrata",
+        "distinct_unit_numbers": 6,
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "https://www.thepointatabington.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "Kingston",
+            "market_rent_high": 4680,
+            "market_rent_low": 2797,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4777974/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4777974",
+            "unit_number": "114"
+          },
+          {
+            "floor_plan_name": "Kingston",
+            "market_rent_high": 4680,
+            "market_rent_low": 2797,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4777974/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4777974",
+            "unit_number": "63"
+          },
+          {
+            "floor_plan_name": "Kingston",
+            "market_rent_high": 4680,
+            "market_rent_low": 2797,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4777974/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4777974",
+            "unit_number": "71"
+          },
+          {
+            "floor_plan_name": "Pembroke",
+            "market_rent_high": 4800,
+            "market_rent_low": 3000,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4777974/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4777974",
+            "unit_number": "32"
+          },
+          {
+            "floor_plan_name": "Pembroke",
+            "market_rent_high": 4800,
+            "market_rent_low": 3000,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4777974/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4777974",
+            "unit_number": "57"
+          }
+        ],
+        "source_property_ids": [
+          "4777974"
+        ],
+        "strict_native_priced_rows": 6,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.thepointatabington.com/availability",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 54798,
+      "property_name": "The Point at Abington",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "4777974"
+    },
+    {
+      "canonical_address": "454 Heather Dr N",
+      "configured_url": "http://heatherridgeapts.net/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 9,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.heatherridgeapts.net/",
+        "configured_status": 200,
+        "detected_pms": "entrata",
+        "distinct_unit_numbers": 9,
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "http://heatherridgeapts.net/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "1 Bedroom",
+            "market_rent_high": 3405,
+            "market_rent_low": 1793,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3318124/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "3318124",
+            "unit_number": "362"
+          },
+          {
+            "floor_plan_name": "1 Bedroom",
+            "market_rent_high": 3405,
+            "market_rent_low": 1793,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3318124/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "3318124",
+            "unit_number": "160"
+          },
+          {
+            "floor_plan_name": "1 Bedroom",
+            "market_rent_high": 3405,
+            "market_rent_low": 1793,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3318124/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "3318124",
+            "unit_number": "278"
+          },
+          {
+            "floor_plan_name": "1 Bedroom",
+            "market_rent_high": 3405,
+            "market_rent_low": 1793,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3318124/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "3318124",
+            "unit_number": "397"
+          },
+          {
+            "floor_plan_name": "1 Bedroom",
+            "market_rent_high": 3405,
+            "market_rent_low": 1793,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3318124/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "3318124",
+            "unit_number": "393"
+          }
+        ],
+        "source_property_ids": [
+          "3318124"
+        ],
+        "strict_native_priced_rows": 9,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.heatherridgeapts.net/floor-plans",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 74872,
+      "property_name": "Heather Ridge",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "3318124"
+    },
+    {
+      "canonical_address": "2352 Cowan Blvd",
+      "configured_url": "http://commonsatcowanboulevard.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 2,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://commonsatcowanboulevard.com/",
+        "configured_status": 200,
+        "detected_pms": "encoreskyline_template",
+        "distinct_unit_numbers": 2,
+        "errors": [
+          "no /floorplans/{slug}/ anchors found"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "http://commonsatcowanboulevard.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "2C",
+            "market_rent_high": 1549,
+            "market_rent_low": 1549,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4760708/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4760708",
+            "unit_number": "233"
+          },
+          {
+            "floor_plan_name": "2C",
+            "market_rent_high": 1549,
+            "market_rent_low": 1549,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4760708/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4760708",
+            "unit_number": "238"
+          }
+        ],
+        "source_property_ids": [
+          "4760708"
+        ],
+        "strict_native_priced_rows": 2,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://commonsatcowanboulevard.com/floorplans/",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 228341,
+      "property_name": "The Commons at Cowan Boulevard",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "4760708"
+    },
+    {
+      "canonical_address": "1925 Roland Clarke Pl",
+      "configured_url": "https://www.thepointatreston.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 18,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.thepointatreston.com/",
+        "configured_status": 200,
+        "detected_pms": "entrata",
+        "distinct_unit_numbers": 18,
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "https://www.thepointatreston.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4843024",
+            "unit_number": "248"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4843024",
+            "unit_number": "275"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4843024",
+            "unit_number": "265"
+          },
+          {
+            "floor_plan_name": "S04",
+            "market_rent_high": 4066,
+            "market_rent_low": 1975,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4843024",
+            "unit_number": "267"
+          },
+          {
+            "floor_plan_name": "S01",
+            "market_rent_high": 3972,
+            "market_rent_low": 2165,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4843024/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "4843024",
+            "unit_number": "224"
+          }
+        ],
+        "source_property_ids": [
+          "4843024"
+        ],
+        "strict_native_priced_rows": 18,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.thepointatreston.com/floor-plans",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 253326,
+      "property_name": "The Point at Reston",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "4843024"
+    },
+    {
+      "canonical_address": "1 Kingston Collection Way",
+      "configured_url": "https://www.thepointatkingston.com/",
+      "current_detector_inventory_page": {
+        "adapter": "onesite",
+        "errors": [],
+        "strict_native_priced_rows": 13,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW"
+      },
+      "current_source_full_pipeline": {
+        "adapter": "onesite",
+        "configured_final_url": "https://www.thepointatkingston.com/",
+        "configured_status": 200,
+        "detected_pms": "entrata",
+        "distinct_unit_numbers": 13,
+        "errors": [
+          "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+        ],
+        "fallback_chain": [
+          "onesite"
+        ],
+        "link_hop_from": "https://www.thepointatkingston.com/",
+        "link_hop_success": true,
+        "sample_units": [
+          {
+            "floor_plan_name": "A3 Fisher",
+            "market_rent_high": 4070,
+            "market_rent_low": 2550,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5268318/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5268318",
+            "unit_number": "73"
+          },
+          {
+            "floor_plan_name": "A3 Fisher",
+            "market_rent_high": 4070,
+            "market_rent_low": 2550,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5268318/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5268318",
+            "unit_number": "75"
+          },
+          {
+            "floor_plan_name": "A2 Grays",
+            "market_rent_high": 3265,
+            "market_rent_low": 2510,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5268318/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5268318",
+            "unit_number": "42"
+          },
+          {
+            "floor_plan_name": "A2 Grays",
+            "market_rent_high": 3265,
+            "market_rent_low": 2510,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5268318/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5268318",
+            "unit_number": "53"
+          },
+          {
+            "floor_plan_name": "A3B Falmouth",
+            "market_rent_high": 3210,
+            "market_rent_low": 2540,
+            "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5268318/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+            "source_property_id": "5268318",
+            "unit_number": "82"
+          }
+        ],
+        "source_property_ids": [
+          "5268318"
+        ],
+        "strict_native_priced_rows": 13,
+        "tier": "TIER_1_API_ONESITE_WORKFLOW",
+        "winning_page_url": ""
+      },
+      "eligible_for_authoritative_ledger": true,
+      "exact_source_property_binding": true,
+      "inventory_url": "https://www.thepointatkingston.com/availability",
+      "outcome": "CURRENT_SOURCE_FULL_PIPELINE_UNIT_QUALIFIED",
+      "property_id": 265143,
+      "property_name": "The Point at Kingston",
+      "same_origin_inventory_route": true,
+      "sole_current_published_site_id": "5268318"
+    }
+  ],
+  "summary": {
+    "authoritative_ledger_delta": 0,
+    "current_source_full_pipeline_qualified_count": 9,
+    "current_source_full_pipeline_qualified_ids": [
+      2948,
+      16172,
+      18194,
+      36530,
+      54798,
+      74872,
+      228341,
+      253326,
+      265143
+    ],
+    "current_source_net_new_count_vs_current_ledger": 9,
+    "current_source_net_new_ids_vs_current_ledger": [
+      2948,
+      16172,
+      18194,
+      36530,
+      54798,
+      74872,
+      228341,
+      253326,
+      265143
+    ],
+    "total_strict_native_priced_rows": 75
+  },
+  "validated_detector_delta": {
+    "confidence_with_knock": 0.85,
+    "confidence_without_knock": 0.94,
+    "marker": "/ollr/widgetloader.js?siteid=",
+    "pms": "onesite",
+    "reason": "The OLLR widgetLoader publishes the exact SiteId consumed by OneSiteAdapter.workflowstartup; it must outrank generic RealPage OLL and Entrata/Encore marketing signals."
+  }
+}

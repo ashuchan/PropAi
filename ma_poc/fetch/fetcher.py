@@ -22,7 +22,11 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from ..models.scrape_profile import ScrapeProfile
 
-from ..config.feature_flags import ENABLE_TIER_ESCALATION, ENABLE_UNLOCKER_TIER
+from ..config.feature_flags import (
+    ENABLE_TIER_ESCALATION,
+    ENABLE_UNLOCKER_TIER,
+    compliance_mode,
+)
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
@@ -398,11 +402,74 @@ class Fetcher:
             # HTTP layer (403/503), so this promotion is a no-op for them.
             # The promotion only affects the OK + captcha_detected combo,
             # which is exactly the Sucuri / sgcaptcha 200/202 pattern.
+            promoted_render_captcha = False
             if (
                 captcha_detected
                 and result.outcome == FetchOutcome.OK
             ):
                 result = dataclasses.replace(result, outcome=FetchOutcome.BOT_BLOCKED)
+                promoted_render_captcha = task.render_mode == RenderMode.RENDER
+
+            # The same Sucuri route sometimes leaves Playwright with the 202
+            # navigation response but no serialisable DOM at all. There is no
+            # body on which CAPTCHA fingerprinting can operate, so recognise
+            # only this exact otherwise-useless RENDER shape. Do not broaden
+            # this to other statuses or non-empty 202 responses.
+            empty_202_render = bool(
+                task.render_mode == RenderMode.RENDER
+                and result.outcome == FetchOutcome.OK
+                and result.status == 202
+                and not result.body
+            )
+            if empty_202_render:
+                result = dataclasses.replace(
+                    result,
+                    outcome=FetchOutcome.BOT_BLOCKED,
+                    error_signature=(
+                        result.error_signature or "HTTP_202_EMPTY_RENDER"
+                    ),
+                )
+
+            # A Sucuri/sgcaptcha render can arrive as HTTP 200/202 and only be
+            # recognised here, after ``_do_request``'s normal blocked-render
+            # rescue gate. In compliance mode, give that exact late-promotion
+            # shape one bounded pass through the existing direct -> clean
+            # Hyperbrowser raw fallback. No Web Unlocker/FlareSolverr/proxy
+            # fallback is reachable, HB is capped at one session for this
+            # property, and a rescued body that is itself a challenge is
+            # rejected fail-closed.
+            if (
+                (promoted_render_captcha or empty_202_render)
+                and compliance_mode()
+            ):
+                from ma_poc.config.feature_flags import hb_enabled
+
+                if hb_enabled():
+                    rescued = await self._try_curl_cffi_fallback(
+                        task,
+                        start_ms,
+                        allow_probe_proxy=False,
+                        hb_max_calls_per_property=1,
+                    )
+                    if rescued is not None and rescued.outcome == FetchOutcome.OK:
+                        rescued_captcha, rescued_provider = looks_like_captcha(
+                            rescued.body or b""
+                        )
+                        if not rescued_captcha:
+                            result = rescued
+                            body_bytes_len = len(result.body or b"")
+                            content_type = (result.headers or {}).get(
+                                "content-type", ""
+                            )
+                            captcha_detected = False
+                            captcha_provider = None
+                        else:
+                            log.info(
+                                "compliant render captcha rescue rejected "
+                                "property=%s provider=%s",
+                                task.property_id,
+                                rescued_provider,
+                            )
 
             emit(
                 EventKind.FETCH_COMPLETED,
@@ -517,7 +584,13 @@ class Fetcher:
                 EventKind.FETCH_RETRY, task.property_id, wait_ms=decision.wait_ms, reason=result.outcome.value
             )
 
-            if decision.rotate_identity:
+            # Compliance mode is also the production kill-switch for browser
+            # fingerprint rotation.  The solver tiers were already disabled
+            # under this switch, but the ordinary retry loop could still call
+            # ``IdentityPool.rotate`` after a second 429 / proxy error.  Keep
+            # retrying with the original sticky identity instead; a compliant
+            # run must never enter a FETCH_ROTATED_IDENTITY path.
+            if decision.rotate_identity and not compliance_mode():
                 self._identities.rotate(task.property_id)
                 identity = self._identities.pick(sticky_key=task.property_id)
                 # (health already degraded above for every failed proxied
@@ -533,6 +606,7 @@ class Fetcher:
                 # the property dies in FAILED_UNREACHABLE territory.
                 result.outcome == FetchOutcome.RATE_LIMITED
                 and proxy is None
+                and not compliance_mode()
             ):
                 forced = self._proxy_pool.pick(sticky_key=None)
                 if forced:
@@ -566,7 +640,12 @@ class Fetcher:
         return last_result
 
     async def _try_curl_cffi_fallback(
-        self, task: CrawlTask, start_ms: int
+        self,
+        task: CrawlTask,
+        start_ms: int,
+        *,
+        allow_probe_proxy: bool = True,
+        hb_max_calls_per_property: int | None = None,
     ) -> FetchResult | None:
         """Free Cloudflare-bypass fallback via curl_cffi chrome120
         impersonation. No API costs, no proxy needed.
@@ -658,7 +737,11 @@ class Fetcher:
                 if hb_enabled():
                     from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
 
-                    hb_status, hb_body = await hb_raw_get(task.url, task.property_id)
+                    hb_status, hb_body = await hb_raw_get(
+                        task.url,
+                        task.property_id,
+                        max_calls_per_property=hb_max_calls_per_property,
+                    )
                     if hb_status == 200 and len(hb_body) >= 1024:
                         status, body, used_hb = hb_status, hb_body, True
             except Exception as exc:  # never let the rescue path raise
@@ -671,6 +754,7 @@ class Fetcher:
         #    that blocks GCP IPs).
         if (
             (status != 200 or len(body) < 1024)
+            and allow_probe_proxy
             and os.environ.get("PROBE_PROXY_URL", "").strip()
             and not _probe_proxy_circuit_open()
         ):

@@ -136,6 +136,11 @@ class TestSquarespaceUnitBlocks:
         by = {r["unit_number"]: r for r in parse_squarespace_unit_blocks(cricket_html)}
         assert str(by["303"].get("bedrooms")) == "1"  # "One Bedroom plus Den" -> 1
 
+    def test_preserves_visible_availability_tokens(self, cricket_html: str) -> None:
+        by = {r["unit_number"]: r for r in parse_squarespace_unit_blocks(cricket_html)}
+        assert by["303"]["availability_date"] == "Available 9/1"
+        assert by["406"]["availability_date"] == "Available Now"
+
     def test_footer_and_contact_blocks_are_excluded(self, cricket_html: str) -> None:
         # 13 pre-wrap <p> exist; only the 8 that START "Unit N" + carry $rent
         # are units — the address / phone / CTA blocks must not become rows.

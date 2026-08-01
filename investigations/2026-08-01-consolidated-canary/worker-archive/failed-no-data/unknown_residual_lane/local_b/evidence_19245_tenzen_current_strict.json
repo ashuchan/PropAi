@@ -1,0 +1,108 @@
+{
+  "audit": "current strict Tenzen Knock recovery",
+  "capture_date": "2026-08-01",
+  "contamination_verdict": "exact_property_page_to_single_knock_property_id",
+  "current_full_scraper_e2e": {
+    "adapter": "knock",
+    "emitted_units": 2,
+    "errors": [],
+    "rows": [
+      {
+        "availability_date": "2026-08-21",
+        "floor_plan_name": "2X1",
+        "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+        "rent": 2650.0,
+        "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+        "source_ids": {
+          "knock_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502"
+        },
+        "source_property_id": "2022654",
+        "unit_id": "knock_unit_id-ddd80a1f-7cea-4920-862a-fe90cef79502",
+        "unit_number": "104"
+      },
+      {
+        "availability_date": "2026-09-08",
+        "floor_plan_name": "1X1",
+        "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+        "rent": 2050.0,
+        "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+        "source_ids": {
+          "knock_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d"
+        },
+        "source_property_id": "2022654",
+        "unit_id": "knock_unit_id-b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+        "unit_number": "504"
+      }
+    ],
+    "strict_native_positive_rent_rows": 2,
+    "tier": "TIER_1_KNOCK_API",
+    "winning_url": "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5"
+  },
+  "ledger_snapshot": {
+    "rows": 183,
+    "sha256": "fdf82e2b4db693da776944ac58927e071559a726522a353cd94f207efd7cfd60",
+    "unchanged_after_validation": true
+  },
+  "local_validation": "exact page/API identity + native IDs/rents + full scraper E2E assertions passed",
+  "native_identity_rows": 2,
+  "native_positive_rent_rows": 2,
+  "native_rows": [
+    {
+      "available_on": "2026-08-21",
+      "floor_plan_name": "2X1",
+      "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+      "property_id": "2022654",
+      "rent": 2650.0,
+      "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+      "unit_number": "104"
+    },
+    {
+      "available_on": "2026-09-08",
+      "floor_plan_name": "1X1",
+      "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+      "property_id": "2022654",
+      "rent": 2050.0,
+      "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+      "unit_number": "504"
+    }
+  ],
+  "net_new_vs_current_ledger": true,
+  "policy": {
+    "captcha_interactions": 0,
+    "hyperbrowser_sessions": 0,
+    "llm_calls": 0,
+    "paid_canary": false,
+    "web_unlocker_calls": 0
+  },
+  "property_boundary_evidence": {
+    "knock_property_address": {
+      "city": "Bellevue",
+      "house": "",
+      "neighborhood": "",
+      "raw": " 4117 124th Ave SE Bellevue WA 98006",
+      "state": "WA",
+      "street": "4117 124th Ave SE",
+      "zip": "98006"
+    },
+    "knock_property_id": "2022654",
+    "knock_property_name": "Tenzen Apartments",
+    "page_final_url": "https://tenzenapartments.com/",
+    "page_title": "Tenzen Apartments Bellevue Washington \u2013 Tenzen Apartments Bellevue Washington",
+    "published_knock_community_id": "5d11eef5c367a4b5",
+    "single_source_property_ids": [
+      "2022654"
+    ],
+    "visible_address": "4117 124th Avenue SE Bellevue, WA 98006",
+    "visible_name": "Tenzen Apartments"
+  },
+  "property_id": "19245",
+  "property_identity_match": true,
+  "property_name": "Tenzen",
+  "source_urls": [
+    "https://tenzenapartments.com/",
+    "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5",
+    "https://doorway-api.knockrentals.com/v1/property/2022654/units"
+  ],
+  "strict_qualifies": true,
+  "website": "http://www.tenzenapartments.com/"
+}

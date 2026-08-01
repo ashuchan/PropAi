@@ -1,0 +1,302 @@
+{
+  "summary": {
+    "result_type": "riverfalls_stale_domain_current_official_securecafe_current_strict",
+    "capture_timestamp_utc": "2026-08-01T14:36:16.807605+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      8654
+    ],
+    "native_positive_rent_rows": 30,
+    "direct_inventory_native_rows": 30,
+    "plan_direct_probes": 3,
+    "hyperbrowser_sessions": 1,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "unlocker": false,
+    "flaresolverr": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 8654,
+      "property_name": "Riverfalls at Bellmar",
+      "website": "https://www.riverfallsatbellmar.com/",
+      "configured_2026_07_31_website": "https://www.riverfallsdallas.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "rentcafe",
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 30,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_official_name_address_securecafe_property_2390470_native_unit_bindings_three_plan_probes_full_pipeline",
+      "identity_evidence": {
+        "canonical_name": "Riverfalls at Bellmar",
+        "canonical_address": "10570 Stone Canyon Rd",
+        "canonical_city_state_zip": "Dallas, TX 75230",
+        "current_official_url": "https://www.riverfallsatbellmar.com/",
+        "securecafe_property_id": "2390470",
+        "current_root_identity": {
+          "name_visible": true,
+          "street_visible": true,
+          "city_state_zip_visible": true
+        },
+        "inventory_identity": {
+          "name_visible": true,
+          "street_visible": true,
+          "city_state_zip_visible": true,
+          "exact_property_id_on_every_native_row": true
+        },
+        "rows_with_native_identity": 30,
+        "rows_with_native_identity_and_positive_rent": 30,
+        "distinct_unit_numbers": 30,
+        "distinct_securecafe_unit_ids": 30,
+        "source_urls": [
+          "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "RF-104",
+            "securecafe_unit_id": "48439238",
+            "securecafe_floorplan_id": "6463796",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 866,
+            "market_rent_high": 1626
+          },
+          "availability_date": "8/21/2026",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-105",
+            "securecafe_unit_id": "48439239",
+            "securecafe_floorplan_id": "6463796",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 866,
+            "market_rent_high": 1626
+          },
+          "availability_date": "Available",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-106",
+            "securecafe_unit_id": "48439240",
+            "securecafe_floorplan_id": "6463796",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 870,
+            "market_rent_high": 1479
+          },
+          "availability_date": "9/14/2026",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-109",
+            "securecafe_unit_id": "48439243",
+            "securecafe_floorplan_id": "6463796",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 791,
+            "market_rent_high": 1490
+          },
+          "availability_date": "8/21/2026",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-111",
+            "securecafe_unit_id": "48439245",
+            "securecafe_floorplan_id": "6463796",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 866,
+            "market_rent_high": 1592
+          },
+          "availability_date": "10/14/2026",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-114",
+            "securecafe_unit_id": "48439248",
+            "securecafe_floorplan_id": "6463798",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1198,
+            "market_rent_high": 2153
+          },
+          "availability_date": "Available",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-118",
+            "securecafe_unit_id": "48439252",
+            "securecafe_floorplan_id": "6463798",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1198,
+            "market_rent_high": 2303
+          },
+          "availability_date": "8/14/2026",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "RF-124",
+            "securecafe_unit_id": "48439258",
+            "securecafe_floorplan_id": "6463797",
+            "securecafe_property_id": "2390470"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 916,
+            "market_rent_high": 1718
+          },
+          "availability_date": "Available",
+          "source_api_url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        }
+      ],
+      "strict_gates": {
+        "cohort_exact_property": true,
+        "captured_current_root_http_200": true,
+        "captured_current_root_hash_exact": true,
+        "captured_current_root_identity_exact": true,
+        "hyperbrowser_single_session_without_captcha_or_stealth": true,
+        "current_root_publishes_exact_securecafe_portal": true,
+        "securecafe_inventory_http_200": true,
+        "securecafe_inventory_identity_exact": true,
+        "securecafe_native_bindings_complete": true,
+        "securecafe_native_unit_ids_unique": true,
+        "securecafe_native_unit_numbers_unique": true,
+        "securecafe_all_rows_native_and_positive_rent": true,
+        "three_floorplan_boundary_probes_exact": true,
+        "current_full_pipeline_selected_rentcafe": true,
+        "current_full_pipeline_selected_securecafe_unit_tier": true,
+        "current_full_pipeline_all_rows_native_positive": true,
+        "current_full_pipeline_unit_set_matches_direct_inventory": true,
+        "current_full_pipeline_rents_match_direct_inventory": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_flaresolverr": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true,
+        "no_paid_canary": true
+      },
+      "floorplan_boundary_probes": [
+        {
+          "securecafe_floorplan_id": "6463796",
+          "url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx?myOlePropertyId=2390470&floorPlans=6463796",
+          "status": 200,
+          "expected_native_units_from_full_inventory": [
+            "RF-104",
+            "RF-105",
+            "RF-106",
+            "RF-109",
+            "RF-111",
+            "RF-207",
+            "RF-209",
+            "RF-235",
+            "RF-304",
+            "RF-305",
+            "RF-334",
+            "RF-337",
+            "RF-339"
+          ],
+          "direct_probe_native_units": [
+            "RF-104",
+            "RF-105",
+            "RF-106",
+            "RF-109",
+            "RF-111",
+            "RF-207",
+            "RF-209",
+            "RF-235",
+            "RF-304",
+            "RF-305",
+            "RF-334",
+            "RF-337",
+            "RF-339"
+          ],
+          "exact_unit_set_match": true,
+          "all_rows_exact_property_id": true
+        },
+        {
+          "securecafe_floorplan_id": "6463798",
+          "url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx?myOlePropertyId=2390470&floorPlans=6463798",
+          "status": 200,
+          "expected_native_units_from_full_inventory": [
+            "RF-114",
+            "RF-118",
+            "RF-222",
+            "RF-318",
+            "RF-322",
+            "RF-326"
+          ],
+          "direct_probe_native_units": [
+            "RF-114",
+            "RF-118",
+            "RF-222",
+            "RF-318",
+            "RF-322",
+            "RF-326"
+          ],
+          "exact_unit_set_match": true,
+          "all_rows_exact_property_id": true
+        },
+        {
+          "securecafe_floorplan_id": "6463802",
+          "url": "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx?myOlePropertyId=2390470&floorPlans=6463802",
+          "status": 200,
+          "expected_native_units_from_full_inventory": [
+            "RF-147",
+            "RF-242",
+            "RF-243",
+            "RF-250",
+            "RF-350",
+            "RF-354"
+          ],
+          "direct_probe_native_units": [
+            "RF-147",
+            "RF-242",
+            "RF-243",
+            "RF-250",
+            "RF-350",
+            "RF-354"
+          ],
+          "exact_unit_set_match": true,
+          "all_rows_exact_property_id": true
+        }
+      ],
+      "configured_source_validation": {
+        "configured_2026_07_31_url": "https://www.riverfallsdallas.com/",
+        "configured_status": 200,
+        "configured_final_url": "https://notfound.apts247.info/",
+        "configured_final_page_contains_property_identity": false,
+        "current_official_url": "https://www.riverfallsatbellmar.com/",
+        "current_official_root_fetch_via": "one Hyperbrowser residential-proxy session",
+        "current_full_pipeline_adapter": "rentcafe",
+        "current_full_pipeline_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "current_full_pipeline_units": 30,
+        "current_full_pipeline_strict_native_positive_rent_rows": 30,
+        "current_full_pipeline_source_urls": [
+          "https://riverfallsatbellmar.securecafe.com/onlineleasing/riverfalls-at-bellmar/availableunits.aspx"
+        ],
+        "current_full_pipeline_errors": [],
+        "current_full_pipeline_elapsed_seconds": 1.22,
+        "minimal_production_lever": "refresh the stale configured domain to the exact current official domain, or add fail-closed stale-domain rediscovery requiring exact name/address/ZIP"
+      }
+    }
+  ]
+}

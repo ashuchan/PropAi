@@ -56,6 +56,51 @@ def test_rent_published_no_available_flag_is_AVAILABLE() -> None:
     assert out[0]["unit_number"] == "203A"
 
 
+def test_native_uuid_is_preserved_as_unit_identity() -> None:
+    """Repeated display labels must not collapse distinct Knock apartments."""
+    out = parse_knock_units(
+        _wrap(
+            [
+                {
+                    "id": "a91f39ed-5603-40be-b405-6a7a98c31980",
+                    "propertyId": 2010515,
+                    "name": "A",
+                    "price": 1165,
+                    "bedrooms": 2,
+                    "bathrooms": 1,
+                    "area": 770,
+                }
+            ]
+        )
+    )
+    assert out[0]["unit_id"] == (
+        "knock_unit_id-a91f39ed-5603-40be-b405-6a7a98c31980"
+    )
+    assert out[0]["source_ids"] == {
+        "knock_unit_id": "a91f39ed-5603-40be-b405-6a7a98c31980"
+    }
+    assert out[0]["source_property_id"] == "2010515"
+
+
+def test_property_scoped_source_endpoint_is_preserved() -> None:
+    endpoint = "https://doorway-api.knockrentals.com/v1/property/2010515/units"
+    out = parse_knock_units(
+        _wrap(
+            [
+                {
+                    "id": "a91f39ed-5603-40be-b405-6a7a98c31980",
+                    "propertyId": 2010515,
+                    "name": "A",
+                    "price": 1165,
+                }
+            ]
+        ),
+        source_api_url=endpoint,
+    )
+
+    assert out[0]["source_api_url"] == endpoint
+
+
 def test_rent_published_available_false_is_AVAILABLE() -> None:
     """Knock's ``available=False`` is a Knock-internal signal (not the
     rentability question) — must NOT downgrade the unit to UNAVAILABLE

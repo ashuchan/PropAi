@@ -478,10 +478,11 @@ def test_retry_episode_outcome_vocabulary_is_declared_once() -> None:
 class _StubAdapterResult:
     """Minimal stand-in for ``ma_poc.pms.adapters.base.AdapterResult``.
 
-    The retry loop only reads ``tier_used`` and ``units`` so the stub
-    only carries those two fields."""
+    The retry loop reads ``tier_used`` plus the physical-unit and plan-summary
+    channels, so the stub carries exactly those fields."""
     tier_used: str | None = None
     units: list = _dc_field(default_factory=list)
+    plan_summaries: list = _dc_field(default_factory=list)
 
 
 @dataclass
@@ -537,7 +538,12 @@ async def _run_retry_loop_under_test(
     # gate.py pins that exactly ONE definition of this predicate exists, and a
     # second copy of the plan-level rule is precisely the drift this repo keeps
     # paying for.
-    from ma_poc.pms.scraper import rows_are_plan_level
+    from ma_poc.pms.scraper import (
+        _retry_plan_rows,
+        _retry_real_unit_count,
+        _retry_result_is_plan_level,
+        rows_are_plan_level,
+    )
     from ma_poc.validation.schema_gate import (
         property_has_area_signal,
         property_has_rent_signal,
@@ -545,6 +551,8 @@ async def _run_retry_loop_under_test(
     )
 
     def _trigger(res: _StubAdapterResult) -> str | None:
+        if res.plan_summaries and _retry_result_is_plan_level(res):
+            return "plan_level_only"
         if is_empty_exit(res.tier_used) and not res.units:
             return "empty_exit"
         if res.units:
@@ -566,21 +574,53 @@ async def _run_retry_loop_under_test(
             res.units
             and property_passes_quality_gate(res.units)
             and property_has_rent_signal(res.units)
+            and _retry_real_unit_count(res) > 0
         )
 
-    def _win_for(res: _StubAdapterResult, trigger: str | None) -> bool:
-        """Mirror of ``_retry_win_condition_for``: swapping one plan-level
-        result for another is not a win."""
-        if not _win(res):
-            return False
-        if trigger == "plan_level_only":
-            return not rows_are_plan_level(res.units)
-        return True
+    def _win_for(res: _StubAdapterResult, _trigger: str | None) -> bool:
+        """Every trigger shares the same canonical-unit win rule."""
+        return _win(res)
+
+    plan_fields = (
+        "floor_plan_name",
+        "floorplan_name",
+        "floor_plan",
+        "name",
+        "beds",
+        "bedrooms",
+        "baths",
+        "bathrooms",
+        "sqft",
+        "area",
+        "rent_low",
+        "rent_high",
+        "asking_rent",
+        "market_rent_low",
+        "market_rent_high",
+        "availability_date",
+        "available_date",
+    )
+
+    def _plan_score(res: _StubAdapterResult) -> tuple[int, int] | None:
+        plan_rows = _retry_plan_rows(res)
+        if not plan_rows:
+            return None
+        populated = sum(
+            1
+            for row in plan_rows
+            for field in plan_fields
+            if row.get(field) not in (None, "", [], {})
+        )
+        return (len(plan_rows), populated)
 
     result_dict: dict[str, Any] = {}
     adapter_result = initial_result
     adapter_name = initial_adapter_name
-    baseline_result = initial_result if initial_result.units else None
+    baseline_result = (
+        initial_result
+        if initial_result.units or initial_result.plan_summaries
+        else None
+    )
     baseline_adapter_name = initial_adapter_name
     tried: set[str] = {adapter_name}
     fallback_chain: list[str] = []
@@ -595,6 +635,10 @@ async def _run_retry_loop_under_test(
     initial_trigger_reason: str | None = None
     in_trigger_eval = False
     current_result = adapter_result
+    plan_fallback_allowed = baseline_result is None
+    best_plan_fallback: tuple[
+        tuple[int, int], _StubAdapterResult, str, bool
+    ] | None = None
 
     # --- episode state (mirrors the ``_ep_*`` locals in scraper.py) ------
     episode_id = uuid.uuid4().hex[:16]
@@ -602,7 +646,10 @@ async def _run_retry_loop_under_test(
     ep_baseline_tier = initial_result.tier_used or ""
     ep_baseline_unit_count = len(initial_result.units or [])
     ep_baseline_error_count = 0  # _StubAdapterResult carries no errors list
-    ep_baseline_plan_level = rows_are_plan_level(initial_result.units)
+    try:
+        ep_baseline_plan_level = _retry_result_is_plan_level(initial_result)
+    except Exception:
+        ep_baseline_plan_level = False
     ep_outcome = ""
     ep_error_type = ""
     ep_final_trigger_reason = ""
@@ -621,6 +668,19 @@ async def _run_retry_loop_under_test(
         initial_trigger_reason = trigger_reason
         ep_final_trigger_reason = trigger_reason or ""
         in_trigger_eval = False
+        plan_fallback_allowed = bool(
+            baseline_result is None
+            or _retry_result_is_plan_level(baseline_result)
+        )
+        if plan_fallback_allowed and baseline_result is not None:
+            baseline_plan_score = _plan_score(baseline_result)
+            if baseline_plan_score is not None:
+                best_plan_fallback = (
+                    baseline_plan_score,
+                    baseline_result,
+                    baseline_adapter_name,
+                    True,
+                )
         while trigger_reason is not None and attempt < max_retries:
             candidates = detect_pms_candidates(
                 url=ctx.base_url,
@@ -694,11 +754,27 @@ async def _run_retry_loop_under_test(
                 fallback_chain.append(f"retry_failed:{nc.pms}:{type(exc).__name__}")
                 break
             fallback_chain.append(f"retry:{nc.pms}")
+            if plan_fallback_allowed:
+                new_plan_score = _plan_score(new_result)
+                if (
+                    new_plan_score is not None
+                    and (
+                        best_plan_fallback is None
+                        or new_plan_score > best_plan_fallback[0]
+                    )
+                ):
+                    best_plan_fallback = (
+                        new_plan_score,
+                        new_result,
+                        nc.pms,
+                        False,
+                    )
             if _win_for(new_result, initial_trigger_reason):
+                real_unit_count = _retry_real_unit_count(new_result)
                 ep_outcome = "won"
                 ep_won_pms = nc.pms
                 ep_won_tier = new_result.tier_used or ""
-                ep_won_unit_count = len(new_result.units)
+                ep_won_unit_count = real_unit_count
                 _events_mod.emit(
                     EventKind.RETRY_SUCCESS,
                     property_id=ctx.property_id,
@@ -710,7 +786,7 @@ async def _run_retry_loop_under_test(
                     initial_trigger_reason=initial_trigger_reason or "",
                     won_pms=nc.pms,
                     won_tier=new_result.tier_used or "",
-                    unit_count=len(new_result.units),
+                    unit_count=real_unit_count,
                 )
                 adapter_result = new_result
                 adapter_name = nc.pms
@@ -733,22 +809,19 @@ async def _run_retry_loop_under_test(
             else:
                 ep_outcome = "lost_dead_end"
 
-        # Plan-level fallback: all retries failed AND baseline had units AND
-        # the initial trigger was a quality concern (not empty-exit).
-        if (
-            not retry_won
-            and baseline_result is not None
-            and baseline_result.units
-            and initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
-            and rows_are_plan_level(baseline_result.units)
-        ):
-            adapter_result = baseline_result
-            baseline_tier = baseline_result.tier_used or ""
-            if baseline_tier and "_PLAN_LEVEL" not in baseline_tier:
-                adapter_result.tier_used = f"{baseline_tier}_PLAN_LEVEL"
+        # Plan-level fallback: select the richest catalog across the eligible
+        # baseline and retry attempts, including the split plan_summaries-only
+        # shape returned by newer adapters.
+        if not retry_won and best_plan_fallback is not None:
+            _, adapter_result, adapter_name, plan_is_baseline = best_plan_fallback
+            plan_tier = adapter_result.tier_used or ""
+            if plan_tier and "_PLAN_LEVEL" not in plan_tier:
+                adapter_result.tier_used = f"{plan_tier}_PLAN_LEVEL"
             result_dict["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
-            result_dict["_plan_level_reason"] = initial_trigger_reason
-            ep_baseline_restored = True
+            result_dict["_plan_level_reason"] = (
+                initial_trigger_reason or "retry_plan_only"
+            )
+            ep_baseline_restored = plan_is_baseline
     except BaseException as exc:  # classify, do not catch
         if not isinstance(exc, Exception):
             ep_outcome = "aborted_cancelled"
@@ -879,6 +952,111 @@ async def test_retry_succeeds_on_second_attempt(captured: _CapturedEvents) -> No
     assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 2
     assert len(captured.of_kind(EventKind.RETRY_SUCCESS)) == 1
     assert captured.of_kind(EventKind.RETRY_SUCCESS)[0].data["won_pms"] == "rentcafe"
+
+
+@pytest.mark.asyncio
+async def test_plan_only_first_retry_is_not_success_and_later_unit_wins(
+    captured: _CapturedEvents,
+) -> None:
+    """Plan cards are fallback evidence; retry continues to the real roster."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    plan_only = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[
+            {
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "baths": 1,
+                "sqft": 750,
+                "asking_rent": 1500,
+            }
+        ],
+    )
+    real_unit = _StubAdapterResult(
+        tier_used="TIER_1_API_RENTCAFE",
+        units=[
+            {
+                "unit_number": "311",
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "sqft": 750,
+                "asking_rent": 1550,
+            }
+        ],
+    )
+
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-plan-then-unit"),
+        adapter_table={
+            "knock": _StubAdapter("knock", plan_only),
+            "rentcafe": _StubAdapter("rentcafe", real_unit),
+        },
+    )
+
+    assert name == "rentcafe"
+    assert result is real_unit
+    assert chain == ["retry:knock", "retry:rentcafe"]
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+    successes = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(successes) == 1
+    assert successes[0].data["attempt"] == 2
+    assert successes[0].data["won_pms"] == "rentcafe"
+    assert successes[0].data["unit_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_all_plan_only_retries_preserve_richest_split_channel_fallback(
+    captured: _CapturedEvents,
+) -> None:
+    """Zero-unit ``plan_summaries`` survive without becoming RETRY_SUCCESS."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    one_plan = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[
+            {
+                "floor_plan_name": "A1",
+                "beds": 1,
+                "sqft": 750,
+                "asking_rent": 1500,
+            }
+        ],
+    )
+    split_catalog = _StubAdapterResult(
+        tier_used="TIER_1_API_RENTCAFE",
+        units=[],
+        plan_summaries=[
+            {"floor_plan_name": "A1", "beds": 1, "sqft": 750},
+            {"floor_plan_name": "B2", "beds": 2, "sqft": 1100},
+        ],
+    )
+
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-plan-fallback"),
+        adapter_table={
+            "knock": _StubAdapter("knock", one_plan),
+            "rentcafe": _StubAdapter("rentcafe", split_catalog),
+        },
+    )
+
+    assert name == "rentcafe"
+    assert result is split_catalog
+    assert result.units == []
+    assert len(result.plan_summaries) == 2
+    assert result.tier_used == "TIER_1_API_RENTCAFE_PLAN_LEVEL"
+    assert chain == ["retry:knock", "retry:rentcafe"]
+    assert result_dict["_verdict_quality"] == "SUCCESS_PLAN_LEVEL"
+    assert result_dict["_plan_level_reason"] == "empty_exit"
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+    episode = captured.of_kind(EventKind.RETRY_EPISODE)[0].data
+    assert episode["outcome"] == "lost_max_retries"
+    assert episode["won_unit_count"] == -1
+    assert episode["baseline_restored"] is False
 
 
 @pytest.mark.asyncio
@@ -1519,6 +1697,62 @@ async def test_path_c_no_area_keeps_real_unit_roster_unit_level_when_retry_loses
 
 
 @pytest.mark.asyncio
+async def test_path_c_no_area_rejects_plan_level_retry_over_real_unit_roster(
+    captured: _CapturedEvents,
+) -> None:
+    """A dimension-complete plan card must not erase native apartments.
+
+    Acorn Acres publishes unit numbers, rents and dates in its RentVision
+    detail roster but omits sqft on those rows. The generic retry sees the
+    marketing plan grid, clears the old dimensions+rent win gate, and used to
+    replace all six real units with plan-level cards. Keep the native baseline
+    unless the retry is itself unit-level.
+    """
+    baseline_units = [
+        {"unit_number": "3717D", "asking_rent": 964, "beds": 1, "baths": 1},
+        {"unit_number": "3864D", "asking_rent": 1085, "beds": 1, "baths": 1},
+    ]
+    initial = _StubAdapterResult(
+        tier_used="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+        units=baseline_units,
+    )
+    generic_plan_rows = [
+        {
+            "unit_id": "inferred_1bed_1bath",
+            "floor_plan_name": "1bed 1bath",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 700,
+            "asking_rent": 964,
+        }
+    ]
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_DOM_GENERIC_PLAN_TEXT",
+                units=generic_plan_rows,
+            ),
+        ),
+    }
+
+    name, result, _chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="rentvision",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-acorn-shape"),
+        adapter_table=table,
+        max_retries=1,
+    )
+
+    assert name == "rentvision"
+    assert result.units == baseline_units
+    assert result.tier_used == "TIER_3_DOM_RENTVISION_UNIT_LEVEL"
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
 async def test_path_c_retry_promotes_over_plan_level_baseline(
     captured: _CapturedEvents,
 ) -> None:
@@ -1749,11 +1983,19 @@ def _assert_episode_invariants(captured: _CapturedEvents) -> list[Event]:
             assert d["won_tier"] == ""
             assert d["won_unit_count"] == -1
 
-        # A13 — the plan-level fallback only fires on a loss with baseline rows.
+        # A13 — restoring the baseline is a losing plan-level episode.  A
+        # channel-split baseline may have zero physical units and carry all
+        # useful rows in plan_summaries, so baseline_plan_level is the binding
+        # invariant rather than baseline_unit_count > 0.
         if d["baseline_restored"]:
             assert outcome != "won"
-            assert d["trigger_reason"] in {"quality_gate", "no_rent", "no_area"}
-            assert d["baseline_unit_count"] > 0
+            assert d["trigger_reason"] in {
+                "quality_gate",
+                "no_rent",
+                "no_area",
+                "plan_level_only",
+            }
+            assert d["baseline_plan_level"] is True
 
     # B1 — every dispatch pairs with its episode, and the totals agree.
     assert sum(e.data["attempts"] for e in eps) == len(dispatched_evs), (
@@ -2244,11 +2486,9 @@ async def test_plan_level_only_trigger_emits_episode(
 
     Plan-level baseline rows clear the dimension, rent and area gates, so
     the first four checks all pass and only ``rows_are_plan_level`` fires.
-    A losing plan_level_only episode gets NO SUCCESS_PLAN_LEVEL stamp,
-    because "plan_level_only" is deliberately absent from the fallback
-    eligibility set — a genuine defect, left alone here because fixing it
-    changes what ships in properties.json. This event makes that gap
-    COUNTABLE in the meantime.
+    A losing plan_level_only episode keeps the best plan catalog and stamps it
+    SUCCESS_PLAN_LEVEL, but does not emit RETRY_SUCCESS because no apartment
+    was recovered.
     """
     initial = _StubAdapterResult(
         tier_used="TIER_1_API_G5", units=_PLAN_LEVEL_UNITS
@@ -2281,9 +2521,9 @@ async def test_plan_level_only_trigger_emits_episode(
     assert d["baseline_plan_level"] is True
     assert d["outcome"] != "won"
     assert d["attempts"] >= 1
-    # The countable gap: lost plan_level_only episodes are NOT restored.
-    assert d["baseline_restored"] is False
-    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+    assert d["baseline_restored"] is True
+    assert result_dict.get("_verdict_quality") == "SUCCESS_PLAN_LEVEL"
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
 
 
 @pytest.mark.asyncio

@@ -1,341 +1,424 @@
-"""Universal recovery cascade priority + fallback step-wise tests (2026-05-24).
+"""Priority contract for the universal recovery cascade.
 
-Pins the FULL recovery chain order. The cascade in
-``recover_universal_embed`` is:
+Every unit-capable recovery gets first refusal.  The generic DOM arm is a
+plan-level catchall and therefore runs last:
 
-    1. appfolio_embed         (most specific — AppFolio iframe in body)
-    2. leaseleads_embed       (LeaseLeads embed)
-    3. pms_portal_hop         (ResMan / SecureCafe portal anchor)
-    4. generic_dom_floorplans (live DOM Track A, then static HTML Track B)
-    5. sightmap_subpage       (2026-05-24 — /floorplans/ embed)
-    6. g5_recovery            (2026-05-24 — g5-cl URN present)
+    AppFolio -> LeaseLeads -> portal -> Knock DNI -> BetterNOI
+    -> embedded availability -> Elise -> SightMap -> Rently -> G5 -> generic DOM
 
-These tests pin that order: when ALL recoveries could match, the
-earlier one wins; when an earlier returns empty, the next fires.
-Stops at the first winner — never tries downstream paths.
-
-Each test mocks one or more recovery functions with controlled
-return values and asserts both the WINNING tier label and which
-recoveries were called.
+These tests deliberately make generic DOM return plan rows while another arm
+can return real units.  That is the regression shape: if generic moves earlier,
+the unit roster becomes unreachable even though it is published.
 """
+
 from __future__ import annotations
 
+import dataclasses
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ma_poc.pms.adapters._universal_recovery import recover_universal_embed
 
+_TARGETS = {
+    "appfolio": "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
+    "leaseleads": "ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
+    "portal_hop": "ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
+    "knock_dni": ("ma_poc.pms.adapters._knock_dni_recovery.recover_knock_dni_config"),
+    "betternoi": ("ma_poc.pms.adapters._betternoi_recovery.recover_betternoi_units"),
+    "funnel_spaces": "ma_poc.pms.adapters.funnel.recover_funnel_spaces",
+    "avail_table": "ma_poc.pms.adapters._avail_table_recovery.recover_avail_table",
+    "elise": (
+        "ma_poc.pms.adapters._elise_applications_recovery.recover_elise_applications"
+    ),
+    "rentvision": "ma_poc.pms.adapters.rentvision.recover_rentvision_crossroute",
+    "sightmap": ("ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage"),
+    "rently": "ma_poc.pms.adapters.rently.recover_rently",
+    "g5": "ma_poc.pms.adapters._g5_recovery.recover_g5",
+    "generic_dom": ("ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans"),
+}
 
-def _ctx(body: bytes = b"<html><body>generic</body></html>"):
-    """Minimal AdapterContext with an immutable-ish fetch_result."""
-    import dataclasses
+_UNIT_ROUTES = (
+    "appfolio",
+    "leaseleads",
+    "portal_hop",
+    "knock_dni",
+    "betternoi",
+    "funnel_spaces",
+    "avail_table",
+    "elise",
+    "rentvision",
+    "sightmap",
+    "rently",
+    "g5",
+)
+
+
+def _ctx(body: bytes = b"<html><body>generic</body></html>") -> MagicMock:
+    """Return the minimal context read by the recovery arms."""
+
     @dataclasses.dataclass
-    class _FR:
+    class _FetchResult:
         body: bytes | None
         final_url: str
+
     ctx = MagicMock()
-    ctx.fetch_result = _FR(body=body, final_url="https://example.com/")
+    ctx.fetch_result = _FetchResult(body=body, final_url="https://example.com/")
     ctx.base_url = "https://example.com/"
     ctx.property_id = "TEST-001"
-    # Recovery uses ``ctx._embed_recovery_attempted`` for idempotency.
     if hasattr(ctx, "_embed_recovery_attempted"):
         delattr(ctx, "_embed_recovery_attempted")
     return ctx
 
 
-def _mock_all_recoveries(
+def _unit(number: str, tier: str = "") -> dict[str, str]:
+    return {"unit_number": number, "extraction_tier": tier}
+
+
+def _plan(tier: str = "TIER_3_DOM_GENERIC") -> dict[str, str]:
+    return {
+        "unit_number": "",
+        "floor_plan_name": "A1",
+        "extraction_tier": tier,
+    }
+
+
+@contextmanager
+def _mock_recoveries(
     *,
-    appfolio: list | None = None,
-    leaseleads: list | None = None,
-    portal_hop: list | None = None,
-    generic_dom: tuple | None = None,
-    sightmap: list | None = None,
-    g5: list | None = None,
-):
-    """Patch all 6 recovery functions with controlled returns.
-
-    Each kwarg is the value to return; None defaults to empty.
-    Returns a dict of the patches keyed by recovery name so callers
-    can inspect ``.called`` / ``.call_count`` after the test.
-    """
-    patches = {}
-
-    patches["appfolio"] = patch(
-        "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
-        AsyncMock(return_value=appfolio or []),
-    )
-    patches["leaseleads"] = patch(
-        "ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
-        AsyncMock(return_value=leaseleads or []),
-    )
-    patches["portal_hop"] = patch(
-        "ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
-        AsyncMock(return_value=portal_hop or []),
-    )
-    patches["generic_dom"] = patch(
-        "ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
-        AsyncMock(return_value=generic_dom or ([], "")),
-    )
-    patches["sightmap"] = patch(
-        "ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
-        AsyncMock(return_value=sightmap or []),
-    )
-    patches["g5"] = patch(
-        "ma_poc.pms.adapters._g5_recovery.recover_g5",
-        AsyncMock(return_value=g5 or []),
-    )
-    return patches
-
-
-# ── PRIORITY ORDER (each step wins when earlier steps return empty) ────
+    appfolio: list[dict[str, str]] | None = None,
+    leaseleads: list[dict[str, str]] | None = None,
+    portal_hop: list[dict[str, str]] | None = None,
+    knock_dni: list[dict[str, str]] | None = None,
+    betternoi: list[dict[str, str]] | None = None,
+    funnel_spaces: list[dict[str, str]] | None = None,
+    avail_table: list[dict[str, str]] | None = None,
+    elise: list[dict[str, str]] | None = None,
+    rentvision: list[dict[str, str]] | None = None,
+    sightmap: list[dict[str, str]] | None = None,
+    rently: list[dict[str, str]] | None = None,
+    g5: list[dict[str, str]] | None = None,
+    generic_dom: tuple[list[dict[str, str]], str] | None = None,
+) -> Iterator[dict[str, AsyncMock]]:
+    """Patch every listed arm so priority tests never perform real I/O."""
+    values: dict[str, Any] = {
+        "appfolio": appfolio or [],
+        "leaseleads": leaseleads or [],
+        "portal_hop": portal_hop or [],
+        "knock_dni": knock_dni or [],
+        "betternoi": betternoi or [],
+        "funnel_spaces": funnel_spaces or [],
+        "avail_table": avail_table or [],
+        "elise": elise or [],
+        "rentvision": rentvision or [],
+        "sightmap": sightmap or [],
+        "rently": rently or [],
+        "g5": g5 or [],
+        "generic_dom": generic_dom or ([], ""),
+    }
+    with ExitStack() as stack:
+        mocks: dict[str, AsyncMock] = {}
+        for name, target in _TARGETS.items():
+            mock = AsyncMock(return_value=values[name])
+            stack.enter_context(patch(target, new=mock))
+            mocks[name] = mock
+        yield mocks
 
 
 @pytest.mark.asyncio
-async def test_step1_appfolio_wins_when_first() -> None:
-    """When appfolio returns units, no downstream recovery is tried."""
-    patches = _mock_all_recoveries(
-        appfolio=[{"unit_number": "A1", "extraction_tier": "TIER_1_DOM_APPFOLIO_SSR"}],
-        # leave others empty — they shouldn't even be called
-    )
-    with patches["appfolio"] as appfolio_m, \
-         patches["leaseleads"] as leaseleads_m, \
-         patches["portal_hop"] as portal_hop_m, \
-         patches["generic_dom"] as gen_m, \
-         patches["sightmap"] as sm_m, \
-         patches["g5"] as g5_m:
+async def test_specific_recovery_stops_the_cascade() -> None:
+    """The first specific unit roster wins and no downstream arm runs."""
+    with _mock_recoveries(appfolio=[_unit("A1")]) as mocks:
         units, tier, name = await recover_universal_embed(None, _ctx())
-    assert units and len(units) == 1
-    assert name == "appfolio_embed"
+
+    assert units == [_unit("A1")]
     assert tier == "TIER_1_DOM_APPFOLIO_SSR"
-    # Downstream paths must NOT have been called
-    leaseleads_m.assert_not_called()
-    portal_hop_m.assert_not_called()
-    gen_m.assert_not_called()
-    sm_m.assert_not_called()
-    g5_m.assert_not_called()
+    assert name == "appfolio_embed"
+    for downstream in (*_UNIT_ROUTES[1:], "generic_dom"):
+        mocks[downstream].assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_step2_leaseleads_wins_when_appfolio_empty() -> None:
-    patches = _mock_all_recoveries(
-        leaseleads=[{"unit_number": "L1"}],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"] as ph, \
-         patches["generic_dom"] as gd, patches["sightmap"] as sm, patches["g5"] as g5:
+@pytest.mark.parametrize(
+    ("route", "expected_name", "row_tier", "expected_tier"),
+    (
+        (
+            "knock_dni",
+            "knock_dni_config",
+            "TIER_1_API_KNOCK_DNI_CONFIG",
+            "TIER_1_API_KNOCK_DNI_CONFIG",
+        ),
+        (
+            "betternoi",
+            "betternoi",
+            "TIER_1_API_BETTERNOI",
+            "TIER_1_API_BETTERNOI",
+        ),
+        (
+            "funnel_spaces",
+            "funnel_spaces",
+            "TIER_1_DOM_FUNNEL_SPACES",
+            "TIER_1_DOM_FUNNEL_SPACES",
+        ),
+        (
+            "avail_table",
+            "avail_table",
+            "TIER_1_EMBEDDED_AVAIL_TABLE",
+            "TIER_1_EMBEDDED_AVAIL_TABLE",
+        ),
+        (
+            "elise",
+            "elise_applications",
+            "TIER_1_API_ELISE_APPLICATIONS",
+            "TIER_1_API_ELISE_APPLICATIONS",
+        ),
+        (
+            "rentvision",
+            "rentvision_crossroute",
+            "TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+            "TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+        ),
+        (
+            "sightmap",
+            "sightmap_subpage",
+            "TIER_1_API_SIGHTMAP_DIRECT",
+            "TIER_1_API_SIGHTMAP_DIRECT",
+        ),
+        ("rently", "rently", "TIER_1_API_RENTLY", "TIER_1_API_RENTLY"),
+        (
+            "g5",
+            "g5_recovery",
+            "TIER_2_API_G5_APOLLO",
+            "TIER_2_API_G5_APOLLO",
+        ),
+    ),
+    ids=(
+        "knock-dni",
+        "betternoi",
+        "funnel-spaces",
+        "avail-table",
+        "elise-applications",
+        "rentvision",
+        "sightmap",
+        "rently",
+        "g5",
+    ),
+)
+async def test_generic_plan_cannot_preempt_unit_route(
+    route: str,
+    expected_name: str,
+    row_tier: str,
+    expected_tier: str,
+) -> None:
+    """A generic plan match must not hide a reachable unit-level result."""
+    kwargs = {
+        route: [_unit("UNIT-101", row_tier)],
+        "generic_dom": ([_plan()], "/floorplans"),
+    }
+    with _mock_recoveries(**kwargs) as mocks:
         units, tier, name = await recover_universal_embed(None, _ctx())
-    assert name == "leaseleads_embed"
-    assert tier == "TIER_1_API_LEASELEADS"
-    ph.assert_not_called()
-    gd.assert_not_called()
-    sm.assert_not_called()
-    g5.assert_not_called()
+
+    assert units[0]["unit_number"] == "UNIT-101"
+    assert tier == expected_tier
+    assert name == expected_name
+    mocks[route].assert_awaited_once()
+    mocks["generic_dom"].assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_step3_portal_hop_wins_when_first_two_empty() -> None:
-    patches = _mock_all_recoveries(
-        portal_hop=[{"unit_number": "P1", "extraction_tier": "TIER_1_API_RESMAN"}],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"] as gd, patches["sightmap"] as sm, patches["g5"] as g5:
+@pytest.mark.parametrize(
+    ("plan_route", "plan_tier"),
+    (
+        ("leaseleads", "TIER_1_API_LEASELEADS_PLAN_LEVEL"),
+        ("portal_hop", "TIER_1_API_RESMAN_PLAN_LEVEL"),
+    ),
+    ids=("leaseleads-plan", "resman-portal-plan"),
+)
+async def test_earlier_plan_only_arm_cannot_preempt_later_unit_route(
+    plan_route: str,
+    plan_tier: str,
+) -> None:
+    """A vendor-native plan catalogue is fallback data, not a cascade win."""
+    sightmap_units = [_unit("UNIT-202", "TIER_1_API_SIGHTMAP_DIRECT")]
+    kwargs = {
+        plan_route: [_plan(plan_tier)],
+        "sightmap": sightmap_units,
+    }
+    with _mock_recoveries(**kwargs) as mocks:
         units, tier, name = await recover_universal_embed(None, _ctx())
-    assert name == "pms_portal_hop"
-    # Portal-hop preserves the per-unit extraction_tier if present
-    assert tier == "TIER_1_API_RESMAN"
-    gd.assert_not_called()
-    sm.assert_not_called()
-    g5.assert_not_called()
 
-
-@pytest.mark.asyncio
-async def test_step4_generic_dom_wins_when_first_three_empty() -> None:
-    patches = _mock_all_recoveries(
-        generic_dom=([{"unit_number": "G1"}], "/floor-plans"),
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"] as sm, patches["g5"] as g5:
-        units, tier, name = await recover_universal_embed(None, _ctx())
-    assert name == "generic_dom"
-    assert tier == "TIER_3_DOM_GENERIC"
-    sm.assert_not_called()
-    g5.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_step5_sightmap_wins_when_first_four_empty() -> None:
-    """The SightMap subpage recovery (NEW 2026-05-24) fires as the 5th
-    path, AFTER all the DOM-based recoveries have returned empty."""
-    patches = _mock_all_recoveries(
-        sightmap=[{"unit_number": "S1"}],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"] as g5:
-        units, tier, name = await recover_universal_embed(None, _ctx())
+    assert units == sightmap_units
+    assert tier == "TIER_1_API_SIGHTMAP_DIRECT"
     assert name == "sightmap_subpage"
-    assert tier == "TIER_1_API_SIGHTMAP_SUBPAGE_RECOVERY"
-    g5.assert_not_called()
+    mocks[plan_route].assert_awaited_once()
+    mocks["sightmap"].assert_awaited_once()
+    mocks["rently"].assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_step6_g5_wins_when_first_five_empty() -> None:
-    """The G5 recovery (NEW 2026-05-24) is the 6th and final path —
-    fires only when nothing earlier matched."""
-    patches = _mock_all_recoveries(
-        g5=[{"unit_number": "G1"}],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"]:
+async def test_richest_earlier_plan_catalogue_survives_total_unit_miss() -> None:
+    """Later unit arms still run, then the best plan fallback is returned."""
+    leaseleads_plans = [
+        _plan("TIER_1_API_LEASELEADS_PLAN_LEVEL"),
+        {
+            **_plan("TIER_1_API_LEASELEADS_PLAN_LEVEL"),
+            "floor_plan_name": "B2",
+        },
+    ]
+    generic_plans = [_plan()]
+    with _mock_recoveries(
+        leaseleads=leaseleads_plans,
+        generic_dom=(generic_plans, "/floorplans"),
+    ) as mocks:
         units, tier, name = await recover_universal_embed(None, _ctx())
-    assert name == "g5_recovery"
-    assert tier == "TIER_1_API_G5_RECOVERY"
+
+    assert units == leaseleads_plans
+    assert tier == "TIER_1_API_LEASELEADS_PLAN_LEVEL"
+    assert name == "leaseleads_embed"
+    for route in _UNIT_ROUTES:
+        mocks[route].assert_awaited_once()
+    mocks["generic_dom"].assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_total_miss_returns_empty_with_attempted_flag() -> None:
-    """All 6 recoveries return empty → ([], '', '') and the ctx flag
-    is set so the syndication adapters don't re-run the chain inline."""
-    patches = _mock_all_recoveries()
-    ctx = _ctx()
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"]:
-        units, tier, name = await recover_universal_embed(None, ctx)
-    assert units == []
-    assert tier == ""
-    assert name == ""
-    # Idempotency flag must be set even on total miss
-    assert getattr(ctx, "_embed_recovery_attempted", False)
+async def test_generic_dom_runs_only_after_every_unit_route_declines() -> None:
+    """Generic plan rows remain available as the final fallback."""
+    plans = [_plan()]
+    with _mock_recoveries(generic_dom=(plans, "/floorplans")) as mocks:
+        units, tier, name = await recover_universal_embed(None, _ctx())
 
-
-# ── FALLBACK ORDER (when earlier returns empty, next runs) ─────────────
+    assert units == plans
+    assert tier == "TIER_3_DOM_GENERIC"
+    assert name == "generic_dom"
+    for route in _UNIT_ROUTES:
+        mocks[route].assert_awaited_once()
+    mocks["generic_dom"].assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_each_step_called_in_strict_order() -> None:
-    """Walk the cascade: every step returns empty, must call all 6
-    in declared order."""
+async def test_generic_dom_preserves_row_extraction_tier() -> None:
+    """A unit-grid tier stamped by the generic parser must not be relabelled."""
+    rows = [_unit("204", "TIER_2_DOM_UNIT_GRID")]
+    with _mock_recoveries(generic_dom=(rows, "/availability")):
+        units, tier, name = await recover_universal_embed(None, _ctx())
+
+    assert units == rows
+    assert tier == "TIER_2_DOM_UNIT_GRID"
+    assert name == "generic_dom"
+
+
+@pytest.mark.asyncio
+async def test_all_empty_arms_run_in_strict_order() -> None:
     call_log: list[str] = []
 
-    async def track(name, ret):
-        async def _fn(*args, **kw):
+    def record(name: str, result: Any):
+        async def _record(*_args: object, **_kwargs: object) -> Any:
             call_log.append(name)
-            return ret
-        return AsyncMock(side_effect=_fn)
+            return result
 
-    with (
-        patch("ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("appfolio") or [])),
-        patch("ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("leaseleads") or [])),
-        patch("ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("portal_hop") or [])),
-        patch("ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
-              AsyncMock(side_effect=lambda *a, **k: (call_log.append("generic_dom") or ([], "")))),
-        patch("ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("sightmap") or [])),
-        patch("ma_poc.pms.adapters._g5_recovery.recover_g5",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("g5") or [])),
-    ):
+        return _record
+
+    with _mock_recoveries() as mocks:
+        for route in _UNIT_ROUTES:
+            mocks[route].side_effect = record(route, [])
+        mocks["generic_dom"].side_effect = record("generic_dom", ([], ""))
         await recover_universal_embed(None, _ctx())
 
-    assert call_log == [
-        "appfolio", "leaseleads", "portal_hop",
-        "generic_dom", "sightmap", "g5",
-    ], f"cascade order drifted: {call_log}"
+    assert call_log == [*_UNIT_ROUTES, "generic_dom"]
 
 
 @pytest.mark.asyncio
-async def test_sightmap_runs_after_generic_dom_empty() -> None:
-    """generic_dom returning ([], 'winningPath') — empty units even with
-    a winningPath — must NOT short-circuit; sightmap should still run."""
-    call_log = []
-    with (
-        patch("ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
-              AsyncMock(side_effect=lambda *a, **k: (call_log.append("gd") or ([], "/some-path")))),
-        patch("ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
-              AsyncMock(side_effect=lambda *a, **k: call_log.append("sm") or [{"unit_number": "X"}])),
-        patch("ma_poc.pms.adapters._g5_recovery.recover_g5",
-              AsyncMock(return_value=[])),
-    ):
-        units, tier, name = await recover_universal_embed(None, _ctx())
-    assert call_log == ["gd", "sm"]
-    assert name == "sightmap_subpage"
-
-
-# ── ADAPTER TIER PRESERVATION ─────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_portal_hop_unit_specific_tier_preserved() -> None:
-    """When portal_hop's units carry their own ``extraction_tier`` (e.g.
-    TIER_1_API_RESMAN), that label wins over the generic
-    TIER_1_PMS_PORTAL_HOP — keeps cohort reporting accurate."""
-    patches = _mock_all_recoveries(
-        portal_hop=[
-            {"unit_number": "1", "extraction_tier": "TIER_1_API_RESMAN_PORTAL"}
-        ],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"]:
-        units, tier, name = await recover_universal_embed(None, _ctx())
-    assert tier == "TIER_1_API_RESMAN_PORTAL"
-
-
-@pytest.mark.asyncio
-async def test_sightmap_unit_tier_preserved_over_generic_recovery_label() -> None:
-    """SightMap units stamp TIER_1_API_SIGHTMAP_DIRECT when the direct-
-    API probe ran; that more-specific label must survive the recovery
-    wrapper."""
-    patches = _mock_all_recoveries(
-        sightmap=[
-            {"unit_number": "1", "extraction_tier": "TIER_1_API_SIGHTMAP_DIRECT"}
-        ],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"]:
-        units, tier, name = await recover_universal_embed(None, _ctx())
-    assert tier == "TIER_1_API_SIGHTMAP_DIRECT"
-
-
-@pytest.mark.asyncio
-async def test_g5_unit_tier_preserved_over_recovery_label() -> None:
-    patches = _mock_all_recoveries(
-        g5=[{"unit_number": "1", "extraction_tier": "TIER_2_API_G5_APOLLO"}],
-    )
-    with patches["appfolio"], patches["leaseleads"], patches["portal_hop"], \
-         patches["generic_dom"], patches["sightmap"], patches["g5"]:
-        units, tier, name = await recover_universal_embed(None, _ctx())
-    assert tier == "TIER_2_API_G5_APOLLO"
-
-
-# ── EXCEPTION SAFETY ──────────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_exception_in_chain_is_swallowed_returns_empty() -> None:
-    """A recovery raising must not propagate — outer try/except returns
-    empty and the chain is marked attempted."""
+async def test_total_miss_marks_chain_attempted() -> None:
     ctx = _ctx()
-    with (
-        patch("ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
-              AsyncMock(side_effect=RuntimeError("oh no"))),
-        patch("ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
-              AsyncMock(return_value=([], ""))),
-        patch("ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
-              AsyncMock(return_value=[])),
-        patch("ma_poc.pms.adapters._g5_recovery.recover_g5",
-              AsyncMock(return_value=[])),
-    ):
+    with _mock_recoveries():
         units, tier, name = await recover_universal_embed(None, ctx)
-    assert units == []
+
+    assert (units, tier, name) == ([], "", "")
     assert getattr(ctx, "_embed_recovery_attempted", False)
+
+
+@pytest.mark.asyncio
+async def test_body_only_miss_skips_navigation_arms_and_preserves_full_retry() -> None:
+    """The early pass must be cheap and must not consume the late fallback."""
+    ctx = _ctx()
+    page = MagicMock(name="live-page-must-not-reach-body-arms")
+    with _mock_recoveries(leaseleads=[_plan("TIER_1_API_LEASELEADS_PLAN_LEVEL")]) as mocks:
+        units, tier, name = await recover_universal_embed(
+            page,
+            ctx,
+            body_only=True,
+        )
+
+    assert (units, tier, name) == ([], "", "")
+    assert not getattr(ctx, "_embed_recovery_attempted", False)
+    mocks["sightmap"].assert_not_called()
+    mocks["generic_dom"].assert_not_called()
+    # Page-capable body arms receive None, preventing browser navigation and
+    # making the already-fetched response the sole discovery surface.
+    assert mocks["appfolio"].await_args.args[0] is None
+    assert mocks["leaseleads"].await_args.args[0] is None
+    assert mocks["portal_hop"].await_args.args[0] is None
+    assert mocks["g5"].await_args.args[0] is None
+
+
+@pytest.mark.asyncio
+async def test_body_only_unit_win_marks_full_chain_attempted() -> None:
+    """A canonical apartment win is final even in the cheap early pass."""
+    ctx = _ctx()
+    recovered = [_unit("UNIT-701", "TIER_1_API_KNOCK_DNI_CONFIG")]
+    with _mock_recoveries(knock_dni=recovered) as mocks:
+        units, tier, name = await recover_universal_embed(
+            MagicMock(),
+            ctx,
+            body_only=True,
+        )
+
+    assert units == recovered
+    assert tier == "TIER_1_API_KNOCK_DNI_CONFIG"
+    assert name == "knock_dni_config"
+    assert getattr(ctx, "_embed_recovery_attempted", False)
+    mocks["sightmap"].assert_not_called()
+    mocks["generic_dom"].assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_exception_in_one_arm_does_not_hide_later_unit_route() -> None:
+    """A broken SightMap arm must not make Rently and later arms unreachable."""
+    rently_units = [_unit("HOME-1", "TIER_1_API_RENTLY")]
+    with _mock_recoveries(rently=rently_units) as mocks:
+        mocks["sightmap"].side_effect = RuntimeError("simulated SightMap failure")
+        units, tier, name = await recover_universal_embed(None, _ctx())
+
+    assert units == rently_units
+    assert tier == "TIER_1_API_RENTLY"
+    assert name == "rently"
+    mocks["rently"].assert_awaited_once()
+    mocks["g5"].assert_not_called()
+    mocks["generic_dom"].assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_exception_in_last_unit_arm_still_reaches_generic_fallback() -> None:
+    plans = [_plan()]
+    with _mock_recoveries(generic_dom=(plans, "/floorplans")) as mocks:
+        mocks["g5"].side_effect = RuntimeError("simulated G5 failure")
+        units, tier, name = await recover_universal_embed(None, _ctx())
+
+    assert units == plans
+    assert tier == "TIER_3_DOM_GENERIC"
+    assert name == "generic_dom"
+    mocks["generic_dom"].assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_specific_route_tiers_are_preserved() -> None:
+    portal_units = [_unit("P1", "TIER_1_API_RESMAN_PORTAL")]
+    with _mock_recoveries(portal_hop=portal_units):
+        units, tier, name = await recover_universal_embed(None, _ctx())
+
+    assert units == portal_units
+    assert tier == "TIER_1_API_RESMAN_PORTAL"
+    assert name == "pms_portal_hop"

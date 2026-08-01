@@ -25,11 +25,12 @@ Key findings:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse, urlunparse
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -103,9 +104,7 @@ _MONEY_RE = re.compile(r"\$[\s]?[\d,]+(?:\.\d{2})?")
 _UNIT_COUNT_RE = re.compile(r"(\d+)\s*units?\s*available", re.IGNORECASE)
 
 
-def parse_prospect_portal_cards(
-    cards: list[dict[str, str]], url: str
-) -> list[dict[str, str]]:
+def parse_prospect_portal_cards(cards: list[dict[str, str]], url: str) -> list[dict[str, str]]:
     """Parse SSR Prospect Portal ``.fp-card`` rows into standard unit dicts.
 
     Plan-level (one row per floor plan, no per-apartment unit number) — these
@@ -153,9 +152,8 @@ def parse_prospect_portal_cards(
             status = "UNAVAILABLE"
             available_units = available_units or "0"
         else:
-            date_m = re.search(r"available\s+(.+)$", avail, re.IGNORECASE)
-            if date_m and not count_m:
-                availability_date = date_m.group(1).strip()
+            if not count_m:
+                availability_date = _pp_visible_availability_date(avail)
 
         units.append(
             make_unit_dict(
@@ -179,6 +177,7 @@ def parse_prospect_portal_cards(
             )
         )
     return units
+
 
 # Entrata widget types that contain real floor plan / availability data.
 _PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
@@ -225,9 +224,16 @@ def _filter_widget_response(body: dict[str, Any]) -> dict[str, Any] | None:
     return body
 
 
-def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
-    """Parse a flat list of Entrata floorplan dicts into standard unit dicts."""
-    units: list[dict[str, str]] = []
+def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, Any]]:
+    """Parse Entrata's flat *floor-plan catalogue* response.
+
+    ``item['id']`` is a floor-plan id, not an apartment id (it is also
+    embedded in Entrata's ``.../{plan}-{id}-1/`` detail URL).  Treating it as
+    ``unit_number`` fabricated unit identity and let this catalogue return
+    before the adapter's conventional-index and per-plan unit drills ran.
+    Preserve the id as plan-scoped provenance instead.
+    """
+    units: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -264,6 +270,17 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
             "",
         )
 
+        floorplan_id = str(item.get("id") or "").strip()
+        published_available_units = str(item.get("available_units") or "").strip()
+        explicit_availability = str(
+            item.get("availability_status") or item.get("availability-status") or ""
+        ).strip()
+        if not explicit_availability and published_available_units:
+            try:
+                if int(float(published_available_units)) > 0:
+                    explicit_availability = "AVAILABLE"
+            except (TypeError, ValueError):
+                pass
         units.append(
             make_unit_dict(
                 floor_plan_name=name,
@@ -271,13 +288,19 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
                 bedrooms=str(beds) if beds is not None else "",
                 bathrooms=str(baths) if baths is not None else "",
                 sqft=sqft,
-                unit_number=str(item.get("id") or ""),
+                unit_number="",
                 rent_range=rent_range,
-                availability_status="AVAILABLE",
+                # The catalogue fixture contains every plan and does not
+                # publish availability.  Do not turn plan existence into an
+                # AVAILABLE claim; retain only explicit status/count signals.
+                availability_status=explicit_availability,
                 availability_date=avail_dt,
-                available_units="1",
+                # This response contains one row per plan, not one row per
+                # available apartment.  Never manufacture a count of one.
+                available_units=published_available_units,
                 source_api_url=url,
-                extraction_tier="TIER_1_API_ENTRATA",
+                extraction_tier="TIER_1_API_ENTRATA_PLAN_LEVEL",
+                source_ids=({"entrata_fpid": floorplan_id} if floorplan_id else {}),
             )
         )
     return units
@@ -304,8 +327,20 @@ _SLUG_BB_RE = re.compile(r"(\d+)\s*br[\s_-]*(\d+(?:\.\d+)?)\s*ba", re.IGNORECASE
 
 
 def _iso_date(s: str) -> str:
-    """``MM/DD/YYYY`` → ``YYYY-MM-DD``; passthrough/'' otherwise."""
-    m = re.match(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$", str(s or ""))
+    """Normalize a source calendar date without timezone conversion.
+
+    A visible ``Available Now`` token is deliberately preserved for the output
+    formatter, which resolves it to the capture date and records
+    ``available_now`` provenance.
+    """
+    raw = str(s or "").strip()
+    if re.search(r"\bavailable\s+(?:now|today|immediately)\b", raw, re.IGNORECASE):
+        return "Available Now"
+    if re.match(r"^\d{4}-\d{2}-\d{2}", raw):
+        # Preserve the operator's calendar date.  Converting a timestamp to UTC
+        # here can shift that visible move-in date by one day.
+        return raw[:10]
+    m = re.match(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$", raw)
     if not m:
         return ""
     mo, d, y = m.groups()
@@ -326,9 +361,7 @@ def _bracket_json(html: str, start: int) -> str | None:
     return None
 
 
-def parse_entrata_available_units(
-    html: str, url: str
-) -> list[dict[str, str]]:
+def parse_entrata_available_units(html: str, url: str) -> list[dict[str, str]]:
     """Parse Entrata-WP per-floorplan-detail embedded ``available_units``.
 
     Entrata marketing sites (WordPress + prospectportal apply links)
@@ -459,9 +492,7 @@ def parse_entrata_modern_units_data(html: str, url: str) -> list[dict[str, Any]]
         for u in arr:
             if not isinstance(u, dict):
                 continue
-            unit_no = str(
-                u.get("unit_number") or u.get("marketing_unit_number") or ""
-            ).strip()
+            unit_no = str(u.get("unit_number") or u.get("marketing_unit_number") or "").strip()
             engrain = str(u.get("unit_id_engrain") or "").strip()
             key = unit_no or engrain or str(u.get("unit_id") or "")
             if not key or key in seen:
@@ -551,6 +582,39 @@ def _ld_num(value: Any) -> str:
     return str(int(f)) if f == int(f) else str(f)
 
 
+def _entrata_floorplan_unit_dates(html: str) -> dict[str, str]:
+    """Extract unit-keyed dates from ProspectPortal's SSR unit cards.
+
+    The JSON-LD ItemList on these pages carries identity, rent, and area but
+    omits availability.  The adjacent visible ``.unit-details`` card carries
+    the same unit number plus ``.available-date`` (for example
+    ``Available Sep 19``).  Joining the two representations is deterministic
+    and avoids defaulting a source-visible future date to the capture date.
+    """
+    if not html or "available-unit__name" not in html:
+        return {}
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return {}
+
+    out: dict[str, str] = {}
+    for card in soup.select(".unit-details"):
+        name_el = card.select_one(".available-unit__name")
+        date_el = card.select_one(".available-date")
+        if name_el is None or date_el is None:
+            continue
+        name_text = name_el.get_text(" ", strip=True)
+        unit_m = re.search(r"\bUnit\s*#?\s*(.+?)\s*$", name_text, re.IGNORECASE)
+        unit_number = (unit_m.group(1) if unit_m else name_text).strip()
+        raw_date = date_el.get_text(" ", strip=True)
+        if unit_number and raw_date:
+            out[unit_number.upper()] = raw_date
+    return out
+
+
 def parse_entrata_floorplan_html_jsonld(html: str, url: str) -> list[dict[str, str]]:
     """Parse a ProspectPortal ``/floor-plan/<type>/<design>.html`` page's JSON-LD.
 
@@ -572,6 +636,7 @@ def parse_entrata_floorplan_html_jsonld(html: str, url: str) -> list[dict[str, s
     _fp_size = fp.get("floorSize") if isinstance(fp.get("floorSize"), dict) else {}
     plan_sqft = _ld_num(_fp_size.get("value"))
     plan_name = str(fp.get("name") or "").strip()
+    unit_dates = _entrata_floorplan_unit_dates(html)
 
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -604,7 +669,7 @@ def parse_entrata_floorplan_html_jsonld(html: str, url: str) -> list[dict[str, s
                     rent_low=rent,
                     rent_high=rent,
                     availability_status="AVAILABLE",
-                    availability_date="",
+                    availability_date=unit_dates.get(unit_no.upper(), ""),
                     source_api_url=url,
                     extraction_tier="TIER_2_JSONLD_ENTRATA_FP",
                 )
@@ -622,9 +687,7 @@ def parse_entrata_floorplan_html_jsonld(html: str, url: str) -> list[dict[str, s
 # data-unitavailabilitydate ...>. Cloudflare-fronted (cf_clearance) →
 # probe_get's cost-gated Web-Unlocker escalation clears it. Stateless
 # GET, repli360/securecafe-class (no browser, no OLL stateful wall).
-_PP_HOST_RE = re.compile(
-    r"https?://([a-z0-9][a-z0-9-]*)\.prospectportal\.com", re.IGNORECASE
-)
+_PP_HOST_RE = re.compile(r"https?://([a-z0-9][a-z0-9-]*)\.prospectportal\.com", re.IGNORECASE)
 _PP_PROPID_RE = re.compile(r"property\[id\][^0-9]{0,6}(\d{3,9})", re.IGNORECASE)
 _PP_FPID_RE = re.compile(
     r"""(?:property_floorplan\[id\]|data-floorplan)["'\]=\s/]{1,4}(\d{4,9})""",
@@ -652,7 +715,9 @@ def _pp_iso(s: str) -> str:
     YYYY), which the year-first-only regex dropped — so availability_date
     came back empty on every replayed unit row.
     """
-    txt = str(s or "")
+    txt = str(s or "").strip()
+    if re.search(r"\bavailable\s+(?:now|today|immediately)\b", txt, re.IGNORECASE):
+        return "Available Now"
     m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", txt)
     if m:
         return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
@@ -662,9 +727,7 @@ def _pp_iso(s: str) -> str:
     return ""
 
 
-def parse_prospectportal_unit_spaces(
-    html: str, url: str
-) -> list[dict[str, str]]:
+def parse_prospectportal_unit_spaces(html: str, url: str) -> list[dict[str, str]]:
     """Parse a ProspectPortal ``view_unit_spaces`` HTML fragment.
 
     One row per ``<a class="unit-button" data-*>``. The ``data-*`` attrs
@@ -692,9 +755,7 @@ def parse_prospectportal_unit_spaces(
     seen: set[str] = set()
     for a in soup.select("a.unit-button"):
         uid = str(a.get("data-unit") or a.get("rel") or "").strip()
-        row = a.find_parent(class_="unit-row-wrapper") or a.find_parent(
-            class_="unit-row"
-        )
+        row = a.find_parent(class_="unit-row-wrapper") or a.find_parent(class_="unit-row")
         unum = ""
         if row is not None:
             uc = row.select_one(".unit-col.unit .unit-col-text")
@@ -705,11 +766,7 @@ def parse_prospectportal_unit_spaces(
             continue
         seen.add(unum)
         rent_i: int | None = None
-        rraw = str(
-            a.get("data-rent")
-            or a.get("data-min-advertised-base-rent")
-            or ""
-        )
+        rraw = str(a.get("data-rent") or a.get("data-min-advertised-base-rent") or "")
         rm = re.search(r"[\d,]+", rraw)
         if rm:
             try:
@@ -733,9 +790,7 @@ def parse_prospectportal_unit_spaces(
                 rent_low=rent_i,
                 rent_high=rent_i,
                 availability_status="AVAILABLE",
-                availability_date=_pp_iso(
-                    str(a.get("data-unitavailabilitydate") or "")
-                ),
+                availability_date=_pp_iso(str(a.get("data-unitavailabilitydate") or "")),
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
             )
@@ -794,9 +849,28 @@ _PP_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*b(?:ed|d)\b", re.IGNORECASE)
 _PP_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*b(?:ath|a)\b", re.IGNORECASE)
 _PP_SQFT_NUM_RE = re.compile(r"([\d,]+)")
 _PP_AVAIL_COUNT_RE = re.compile(r"(\d+)\s*units?\s*available", re.IGNORECASE)
-_PP_AVAIL_DATE_RE = re.compile(
-    r"available\s+([a-z]{3,9}\s+\d{1,2},?\s*\d{4})", re.IGNORECASE
-)
+_PP_AVAIL_DATE_RE = re.compile(r"available\s+([a-z]{3,9}\s+\d{1,2},?\s*\d{4})", re.IGNORECASE)
+
+
+def _pp_visible_availability_date(raw: Any) -> str:
+    """Preserve an explicit PP date or relative available-now source token."""
+    text = re.sub(r"\s+", " ", str(raw or "")).strip()
+    if not text or re.search(
+        r"waitlist|unavailable|no\s+availability|contact\s+for\s+availability",
+        text,
+        re.IGNORECASE,
+    ):
+        return ""
+    if re.search(
+        r"\bavailable\s+(?:now|today|immediately)\b|^(?:now|today|immediately)$",
+        text,
+        re.IGNORECASE,
+    ):
+        return "Available Now"
+    named = _PP_AVAIL_DATE_RE.search(text)
+    if named:
+        return named.group(1)
+    return _pp_iso(text)
 
 
 # ── Fee-transparency dual-price display (2026-07-28) ────────────────────
@@ -983,16 +1057,18 @@ def _pp_txt(el: Any) -> str:
     return el.get_text(" ", strip=True) if el else ""
 
 
-def parse_entrata_prospectportal_html(
-    html: str, url: str
-) -> list[dict[str, str]]:
-    """Parse Entrata Prospect Portal SSR HTML — supports THREE templates:
+def parse_entrata_prospectportal_html(html: str, url: str) -> list[dict[str, str]]:
+    """Parse Entrata Prospect Portal SSR HTML — supports four templates:
 
     Template A — ``.fp-card`` with ``dynamic-text-before/after`` siblings
     Template B — ``li.fp-group-item`` with ``.fp-col`` title-labelled blocks
     Template C — ``.unit-item`` with ``.unit-title`` / ``.unit-bed-bath``
                  (packed "N Bed, N Bath, NNN SqFt") / ``.unit-price``
                  (the "unit-roster" layout)
+    Template D — an ``.fp-name-link`` anchored grid whose row is either
+                 ``.grid-details`` or ``li.fp-row``. Newer fee-transparency
+                 themes dropped the A/B wrapper classes while retaining the
+                 same labelled bed/rent/sqft fields.
 
     Plan-level output (one row per floorplan name) — these pages render
     a plan grid, not a per-apartment unit roster. Returns ``[]`` when
@@ -1031,18 +1107,18 @@ def parse_entrata_prospectportal_html(
     if unit_items:
         return _parse_pp_unit_item(unit_items, url)
 
+    anchors = soup.select(".fp-name-link")
+    if anchors:
+        return _parse_pp_anchor_grid(anchors, url)
+
     return []
 
 
-def _parse_pp_fp_card(
-    cards: list[Any], url: str
-) -> list[dict[str, str]]:
+def _parse_pp_fp_card(cards: list[Any], url: str) -> list[dict[str, str]]:
     """Template A: ``.fp-card`` with ``dynamic-text-before/after`` siblings."""
     units: list[dict[str, str]] = []
     for card in cards:
-        name = _pp_txt(card.select_one(".fp-title")) or _pp_txt(
-            card.select_one(".fp-name")
-        )
+        name = _pp_txt(card.select_one(".fp-title")) or _pp_txt(card.select_one(".fp-name"))
         bedbath = _pp_txt(card.select_one(".dynamic-text-before"))
         sqft_raw = _pp_txt(card.select_one(".dynamic-text-after"))
         # Fee-transparency guard — see _pp_rent_cell_text. No-op on themes
@@ -1050,9 +1126,9 @@ def _parse_pp_fp_card(
         rent_raw = _pp_rent_cell_text(card.select_one(".fee-transparency-text"))
         avail_raw = _pp_txt(card.select_one(".availability"))
         lease_raw = _pp_txt(card.select_one(".lease-term-name"))
-        special_raw = _pp_txt(
-            card.select_one(".fp-special-main-text")
-        ) or _pp_txt(card.select_one(".fp-special-text"))
+        special_raw = _pp_txt(card.select_one(".fp-special-main-text")) or _pp_txt(
+            card.select_one(".fp-special-text")
+        )
 
         beds, baths = _pp_beds_baths(bedbath)
         sqft_m = _PP_SQFT_NUM_RE.search(sqft_raw)
@@ -1065,11 +1141,7 @@ def _parse_pp_fp_card(
         if re.search(r"waitlist", avail_raw, re.IGNORECASE):
             status = "UNAVAILABLE"
             avail_units = avail_units or "0"
-        avail_date = ""
-        if not count_m:
-            date_m = _PP_AVAIL_DATE_RE.search(avail_raw)
-            if date_m:
-                avail_date = date_m.group(1)
+        avail_date = _pp_visible_availability_date(avail_raw)
 
         # Skip empty rows — name and at least one numeric dimension needed
         if not (name or bedbath) or not (rent_lo or rent_hi or sqft):
@@ -1098,15 +1170,11 @@ def _parse_pp_fp_card(
     return units
 
 
-def _parse_pp_fp_group_item(
-    items: list[Any], url: str
-) -> list[dict[str, str]]:
+def _parse_pp_fp_group_item(items: list[Any], url: str) -> list[dict[str, str]]:
     """Template B: ``li.fp-group-item`` with title-labelled ``.fp-col`` blocks."""
     units: list[dict[str, str]] = []
     for item in items:
-        name = _pp_txt(
-            item.select_one(".fp-name-link, .fp-name, .fp-title")
-        )
+        name = _pp_txt(item.select_one(".fp-name-link, .fp-name, .fp-title"))
 
         # Walk every .fp-col block; index by .fp-col-title text + by
         # class hint (bed-bath / rent / sq-feet / deposit / action).
@@ -1136,19 +1204,11 @@ def _parse_pp_fp_group_item(
                     break
             title = _pp_txt(col.select_one(".fp-col-title"))
             if title:
-                cols.setdefault(
-                    title.lower().strip().rstrip(":"), value
-                )
+                cols.setdefault(title.lower().strip().rstrip(":"), value)
 
         bedbath = cols.get("bed-bath") or cols.get("beds / baths") or ""
         rent_raw = cols.get("rent", "")
-        sqft_raw = (
-            cols.get("sq-feet")
-            or cols.get("sqft")
-            or cols.get("sq. ft")
-            or cols.get("sq ft")
-            or ""
-        )
+        sqft_raw = cols.get("sq-feet") or cols.get("sqft") or cols.get("sq. ft") or cols.get("sq ft") or ""
         action_raw = cols.get("action", "")
         deposit_raw = cols.get("deposit", "")
 
@@ -1158,15 +1218,12 @@ def _parse_pp_fp_group_item(
         rent_lo, rent_hi = _pp_money_low_high(rent_raw)
 
         avail_units = ""
-        avail_date = ""
+        avail_date = _pp_visible_availability_date(action_raw)
         count_m = _PP_AVAIL_COUNT_RE.search(action_raw)
         if count_m:
             avail_units = count_m.group(1)
         elif re.search(r"only\s+one\b", action_raw, re.IGNORECASE):
             avail_units = "1"
-        date_m = _PP_AVAIL_DATE_RE.search(action_raw)
-        if date_m:
-            avail_date = date_m.group(1)
         status = "AVAILABLE"
         if re.search(r"waitlist", action_raw, re.IGNORECASE):
             status = "UNAVAILABLE"
@@ -1192,6 +1249,114 @@ def _parse_pp_fp_group_item(
                 availability_date=avail_date,
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_ENTRATA_PP_FPGROUP",
+            )
+        )
+    return units
+
+
+def _parse_pp_anchor_grid(anchors: list[Any], url: str) -> list[dict[str, str]]:
+    """Template D: wrapper-less ``.fp-name-link`` anchored plan grids.
+
+    Entrata's current fee-transparency themes use two sibling row shapes:
+
+    * ``.grid-details`` + ``.details-col`` (Marlowe Live Oak, Avana Court)
+    * ``li.fp-row`` + ``.fp-col`` (White Furniture Lofts)
+
+    Both retain a floor-plan anchor and labelled bed/rent/sqft cells, but omit
+    ``.fp-card`` and ``li.fp-group-item``. Anchor each parse to that explicit
+    plan link, then walk only its nearest recognised row so map/search/nav
+    content cannot bleed across plans.
+    """
+
+    def _container(anchor: Any) -> Any | None:
+        node = anchor
+        while node is not None:
+            classes = set(node.get("class") or []) if hasattr(node, "get") else set()
+            if "grid-details" in classes:
+                return node
+            if getattr(node, "name", None) == "li" and "fp-row" in classes:
+                return node
+            node = getattr(node, "parent", None)
+        return None
+
+    units: list[dict[str, str]] = []
+    seen_containers: set[int] = set()
+    seen_rows: set[tuple[Any, ...]] = set()
+    for anchor in anchors:
+        row = _container(anchor)
+        if row is None or id(row) in seen_containers:
+            continue
+        seen_containers.add(id(row))
+
+        name = _pp_txt(anchor)
+        bedbath = _pp_txt(
+            row.select_one(".details-col.bed-bath .value, .fp-col.bed-bath .fp-col-text, .bed-bath .value")
+        )
+        rent_node = row.select_one(".details-col.rent, .fp-col.rent")
+        rent_raw = _pp_rent_cell_text(rent_node)
+        sqft_raw = _pp_txt(
+            row.select_one(
+                ".details-col.sq-feet .value, "
+                ".details-col.sqft .value, "
+                ".fp-col.sq-feet .fp-col-text, "
+                ".fp-col.sqft .fp-col-text"
+            )
+        )
+        deposit_raw = _pp_txt(row.select_one(".details-col.deposit .value, .fp-col.deposit .fp-col-text"))
+        avail_raw = _pp_txt(
+            row.select_one(".available-units, .mobile-availability, .availability-link, .fp-col.action")
+        )
+        lease_raw = _pp_txt(row.select_one(".lease-term-name"))
+        special_raw = _pp_txt(row.select_one(".fp-special-main-text, .fp-special-text"))
+
+        beds, baths = _pp_beds_baths(bedbath)
+        sqft_m = _PP_SQFT_NUM_RE.search(sqft_raw)
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+        rent_lo, rent_hi = _pp_money_low_high(rent_raw)
+
+        # The newer grid says "10 Available" (without the word "units").
+        count_m = _PP_AVAIL_COUNT_RE.search(avail_raw) or re.search(
+            r"\b(\d+)\s+available\b", avail_raw, re.IGNORECASE
+        )
+        avail_units = count_m.group(1) if count_m else ""
+        date_m = _PP_AVAIL_DATE_RE.search(avail_raw)
+        avail_date = date_m.group(1) if date_m else ""
+        status = "AVAILABLE"
+        if re.search(
+            r"waitlist|no\s+availability|contact\s+for\s+availability",
+            avail_raw,
+            re.IGNORECASE,
+        ):
+            status = "UNAVAILABLE"
+
+        # A plan anchor plus a real price or area is the precision gate. Beds
+        # alone occur in marketing navigation and are not inventory evidence.
+        if not name or not (rent_lo or rent_hi or sqft):
+            continue
+        dedupe_key = (name, bedbath, sqft, rent_lo, rent_hi)
+        if dedupe_key in seen_rows:
+            continue
+        seen_rows.add(dedupe_key)
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft=sqft,
+                unit_number="",
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                deposit=(deposit_raw if deposit_raw and deposit_raw not in {"—", "--"} else ""),
+                concession=special_raw,
+                availability_status=status,
+                available_units=avail_units,
+                availability_date=avail_date,
+                lease_term=lease_raw,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_ANCHOR_GRID",
             )
         )
     return units
@@ -1226,9 +1391,7 @@ def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
     units: list[dict[str, str]] = []
     seen_names: set[str] = set()
     for item in items:
-        name = _pp_txt(item.select_one(".unit-title")) or _pp_txt(
-            item.select_one(".floorplan-title")
-        )
+        name = _pp_txt(item.select_one(".unit-title")) or _pp_txt(item.select_one(".floorplan-title"))
         if not name:
             continue
         # Some sites repeat the same title across multiple variations of
@@ -1284,6 +1447,7 @@ def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
                 avail_units = am.group(1) or ("1" if am.group(2) else "")
         if re.search(r"waitlist|no\s+availability", avail_raw, re.IGNORECASE):
             status = "UNAVAILABLE"
+        avail_date = _pp_visible_availability_date(avail_raw)
 
         # Skip empty rows — need name + at least one numeric dimension
         if not (rent_lo or rent_hi or sqft):
@@ -1309,6 +1473,7 @@ def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
                 rent_high=rent_hi,
                 availability_status=status,
                 available_units=avail_units,
+                availability_date=avail_date,
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_ENTRATA_PP_UNITITEM",
             )
@@ -1364,27 +1529,17 @@ def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
 # some legacy PP themes use them in the same position.
 _PP_UNIT_CARD_SEP_RE = re.compile(r"[•|,]")
 _PP_UNIT_CARD_AVAIL_NOW_RE = re.compile(r"available\s+now", re.IGNORECASE)
-_PP_UNIT_CARD_AVAIL_MDY_RE = re.compile(
-    r"available\s+(\d{1,2})/(\d{1,2})/(\d{4})", re.IGNORECASE
-)
+_PP_UNIT_CARD_AVAIL_MDY_RE = re.compile(r"available\s+(\d{1,2})/(\d{1,2})/(\d{4})", re.IGNORECASE)
 # "from $1,595 per month" / "$1,595" / "$1,495 - $1,695"
-_PP_UNIT_CARD_RENT_RE = re.compile(
-    r"\$\s*([\d,]+)(?:\.\d{2})?", re.IGNORECASE
-)
+_PP_UNIT_CARD_RENT_RE = re.compile(r"\$\s*([\d,]+)(?:\.\d{2})?", re.IGNORECASE)
 # Class suffix encoding the unit id, e.g. "unit-item-details-267".
 _PP_UNIT_CARD_ID_CLASS_RE = re.compile(r"unit-item-details-(\d+)")
 # Bed/bath/sqft tuples that may appear once in the same line, e.g.
 # "2 Bed • 2 Bath • 954 SqFt" or "Studio • 1 Bath • 480 SqFt".
-_PP_UNIT_CARD_BED_RE = re.compile(
-    r"(\d+)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE
-)
-_PP_UNIT_CARD_BATH_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE
-)
+_PP_UNIT_CARD_BED_RE = re.compile(r"(\d+)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE)
+_PP_UNIT_CARD_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE)
 # Sqft tolerant to NBSP / "&nbsp" sans-semicolon / plain whitespace.
-_PP_UNIT_CARD_SQFT_RE = re.compile(
-    r"([\d,]+)[\s\xa0&\w]{0,8}?(?:sq\s*ft|sqft)", re.IGNORECASE
-)
+_PP_UNIT_CARD_SQFT_RE = re.compile(r"([\d,]+)[\s\xa0&\w]{0,8}?(?:sq\s*ft|sqft)", re.IGNORECASE)
 # Plan-slug-fpid extraction from the per-plan URL:
 # .../floorplans/<location>/<property>/<plan-slug>-<fpid>-<phase>/
 # fpid is \d{2,9}: some Entrata properties number floor plans with 2-digit ids
@@ -1444,15 +1599,14 @@ def _pp_plan_url_match(url: str) -> tuple[str, str] | None:
 #: livethewatts.com/floorplans/ has 46 of them and ZERO Entrata elements),
 #: which would hand a foreign vendor's page to the Entrata parser for a
 #: guaranteed-empty parse.
-_PP_PLAN_UNIT_MARKERS_RE = re.compile(
-    r"(?<![-\w])(?:unit-card|fp-units-table|option-row)(?![-\w])"
-)
+_PP_PLAN_UNIT_MARKERS_RE = re.compile(r"(?<![-\w])(?:unit-card|fp-units-table|option-row)(?![-\w])")
 
 
-#: ProspectPortal plan-index href: ``/{city-slug}/{property-slug}/conventional/``.
-#: Absolute or root-relative; the trailing slash is optional in the wild.
+#: ProspectPortal plan-index URL published in an anchor ``href`` or CTA form
+#: ``action``: ``/{city-slug}/{property-slug}/conventional/``. Absolute or
+#: root-relative; the trailing slash is optional in the wild.
 _PP_CONVENTIONAL_RE = re.compile(
-    r"""href=["'']((?:https?://[^"'\s]+)?/[a-z0-9][a-z0-9\-]*/[a-z0-9][a-z0-9\-]*/conventional/?)["'']""",
+    r"""(?:href|action)=["'']((?:https?://[^"'\s]+)?/[a-z0-9][a-z0-9\-]*/[a-z0-9][a-z0-9\-]*/conventional/?)["'']""",
     re.IGNORECASE,
 )
 
@@ -1464,7 +1618,8 @@ def _find_pp_conventional_index(html: str, base: str) -> list[str]:
     ``/rockville/fenestra-at-the-square/``,
     ``/oklahoma-city-oklahoma-city/garden-gate/`` and
     ``/corvallis-corvallis/grand-oaks-grand-oaks/``, where city and property
-    are each sometimes doubled. So it is read off the page's own anchors.
+    are each sometimes doubled. So it is read off the page's own anchors or
+    exact availability-search form action.
 
     Same-host only: a ProspectPortal vanity site can link a sibling property,
     and drilling someone else's roster would attribute their apartments here.
@@ -1547,29 +1702,39 @@ def _pp_extract_card_fpid(card: Any) -> str:
     return ""
 
 
-_PP_OPT_ROW_BED_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE
-)
-_PP_OPT_ROW_BATH_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE
-)
+_PP_OPT_ROW_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE)
+_PP_OPT_ROW_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE)
 # Aria emits ``data-date="06/06/2026"`` (MM/DD/YYYY) on the See-Details
 # button. The visible text "Available Jun 06, 2026" is the human form;
 # we prefer the numeric attr because it's locale-stable.
-_PP_OPT_ROW_DATA_DATE_RE = re.compile(
-    r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$"
-)
+_PP_OPT_ROW_DATA_DATE_RE = re.compile(r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$")
 # Fallback for the visible "Jun 06, 2026" / "June 6, 2026" form when
 # the See-Details button is missing or stripped.
-_PP_OPT_ROW_TEXT_DATE_RE = re.compile(
-    r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})"
-)
+_PP_OPT_ROW_TEXT_DATE_RE = re.compile(r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})")
 _PP_OPT_ROW_MONTH_NAMES = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-    "january": 1, "february": 2, "march": 3, "april": 4,
-    "june": 6, "july": 7, "august": 8, "september": 9,
-    "october": 10, "november": 11, "december": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
 }
 
 
@@ -1596,9 +1761,7 @@ def _pp_opt_row_iso_date(s: str) -> str:
     return ""
 
 
-def _parse_pp_option_rows(
-    soup: Any, url: str, plan: str, derived_fpid: str
-) -> list[dict[str, str]]:
+def _parse_pp_option_rows(soup: Any, url: str, plan: str, derived_fpid: str) -> list[dict[str, str]]:
     """Template U2 — Aria-style per-plan ``.option-row`` roster.
 
     See ``parse_entrata_pp_unit_cards`` docstring for the markup
@@ -1611,10 +1774,7 @@ def _parse_pp_option_rows(
     title`` is the column-headers row PP renders to label the table
     on mobile — never a unit).
     """
-    data_rows = [
-        r for r in soup.select(".option-row")
-        if "title" not in (r.get("class") or [])
-    ]
+    data_rows = [r for r in soup.select(".option-row") if "title" not in (r.get("class") or [])]
     if not data_rows:
         return []
 
@@ -1697,36 +1857,71 @@ def _parse_pp_option_rows(
         lease_el = row.select_one(".lease-term-name")
         lease_term = lease_el.get_text(" ", strip=True) if lease_el else ""
 
-        # Sqft + availability — both rendered as ``.detail.block`` in
-        # document order. PP labels them with a mobile-text label that
-        # we strip.
+        # Sqft / availability / floor are all rendered as ``.detail.block``.
+        # Older pages happened to put sqft first and availability second, but
+        # current Scully/Entrata pages insert a Floor cell before sqft and a
+        # Deposit cell before availability.  Position-based parsing therefore
+        # turned floors 0/1/2/4 into sqft and treated deposits as dates.  Route
+        # by the explicit ``.mobile-text`` label; retain a guarded positional
+        # fallback only for old label-less fixtures.
         blocks = row.select(".detail.block")
         sqft_val = ""
-        if blocks:
-            txt = blocks[0].get_text(" ", strip=True)
-            txt = re.sub(
-                r"^sq\.?\s*ft\.?\s*", "", txt, flags=re.IGNORECASE
-            ).strip()
-            sm = re.search(r"([\d,]+)", txt)
-            if sm:
-                sqft_val = sm.group(1).replace(",", "")
         visible_avail = ""
-        if len(blocks) >= 2:
-            txt = blocks[1].get_text(" ", strip=True)
-            visible_avail = re.sub(
-                r"^available\s*", "", txt, flags=re.IGNORECASE
-            ).strip()
+        floor = ""
+        for block in blocks:
+            label_node = block.select_one(".mobile-text")
+            label = label_node.get_text(" ", strip=True).casefold() if label_node is not None else ""
+            value = block.get_text(" ", strip=True)
+            if label_node is not None:
+                value = re.sub(
+                    rf"^{re.escape(label_node.get_text(' ', strip=True))}\s*",
+                    "",
+                    value,
+                    flags=re.IGNORECASE,
+                ).strip()
+            if label.startswith(("sq", "square")) or "unit-sqft-cell" in (block.get("class") or []):
+                sm = re.search(r"([\d,]+)", value)
+                if sm:
+                    sqft_val = sm.group(1).replace(",", "")
+            elif label.startswith("available"):
+                visible_avail = value
+            elif label == "floor":
+                floor = value
+
+        if not sqft_val and blocks:
+            first_label = _pp_txt(blocks[0].select_one(".mobile-text")).casefold()
+            if not first_label or first_label.startswith(("sq", "square")):
+                sm = re.search(r"([\d,]+)", blocks[0].get_text(" ", strip=True))
+                if sm:
+                    sqft_val = sm.group(1).replace(",", "")
+        if not visible_avail:
+            for block in reversed(blocks):
+                text = block.get_text(" ", strip=True)
+                if re.search(r"\bavailable\b|\bnow\b", text, re.IGNORECASE):
+                    visible_avail = re.sub(r"^available\s*", "", text, flags=re.IGNORECASE).strip()
+                    break
+
+        building = ""
+        for second in row.select(".detail.second"):
+            label_node = second.select_one(".mobile-text")
+            label = _pp_txt(label_node).casefold()
+            if label != "building":
+                continue
+            text = second.get_text(" ", strip=True)
+            building = re.sub(r"^building\s*", "", text, flags=re.IGNORECASE).strip()
+            break
 
         # data-* on the See-Details button is the authoritative source.
-        btn = row.select_one(
-            ".js-show-details, .detail.action button, .detail.action a"
-        )
+        btn = row.select_one(".js-show-details, .detail.action button, .detail.action a")
         data_unit = str(btn.get("data-unit") or "").strip() if btn else ""
         data_fp = str(btn.get("data-floorplan") or "").strip() if btn else ""
         data_date = str(btn.get("data-date") or "").strip() if btn else ""
 
-        avail_date = _pp_opt_row_iso_date(data_date) or _pp_opt_row_iso_date(
-            visible_avail
+        avail_date = _pp_opt_row_iso_date(data_date) or _pp_opt_row_iso_date(visible_avail)
+        avail_date = (
+            _pp_opt_row_iso_date(data_date)
+            or _pp_opt_row_iso_date(visible_avail)
+            or _pp_visible_availability_date(visible_avail)
         )
         status = "AVAILABLE"
 
@@ -1752,6 +1947,8 @@ def _parse_pp_option_rows(
                 bathrooms=baths_val,
                 sqft=sqft_val,
                 unit_number=unit_num,
+                floor=floor,
+                building=building,
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 rent_low=rent_lo,
                 rent_high=rent_hi,
@@ -1766,9 +1963,7 @@ def _parse_pp_option_rows(
     return units
 
 
-def parse_entrata_pp_unit_cards(
-    html: str, url: str, floor_plan_name: str = ""
-) -> list[dict[str, str]]:
+def parse_entrata_pp_unit_cards(html: str, url: str, floor_plan_name: str = "") -> list[dict[str, str]]:
     """Parse a Prospect Portal **per-plan** page's per-apartment roster.
 
     Two DOM templates as of 2026-05-25:
@@ -1834,9 +2029,7 @@ def parse_entrata_pp_unit_cards(
     cards = soup.select(".unit-card")
     if not cards:
         # Template U2 (Aria at Ella style) — .option-row roster.
-        return _parse_pp_option_rows(
-            soup, url, plan or "", derived_fpid
-        )
+        return _parse_pp_option_rows(soup, url, plan or "", derived_fpid)
 
     units: list[dict[str, str]] = []
     seen_uids: set[str] = set()
@@ -1906,25 +2099,23 @@ def parse_entrata_pp_unit_cards(
         # Text-level fallback for a theme that renders the "Base Rent:"
         # label with no base-rent node to anchor on. No-op on every other
         # PP theme (no "Base Rent:" label -> whole string, as before).
-        rent_matches = _PP_UNIT_CARD_RENT_RE.findall(
-            _pp_base_rent_scope(rent_text) or rent_text
-        )
+        rent_matches = _PP_UNIT_CARD_RENT_RE.findall(_pp_base_rent_scope(rent_text) or rent_text)
         rent_lo: int | None = None
         rent_hi: int | None = None
         if rent_matches:
             rent_lo = money_to_int(rent_matches[0])
             rent_hi = money_to_int(rent_matches[-1])
 
-        # Availability: "Available Now" → today (left empty, downstream
-        # fills the scrape date) | "Available MM/DD/YYYY" → ISO date.
-        avail_date = ""
+        # Preserve Available Now as a source token. The formatter resolves it
+        # against the capture timestamp and records ``available_now`` lineage.
+        avail_date = _pp_visible_availability_date(text)
         status = "AVAILABLE"
         date_m = _PP_UNIT_CARD_AVAIL_MDY_RE.search(text)
         if date_m:
             mo, d, y = date_m.groups()
             avail_date = f"{y}-{int(mo):02d}-{int(d):02d}"
-        # "Available Now" / no date → leave avail_date blank; status
-        # stays AVAILABLE so the downstream gate doesn't reject.
+        # No availability token/date leaves the field blank; status stays
+        # AVAILABLE so the downstream gate does not reject a real unit row.
 
         # Building / floor — best-effort, useful for downstream merge
         # but not required for validity.
@@ -1979,9 +2170,7 @@ def parse_entrata_pp_unit_cards(
 # filters the preload skeletons out. Live-verified 2026-07-16 on a rendered
 # anthemeverett.com/floorplans capture: 25/25 real distinct unit numbers.
 _JDFP_TITLE_RE = re.compile(r"#\s*([0-9A-Za-z][0-9A-Za-z-]*)")
-_JDFP_FP_RE = re.compile(
-    r"Floorplan layout:\s*([^\n$]+?)(?:\s+\$|\s+\d+\s*months?|$)", re.IGNORECASE
-)
+_JDFP_FP_RE = re.compile(r"Floorplan layout:\s*([^\n$]+?)(?:\s+\$|\s+\d+\s*months?|$)", re.IGNORECASE)
 # jd-fp cards write sqft as "464 sq. ft." (with periods) — the older
 # _PP_UNIT_CARD_SQFT_RE doesn't tolerate the dotted form.
 _JDFP_SQFT_RE = re.compile(r"([\d,]+)\s*sq\.?\s*ft", re.IGNORECASE)
@@ -2027,17 +2216,16 @@ def parse_entrata_pp_jd_fp_cards(html: str, url: str) -> list[dict[str, str]]:
         # ``text`` is the WHOLE card (beds/baths/sqft/availability all live
         # in it), so the rent string is narrowed separately.
         rent_text = _pp_base_rent_node_text(card) or text
-        rents = _PP_UNIT_CARD_RENT_RE.findall(
-            _pp_base_rent_scope(rent_text) or rent_text
-        )
+        rents = _PP_UNIT_CARD_RENT_RE.findall(_pp_base_rent_scope(rent_text) or rent_text)
         rent_lo = int(rents[0].replace(",", "")) if rents else None
         rent_hi = int(rents[-1].replace(",", "")) if rents else None
         status = "AVAILABLE" if re.search(r"available", text, re.IGNORECASE) else "UNKNOWN"
         adm = _PP_UNIT_CARD_AVAIL_MDY_RE.search(text)
+        avail_date = f"{adm.group(3)}-{adm.group(1).zfill(2)}-{adm.group(2).zfill(2)}" if adm else ""
         avail_date = (
             f"{adm.group(3)}-{adm.group(1).zfill(2)}-{adm.group(2).zfill(2)}"
             if adm
-            else ""
+            else _pp_visible_availability_date(text)
         )
         src = str(card.get("data-unit") or "").strip()
         source_ids: dict[str, Any] = {"entrata_uid": src} if src else {}
@@ -2162,13 +2350,18 @@ async def _entrata_static_fetch(
     kw: dict[str, Any] = {"timeout": 20, "unlocker": unlocker, "retries": retries}
     if headers:
         kw["headers"] = headers
-    r = probe_get(url, **kw)
+    # ``probe_get`` is curl_cffi-backed and synchronous.  This helper fans out
+    # across multiple candidate and per-plan URLs from ``extract``; calling it
+    # bare here serialised the whole async property batch behind curl timeouts
+    # (live FND bulk reproduction: zero of six concurrent properties could
+    # reach its 75s ``wait_for`` while one task slept/retried in probe_get).
+    # Keep the existing transport semantics, but move the blocking request off
+    # the event loop so property-level timeouts and concurrency remain real.
+    r = await asyncio.to_thread(probe_get, url, **kw)
     return (r.text or "") if r.status_code == 200 else ""
 
 
-async def _entrata_fetch_ssr(
-    url: str, *, headers: dict[str, str] | None = None
-) -> str:
+async def _entrata_fetch_ssr(url: str, *, headers: dict[str, str] | None = None) -> str:
     """Fetch a server-rendered ProspectPortal page for CODE-ONLY recovery,
     DIRECT first and escalating to the Web Unlocker only when direct is empty.
 
@@ -2190,9 +2383,7 @@ async def _entrata_fetch_ssr(
         # sinks the whole /conventional/ recovery (the Web Unlocker is off under
         # compliance, so there is no other fallback). A plain re-GET recovered
         # the intermittent block 4/4 live.
-        html = await _entrata_static_fetch(
-            url, unlocker=False, retries=2, headers=headers
-        )
+        html = await _entrata_static_fetch(url, unlocker=False, retries=2, headers=headers)
     except Exception:
         html = ""
     if html:
@@ -2201,6 +2392,380 @@ async def _entrata_fetch_ssr(
         return await _entrata_static_fetch(url, unlocker=True, headers=headers)
     except Exception:
         return ""
+
+
+# EntrataSnippet conventional detail links.  ``unquote`` is applied before
+# matching because live indexes encode either or both ``[id]`` tokens as
+# ``%5Bid%5D``.  Requiring the full property-floorplan path plus conventional
+# occupancy prevents application/authentication and generic widget URLs from
+# entering this recovery.
+_ENTRATA_SNIPPET_DETAIL_RE = re.compile(
+    r"^/apartments/module/property_floorplans/"
+    r"property\[id\]/(?P<property_id>\d{3,12})/"
+    r"property_floorplan\[id\]/(?P<floorplan_id>\d{2,12})/"
+    r"(?:[^/]+/)*occupancy_type/conventional(?:/|$)",
+    re.IGNORECASE,
+)
+
+
+def _entrata_snippet_identity_match(html: str, property_name: str) -> bool:
+    """Require the configured property name in human-visible page text."""
+    if not html or not property_name.strip():
+        return False
+    from bs4 import BeautifulSoup
+
+    def _norm(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+    expected = _norm(property_name)
+    visible = _norm(BeautifulSoup(html, "lxml").get_text(" ", strip=True))
+    return bool(expected) and f" {expected} " in f" {visible} "
+
+
+def _entrata_snippet_positive_rent(row: dict[str, Any]) -> bool:
+    for key in ("market_rent_low", "market_rent_high", "rent_low", "rent_high"):
+        value = row.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return True
+    return False
+
+
+def _entrata_snippet_plan_name(anchor: Any) -> str:
+    """Return the explicit plan title attached to a snippet detail CTA."""
+    container = anchor.find_parent(class_="inner-card-container")
+    if container is None:
+        container = anchor.find_parent(class_="fp-card")
+    if container is not None:
+        title = container.select_one(".fp-title")
+        if title is not None:
+            plan_name = re.sub(r"\s+", " ", title.get_text(" ", strip=True)).strip()
+            if plan_name:
+                return plan_name
+
+    aria_label = re.sub(r"\s+", " ", str(anchor.get("aria-label") or "")).strip()
+    aria_match = re.fullmatch(
+        r"view\s+details\s+(?:for|of)\s+(.+)",
+        aria_label,
+        re.IGNORECASE,
+    )
+    if aria_match:
+        return aria_match.group(1).strip()
+
+    anchor_text = re.sub(r"\s+", " ", anchor.get_text(" ", strip=True)).strip()
+    generic_ctas = {
+        "availability",
+        "check availability",
+        "details",
+        "learn more",
+        "view details",
+        "view floor plan",
+    }
+    return "" if anchor_text.casefold() in generic_ctas else anchor_text
+
+
+async def _recover_entrata_snippet_units(
+    ctx: AdapterContext,
+) -> tuple[list[dict[str, Any]], str, str]:
+    """Recover native units from an exact property-owned EntrataSnippet iframe.
+
+    The route fails closed unless the configured property name appears on both
+    the captured parent page and iframe index, exactly one iframe host is the
+    ``entratasnipit.`` child of the marketing host, every published detail URL
+    stays on that child and shares one Entrata property id, and visible native
+    unit numbers are globally unique.  Fetches are direct-only; this path never
+    invokes Web Unlocker or Hyperbrowser.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    parent_body: object = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(parent_body, bytes):
+        parent_body = parent_body.decode("utf-8", "replace")
+    if not isinstance(parent_body, str) or not parent_body:
+        return [], "", ""
+
+    parent_url = str(
+        (getattr(fr, "final_url", "") if fr is not None else "") or getattr(ctx, "base_url", "") or ""
+    )
+    parent_host = (urlparse(parent_url).hostname or "").casefold()
+    marketing_host = parent_host.removeprefix("www.")
+    property_name = str(getattr(ctx, "property_name", "") or "").strip()
+    if not marketing_host or not _entrata_snippet_identity_match(parent_body, property_name):
+        return [], "", ""
+
+    from bs4 import BeautifulSoup
+
+    parent_soup = BeautifulSoup(parent_body, "lxml")
+    iframe_urls: list[str] = []
+    expected_iframe_host = f"entratasnipit.{marketing_host}"
+    for node in parent_soup.select("iframe[src]"):
+        raw_src = str(node.get("src") or "").strip()
+        candidate = urljoin(parent_url, raw_src)
+        parsed = urlparse(candidate)
+        if (
+            parsed.scheme.casefold() in {"http", "https"}
+            and (parsed.hostname or "").casefold() == expected_iframe_host
+            and "application_authentication" not in parsed.path.casefold()
+        ):
+            iframe_urls.append(candidate)
+    # Multiple matching nodes are ambiguous even if they repeat the same URL:
+    # do not silently choose between inventory surfaces.
+    if len(iframe_urls) != 1:
+        return [], "", ""
+
+    iframe_url = iframe_urls[0]
+    if "host_domain=" not in iframe_url.casefold():
+        separator = "&" if "?" in iframe_url else "?"
+        iframe_url = f"{iframe_url}{separator}host_domain={parent_host}"
+    try:
+        index_html = await _entrata_static_fetch(
+            iframe_url,
+            unlocker=False,
+            retries=1,
+            headers={"Referer": parent_url},
+        )
+    except Exception:
+        return [], "", ""
+    if not _entrata_snippet_identity_match(index_html, property_name):
+        return [], "", ""
+
+    index_soup = BeautifulSoup(index_html, "lxml")
+    iframe_host = (urlparse(iframe_url).hostname or "").casefold()
+    property_ids: set[str] = set()
+    detail_by_url: dict[str, str] = {}
+    for anchor in index_soup.select("a[href]"):
+        raw_href = str(anchor.get("href") or "").strip()
+        detail_url = urljoin(iframe_url, raw_href)
+        detail_parsed = urlparse(detail_url)
+        match = _ENTRATA_SNIPPET_DETAIL_RE.match(unquote(detail_parsed.path))
+        if match is None:
+            continue
+        # A conventional Entrata detail link on any other host makes the
+        # index multi-source/ambiguous; reject the whole recovery.
+        if (detail_parsed.hostname or "").casefold() != iframe_host:
+            return [], "", ""
+        property_ids.add(match.group("property_id"))
+        plan_name = _entrata_snippet_plan_name(anchor)
+        # A generic "View Details" CTA is not a floor-plan name.  Every
+        # admitted detail route must have an explicit title in its card,
+        # aria-label, or non-generic anchor text.
+        if not plan_name:
+            return [], "", ""
+        if detail_url not in detail_by_url or (not detail_by_url[detail_url] and plan_name):
+            detail_by_url[detail_url] = plan_name
+
+    if not detail_by_url or len(property_ids) != 1:
+        return [], "", ""
+    source_property_id = next(iter(property_ids))
+
+    recovered: list[dict[str, Any]] = []
+    first_winning_url = ""
+    for detail_url, plan_name in list(detail_by_url.items())[:30]:
+        try:
+            detail_html = await _entrata_static_fetch(
+                detail_url,
+                unlocker=False,
+                retries=1,
+                headers={"Referer": iframe_url},
+            )
+        except Exception:
+            continue
+        if not detail_html or not _pp_plan_page_has_units(detail_html):
+            continue
+        rows = parse_entrata_pp_unit_cards(detail_html, detail_url, plan_name)
+        priced_native_rows = [
+            row
+            for row in rows
+            if str(row.get("unit_number") or "").strip()
+            and not str(row.get("unit_number") or "").startswith("ent-")
+            and _entrata_snippet_positive_rent(row)
+        ]
+        if priced_native_rows and not first_winning_url:
+            first_winning_url = detail_url
+        for row in priced_native_rows:
+            stamped = dict(row)
+            stamped["source_property_id"] = source_property_id
+            stamped["source_property_name"] = property_name
+            stamped["source_property_provenance"] = "exact_property_owned_entratasnippet_iframe"
+            stamped["source_portal_url"] = iframe_url
+            recovered.append(stamped)
+
+    unit_numbers = [str(row.get("unit_number") or "").strip().casefold() for row in recovered]
+    if not recovered or len(unit_numbers) != len(set(unit_numbers)) or len(detail_by_url) > 30:
+        return [], "", ""
+    return recovered, first_winning_url or iframe_url, source_property_id
+
+
+async def _recover_widget_checkpoint(
+    ctx: AdapterContext,
+    api_responses: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str, str, str] | None:
+    """Continue a date-less Entrata widget result to its public SSR route.
+
+    ``/Apartments/module/widgets/`` publishes floor-plan summaries and often
+    omits the availability text rendered on the site's own
+    ``/{city}/{property}/conventional/`` page.  This recovery follows only a
+    same-property route discovered in the already-fetched HTML. It tries a
+    direct GET first; when the configured production backend has a
+    Hyperbrowser key, it may use one clean rendered session for the first route.
+    Hyperbrowser's integration hard-disables CAPTCHA solving. This path never
+    invokes Web Unlocker, FlareSolverr, fingerprint rotation, or an external
+    model.
+
+    Returns only when the deeper route provides real unit rows or at least one
+    source-backed availability token/date; otherwise the caller keeps the
+    captured widget checkpoint unchanged.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None:
+        return None
+    body = getattr(fr, "body", None)
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", "replace")
+    html = body if isinstance(body, str) else ""
+    final_url = str(getattr(fr, "final_url", "") or "")
+    seed_url = final_url or str(getattr(ctx, "base_url", "") or "")
+    try:
+        parsed = urlparse(seed_url)
+        base = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    except Exception:
+        base = ""
+    if not base:
+        return None
+
+    def _captured_conventional_urls() -> list[str]:
+        """Provider-authored conventional URLs from captured widget values."""
+        base_host = urlparse(base).netloc.lower()
+        found: list[str] = []
+        seen: set[str] = set()
+
+        def _walk(value: Any) -> None:
+            if isinstance(value, dict):
+                for child in value.values():
+                    _walk(child)
+                return
+            if isinstance(value, list):
+                for child in value:
+                    _walk(child)
+                return
+            if not isinstance(value, str):
+                return
+            text = value.strip().replace("\\/", "/")
+            if "/conventional/" not in text.lower():
+                return
+            match = re.search(r"https?://[^\s\"'<>]+/conventional/?", text, re.IGNORECASE)
+            if not match:
+                return
+            candidate = match.group(0)
+            host = urlparse(candidate).netloc.lower()
+            if base_host and host != base_host and not host.endswith("prospectportal.com"):
+                return
+            if candidate not in seen:
+                seen.add(candidate)
+                found.append(candidate)
+
+        for response in api_responses:
+            _walk(response.get("body"))
+        return found
+
+    candidates: list[str] = []
+    if "/conventional/" in urlparse(final_url).path.lower():
+        candidates.append(final_url)
+    for candidate in _find_pp_conventional_index(html, base):
+        if candidate not in candidates:
+            candidates.append(candidate)
+    for candidate in _captured_conventional_urls():
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    if not candidates:
+        try:
+            landing = await _entrata_static_fetch(base + "/", unlocker=False, retries=2)
+        except Exception:
+            landing = ""
+        candidates.extend(_find_pp_conventional_index(landing, base))
+
+    for candidate in candidates[:3]:
+        same_page = bool(html and final_url and candidate.rstrip("/") == final_url.rstrip("/"))
+        if same_page:
+            route_html = html
+        else:
+            try:
+                route_html = await _entrata_static_fetch(candidate, unlocker=False, retries=2)
+            except Exception:
+                route_html = ""
+        if not route_html:
+            continue
+
+        unit_rows = parse_entrata_modern_units_data(route_html, candidate)
+        if unit_rows:
+            return (
+                unit_rows,
+                candidate,
+                "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+                "entrata_widget_checkpoint_direct",
+            )
+
+        plan_rows = parse_entrata_prospectportal_html(route_html, candidate)
+        if plan_rows and any(row.get("available_date") or row.get("availability_date") for row in plan_rows):
+            return (
+                plan_rows,
+                candidate,
+                "TIER_1_DOM_ENTRATA_PP_SSR",
+                "entrata_widget_checkpoint_direct",
+            )
+
+    # All three July 31 Entrata date-gap controls currently render their
+    # conventional cards only in a clean browser. Use at most one configured HB
+    # session after direct failure. The provider enforces the shared per-
+    # property call cap and always closes its session in ``finally``.
+    if candidates:
+        try:
+            from ma_poc.fetch.hyperbrowser_backend import (
+                HyperbrowserProvider,
+                _hb_api_key,
+            )
+
+            if not _hb_api_key():
+                return None
+            from ma_poc.discovery.contracts import CrawlTask, TaskReason
+            from ma_poc.fetch.contracts import RenderMode
+
+            candidate = candidates[0]
+            task = CrawlTask(
+                url=candidate,
+                property_id=str(getattr(ctx, "property_id", "") or ""),
+                priority=0,
+                budget_ms=60_000,
+                reason=TaskReason.RETRY,
+                render_mode=RenderMode.RENDER,
+                expected_pms="entrata",
+            )
+            rendered = await HyperbrowserProvider(mode="render").fetch(task, getattr(ctx, "profile", None))
+            if not rendered.ok() or not rendered.body:
+                return None
+            rendered_html = rendered.body.decode("utf-8", "replace")
+            rendered_url = str(rendered.final_url or candidate)
+            unit_rows = parse_entrata_modern_units_data(rendered_html, rendered_url)
+            if unit_rows:
+                return (
+                    unit_rows,
+                    rendered_url,
+                    "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+                    "entrata_widget_checkpoint_hyperbrowser",
+                )
+            plan_rows = parse_entrata_prospectportal_html(rendered_html, rendered_url)
+            if plan_rows and any(
+                row.get("available_date") or row.get("availability_date") for row in plan_rows
+            ):
+                return (
+                    plan_rows,
+                    rendered_url,
+                    "TIER_1_DOM_ENTRATA_PP_SSR",
+                    "entrata_widget_checkpoint_hyperbrowser",
+                )
+        except Exception as exc:  # noqa: BLE001 - keep widget checkpoint
+            log.debug("entrata widget checkpoint HB recovery failed: %s", exc)
+
+    return None
 
 
 # Verbatim ``view_unit_spaces`` XHR URL embedded in a PP grid's primary-action
@@ -2216,15 +2781,33 @@ def _extract_vus_urls(index_bodies: list[tuple[str, str]], base: str) -> list[tu
     """Return ``(grid_url, view_unit_spaces_url)`` pairs harvested from the
     grid bodies. ``is_availability_alert`` (waitlist) plans are skipped —
     they are legitimately 0-unit and keep their plan-level row."""
+    from html import unescape
     from urllib.parse import urljoin
+
+    from bs4 import BeautifulSoup
 
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
     for idx_url, html in index_bodies:
         if not html:
             continue
-        for m in _VUS_URL_RE.finditer(html):
-            raw = m.group(1).replace("&amp;", "&").replace("\\/", "/")
+        # Prefer the parsed quoted attribute. The legacy non-whitespace regex
+        # truncates perfectly valid values such as ``lease_term_name=13mo
+        # lease`` at the first space, dropping the tail of the query and
+        # turning a working XHR into HTTP 400. BeautifulSoup preserves the
+        # complete data-url/href value and decodes HTML entities for us.
+        soup = BeautifulSoup(html, "lxml")
+        raw_candidates = [
+            str(tag.get("data-url") or tag.get("href") or "").strip()
+            for tag in soup.select("[data-url], [href]")
+            if "view_unit_spaces" in str(tag.get("data-url") or tag.get("href") or "").casefold()
+        ]
+        # Some themes place the URL in an inline script rather than an HTML
+        # attribute. Retain the old regex only as that shape's fallback.
+        if not raw_candidates:
+            raw_candidates = [m.group(1) for m in _VUS_URL_RE.finditer(html)]
+        for candidate in raw_candidates:
+            raw = unescape(candidate).replace("\\/", "/")
             if "is_availability_alert" in raw:
                 continue
             if raw.startswith("//"):
@@ -2236,6 +2819,490 @@ def _extract_vus_urls(index_bodies: list[tuple[str, str]], base: str) -> list[tu
             seen.add(raw)
             out.append((idx_url or base, raw))
     return out
+
+
+# Entrata's newer ProspectPortal "Mapping Intelligence" layout publishes an
+# exact, same-origin iframe containing a Beans map.  Unlike the surrounding
+# plan grid, the iframe carries one JSON object per *physical apartment* with
+# the visible unit number, stable Entrata ids, floor-plan name/id, dimensions,
+# asking-rent range and availability.  The endpoint is session-bound: a naked
+# GET returns 400, while a cookie-bearing replay after opening the exact grid
+# returns the roster.
+_BEANS_MAP_PATH_RE = re.compile(
+    r"^/Apartments/module/property_info/action/view_beans_map/"
+    r"property\[id\]/(?P<property_id>\d{3,12})/?$",
+    re.IGNORECASE,
+)
+
+_BEANS_ADDRESS_ALIASES = {
+    "ave": "avenue",
+    "blvd": "boulevard",
+    "cir": "circle",
+    "ct": "court",
+    "dr": "drive",
+    "e": "east",
+    "hwy": "highway",
+    "ln": "lane",
+    "n": "north",
+    "ne": "northeast",
+    "nw": "northwest",
+    "pkwy": "parkway",
+    "pl": "place",
+    "rd": "road",
+    "s": "south",
+    "se": "southeast",
+    "st": "street",
+    "sw": "southwest",
+    "ter": "terrace",
+    "trl": "trail",
+    "w": "west",
+    "way": "way",
+}
+
+
+def _beans_map_url(html: str, grid_url: str) -> tuple[str, str]:
+    """Return the one exact same-origin Beans iframe URL + property id.
+
+    The URL must be operator-published in ``iframe#beans-maps-iframe`` and
+    match Entrata's encoded ``view_beans_map/property[id]/<id>`` route.  A
+    page publishing multiple distinct map endpoints is ambiguous and fails
+    closed.  No path is guessed or reconstructed.
+    """
+    if not html or not grid_url:
+        return "", ""
+    from bs4 import BeautifulSoup
+
+    grid = urlparse(grid_url)
+    if grid.scheme.casefold() not in {"http", "https"} or not grid.netloc:
+        return "", ""
+    candidates: dict[str, str] = {}
+    soup = BeautifulSoup(html, "lxml")
+    for iframe in soup.select("iframe#beans-maps-iframe"):
+        raw = str(iframe.get("data-src") or iframe.get("src") or "").strip()
+        if not raw:
+            continue
+        candidate = urljoin(grid_url, raw)
+        parsed = urlparse(candidate)
+        if (
+            parsed.scheme.casefold() not in {"http", "https"}
+            or parsed.netloc.casefold() != grid.netloc.casefold()
+        ):
+            continue
+        match = _BEANS_MAP_PATH_RE.fullmatch(unquote(parsed.path))
+        query = parse_qs(parsed.query)
+        if match is None or "conventional" not in {
+            str(v).casefold() for v in query.get("occupancy_type", [])
+        }:
+            continue
+        candidates[candidate] = match.group("property_id")
+    if len(candidates) != 1:
+        return "", ""
+    return next(iter(candidates.items()))
+
+
+def _beans_address_tokens(value: str) -> list[str]:
+    tokens = re.findall(r"[a-z0-9]+", str(value or "").casefold())
+    return [_BEANS_ADDRESS_ALIASES.get(token, token) for token in tokens]
+
+
+def _beans_address_matches(observed: str, expected_street: str, expected_zip: str) -> bool:
+    """Strict configured-address boundary for a Beans unit record.
+
+    Beans publishes a full address on every map item.  Admission requires the
+    configured house number, all configured street tokens (normalising common
+    suffix/direction abbreviations), and the configured five-digit ZIP.  A
+    missing identity field is a reject, not a reason to relax the boundary.
+    """
+    observed_tokens = _beans_address_tokens(observed)
+    expected_tokens = _beans_address_tokens(expected_street)
+    zip_match = re.search(r"\d{5}", str(expected_zip or ""))
+    if not observed_tokens or not expected_tokens or zip_match is None:
+        return False
+    expected_house = next(
+        (token for token in expected_tokens if re.fullmatch(r"\d+[a-z]?", token)),
+        "",
+    )
+    observed_house = next(
+        (token for token in observed_tokens if re.fullmatch(r"\d+[a-z]?", token)),
+        "",
+    )
+    if not expected_house or expected_house != observed_house:
+        return False
+    if zip_match.group(0) not in observed_tokens:
+        return False
+    expected_street_tokens = {token for token in expected_tokens if token != expected_house}
+    return bool(expected_street_tokens) and expected_street_tokens.issubset(set(observed_tokens))
+
+
+def _beans_render_items(html: str) -> list[dict[str, Any]]:
+    """Decode the JSON unit arrays passed as the third ``BeansMap.render`` arg."""
+    if not html or "be.render" not in html:
+        return []
+    decoder = json.JSONDecoder()
+    items: list[dict[str, Any]] = []
+    cursor = 0
+    while True:
+        match = re.search(r"\bbe\.render\s*\(", html[cursor:])
+        if match is None:
+            break
+        render_start = cursor + match.end()
+        array_start = html.find("[", render_start)
+        if array_start < 0:
+            break
+        try:
+            decoded, consumed = decoder.raw_decode(html[array_start:])
+        except (json.JSONDecodeError, ValueError):
+            cursor = array_start + 1
+            continue
+        cursor = array_start + max(consumed, 1)
+        if not isinstance(decoded, list) or len(decoded) > 1000:
+            continue
+        items.extend(item for item in decoded if isinstance(item, dict))
+    return items
+
+
+def parse_entrata_beans_map(
+    html: str,
+    url: str,
+    *,
+    expected_address: str,
+    expected_zip: str,
+) -> list[dict[str, Any]]:
+    """Parse a property-bound Entrata Beans map into strict unit rows.
+
+    Rows are admitted only when the map's published address matches the
+    configured street+ZIP, all repeated native identity attributes agree,
+    and the row has a positive published rent.  Duplicate 2-D/3-D render
+    arrays are collapsed by Entrata unit-space id; any conflicting duplicate
+    or duplicate visible unit number fails the whole payload closed.
+    """
+    from bs4 import BeautifulSoup
+
+    endpoint_match = _BEANS_MAP_PATH_RE.fullmatch(unquote(urlparse(url).path))
+    if endpoint_match is None or not expected_address or not expected_zip:
+        return []
+    property_id = endpoint_match.group("property_id")
+    rows_by_uid: dict[str, tuple[tuple[Any, ...], dict[str, Any]]] = {}
+    for item in _beans_render_items(html):
+        options = item.get("options")
+        if not isinstance(options, dict):
+            continue
+        card_html = options.get("onCardContent")
+        if not isinstance(card_html, str) or not card_html:
+            continue
+
+        observed_address = str(item.get("address") or "").strip()
+        # A unit-shaped item outside the configured address boundary makes the
+        # map ambiguous; never cherry-pick matching rows from a mixed roster.
+        if not _beans_address_matches(observed_address, expected_address, expected_zip):
+            return []
+
+        soup = BeautifulSoup(card_html, "lxml")
+        identities: set[tuple[str, str, str, str]] = set()
+        for node in soup.select("[data-unit-number][data-unit-id][data-floorplan-id][data-floorplan-name]"):
+            identity = (
+                str(node.get("data-unit-number") or "").strip(),
+                str(node.get("data-unit-id") or "").strip(),
+                str(node.get("data-floorplan-id") or "").strip(),
+                str(node.get("data-floorplan-name") or "").strip(),
+            )
+            if all(identity):
+                identities.add(identity)
+        if len(identities) != 1:
+            continue
+        unit_number, uid, fpid, plan_name = next(iter(identities))
+        top_level_unit = str(item.get("unit") or "").strip()
+        if (
+            not top_level_unit
+            or top_level_unit.casefold() != unit_number.casefold()
+            or not uid.isdigit()
+            or not fpid.isdigit()
+        ):
+            continue
+
+        listing = soup.select_one(".beans-map-unit-listing-container[data-unit-id]")
+        listing_id = str(listing.get("data-unit-id") or "").strip() if listing else ""
+        if not listing_id.isdigit():
+            continue
+
+        text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).strip()
+        bed_match = _PP_UNIT_CARD_BED_RE.search(text)
+        beds: int | None = None
+        if bed_match:
+            if bed_match.group(0).casefold().startswith("studio"):
+                beds = 0
+            elif bed_match.group(1):
+                try:
+                    beds = int(bed_match.group(1))
+                except ValueError:
+                    beds = None
+        bath_match = _PP_UNIT_CARD_BATH_RE.search(text)
+        baths = bath_match.group(1) if bath_match else ""
+        sqft_match = _PP_UNIT_CARD_SQFT_RE.search(text)
+        sqft = sqft_match.group(1).replace(",", "") if sqft_match else ""
+        if beds is None and not baths and not sqft:
+            continue
+
+        rent_node = soup.select_one(
+            ".beans-map-preview-content-pricing-price .fee-transparency-text"
+        ) or soup.select_one(".udm-pricing-price .fee-transparency-text")
+        rent_text = rent_node.get_text(" ", strip=True) if rent_node else ""
+        rent_low, rent_high = _pp_money_low_high(rent_text)
+        if not rent_low or rent_low <= 0 or not rent_high or rent_high <= 0:
+            continue
+
+        availability_node = soup.select_one(".beans-map-preview-content-availability-text")
+        availability = availability_node.get_text(" ", strip=True) if availability_node is not None else ""
+        preview_data = options.get("onPreviewData")
+        preview_availability = ""
+        if isinstance(preview_data, list):
+            for value in preview_data:
+                if isinstance(value, dict) and value.get("value"):
+                    preview_availability = str(value["value"]).strip()
+                    break
+        if not availability:
+            availability = preview_availability
+        if "available" not in availability.casefold():
+            continue
+        availability_date = _pp_opt_row_iso_date(availability)
+        preview_date = _pp_opt_row_iso_date(preview_availability)
+        if preview_date and availability_date and preview_date != availability_date:
+            continue
+
+        floor_match = re.search(r"\bfloor\s+([A-Za-z0-9-]+)", text, re.IGNORECASE)
+        lease_node = soup.select_one(".lease-term-name")
+        lease_term = lease_node.get_text(" ", strip=True) if lease_node else ""
+        source_ids: dict[str, Any] = {
+            "entrata_uid": uid,
+            "entrata_fpid": fpid,
+            "entrata_property_id": property_id,
+            "entrata_beans_listing_id": listing_id,
+        }
+        row = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(beds, plan_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=baths,
+            sqft=sqft,
+            unit_number=unit_number,
+            floor=floor_match.group(1) if floor_match else "",
+            rent_range=format_rent_range(rent_low, rent_high),
+            rent_low=rent_low,
+            rent_high=rent_high,
+            availability_status="AVAILABLE",
+            availability_date=availability_date,
+            lease_term=lease_term,
+            source_api_url=url,
+            extraction_tier="TIER_1_DOM_ENTRATA_BEANS_MAP",
+            source_ids=source_ids,
+        )
+        row["source_property_address"] = observed_address
+        signature = (
+            unit_number.casefold(),
+            plan_name.casefold(),
+            beds,
+            baths,
+            sqft,
+            rent_low,
+            rent_high,
+            availability_date,
+            listing_id,
+        )
+        prior = rows_by_uid.get(uid)
+        if prior is not None and prior[0] != signature:
+            return []
+        rows_by_uid[uid] = (signature, row)
+
+    rows = [value[1] for value in rows_by_uid.values()]
+    unit_numbers = [str(row.get("unit_number") or "").casefold() for row in rows]
+    if len(unit_numbers) != len(set(unit_numbers)):
+        return []
+    return rows
+
+
+def _extract_beans_map_pairs(
+    index_bodies: list[tuple[str, str]],
+    base: str,
+    property_name: str,
+) -> list[tuple[str, str, str]]:
+    """Return one unambiguous ``(grid, iframe, property_id)`` replay target."""
+    found: dict[tuple[str, str], str] = {}
+    for grid_url, body in index_bodies:
+        if not _entrata_snippet_identity_match(body, property_name):
+            continue
+        beans_url, property_id = _beans_map_url(body, grid_url or base)
+        if beans_url and property_id:
+            found[(grid_url or base, beans_url)] = property_id
+    if not found or len(set(found.values())) != 1 or len(found) != 1:
+        return []
+    (grid_url, beans_url), property_id = next(iter(found.items()))
+    return [(grid_url, beans_url, property_id)]
+
+
+def _replay_beans_sync(
+    pairs: list[tuple[str, str, str]],
+    *,
+    property_name: str,
+    expected_address: str,
+    expected_zip: str,
+) -> tuple[list[dict[str, Any]], str]:
+    """Replay one exact Beans iframe on a fresh, direct cookie session."""
+    try:
+        from curl_cffi import requests as _cc
+    except Exception:
+        return [], ""
+    for grid_url, expected_url, expected_property_id in pairs[:1]:
+        sess: Any | None = None
+        try:
+            sess = _cc.Session(impersonate="chrome120")
+            grid_response = sess.get(grid_url, timeout=25)
+            if getattr(grid_response, "status_code", 0) != 200:
+                continue
+            fresh_grid_url = str(getattr(grid_response, "url", "") or grid_url)
+            grid_html = str(getattr(grid_response, "text", "") or "")
+            if not _entrata_snippet_identity_match(grid_html, property_name):
+                continue
+            fresh_url, fresh_property_id = _beans_map_url(grid_html, fresh_grid_url)
+            if (
+                not fresh_url
+                or fresh_property_id != expected_property_id
+                or urlparse(fresh_url).path != urlparse(expected_url).path
+            ):
+                continue
+            response = sess.get(
+                fresh_url,
+                timeout=30,
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "text/html, */*; q=0.01",
+                    "Referer": fresh_grid_url,
+                },
+            )
+            if getattr(response, "status_code", 0) != 200:
+                continue
+            rows = parse_entrata_beans_map(
+                str(getattr(response, "text", "") or ""),
+                fresh_url,
+                expected_address=expected_address,
+                expected_zip=expected_zip,
+            )
+            if rows:
+                return rows, fresh_url
+        except Exception:
+            continue
+        finally:
+            if sess is not None:
+                try:
+                    sess.close()
+                except Exception:
+                    pass
+    return [], ""
+
+
+def _fetch_published_grid_and_beans_sync(
+    grid_url: str,
+    *,
+    property_name: str,
+    expected_address: str,
+    expected_zip: str,
+) -> tuple[str, str, list[dict[str, Any]], str]:
+    """Fetch an operator-published grid and its Beans iframe on one session.
+
+    This is the no-duplicate-GET path used when the configured landing page
+    already published the exact conventional URL.  The fetched grid body is
+    returned even when no Beans iframe exists so the normal PP parsers can
+    consume that same response instead of fetching the grid again.
+    """
+    try:
+        from curl_cffi import requests as _cc
+    except Exception:
+        return "", grid_url, [], ""
+    sess: Any | None = None
+    try:
+        sess = _cc.Session(impersonate="chrome120")
+        grid_response = sess.get(grid_url, timeout=25)
+        if getattr(grid_response, "status_code", 0) != 200:
+            return "", grid_url, [], ""
+        final_grid_url = str(getattr(grid_response, "url", "") or grid_url)
+        grid_html = str(getattr(grid_response, "text", "") or "")
+        if not _entrata_snippet_identity_match(grid_html, property_name):
+            return grid_html, final_grid_url, [], ""
+        beans_url, _property_id = _beans_map_url(grid_html, final_grid_url)
+        if not beans_url:
+            return grid_html, final_grid_url, [], ""
+        response = sess.get(
+            beans_url,
+            timeout=30,
+            headers={
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "text/html, */*; q=0.01",
+                "Referer": final_grid_url,
+            },
+        )
+        if getattr(response, "status_code", 0) != 200:
+            return grid_html, final_grid_url, [], ""
+        rows = parse_entrata_beans_map(
+            str(getattr(response, "text", "") or ""),
+            beans_url,
+            expected_address=expected_address,
+            expected_zip=expected_zip,
+        )
+        return grid_html, final_grid_url, rows, beans_url if rows else ""
+    except Exception:
+        return "", grid_url, [], ""
+    finally:
+        if sess is not None:
+            try:
+                sess.close()
+            except Exception:
+                pass
+
+
+async def _fetch_published_grid_and_beans(
+    grid_url: str, ctx: AdapterContext
+) -> tuple[str, str, list[dict[str, Any]], str]:
+    """Async direct-only wrapper for one published conventional grid."""
+    property_name = str(getattr(ctx, "property_name", "") or "").strip()
+    expected_address = str(getattr(ctx, "address", "") or "").strip()
+    expected_zip = str(getattr(ctx, "zip_code", "") or "").strip()
+    if not property_name or not expected_address or not expected_zip:
+        return "", grid_url, [], ""
+    try:
+        return await asyncio.to_thread(
+            _fetch_published_grid_and_beans_sync,
+            grid_url,
+            property_name=property_name,
+            expected_address=expected_address,
+            expected_zip=expected_zip,
+        )
+    except Exception:
+        return "", grid_url, [], ""
+
+
+async def _harvest_beans_map(
+    index_bodies: list[tuple[str, str]],
+    base: str,
+    ctx: AdapterContext,
+) -> tuple[list[dict[str, Any]], str]:
+    """Direct-only, property-bound recovery for a published Beans iframe."""
+    property_name = str(getattr(ctx, "property_name", "") or "").strip()
+    expected_address = str(getattr(ctx, "address", "") or "").strip()
+    expected_zip = str(getattr(ctx, "zip_code", "") or "").strip()
+    if not property_name or not expected_address or not expected_zip:
+        return [], ""
+    pairs = _extract_beans_map_pairs(index_bodies, base, property_name)
+    if not pairs:
+        return [], ""
+    try:
+        return await asyncio.to_thread(
+            _replay_beans_sync,
+            pairs,
+            property_name=property_name,
+            expected_address=expected_address,
+            expected_zip=expected_zip,
+        )
+    except Exception:
+        return [], ""
 
 
 def _replay_vus_sync(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
@@ -2252,15 +3319,24 @@ def _replay_vus_sync(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
         from curl_cffi import requests as _cc
     except Exception:
         return []
+    import time
+
     rows: list[dict[str, str]] = []
     sessions: dict[str, Any] = {}
-    for grid_url, vus_url in pairs[:8]:
+    last_xhr_at: dict[str, float] = {}
+    for grid_url, vus_url in pairs[:16]:
         try:
             sess = sessions.get(grid_url)
             if sess is None:
                 sess = _cc.Session(impersonate="chrome120")
                 sess.get(grid_url, timeout=25)  # seat cookies
                 sessions[grid_url] = sess
+            # ProspectPortal rate-limits back-to-back availability XHRs. A
+            # fixed per-grid interval recovered every request in the live
+            # two-plan probe; this is pacing, not a retry/poll loop.
+            elapsed = time.monotonic() - last_xhr_at.get(grid_url, 0.0)
+            if elapsed < 1.1:
+                time.sleep(1.1 - elapsed)
             r = sess.get(
                 vus_url,
                 timeout=25,
@@ -2270,6 +3346,7 @@ def _replay_vus_sync(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
                     "Referer": grid_url,
                 },
             )
+            last_xhr_at[grid_url] = time.monotonic()
             if getattr(r, "status_code", 0) == 200 and r.text:
                 rows.extend(parse_prospectportal_unit_spaces(r.text, vus_url))
         except Exception:
@@ -2282,9 +3359,87 @@ def _replay_vus_sync(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
     return rows
 
 
-async def _harvest_view_unit_spaces(
-    index_bodies: list[tuple[str, str]], base: str
-) -> list[dict[str, str]]:
+async def _recover_embedded_vus_direct(
+    ctx: AdapterContext,
+) -> tuple[list[dict[str, str]], str]:
+    """Replay page-published Entrata availability XHRs without escalation.
+
+    The fetched body supplies both the exact request URLs and the property-
+    scoped grid Referer. Cross-host ProspectPortal routes must pass the strict
+    property-name boundary; same-host routes must expose one Entrata property
+    id. This path uses direct HTTP only.
+    """
+    from urllib.parse import urlparse
+
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", errors="replace")
+    if not isinstance(body, str) or "view_unit_spaces" not in body:
+        return [], ""
+
+    base = str(getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or "").strip()
+    if not base:
+        return [], ""
+    if "://" not in base:
+        base = "https://" + base.lstrip("/")
+    base_host = (urlparse(base).hostname or "").casefold()
+    if not base_host:
+        return [], ""
+
+    published_pairs = _extract_vus_urls([(base, body)], base)
+    if not published_pairs:
+        return [], ""
+    property_ids = {
+        match.group(1) for _, url in published_pairs if (match := _PP_PROPID_RE.search(url)) is not None
+    }
+    if len(property_ids) != 1:
+        return [], ""
+
+    conventional = _find_pp_conventional_index(body, base)
+    same_host_grid = next(
+        (url for url in conventional if (urlparse(url).hostname or "").casefold() == base_host),
+        base,
+    )
+    try:
+        from ma_poc.pms.adapters._entrata_hb_recovery import (
+            strict_conventional_url,
+        )
+
+        strict_cross_host_grid = strict_conventional_url(
+            body,
+            base,
+            str(getattr(ctx, "property_name", "") or ""),
+        )
+    except Exception:
+        strict_cross_host_grid = ""
+
+    replay_pairs: list[tuple[str, str]] = []
+    winning_grid = ""
+    for _, vus_url in published_pairs:
+        vus_host = (urlparse(vus_url).hostname or "").casefold()
+        if not vus_host:
+            continue
+        if vus_host == base_host:
+            grid_url = same_host_grid
+        else:
+            strict_host = (urlparse(strict_cross_host_grid).hostname or "").casefold()
+            if not strict_cross_host_grid or strict_host != vus_host:
+                continue
+            grid_url = strict_cross_host_grid
+        replay_pairs.append((grid_url, vus_url))
+        winning_grid = winning_grid or grid_url
+    if not replay_pairs:
+        return [], ""
+
+    try:
+        rows = await asyncio.to_thread(_replay_vus_sync, replay_pairs)
+    except Exception:
+        rows = []
+    return rows, winning_grid
+
+
+async def _harvest_view_unit_spaces(index_bodies: list[tuple[str, str]], base: str) -> list[dict[str, str]]:
     """Harvest the verbatim ``view_unit_spaces`` XHR URLs from PP grid bodies
     and replay them (cookie-bearing session + XHR + Referer) into unit rows.
 
@@ -2358,6 +3513,8 @@ def _looks_like_challenge_page(html: str | None) -> bool:
         return any(m in low for m in _CHALLENGE_MARKERS)
     except Exception:  # pragma: no cover - defensive
         return False
+
+
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
@@ -2429,8 +3586,7 @@ def _classify_entrata_failure(
         )
     return (
         _TIER_EMPTY,
-        f"ENTRATA_EMPTY: {len(shape_matches)} shape-matched response(s), "
-        "but parser emitted 0 admitted units",
+        f"ENTRATA_EMPTY: {len(shape_matches)} shape-matched response(s), but parser emitted 0 admitted units",
     )
 
 
@@ -2486,18 +3642,344 @@ class EntrataAdapter:
 
             _pp_parsed = len(all_units)
             _pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
-            if _pp.n_admitted > 0:
-                result.units = _pp.admitted
-                result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
-                result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+            if _pp.units:
+                result.units = list(_pp.units)
+                result.plan_summaries = list(_pp.plan_summaries)
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(0.95, 0.7 + 0.05 * len(_pp.units))
                 return result
+            if _pp.plan_summaries:
+                # Entrata's widget response is a floor-plan catalogue (its
+                # ``id`` is a floor-plan id, not an apartment number).  When it
+                # carries no date, treat it as a checkpoint and continue to the
+                # site's public conventional route, where the operator renders
+                # explicit future/Available Now text. The helper is direct-
+                # first, may use one configured clean Hyperbrowser render, and
+                # falls back losslessly to these captured rows.
+                widget_has_date = any(
+                    unit.get("available_date") or unit.get("availability_date") for unit in all_units
+                )
+                recovered = None if widget_has_date else await _recover_widget_checkpoint(ctx, api_responses)
+                if recovered is not None:
+                    (
+                        recovered_rows,
+                        recovered_url,
+                        recovered_tier,
+                        recovered_via,
+                    ) = recovered
+                    _pp_recovered = post_process(
+                        recovered_rows,
+                        property_id=getattr(ctx, "property_id", None),
+                    )
+                    if _pp_recovered.n_admitted > 0:
+                        result.units = list(_pp_recovered.units)
+                        result.plan_summaries = list(_pp_recovered.plan_summaries)
+                        result.winning_url = recovered_url
+                        result.tier_used = recovered_tier
+                        result.confidence = min(0.92, 0.7 + 0.04 * _pp_recovered.n_admitted)
+                        result.api_responses.append(
+                            {
+                                "url": recovered_url,
+                                "status": 200,
+                                "body": "<entrata-conventional-checkpoint>",
+                                "via": recovered_via,
+                            }
+                        )
+                        if _pp_recovered.units:
+                            return result
+                if not result.plan_summaries:
+                    result.plan_summaries = list(_pp.plan_summaries)
+                # Preserve the legacy adapter contract for a caller that has
+                # already fetched an operator-published conventional route but
+                # cannot render it (for example, a direct 403 with no configured
+                # browser backend).  These remain plan-stamped rows: their
+                # ``entrata_fpid`` is not a unit identity, so the strict output
+                # gate cannot count them as a unit-level success.  Restrict this
+                # compatibility shape to an exact route present in the captured
+                # page; ordinary plan catalogues continue through the recovery
+                # cascade and finish in ``plan_summaries`` only.
+                _checkpoint_fetch = getattr(ctx, "fetch_result", None)
+                if page is None and _checkpoint_fetch is not None:
+                    _checkpoint_body = getattr(_checkpoint_fetch, "body", b"")
+                    if isinstance(_checkpoint_body, bytes):
+                        _checkpoint_body = _checkpoint_body.decode("utf-8", "replace")
+                    _checkpoint_final_url = str(
+                        getattr(_checkpoint_fetch, "final_url", "")
+                        or getattr(ctx, "base_url", "")
+                        or ""
+                    )
+                    _checkpoint_parts = urlparse(_checkpoint_final_url)
+                    _checkpoint_base = (
+                        f"{_checkpoint_parts.scheme}://{_checkpoint_parts.netloc}"
+                        if _checkpoint_parts.scheme and _checkpoint_parts.netloc
+                        else ""
+                    )
+                    if _checkpoint_base and _find_pp_conventional_index(
+                        _checkpoint_body if isinstance(_checkpoint_body, str) else "",
+                        _checkpoint_base,
+                    ):
+                        result.units = list(_pp.admitted)
+                        result.tier_used = "TIER_1_API_ENTRATA"
+                        result.winning_url = (
+                            result.api_responses[0].get("url")
+                            if result.api_responses
+                            else None
+                        )
+                        result.confidence = min(
+                            0.85,
+                            0.6 + 0.04 * len(result.units),
+                        )
+                        return result
+                # A valid plan catalogue is useful fallback data, but it is
+                # not a terminal unit-level win.  Keep it while the newer
+                # conventional-index / per-plan / data-attribute recoveries
+                # continue below.
+                result.tier_used = "TIER_1_API_ENTRATA_PLAN_LEVEL"
+                if result.winning_url is None:
+                    result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(
+                    0.85,
+                    0.6 + 0.04 * len(result.plan_summaries),
+                )
             result.errors.append(
-                f"ENTRATA_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                f"failed unit_validity (no numeric dimension)"
+                f"ENTRATA_PLAN_CATALOGUE: {_pp_parsed} plan rows retained; "
+                "continuing to unit-level recoveries"
             )
+
+        # The rendered grid often already publishes the exact
+        # ``view_unit_spaces`` URLs in its active-plan buttons. Replay those
+        # first with one bounded, cookie-bearing direct session: this avoids
+        # the much broader static/HB cascade and, unlike the historical regex,
+        # preserves query values containing spaces. Strict identity and rent
+        # gates live on both sides of the replay so a sibling/plan row cannot
+        # become a unit-level win.
+        try:
+            _vus_rows, _vus_grid = await _recover_embedded_vus_direct(ctx)
+        except Exception as exc:  # pragma: no cover - never sink Entrata
+            _vus_rows, _vus_grid = [], ""
+            result.errors.append(f"ENTRATA_EMBEDDED_VUS_DIRECT_ERROR: {type(exc).__name__}")
+        if _vus_rows:
+            from ma_poc.core.identity import unit_has_real_anchor
+            from ma_poc.extraction.post_process import post_process
+
+            _strict_vus = [
+                row
+                for row in _vus_rows
+                if unit_has_real_anchor(row)
+                and any(
+                    isinstance(row.get(key), (int, float))
+                    and not isinstance(row.get(key), bool)
+                    and float(row[key]) > 0
+                    for key in ("market_rent_low", "market_rent_high")
+                )
+            ]
+            _vus_pp = post_process(
+                _strict_vus,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if _vus_pp.units:
+                result.units = list(_vus_pp.units)
+                if not result.plan_summaries:
+                    result.plan_summaries = list(_vus_pp.plan_summaries)
+                result.tier_used = "TIER_1_DOM_ENTRATA_EMBEDDED_VUS_DIRECT"
+                result.winning_url = _vus_grid or None
+                result.confidence = min(
+                    0.94,
+                    0.76 + 0.03 * len(_vus_pp.units),
+                )
+                result.api_responses.append(
+                    {
+                        "url": _vus_grid,
+                        "status": 200,
+                        "body": "<entrata-embedded-view-unit-spaces>",
+                        "via": "entrata_embedded_vus_direct",
+                    }
+                )
+                return result
+
+        # 2026-07-31 plan-to-unit recovery: 61/75 raw Entrata cohort pages
+        # publish an exact property-scoped ``/{city}/{slug}/conventional/``
+        # route, but ordinary HTTP receives Cloudflare and the older static
+        # drill can spend the full property budget retrying it.  Under the
+        # explicitly selected Hyperbrowser backend, use one clean residential
+        # browser session to load that published grid and same-origin-fetch
+        # every bounded per-plan page before the broad retry cascade.  The
+        # helper enforces property-name/host identity, the shared per-property
+        # HB cost cap, real apartment anchors, and positive numeric rent;
+        # Hyperbrowser itself keeps CAPTCHA solving hard-disabled.
+        #
+        # A fully observed plan-only grid is also useful: retaining it here
+        # avoids repeating the same 403-prone route for ~180 seconds merely to
+        # rediscover that there are currently no listed apartments.
+        try:
+            from ma_poc.pms.adapters._entrata_hb_recovery import (
+                recover_entrata_hb_conventional,
+            )
+
+            _hb_pp = await recover_entrata_hb_conventional(ctx)
+        except Exception as exc:  # pragma: no cover - never sink Entrata
+            _hb_pp = None
+            result.errors.append(f"ENTRATA_HB_CONVENTIONAL_ERROR: {type(exc).__name__}")
+
+        if _hb_pp is not None and _hb_pp.units:
+            from ma_poc.extraction.post_process import post_process
+
+            _hb_units_pp = post_process(
+                _hb_pp.units,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if _hb_units_pp.units:
+                result.units = list(_hb_units_pp.units)
+                result.plan_summaries = list(_hb_units_pp.plan_summaries)
+                result.tier_used = "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_UNIT_LEVEL"
+                result.winning_url = _hb_pp.winning_url or None
+                result.confidence = min(
+                    0.94,
+                    0.76 + 0.03 * len(_hb_units_pp.units),
+                )
+                result.api_responses.append(
+                    {
+                        "url": _hb_pp.winning_url,
+                        "status": 200,
+                        "body": "<entrata-pp-hyperbrowser-unit-drill>",
+                        "via": "entrata_pp_hyperbrowser_unit_drill",
+                    }
+                )
+                return result
+
+        if _hb_pp is not None and _hb_pp.plan_rows:
+            from ma_poc.extraction.post_process import post_process
+
+            _hb_plans_pp = post_process(
+                _hb_pp.plan_rows,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if len(_hb_plans_pp.plan_summaries) > len(result.plan_summaries):
+                result.plan_summaries = list(_hb_plans_pp.plan_summaries)
+                result.winning_url = _hb_pp.winning_url or result.winning_url
+
+        if _hb_pp is not None and _hb_pp.complete and result.plan_summaries:
+            result.tier_used = "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_PLAN_LEVEL"
+            result.winning_url = _hb_pp.winning_url or result.winning_url
+            result.confidence = min(
+                0.88,
+                0.64 + 0.03 * len(result.plan_summaries),
+            )
+            result.errors.append(
+                "ENTRATA_HB_CONVENTIONAL_COMPLETE_PLAN_ONLY: all published "
+                "plan pages returned 200 with no priced apartment roster"
+            )
+            return result
+
+        # Exact EntrataSnippet iframe recovery.  Three live Encore/Jonah
+        # marketing shells publish their conventional roster this way: the
+        # parent /pricing page owns one ``entratasnipit.<marketing-host>``
+        # iframe whose same-host per-plan pages SSR native apartment cards.
+        # Detection and the helper both fail closed on identity, host,
+        # property-id, and duplicate-unit ambiguity.  Run before the paid
+        # browser path because the published pages are reachable directly.
+        try:
+            (
+                _snippet_rows,
+                _snippet_winning_url,
+                _snippet_property_id,
+            ) = await _recover_entrata_snippet_units(ctx)
+        except Exception as exc:  # pragma: no cover - never sink Entrata
+            _snippet_rows = []
+            _snippet_winning_url = ""
+            _snippet_property_id = ""
+            result.errors.append(f"ENTRATA_SNIPPET_ERROR: {type(exc).__name__}")
+        if _snippet_rows:
+            from ma_poc.extraction.post_process import post_process
+
+            _snippet_pp = post_process(
+                _snippet_rows,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if _snippet_pp.units:
+                result.units = list(_snippet_pp.units)
+                result.plan_summaries = list(_snippet_pp.plan_summaries)
+                result.tier_used = "TIER_1_DOM_ENTRATA_SNIPPET_UNIT_LEVEL"
+                result.winning_url = _snippet_winning_url or None
+                result.confidence = min(
+                    0.94,
+                    0.78 + 0.02 * len(_snippet_pp.units),
+                )
+                result.api_responses.append(
+                    {
+                        "url": _snippet_winning_url,
+                        "status": 200,
+                        "body": "<entrata-snippet-native-unit-drill>",
+                        "via": "entrata_snippet_native_unit_drill",
+                        "source_property_id": _snippet_property_id,
+                    }
+                )
+                return result
+
+        # One bounded Hyperbrowser session can reach an exact, property-
+        # matched ProspectPortal conventional grid and replay its published
+        # per-plan pages / view_unit_spaces XHRs in the same browser context.
+        # The helper admits only real native apartment anchors with positive
+        # rent; CAPTCHA solving remains hard-disabled by the HB backend.
+        try:
+            from ma_poc.pms.adapters._entrata_hb_recovery import (
+                recover_entrata_hb_conventional,
+            )
+
+            _hb_pp = await recover_entrata_hb_conventional(ctx)
+        except Exception as exc:  # pragma: no cover - never sink Entrata
+            _hb_pp = None
+            result.errors.append(f"ENTRATA_HB_CONVENTIONAL_ERROR: {type(exc).__name__}")
+
+        if _hb_pp is not None and _hb_pp.units:
+            from ma_poc.extraction.post_process import post_process
+
+            _hb_units_pp = post_process(
+                _hb_pp.units,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if _hb_units_pp.units:
+                result.units = list(_hb_units_pp.units)
+                result.plan_summaries = list(_hb_units_pp.plan_summaries)
+                result.tier_used = "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_UNIT_LEVEL"
+                result.winning_url = _hb_pp.winning_url or None
+                result.confidence = min(
+                    0.94,
+                    0.76 + 0.03 * len(_hb_units_pp.units),
+                )
+                result.api_responses.append(
+                    {
+                        "url": _hb_pp.winning_url,
+                        "status": 200,
+                        "body": "<entrata-pp-hyperbrowser-unit-drill>",
+                        "via": "entrata_pp_hyperbrowser_unit_drill",
+                    }
+                )
+                return result
+
+        if _hb_pp is not None and _hb_pp.plan_rows:
+            from ma_poc.extraction.post_process import post_process
+
+            _hb_plans_pp = post_process(
+                _hb_pp.plan_rows,
+                property_id=getattr(ctx, "property_id", None),
+            )
+            if len(_hb_plans_pp.plan_summaries) > len(result.plan_summaries):
+                result.plan_summaries = list(_hb_plans_pp.plan_summaries)
+                result.winning_url = _hb_pp.winning_url or result.winning_url
+
+        if _hb_pp is not None and _hb_pp.complete and result.plan_summaries:
+            result.tier_used = "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_PLAN_LEVEL"
+            result.winning_url = _hb_pp.winning_url or result.winning_url
+            result.confidence = min(
+                0.88,
+                0.64 + 0.03 * len(result.plan_summaries),
+            )
+            result.errors.append(
+                "ENTRATA_HB_CONVENTIONAL_COMPLETE_PLAN_ONLY: all published "
+                "plan pages returned 200 with no priced apartment roster"
+            )
+            return result
 
         # Bug 9 (2026-05-09 deep-dive): direct probe of known Entrata paths
         # when the captured-API path produced nothing AND we have a live
@@ -2511,18 +3993,26 @@ class EntrataAdapter:
                 # Stage 1 validity gate also applies to probed units.
                 from ma_poc.extraction.post_process import post_process
 
-                _pp_probe = post_process(
-                    probe_units, property_id=getattr(ctx, "property_id", None)
-                )
-                if _pp_probe.n_admitted > 0:
-                    result.units = _pp_probe.admitted
-                    result.plan_summaries = _pp_probe.plan_summaries
+                _pp_probe = post_process(probe_units, property_id=getattr(ctx, "property_id", None))
+                if _pp_probe.units:
+                    result.units = list(_pp_probe.units)
+                    result.plan_summaries = list(_pp_probe.plan_summaries)
                     result.tier_used = "TIER_1_API_ENTRATA_PROBE"
-                    result.confidence = min(0.95, 0.7 + 0.05 * _pp_probe.n_admitted)
+                    result.confidence = min(
+                        0.95,
+                        0.7 + 0.05 * len(_pp_probe.units),
+                    )
                     return result
+                if _pp_probe.plan_summaries:
+                    # Same response shape as the captured catalogue.  It is
+                    # plan context, not proof that the unit route is complete.
+                    if len(_pp_probe.plan_summaries) > len(result.plan_summaries):
+                        result.plan_summaries = list(_pp_probe.plan_summaries)
+                    result.tier_used = "TIER_1_API_ENTRATA_PROBE_PLAN_LEVEL"
+                    result.confidence = min(0.85, 0.6 + 0.04 * _pp_probe.n_admitted)
                 result.errors.append(
-                    f"ENTRATA_PROBE_VALIDITY_REJECTED: {len(probe_units)} probed rows "
-                    f"failed unit_validity (no numeric dimension)"
+                    f"ENTRATA_PROBE_PLAN_CATALOGUE: {len(probe_units)} plan rows "
+                    "retained; continuing to unit-level recoveries"
                 )
 
         # Entrata-WP static fallback: marketing sites (WordPress +
@@ -2558,9 +4048,7 @@ class EntrataAdapter:
             # per-plan unit-card drill (canary 1ef1060 regr#9) to find
             # plan links without re-fetching the index.
             pp_ssr_index_bodies: list[tuple[str, str]] = []
-            fr_body_check = (
-                getattr(fr, "body", None) if fr is not None else None
-            )
+            fr_body_check = getattr(fr, "body", None) if fr is not None else None
             if isinstance(fr_body_check, bytes):
                 fr_body_check = fr_body_check.decode("utf-8", "replace")
 
@@ -2591,16 +4079,12 @@ class EntrataAdapter:
             _landing_disc: list[str | None] = [None]
 
             async def _conventional_index_urls(captured: object) -> list[str]:
-                hits = _find_pp_conventional_index(
-                    captured if isinstance(captured, str) else "", base
-                )
+                hits = _find_pp_conventional_index(captured if isinstance(captured, str) else "", base)
                 if hits:
                     return hits
                 if _landing_disc[0] is None:
                     try:
-                        _landing_disc[0] = (
-                            await _entrata_fetch_ssr(base + "/") or ""
-                        )
+                        _landing_disc[0] = await _entrata_fetch_ssr(base + "/") or ""
                     except Exception:
                         _landing_disc[0] = ""
                 return _find_pp_conventional_index(_landing_disc[0] or "", base)
@@ -2617,17 +4101,17 @@ class EntrataAdapter:
             # on 14fiftyapartments.com pid 258254). Without it those
             # bodies were silently dropped before the per-plan unit-
             # card drill could see their plan links.
-            if isinstance(fr_body_check, str) and fr_body_check and (
-                "fp-card" in fr_body_check
-                or "fp-group-item" in fr_body_check
-                or "fp-name-link" in fr_body_check
+            if (
+                isinstance(fr_body_check, str)
+                and fr_body_check
+                and (
+                    "fp-card" in fr_body_check
+                    or "fp-group-item" in fr_body_check
+                    or "fp-name-link" in fr_body_check
+                )
             ):
                 _cap_url = str(getattr(fr, "final_url", "") or base)
-                pp_ssr_units.extend(
-                    parse_entrata_prospectportal_html(
-                        fr_body_check, _cap_url
-                    )
-                )
+                pp_ssr_units.extend(parse_entrata_prospectportal_html(fr_body_check, _cap_url))
                 pp_ssr_index_bodies.append((_cap_url, fr_body_check))
 
             # Step 2: discover deep ``/{city}/{slug}/(conventional|affordable)/``
@@ -2643,15 +4127,22 @@ class EntrataAdapter:
             # multi-property portals. Reference impl:
             # investigations/2026-05-27-failure-grind/artifacts/probe/
             # entrata_deep_probe.py (14 rescues, ~30 estimated remaining).
-            deep_candidates: list[str] = []
+            # ``_find_pp_conventional_index`` is the stronger source: it also
+            # accepts an operator-published cross-domain prospectportal link,
+            # while the legacy regex below intentionally restricts itself to
+            # same-host URLs. Keep these separately for the paid-HB precision
+            # gate below; a guessed /conventional/ path must never spend a
+            # browser session.
+            exact_conventional_urls = _find_pp_conventional_index(
+                fr_body_check if isinstance(fr_body_check, str) else "", base
+            )
+            deep_candidates: list[str] = list(exact_conventional_urls)
             if isinstance(fr_body_check, str) and fr_body_check:
                 _base_host = urlparse(base).netloc
                 # Host slug (e.g. "princetonbradford" from
                 # "www.princetonbradford.com") — used to rank anchors
                 # whose path segment overlaps with the property name.
-                _host_slug = re.sub(
-                    r"^www\.|\..*$", "", _base_host
-                ).lower()
+                _host_slug = re.sub(r"^www\.|\..*$", "", _base_host).lower()
                 _re_deep_abs = re.compile(
                     r'href=["\']'
                     r'(https?://[^"\']+/(?:[^/"\']+/){2,}'
@@ -2680,9 +4171,7 @@ class EntrataAdapter:
                 # Rank slug-matching first, then preserve discovery
                 # order; dedupe; cap at 3 to prevent runaway crawls.
                 _seen: set[str] = set()
-                _ranked = sorted(
-                    _raw, key=lambda u: -_slug_score(u)
-                )
+                _ranked = sorted(_raw, key=lambda u: -_slug_score(u))
                 for cand in _ranked:
                     if cand in _seen:
                         continue
@@ -2732,11 +4221,7 @@ class EntrataAdapter:
                         if _m:
                             _pid = _m.group(1)
                 if _pid:
-                    deep_candidates.append(
-                        base
-                        + "/Apartments/module/property_info/property_id/"
-                        + _pid
-                    )
+                    deep_candidates.append(base + "/Apartments/module/property_info/property_id/" + _pid)
             elif isinstance(fr_body_check, str) and fr_body_check:
                 # 2026-07-11 (DOM-tier debug): CROSS-DOMAIN Prospect Portal.
                 # Plan-card marketing sites (WordPress etc.) link to
@@ -2758,45 +4243,133 @@ class EntrataAdapter:
                 # path above.
                 _pp_m = _PP_HOST_RE.search(fr_body_check)
                 if _pp_m:
-                    _pp_origin = (
-                        f"https://{_pp_m.group(1)}.prospectportal.com"
-                    )
+                    _pp_origin = f"https://{_pp_m.group(1)}.prospectportal.com"
                     try:
-                        _pp_shell = await _entrata_static_fetch(
-                            _pp_origin + "/"
-                        )
+                        _pp_shell = await _entrata_static_fetch(_pp_origin + "/")
                     except Exception:
                         _pp_shell = ""
                     if _pp_shell:
                         _m = _pid_re.search(_pp_shell)
                         if _m:
                             deep_candidates.append(
-                                _pp_origin
-                                + "/Apartments/module/property_info/property_id/"
-                                + _m.group(1)
+                                _pp_origin + "/Apartments/module/property_info/property_id/" + _m.group(1)
                             )
 
             # Step 3: fetch and try the PP SSR parser. Stop on first
             # body that admits at least one validity-gated row.
+            direct_inventory_surface_urls: set[str] = set()
+            early_beans_rows: list[dict[str, Any]] = []
+            early_beans_winning_url = ""
+            exact_conventional_set = set(exact_conventional_urls)
             for cand_url in dict.fromkeys(deep_candidates):
                 if pp_ssr_units:
                     break  # already got the homepage body
-                try:
-                    cand_html = await _entrata_static_fetch(cand_url)
-                except Exception:
-                    cand_html = ""
+                cand_html = ""
+                cand_source_url = cand_url
+                # The exact conventional URL is already operator-published on
+                # the configured landing page. Fetch it on one cookie session
+                # so a Beans iframe, when present, can be replayed immediately
+                # without a second grid GET. A non-Beans grid body is retained
+                # for the ordinary PP parsers below.
+                if cand_url in exact_conventional_set:
+                    (
+                        cand_html,
+                        cand_source_url,
+                        _early_rows,
+                        _early_winning_url,
+                    ) = await _fetch_published_grid_and_beans(cand_url, ctx)
+                    if _early_rows:
+                        early_beans_rows.extend(_early_rows)
+                        early_beans_winning_url = _early_winning_url
+                        pp_ssr_units.extend(_early_rows)
+                        pp_ssr_index_bodies.append((cand_source_url, cand_html))
+                        direct_inventory_surface_urls.add(cand_url)
+                        break
+                if not cand_html:
+                    try:
+                        cand_html = await _entrata_static_fetch(cand_url)
+                    except Exception:
+                        cand_html = ""
                 if not cand_html:
                     continue
+                if any(
+                    marker in cand_html
+                    for marker in (
+                        "fp-card",
+                        "fp-group-item",
+                        "fp-name-link",
+                        "unitsData",
+                        "jd-fp-unit-card",
+                    )
+                ):
+                    direct_inventory_surface_urls.add(cand_url)
                 if (
                     "fp-card" not in cand_html
                     and "fp-group-item" not in cand_html
                     and "fp-name-link" not in cand_html
                 ):
                     continue
-                pp_ssr_units.extend(
-                    parse_entrata_prospectportal_html(cand_html, cand_url)
-                )
-                pp_ssr_index_bodies.append((cand_url, cand_html))
+                pp_ssr_units.extend(parse_entrata_prospectportal_html(cand_html, cand_source_url))
+                pp_ssr_index_bodies.append((cand_source_url, cand_html))
+
+            # Step 3a: one bounded Hyperbrowser RAW fallback for the strongest
+            # operator-published conventional URL. Exact 2026-07-31 FND probes:
+            # direct curl returned 403 on Westwind, Parkcrest and Alister
+            # Montclair; one no-stealth, solveCaptchas:false HB session returned
+            # HTTP 200 and 8/3/7 canonical PP plan rows respectively (3/3).
+            #
+            # Precision/cost gates:
+            #   * FETCH_BACKEND must explicitly be ``hyperbrowser``;
+            #   * the URL must be harvested verbatim from the captured page —
+            #     never a guessed /conventional/ path;
+            #   * direct must have failed to expose any inventory surface;
+            #   * one URL, one call, no retry. hb_raw_get shares the global
+            #     per-property paid-session cap and always closes its session.
+            if (
+                pp_ssr_units == []
+                and exact_conventional_urls
+                and not (_hb_pp is not None and _hb_pp.attempted)
+            ):
+                hb_candidate = exact_conventional_urls[0]
+                if hb_candidate not in direct_inventory_surface_urls:
+                    try:
+                        from ma_poc.config.feature_flags import hb_enabled
+
+                        if hb_enabled():
+                            from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                            hb_status, hb_html = await hb_raw_get(
+                                hb_candidate,
+                                str(getattr(ctx, "property_id", "") or ""),
+                            )
+                            if (
+                                hb_status == 200
+                                and hb_html
+                                and any(
+                                    marker in hb_html
+                                    for marker in (
+                                        "fp-card",
+                                        "fp-group-item",
+                                        "fp-name-link",
+                                        "unitsData",
+                                        "jd-fp-unit-card",
+                                    )
+                                )
+                            ):
+                                pp_ssr_units.extend(parse_entrata_prospectportal_html(hb_html, hb_candidate))
+                                pp_ssr_index_bodies.append((hb_candidate, hb_html))
+                                result.api_responses.append(
+                                    {
+                                        "url": hb_candidate,
+                                        "status": 200,
+                                        "body": "<entrata-pp-hyperbrowser-raw>",
+                                        "via": "entrata_pp_hyperbrowser_raw",
+                                    }
+                                )
+                    except Exception as exc:
+                        result.errors.append(
+                            f"entrata-pp-hb-fetch-error: {type(exc).__name__}: {str(exc)[:90]}"
+                        )
 
             # 2026-07-26 — HARVEST THE PLAN INDEX FROM THE PAGE.
             #
@@ -2820,9 +4393,7 @@ class EntrataAdapter:
             # conventional index yields 19 plan links whose detail pages
             # carry real apartments (4032 Renovated $1,863).
             if not pp_ssr_index_bodies:
-                for _conv_url in (
-                    await _conventional_index_urls(fr_body_check)
-                )[:2]:
+                for _conv_url in (await _conventional_index_urls(fr_body_check))[:2]:
                     try:
                         _conv_html = await _entrata_fetch_ssr(_conv_url)
                     except Exception:
@@ -2845,11 +4416,7 @@ class EntrataAdapter:
                     if not _conv_fp and "unitsData" not in _conv_html:
                         continue
                     if _conv_fp:
-                        pp_ssr_units.extend(
-                            parse_entrata_prospectportal_html(
-                                _conv_html, _conv_url
-                            )
-                        )
+                        pp_ssr_units.extend(parse_entrata_prospectportal_html(_conv_html, _conv_url))
                     pp_ssr_index_bodies.append((_conv_url, _conv_html))
                     break
 
@@ -2863,9 +4430,7 @@ class EntrataAdapter:
             # drill below can discover them. Additive: no-op when the page has no
             # such links. Verified: brownstonetx.com (4 plans, 2-digit fpids →
             # unit 423, 1/1, 610sf) and drexelridge.com (unit 204, 1/1, 906sf).
-            if not any(
-                find_entrata_pp_plan_links(_b, base) for _, _b in pp_ssr_index_bodies
-            ):
+            if not any(find_entrata_pp_plan_links(_b, base) for _, _b in pp_ssr_index_bodies):
                 _dom_sources: list[str] = []
                 if page is not None:
                     try:
@@ -2884,10 +4449,24 @@ class EntrataAdapter:
                     _dom_sources.append(fr_body_check)
                 for _dom in _dom_sources:
                     if find_entrata_pp_plan_links(_dom, base):
-                        pp_ssr_index_bodies.append(
-                            (str(getattr(fr, "final_url", "") or base), _dom)
-                        )
+                        pp_ssr_index_bodies.append((str(getattr(fr, "final_url", "") or base), _dom))
                         break
+
+            # Step 3c (2026-08-01): Entrata's newer Mapping Intelligence
+            # layout publishes a same-origin Beans iframe on the conventional
+            # grid. It is a complete native-unit roster, so try its one
+            # cookie-bearing direct replay BEFORE the per-plan fan-out below.
+            # Besides being cheaper, this matters on rate-limited hosts: eight
+            # speculative detail GETs can exhaust the host before the one
+            # authoritative roster request. The helper self-gates on exact
+            # published URL, configured name + street + ZIP, native ids and
+            # positive rent; an absent/ambiguous map is a no-op.
+            pp_unit_card_rows: list[dict[str, Any]] = list(early_beans_rows)
+            beans_map_winning_url = early_beans_winning_url
+            if not pp_unit_card_rows and pp_ssr_index_bodies:
+                _beans_rows, beans_map_winning_url = await _harvest_beans_map(pp_ssr_index_bodies, base, ctx)
+                if _beans_rows:
+                    pp_unit_card_rows.extend(_beans_rows)
 
             # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
             # Templates A/B/C above produce plan-level rows with
@@ -2905,41 +4484,38 @@ class EntrataAdapter:
             # keeping both would double-count. The drill is best-effort:
             # any per-plan fetch that errors / 404s is skipped, and an
             # empty drill leaves the plan-level rows intact.
-            pp_unit_card_rows: list[dict[str, str]] = []
             seen_plan_urls: set[str] = set()
-            for _idx_url, _idx_html in pp_ssr_index_bodies:
-                plan_links = find_entrata_pp_plan_links(_idx_html, base)
-                for plan_url in plan_links:
-                    if plan_url in seen_plan_urls:
-                        continue
-                    seen_plan_urls.add(plan_url)
-                    # Cap drill fan-out — the largest PP properties have
-                    # ~30 plans; beyond that we trust the plan-level
-                    # rows rather than incur the per-plan fetch cost.
-                    if len(seen_plan_urls) > 30:
-                        break
-                    try:
-                        plan_html = await _entrata_static_fetch(plan_url)
-                    except Exception:
-                        plan_html = ""
-                    if not plan_html or not _pp_plan_page_has_units(plan_html):
-                        continue
-                    pp_unit_card_rows.extend(
-                        parse_entrata_pp_unit_cards(plan_html, plan_url)
-                    )
+            if not pp_unit_card_rows:
+                for _idx_url, _idx_html in pp_ssr_index_bodies:
+                    plan_links = find_entrata_pp_plan_links(_idx_html, base)
+                    for plan_url in plan_links:
+                        if plan_url in seen_plan_urls:
+                            continue
+                        seen_plan_urls.add(plan_url)
+                        # Cap drill fan-out — the largest PP properties have
+                        # ~30 plans; beyond that we trust the plan-level
+                        # rows rather than incur the per-plan fetch cost.
+                        if len(seen_plan_urls) > 30:
+                            break
+                        try:
+                            plan_html = await _entrata_static_fetch(plan_url)
+                        except Exception:
+                            plan_html = ""
+                        if not plan_html or not _pp_plan_page_has_units(plan_html):
+                            continue
+                        pp_unit_card_rows.extend(parse_entrata_pp_unit_cards(plan_html, plan_url))
 
             # Also check the captured body itself in case link-hop
             # landed us directly on a per-plan page (the user-flagged
             # cohort — risewestarlington / foxlake — does exactly this).
             if (
-                isinstance(fr_body_check, str)
+                not pp_unit_card_rows
+                and isinstance(fr_body_check, str)
                 and fr_body_check
                 and "unit-card" in fr_body_check
             ):
                 _cap_url = str(getattr(fr, "final_url", "") or base)
-                pp_unit_card_rows.extend(
-                    parse_entrata_pp_unit_cards(fr_body_check, _cap_url)
-                )
+                pp_unit_card_rows.extend(parse_entrata_pp_unit_cards(fr_body_check, _cap_url))
 
             # 2026-07-12: when the per-plan unit-card drill found nothing,
             # harvest the verbatim view_unit_spaces XHR URLs from the grid
@@ -2948,9 +4524,7 @@ class EntrataAdapter:
             # grids carry no such buttons and harvest nothing — they keep
             # their plan-level row). See _harvest_view_unit_spaces.
             if not pp_unit_card_rows and pp_ssr_index_bodies:
-                _vus_rows = await _harvest_view_unit_spaces(
-                    pp_ssr_index_bodies, base
-                )
+                _vus_rows = await _harvest_view_unit_spaces(pp_ssr_index_bodies, base)
                 if _vus_rows:
                     pp_unit_card_rows.extend(_vus_rows)
 
@@ -2968,9 +4542,7 @@ class EntrataAdapter:
                 for _jb in _jdfp_bodies:
                     if "jd-fp-unit-card" not in _jb:
                         continue
-                    pp_unit_card_rows.extend(
-                        parse_entrata_pp_jd_fp_cards(_jb, _jdfp_url)
-                    )
+                    pp_unit_card_rows.extend(parse_entrata_pp_jd_fp_cards(_jb, _jdfp_url))
 
             # 2026-07-30 — MODERN prospect-portal theme (`var unitsData`).
             # Classes pricing-card / fee-transparency-wrapper / unit-cell; the
@@ -2982,21 +4554,13 @@ class EntrataAdapter:
             # per-plan fan-out). See parse_entrata_modern_units_data.
             if not pp_unit_card_rows:
                 _mud_bodies: list[tuple[str, str]] = list(pp_ssr_index_bodies)
-                if (
-                    isinstance(fr_body_check, str)
-                    and fr_body_check
-                    and "unitsData" in fr_body_check
-                ):
-                    _mud_bodies.append(
-                        (str(getattr(fr, "final_url", "") or base), fr_body_check)
-                    )
+                if isinstance(fr_body_check, str) and fr_body_check and "unitsData" in fr_body_check:
+                    _mud_bodies.append((str(getattr(fr, "final_url", "") or base), fr_body_check))
                 # No collected body carries the blob → harvest the /conventional/
                 # index href from the landing page and fetch it once. The modern
                 # listing lacks fp-card/fp-name-link, so Steps 1/3 discarded it.
                 if not any("unitsData" in _b for _, _b in _mud_bodies):
-                    for _mu_conv in (
-                        await _conventional_index_urls(fr_body_check)
-                    )[:2]:
+                    for _mu_conv in (await _conventional_index_urls(fr_body_check))[:2]:
                         try:
                             _mu_html = await _entrata_fetch_ssr(_mu_conv)
                         except Exception:
@@ -3020,9 +4584,7 @@ class EntrataAdapter:
                     # different URL shape, so nothing re-derives the plan rows —
                     # the loss would be plan->FAILED, not plan->plan.
                     pp_unit_card_rows.extend(
-                        _r
-                        for _r in parse_entrata_modern_units_data(_mb, _mu_url)
-                        if has_dimension(_r)
+                        _r for _r in parse_entrata_modern_units_data(_mb, _mu_url) if has_dimension(_r)
                     )
                     if pp_unit_card_rows:
                         break
@@ -3044,14 +4606,8 @@ class EntrataAdapter:
                 _fp_html_links: list[str] = []
                 _seen_fp: set[str] = set()
                 for _src in _fp_html_srcs:
-                    for _m in re.findall(
-                        r'href="([^"]*?/floor-plan/[^"]*?\.html)"', _src
-                    ):
-                        _u = (
-                            _m
-                            if _m.startswith("http")
-                            else base.rstrip("/") + "/" + _m.lstrip("/")
-                        )
+                    for _m in re.findall(r'href="([^"]*?/floor-plan/[^"]*?\.html)"', _src):
+                        _u = _m if _m.startswith("http") else base.rstrip("/") + "/" + _m.lstrip("/")
                         if _u not in _seen_fp:
                             _seen_fp.add(_u)
                             _fp_html_links.append(_u)
@@ -3061,9 +4617,7 @@ class EntrataAdapter:
                     except Exception:
                         continue
                     pp_unit_card_rows.extend(
-                        _r
-                        for _r in parse_entrata_floorplan_html_jsonld(_fp_h, _fp_url)
-                        if has_dimension(_r)
+                        _r for _r in parse_entrata_floorplan_html_jsonld(_fp_h, _fp_url) if has_dimension(_r)
                     )
 
             if pp_unit_card_rows:
@@ -3089,42 +4643,43 @@ class EntrataAdapter:
                         # unit-level tier, not just the drill. winning_url
                         # points at the per-plan page when the drill fired,
                         # else the conventional/candidate index we parsed.
-                        result.winning_url = (
-                            next(iter(seen_plan_urls))
-                            if seen_plan_urls
-                            else (deep_candidates[0] if deep_candidates else base)
-                        )
-                        result.tier_used = (
-                            "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
-                        )
+                        if beans_map_winning_url:
+                            result.winning_url = beans_map_winning_url
+                            result.tier_used = "TIER_1_DOM_ENTRATA_BEANS_MAP"
+                        else:
+                            result.winning_url = (
+                                next(iter(seen_plan_urls))
+                                if seen_plan_urls
+                                else (deep_candidates[0] if deep_candidates else base)
+                            )
+                            result.tier_used = "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
                     else:
-                        result.winning_url = (
-                            deep_candidates[0] if deep_candidates else base
-                        )
+                        result.winning_url = deep_candidates[0] if deep_candidates else base
                         result.tier_used = "TIER_1_DOM_ENTRATA_PP_SSR"
-                    result.confidence = min(
-                        0.92, 0.7 + 0.04 * _pps.n_admitted
-                    )
+                    result.confidence = min(0.92, 0.7 + 0.04 * _pps.n_admitted)
                     result.api_responses.append(
                         {
                             "url": result.winning_url or base,
                             "status": 200,
                             "body": (
-                                "<entrata-pp-unit-cards>"
-                                if pp_unit_card_rows
-                                else "<entrata-pp-ssr-grid>"
+                                "<entrata-beans-map>"
+                                if beans_map_winning_url
+                                else (
+                                    "<entrata-pp-unit-cards>"
+                                    if pp_unit_card_rows
+                                    else "<entrata-pp-ssr-grid>"
+                                )
                             ),
                             "via": (
-                                "entrata_pp_unit_card_drill"
-                                if pp_unit_card_rows
-                                else "entrata_pp_ssr"
+                                "entrata_beans_map"
+                                if beans_map_winning_url
+                                else ("entrata_pp_unit_card_drill" if pp_unit_card_rows else "entrata_pp_ssr")
                             ),
                         }
                     )
                     return result
                 result.errors.append(
-                    f"ENTRATA_PP_SSR_VALIDITY_REJECTED: "
-                    f"{len(pp_ssr_units)} parsed rows failed unit_validity"
+                    f"ENTRATA_PP_SSR_VALIDITY_REJECTED: {len(pp_ssr_units)} parsed rows failed unit_validity"
                 )
 
         if base:
@@ -3136,9 +4691,7 @@ class EntrataAdapter:
                 fr_body = fr_body.decode("utf-8", "replace")
             if isinstance(fr_body, str) and "available_units" in fr_body:
                 wp_units.extend(
-                    parse_entrata_available_units(
-                        fr_body, str(getattr(fr, "final_url", "") or base)
-                    )
+                    parse_entrata_available_units(fr_body, str(getattr(fr, "final_url", "") or base))
                 )
             links: list[str] = []
             for idx_path in ("/floorplans/", "/floor-plans/", "/"):
@@ -3158,9 +4711,7 @@ class EntrataAdapter:
             if wp_units:
                 from ma_poc.extraction.post_process import post_process
 
-                _ppw = post_process(
-                    wp_units, property_id=getattr(ctx, "property_id", None)
-                )
+                _ppw = post_process(wp_units, property_id=getattr(ctx, "property_id", None))
                 if _ppw.n_admitted > 0:
                     result.units = _ppw.admitted
                     result.plan_summaries = _ppw.plan_summaries
@@ -3187,15 +4738,11 @@ class EntrataAdapter:
             pp_units = await self._probe_prospectportal(ctx)
         except Exception as exc:  # noqa: BLE001 — never raise from an adapter
             pp_units = []
-            result.errors.append(
-                f"prospectportal-probe-error: {type(exc).__name__}: {str(exc)[:90]}"
-            )
+            result.errors.append(f"prospectportal-probe-error: {type(exc).__name__}: {str(exc)[:90]}")
         if pp_units:
             from ma_poc.extraction.post_process import post_process
 
-            _ppp = post_process(
-                pp_units, property_id=getattr(ctx, "property_id", None)
-            )
+            _ppp = post_process(pp_units, property_id=getattr(ctx, "property_id", None))
             if _ppp.n_admitted > 0:
                 result.units = _ppp.admitted
                 result.plan_summaries = _ppp.plan_summaries
@@ -3284,9 +4831,7 @@ class EntrataAdapter:
                         result.plan_summaries = _ppda.plan_summaries
                         result.winning_url = _da_url
                         result.tier_used = "TIER_1_DOM_ENTRATA_PP_DATA_ATTR"
-                        result.confidence = min(
-                            0.92, 0.7 + 0.04 * _ppda.n_admitted
-                        )
+                        result.confidence = min(0.92, 0.7 + 0.04 * _ppda.n_admitted)
                         result.api_responses.append(
                             {
                                 "url": _da_url,
@@ -3313,16 +4858,21 @@ class EntrataAdapter:
         # markers but no real Entrata inventory backing; the detector
         # picks Entrata at 0.85 based on the marker, the adapter runs
         # empty, and Path B should re-dispatch to the next candidate.
-        tier_code, err_msg = _classify_entrata_failure(api_responses, html)
-        result.tier_used = tier_code
-        result.confidence = 0.0
-        result.errors.append(err_msg)
+        if result.plan_summaries:
+            # Every unit-capable path declined, but the earlier catalogue is
+            # still a valid plan-level result.  Do not relabel it as an empty
+            # adapter failure and do not discard its route provenance.
+            if "PLAN_LEVEL" not in result.tier_used.upper():
+                result.tier_used = f"{result.tier_used}_PLAN_LEVEL"
+        else:
+            tier_code, err_msg = _classify_entrata_failure(api_responses, html)
+            result.tier_used = tier_code
+            result.confidence = 0.0
+            result.errors.append(err_msg)
 
         return result
 
-    async def _probe_prospectportal(
-        self, ctx: AdapterContext
-    ) -> list[dict[str, str]]:
+    async def _probe_prospectportal(self, ctx: AdapterContext) -> list[dict[str, str]]:
         """Discover <sub>.prospectportal.com + property/floorplan ids,
         then per-floorplan ``view_unit_spaces`` via probe_get (+WU for
         the Cloudflare challenge). Never raises; [] when not a PP site.
@@ -3350,9 +4900,7 @@ class EntrataAdapter:
         _PP_FP_WU_CAP = 8
         landing = ""
         try:
-            r = await _entrata_static_fetch(
-                portal + "/?module=check_availability&is_secure=1"
-            )
+            r = await _entrata_static_fetch(portal + "/?module=check_availability&is_secure=1")
             landing = r or ""
         except Exception:
             landing = ""
@@ -3462,10 +5010,7 @@ class EntrataAdapter:
                 continue
             try:
                 if isinstance(payload, list) and payload and isinstance(payload[0], dict):
-                    if any(
-                        k in payload[0]
-                        for k in ("floorplan-name", "no_of_bedroom", "square_footage")
-                    ):
+                    if any(k in payload[0] for k in ("floorplan-name", "no_of_bedroom", "square_footage")):
                         units = parse_entrata_floorplans(payload, url)
                         if units:
                             return units

@@ -33,6 +33,7 @@ Key findings:
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 import typing as t
 import urllib.parse
@@ -92,6 +93,8 @@ PmsName = Literal[
     "onsite_apply",
     "venterra",
     "camden",
+    "yotta",
+    "mri_prospectconnect",
     "custom",
     "unknown",
 ]
@@ -150,6 +153,8 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "onsite_apply": "portal_hop",
     "venterra": "dom_first",
     "camden": "dom_first",
+    "yotta": "api_first",
+    "mri_prospectconnect": "api_first",
     "custom": "cascade",
     "unknown": "cascade",
 }
@@ -174,6 +179,18 @@ MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
 
 # Host-suffix patterns that are definitive. First match wins.
 _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
+    (
+        re.compile(r"(?:^|\.)yottareal\.com$"),
+        "yotta",
+        0.95,
+        "host ends in yottareal.com (Yotta public leasing portal)",
+    ),
+    (
+        re.compile(r"(?:^|\.)mriprospectconnect\.com$"),
+        "mri_prospectconnect",
+        0.95,
+        "host ends in mriprospectconnect.com (MRI ProspectConnect)",
+    ),
     (
         re.compile(r"^\d{3,9}\.onlineleasing\.realpage\.com$"),
         "onesite",
@@ -319,6 +336,94 @@ _ENTRATA_REAL_MODULE_RE = re.compile(
     r"/apartments/module/(?!application_authentication\b)[a-z][a-z0-9_]*/",
     re.IGNORECASE,
 )
+# A small Entrata deployment family publishes its conventional inventory in an
+# actual child iframe such as
+# ``<iframe src="//entratasnipit.example.com/city/property/?...">``.  The
+# iframe index, not the Jonah/MeetElise marketing shell around it, owns the
+# apartment roster.  Keep this tag-anchored: a bare ``entratasnipit`` string in
+# JavaScript, prose, or an authentication link is not routing evidence.
+_ENTRATA_SNIPPET_IFRAME_RE = re.compile(
+    r"<iframe\b[^>]*\bsrc\s*=\s*[\"']"
+    r"(?:https?:)?//entratasnipit\.[a-z0-9.-]+/[^\"']*[\"']",
+    re.IGNORECASE,
+)
+
+_ENTRATA_IFRAME_TAG_RE = re.compile(r"<iframe\b[^>]*>", re.IGNORECASE)
+_ENTRATA_IFRAME_SRC_RE = re.compile(
+    r"\bsrc\s*=\s*[\"'](?P<src>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
+_ENTRATA_IFRAME_ID_RE = re.compile(
+    r"\bid\s*=\s*[\"'](?P<id>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
+
+
+def _detect_property_owned_entrata_snippet_iframe(
+    page_html: str,
+    page_url: str,
+) -> bool:
+    """Recognise an operator-published Entrata website-snippet iframe.
+
+    Entrata does not always use the literal ``entratasnipit.`` hostname.
+    Scully Company, for example, publishes inventory on property-specific
+    children such as ``hamiltonhall.scullycompany.com``.  The exact Entrata
+    signature is the conjunction of a real iframe, ``snippet_type=website``,
+    responsive + conventional occupancy parameters, a child of the marketing
+    host, and either the legacy ``entratasnipit.`` label or Entrata's numeric
+    ``website_<property-id>`` iframe id.  This is intentionally stronger than
+    a bare provider-domain string and therefore safely outranks incidental
+    SightMap attribution links on the same marketing page.
+    """
+    if not page_html or not page_url:
+        return False
+    try:
+        parent_host = (
+            urllib.parse.urlsplit(page_url).hostname or ""
+        ).casefold().rstrip(".")
+    except (TypeError, ValueError):
+        return False
+    marketing_host = parent_host.removeprefix("www.")
+    if not marketing_host:
+        return False
+
+    for match in _ENTRATA_IFRAME_TAG_RE.finditer(page_html):
+        tag = html_lib.unescape(match.group(0))
+        src_match = _ENTRATA_IFRAME_SRC_RE.search(tag)
+        if src_match is None:
+            continue
+        raw_src = src_match.group("src").strip()
+        candidate = urllib.parse.urljoin(page_url, raw_src)
+        try:
+            parsed = urllib.parse.urlsplit(candidate)
+            query = urllib.parse.parse_qs(parsed.query)
+        except (TypeError, ValueError):
+            continue
+        host = (parsed.hostname or "").casefold().rstrip(".")
+        if (
+            parsed.scheme.casefold() not in {"http", "https"}
+            or not host
+            or host == marketing_host
+            or not host.endswith(f".{marketing_host}")
+            or "application_authentication" in parsed.path.casefold()
+            or "guest_card" in parsed.path.casefold()
+            or query.get("snippet_type", [""])[0].casefold() != "website"
+        ):
+            continue
+
+        responsive = query.get("is_responsive_snippet", [""])[0]
+        occupancy = query.get("occupancy_type", [""])[0].casefold()
+        iframe_id_match = _ENTRATA_IFRAME_ID_RE.search(tag)
+        iframe_id = iframe_id_match.group("id") if iframe_id_match else ""
+        if (
+            (responsive == "1" and occupancy in {"1", "conventional"})
+            and (
+                host == f"entratasnipit.{marketing_host}"
+                or re.fullmatch(r"website_\d{3,12}", iframe_id)
+            )
+        ):
+            return True
+    return False
 
 _ONESITE_CLIENT_ID_RE = re.compile(r"^(?P<id>\d{3,9})\.onlineleasing\.realpage\.com$")
 _APPFOLIO_CLIENT_ID_RE = re.compile(r"^(?P<id>[a-z0-9-]+)\.appfolio\.com$")
@@ -595,7 +700,48 @@ def _detect_sightmap_embed(h: str) -> bool:
     return bool(_SIGHTMAP_EMBED_CODE_RE.search(h_norm))
 
 
-def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[str]]]:
+_RENTMANAGER_CONDOR_REQUIRED_MARKERS: tuple[str, ...] = (
+    "availabilitylisting",
+    "unit-details",
+    "data-unitid",
+    "data-name",
+    "data-unitfloorplan",
+    "data-propid",
+    "data-bed",
+    "data-bath",
+    "data-price",
+    "data-availability",
+)
+_RENTMANAGER_ATTRIBUTION_RE = re.compile(
+    r"website\s+created\s+by.{0,300}?rent\s+manager",
+    re.IGNORECASE | re.DOTALL,
+)
+_RENTMANAGER_FILE_READER_RE = re.compile(
+    r"(?:rm\d+)?filereader\.rentmanager\.com",
+    re.IGNORECASE,
+)
+
+
+def has_rentmanager_condor_inventory_signature(page_html: str) -> bool:
+    """Return whether HTML carries a strongly-attributed Condor unit roster."""
+    if not isinstance(page_html, str) or not page_html:
+        return False
+    lowered = page_html.lower()
+    if not all(
+        marker in lowered
+        for marker in _RENTMANAGER_CONDOR_REQUIRED_MARKERS
+    ):
+        return False
+    return bool(
+        _RENTMANAGER_FILE_READER_RE.search(page_html)
+        or _RENTMANAGER_ATTRIBUTION_RE.search(page_html)
+    )
+
+
+def _iter_html_markers(
+    page_html: str,
+    page_url: str = "",
+) -> Iterator[tuple[PmsName, float, list[str]]]:
     h = page_html.lower()
     # 2026-05-20 fix (feature_fail_1429 cluster #3): G5 marketing-cloud
     # markers (g5marketingcloud / g5dxm.com / g5-c- / g5-cl- /
@@ -672,7 +818,22 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # 2026-07-18: also match the OneSite "welcomehome" portal link
     # (property.onesite.realpage.com/welcomehome?siteId=NNN) — a distinct
     # OneSite surface whose siteId is parsed from the query by onesite.py.
-    if "onlineleasing.realpage.com" in h or "onesite.realpage.com/welcomehome" in h:
+    # 2026-08-01 FAILED_NO_DATA residual: some property inventory pages publish
+    # OneSite directly through its OLLR loader and never link an
+    # ``onlineleasing.realpage.com`` subdomain.  The OneSite adapter has always
+    # parsed this exact path to obtain SiteId, but the detector did not route it
+    # there.  Requiring the complete loader path + query key avoids treating a
+    # generic RealPage asset/reference as inventory-system evidence.  It is
+    # slightly stronger than the generic portal link because the OLLR loader is
+    # the executable unit-inventory widget itself.  Preserve the established
+    # Knock co-residence guard: on Knock-backed sites OLLR may still be only an
+    # apply-flow target.
+    _has_onesite_ollr_widget = "/ollr/widgetloader.js?siteid=" in h
+    if (
+        "onlineleasing.realpage.com" in h
+        or "onesite.realpage.com/welcomehome" in h
+        or _has_onesite_ollr_widget
+    ):
         if _has_knock_marker:
             yield (
                 "onesite",
@@ -681,7 +842,14 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                  "— OneSite is the apply-link target, Knock is the real PMS"],
             )
         else:
-            yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing / welcomehome)"]
+            yield (
+                "onesite",
+                0.94 if _has_onesite_ollr_widget else 0.92,
+                [
+                    "OneSite portal marker in HTML "
+                    "(OLLR widgetLoader / onlineleasing / welcomehome)"
+                ],
+            )
 
     # On-Site.com (on-site.com) — DISTINCT from RealPage OneSite above. The
     # marketing page links to ``on-site.com/apply/property/{id}`` (or
@@ -788,8 +956,13 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     has_entrata_widget_path = bool(
         _ENTRATA_REAL_MODULE_RE.search(h)
     )
+    _has_entrata_snippet_iframe = any(
+        "application_authentication" not in match.group(0)
+        for match in _ENTRATA_SNIPPET_IFRAME_RE.finditer(h)
+    ) or _detect_property_owned_entrata_snippet_iframe(h, page_url)
     _has_entrata_widget = (
         has_entrata_widget_path
+        or _has_entrata_snippet_iframe
         or "entrata-widget" in h
         or "commoncf.entrata.com" in h
         or ".prospectportal.com" in h
@@ -867,11 +1040,16 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     if _has_entrata_widget:
         yield (
             "entrata",
-            0.85,
+            0.92 if _has_entrata_snippet_iframe else 0.85,
             [
-                "Entrata widget marker in HTML (/Apartments/module/"
-                "<widget>/ / entrata-widget / commoncf.entrata.com / "
-                ".prospectportal.com)"
+                (
+                    "Property-owned EntrataSnippet inventory iframe in HTML "
+                    "(Entrata responsive website snippet on a property child host)"
+                    if _has_entrata_snippet_iframe
+                    else "Entrata widget marker in HTML (/Apartments/module/"
+                    "<widget>/ / entrata-widget / commoncf.entrata.com / "
+                    ".prospectportal.com)"
+                )
             ],
         )
     # AppFolio tenant subdomain + leasing-system path
@@ -1076,6 +1254,7 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         or "myresman.com/portal/applicants/availability" in h
         or "commoncf.entrata.com" in h
         or "/apartments/module/" in h
+        or _has_entrata_snippet_iframe
         or "entrata-widget" in h
         or ".prospectportal.com" in h
         or "onlineleasing.realpage.com" in h
@@ -1125,6 +1304,46 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         )
     if "mytouchtour.com" in h:
         yield "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
+    # Spherexx/ZRS server-rendered marketing template.  This is distinct from
+    # the Convert iframe below: current ZRS pages use vendor CDN assets plus
+    # /Content/js/core floor-plan scripts and expose per-unit HTML tables on
+    # plan-detail pages.  Require all three vendor/template families so a
+    # generic copyright link cannot redirect unrelated sites into this path.
+    has_spherexx_zrs_template = (
+        "spherexx.com/copyright" in h
+        and "sxxweb" in h
+        and (
+            "/content/js/core/floorplans.js" in h
+            or "/content/js/fci/" in h
+            or "/content/js/fci/floorplans.js" in h
+            or "/content/js/zrscustom/floorplans.js" in h
+            or "/content/js/core/unit-list.js" in h
+            or "/ajax/availabilityv2/" in h
+            or "unit-list__unit" in h
+            or "floorplan-detail__units" in h
+            # The home page of the FCI template carries the vendor assets and
+            # nested plan-detail links, but loads floorplans.js only after the
+            # user opens /floorplans/.  This strict three-signal form must
+            # outrank a co-resident iLoveLeasing contact widget.
+            or bool(
+                re.search(
+                    r"/floor-?plans(?:-and-pricing)?/[a-z0-9-]+/[a-z0-9-]+/?",
+                    h,
+                    re.IGNORECASE,
+                )
+            )
+        )
+    )
+    if has_spherexx_zrs_template:
+        yield (
+            "spherexx",
+            0.92,
+            [
+                "Spherexx/ZRS server-rendered inventory template "
+                "(vendor copyright + sxxweb CDN + floorplan/unit-list asset)"
+            ],
+        )
+
     # Spherexx Presentation Software ("Convert") — Leaflet-based interactive
     # building site-map widget. Identified by the ssploader.js script tag
     # and/or window.sspcfg config. Confirmed via 2026-05-13 deep probe of
@@ -1345,13 +1564,25 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         )
 
     _has_apts247_marker = "apts247" in h or "rentdynamics.com" in h
+    _has_property_scoped_resman_applicant = bool(
+        re.search(
+            r"myresman\.com/portal/applicants/new/[a-z0-9_-]+\?a=\d+",
+            html_lib.unescape(h),
+            re.IGNORECASE,
+        )
+    )
     if "myresman.com" in h or "/portal/applicants/availability" in h:
         if _has_apts247_marker:
             yield (
                 "resman",
-                0.85,
-                ["ResMan marker present but apts247 co-resident — "
-                 "apts247 is the data API, ResMan is the apply-flow target"],
+                0.86 if _has_property_scoped_resman_applicant else 0.85,
+                [
+                    "ResMan property-scoped Applicants/New fallback co-resident "
+                    "with apts247"
+                    if _has_property_scoped_resman_applicant
+                    else "ResMan marker present but apts247 co-resident — "
+                    "apts247 is the data API, ResMan is the apply-flow target"
+                ],
             )
         elif _has_edificecms_marker:
             # Same co-resident pattern: Edifice CMS owns the data API,
@@ -1462,7 +1693,14 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # tenant-web-access / CDN hosts. 2026-05-18 server-side curl verified
     # (high.ua.rentmanager.com → unit 2600 @ $4,971). Routed to
     # RentManagerAdapter whose extract() probes Search_Result.
-    if (
+    if has_rentmanager_condor_inventory_signature(page_html):
+        yield (
+            "rentmanager",
+            0.92,
+            ["RentManager Condor availability roster in HTML "
+             "(complete unit-card attributes + strong vendor attribution)"],
+        )
+    elif (
         ".ua.rentmanager.com" in h
         or ".twa.rentmanager.com" in h
         or "cdn.rentmanager.com" in h
@@ -1788,12 +2026,27 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
         "embed.fortresstech.io/unit-availability",
     ),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
-    "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
+    "spherexx": (
+        "presentation.spherexx.app",
+        "ssploader.js",
+        "sspcfg",
+        "spherexx.com/copyright",
+        "sxxweb",
+        "/content/js/core/floorplans.js",
+        "/content/js/fci/",
+        "/content/js/fci/floorplans.js",
+        "/content/js/zrscustom/floorplans.js",
+        "/content/js/core/unit-list.js",
+        "/ajax/availabilityv2/",
+        "floorplan-detail__units",
+    ),
     "rentmanager": (
         ".ua.rentmanager.com",
         ".twa.rentmanager.com",
         "cdn.rentmanager.com",
         "iloveleasing.com",
+        "filereader.rentmanager.com",
+        "website created by rent manager",
     ),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
@@ -1816,6 +2069,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
 
 def _detect_html_markers(
     page_html: str,
+    page_url: str = "",
 ) -> tuple[PmsName, float, list[str]] | None:
     """Pick the highest-confidence marker yielded by :func:`_iter_html_markers`.
 
@@ -1835,7 +2089,7 @@ def _detect_html_markers(
     order (first-yielded wins) so the legacy single-signal contract is
     preserved.
     """
-    matches = list(_iter_html_markers(page_html))
+    matches = list(_iter_html_markers(page_html, page_url))
     if not matches:
         return None
     best_idx = 0
@@ -2131,7 +2385,11 @@ def _detect_pms_impl(
     ext_hit = _detect_url_extension(url) if isinstance(url, str) else None
 
     # 3. HTML markers (optional input)
-    html_hit = _detect_html_markers(page_html) if isinstance(page_html, str) and page_html else None
+    html_hit = (
+        _detect_html_markers(page_html, url if isinstance(url, str) else "")
+        if isinstance(page_html, str) and page_html
+        else None
+    )
 
     # 4. CSV management-company prior
     mgmt_hit = _lookup_mgmt_prior(csv_row)
@@ -2268,7 +2526,7 @@ def detect_pms_candidates(
         # SightMap (0.90, yielded later) on co-resident pages.
         if isinstance(page_html, str) and page_html:
             client_id_url = url if isinstance(url, str) else ""
-            html_matches = list(_iter_html_markers(page_html))
+            html_matches = list(_iter_html_markers(page_html, client_id_url))
             # Stable sort by -confidence preserves yield order on ties.
             html_matches.sort(key=lambda m: -m[1])
             for pms, conf, ev in html_matches:

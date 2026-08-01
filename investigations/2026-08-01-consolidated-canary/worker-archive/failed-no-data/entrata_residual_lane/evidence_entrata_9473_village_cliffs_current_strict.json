@@ -1,0 +1,246 @@
+{
+  "result_type": "strict_current_exact_property_native_entrata_attributes",
+  "capture_timestamp_utc": "2026-08-01T09:31:11.433590+00:00",
+  "property": {
+    "property_id": 9473,
+    "apartmentid": "9473",
+    "name": "The Village Cliffs",
+    "address": "8610 Southwestern Blvd",
+    "city": "Dallas",
+    "state": "TX",
+    "zip": "75206",
+    "website": "https://www.thevillagedallas.com/properties/the-village-cliffs/"
+  },
+  "provider": "entrata_prospectportal",
+  "hyperbrowser_sessions_used": 0,
+  "parent_page": {
+    "url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+        "body_bytes": 386966,
+        "body_sha256": "b06cd9d951827d8845f00c227ccf2822b2fd252f31dcbca13333592a66e9e6e7",
+        "accepted": true
+      }
+    ],
+    "identity": {
+      "name_match": true,
+      "address_match": false,
+      "street_number_and_zip_match": false
+    }
+  },
+  "published_entrata_identity_page": {
+    "url": "https://villagecliffs.prospectportal.com/dallas/the-village-cliffs/conventional/",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://villagecliffs.prospectportal.com/dallas/the-village-cliffs/conventional/",
+        "body_bytes": 183480,
+        "body_sha256": "f99d042bff53f23239581ac7dac2405989f7eced9c0570fa7806f3e923d28248",
+        "accepted": true
+      }
+    ],
+    "identity": {
+      "name_match": true,
+      "address_match": true,
+      "street_number_and_zip_match": true
+    }
+  },
+  "property_identity_match": true,
+  "strict_gates": {
+    "exact_property_parent_name": true,
+    "published_entrata_twin_name_address_zip": true,
+    "native_unit_numbers": 8,
+    "native_entrata_uids": 8,
+    "native_floorplan_ids": 8,
+    "positive_rent_rows": 8,
+    "distinct_units": 8,
+    "distinct_uids": 8,
+    "sibling_or_cross_property_rows": 0
+  },
+  "contamination_verdict": "pass_exact_parent_published_entrata_twin_native_ids_positive_rents",
+  "native_identity_rows": 8,
+  "native_positive_rent_rows": 8,
+  "source_urls": [
+    "https://www.thevillagedallas.com/properties/the-village-cliffs/"
+  ],
+  "native_rows": [
+    {
+      "floor_plan_name": "",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "899",
+      "unit_number": "1202",
+      "building": "Building 12",
+      "market_rent_low": 2012,
+      "market_rent_high": 2012,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-08-04",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109440",
+        "entrata_fpid": "514914",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "680",
+      "unit_number": "0706",
+      "building": "Building 7",
+      "market_rent_low": 1733,
+      "market_rent_high": 1733,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-08-16",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109356",
+        "entrata_fpid": "527312",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "636",
+      "unit_number": "0305",
+      "building": "Building 3",
+      "market_rent_low": 1634,
+      "market_rent_high": 1634,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-08-25",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109315",
+        "entrata_fpid": "527310",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "636",
+      "unit_number": "0113",
+      "building": "Building 1",
+      "market_rent_low": 1614,
+      "market_rent_high": 1614,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-09-01",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109299",
+        "entrata_fpid": "527310",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "561",
+      "unit_number": "1210",
+      "building": "Building 12",
+      "market_rent_low": 1497,
+      "market_rent_high": 1497,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-09-03",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109448",
+        "entrata_fpid": "527308",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "926",
+      "unit_number": "0205",
+      "building": "Building 2",
+      "market_rent_low": 2007,
+      "market_rent_high": 2007,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-09-10",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109307",
+        "entrata_fpid": "514912",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "636",
+      "unit_number": "1321",
+      "building": "Building 13",
+      "market_rent_low": 1669,
+      "market_rent_high": 1669,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-09-11",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109483",
+        "entrata_fpid": "527310",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "899",
+      "unit_number": "1424",
+      "building": "Building 14",
+      "market_rent_low": 2122,
+      "market_rent_high": 2122,
+      "availability_status": "AVAILABLE",
+      "availability_date": "2026-10-05",
+      "source_api_url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_NATIVE_DATA_ATTRIBUTES",
+      "source_ids": {
+        "entrata_uid": "4109510",
+        "entrata_fpid": "514914",
+        "entrata_property_id": "488093"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    }
+  ],
+  "shared_ledger": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "sha256_before": "450154025ef060d9152eee50ff109847be4e9786d1baef2bc0326dadc82093ab",
+    "rows_before": 163,
+    "property_present_before": false
+  }
+}

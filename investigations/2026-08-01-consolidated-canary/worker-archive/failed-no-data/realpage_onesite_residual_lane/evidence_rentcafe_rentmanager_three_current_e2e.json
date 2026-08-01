@@ -1,0 +1,432 @@
+{
+  "batch_label": "rentcafe-rentmanager-three-current-source-configured-e2e",
+  "generated_at_utc": "2026-08-01T11:19:21.332550+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified_by_lane": false,
+    "shared_builder_modified": false,
+    "shared_ledger_modified": false,
+    "web_unlocker": false
+  },
+  "ledger_snapshot": {
+    "net_new_ids": [
+      60303,
+      234385,
+      263127
+    ],
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "rows": 187,
+    "sha256": "0f49bccfac1fda91af0c4d910d69c5670cdccdf33039765dea899372dcfc3ec1"
+  },
+  "recoveries": [
+    {
+      "current_full_pipeline": {
+        "adapter": "rentcafe",
+        "errors": [],
+        "strict_native_positive_rent_rows": 2,
+        "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+        "winning_page_url": "https://ironworksindy.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1806816&RequestBeforeLogin=true&isPropertyList=false"
+      },
+      "native_identity_rows": 2,
+      "native_positive_rent_rows": 2,
+      "property_boundary_evidence": {
+        "api_property_addresses": [
+          "2727 East 86th Street"
+        ],
+        "api_property_cities": [
+          "indianapolis"
+        ],
+        "api_property_names": [
+          "ironworkskeystone"
+        ],
+        "api_property_states": [
+          "in"
+        ],
+        "api_property_zips": [
+          "46240"
+        ],
+        "api_response_url": "https://ironworksindy.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1806816&RequestBeforeLogin=true&isPropertyList=false",
+        "canonical_address": "2727 E 86th St",
+        "canonical_city": "Indianapolis",
+        "canonical_state": "IN",
+        "canonical_zip": "46240",
+        "configured_final_host": "www.ironworksindy.com",
+        "configured_final_url": "https://www.ironworksindy.com/",
+        "expected_source_property_id": "1806816",
+        "gates": {
+          "all_emitted_rows_strict_native_positive": true,
+          "all_output_native_ids_present": true,
+          "all_output_source_urls_exact_api": true,
+          "all_output_unit_numbers_present": true,
+          "api_property_city_exact": true,
+          "api_property_id_exact": true,
+          "api_property_name_exact": true,
+          "api_property_state_exact": true,
+          "api_property_street_exact_normalized": true,
+          "api_zip_or_native_unit_zip_exact": true,
+          "applicant_api_http_200": true,
+          "applicant_api_status_true": true,
+          "configured_city_visible": true,
+          "configured_http_200": true,
+          "configured_name_visible": true,
+          "configured_publishes_exact_portal": true,
+          "configured_state_visible": true,
+          "current_pipeline_adapter_exact": true,
+          "current_pipeline_no_errors": true,
+          "current_pipeline_tier_exact": true,
+          "output_source_property_id_exact": true,
+          "output_source_property_name_exact": true,
+          "output_source_property_street_exact_normalized": true,
+          "winning_url_exact_api": true
+        },
+        "native_unit_addresses": [],
+        "published_links": [
+          "https://ironworksindy.securecafeapplicant.com/onlineleasing/content3/access/ironworks-at-keystone0/login",
+          "https://ironworksindy.securecafeapplicant.com/onlineleasing/content3/access/ironworks-at-keystone0/floorplans",
+          "https://ironworksindy.securecafeapplicant.com/onlineleasing/content3/access/ironworks-at-keystone0/login",
+          "https://ironworksindy.securecafeapplicant.com/onlineleasing/content3/access/ironworks-at-keystone0/floorplans"
+        ]
+      },
+      "property_id": 60303,
+      "property_name": "Ironworks At Keystone",
+      "source_urls": [
+        "http://ironworksindy.com/",
+        "https://ironworksindy.securecafe.com/onlineleasing/ironworks-at-keystone0",
+        "https://ironworksindy.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1806816&RequestBeforeLogin=true&isPropertyList=false"
+      ],
+      "strict_verdict": "pass_exact_configured_published_applicant_property_native_units",
+      "units": [
+        {
+          "availability_date": "09/05/2026",
+          "floor_plan_name": "1A",
+          "market_rent_high": 1595,
+          "rent": 1595,
+          "source_ids": {
+            "securecafe_apartment_id": "40532714",
+            "securecafe_floorplan_id": "5283526"
+          },
+          "source_property_address": "2727 East 86th Street, Indianapolis, IN, 46240",
+          "source_property_id": "1806816",
+          "source_property_name": "Ironworks at Keystone",
+          "source_url": "https://ironworksindy.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1806816&RequestBeforeLogin=true&isPropertyList=false",
+          "unit_number": "312"
+        },
+        {
+          "availability_date": "10/05/2026",
+          "floor_plan_name": "2A",
+          "market_rent_high": 2282,
+          "rent": 2282,
+          "source_ids": {
+            "securecafe_apartment_id": "40532773",
+            "securecafe_floorplan_id": "5292219"
+          },
+          "source_property_address": "2727 East 86th Street, Indianapolis, IN, 46240",
+          "source_property_id": "1806816",
+          "source_property_name": "Ironworks at Keystone",
+          "source_url": "https://ironworksindy.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1806816&RequestBeforeLogin=true&isPropertyList=false",
+          "unit_number": "505"
+        }
+      ],
+      "website": "http://ironworksindy.com/"
+    },
+    {
+      "current_full_pipeline": {
+        "adapter": "rentcafe",
+        "errors": [],
+        "strict_native_positive_rent_rows": 2,
+        "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+        "winning_page_url": "https://townhomesatspringvalley-mmgapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=59503&RequestBeforeLogin=true&isPropertyList=false"
+      },
+      "native_identity_rows": 2,
+      "native_positive_rent_rows": 2,
+      "property_boundary_evidence": {
+        "api_property_addresses": [
+          "2149B Elder Street"
+        ],
+        "api_property_cities": [
+          "reading"
+        ],
+        "api_property_names": [
+          "townhomesspringvalley"
+        ],
+        "api_property_states": [
+          "pa"
+        ],
+        "api_property_zips": [
+          "19605"
+        ],
+        "api_response_url": "https://townhomesatspringvalley-mmgapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=59503&RequestBeforeLogin=true&isPropertyList=false",
+        "canonical_address": "2149 B Elder St",
+        "canonical_city": "Reading",
+        "canonical_state": "PA",
+        "canonical_zip": "19604",
+        "configured_final_host": "mmgapts.com",
+        "configured_final_url": "https://mmgapts.com/property/townhomes-at-spring-valley/",
+        "expected_source_property_id": "59503",
+        "gates": {
+          "all_emitted_rows_strict_native_positive": true,
+          "all_output_native_ids_present": true,
+          "all_output_source_urls_exact_api": true,
+          "all_output_unit_numbers_present": true,
+          "api_property_city_exact": true,
+          "api_property_id_exact": true,
+          "api_property_name_exact": true,
+          "api_property_state_exact": true,
+          "api_property_street_exact_normalized": true,
+          "api_zip_or_native_unit_zip_exact": true,
+          "applicant_api_http_200": true,
+          "applicant_api_status_true": true,
+          "configured_city_visible": true,
+          "configured_http_200": true,
+          "configured_name_visible": true,
+          "configured_publishes_exact_portal": true,
+          "configured_state_visible": true,
+          "current_pipeline_adapter_exact": true,
+          "current_pipeline_no_errors": true,
+          "current_pipeline_tier_exact": true,
+          "output_source_property_id_exact": true,
+          "output_source_property_name_exact": true,
+          "output_source_property_street_exact_normalized": true,
+          "winning_url_exact_api": true
+        },
+        "native_unit_addresses": [
+          "Townhomes at Spring Valley 2142F Elder Street Reading PA 19604",
+          "Townhomes at Spring Valley 2116G Elder Street Reading PA 19604"
+        ],
+        "published_links": [
+          "https://townhomesatspringvalley-mmgapts.securecafe.com/onlineleasing/townhomes-at-spring-valley/guestlogin.aspx",
+          "https://townhomesatspringvalley-mmgapts.securecafe.com/residentservices/townhomes-at-spring-valley/userlogin.aspx",
+          "https://townhomesatspringvalley-mmgapts.securecafe.com/onlineleasing/townhomes-at-spring-valley/guestlogin.aspx",
+          "https://townhomesatspringvalley-mmgapts.securecafe.com/residentservices/townhomes-at-spring-valley/userlogin.aspx"
+        ]
+      },
+      "property_id": 234385,
+      "property_name": "Townhomes at Spring Valley",
+      "source_urls": [
+        "http://www.mmgapts.com/spring-valley.htm",
+        "https://townhomesatspringvalley-mmgapts.securecafe.com/onlineleasing/townhomes-at-spring-valley",
+        "https://townhomesatspringvalley-mmgapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=59503&RequestBeforeLogin=true&isPropertyList=false"
+      ],
+      "strict_verdict": "pass_exact_configured_published_applicant_property_native_units",
+      "units": [
+        {
+          "availability_date": "10/01/2026",
+          "floor_plan_name": "Two Bedroom Townhome",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "securecafe_apartment_id": "434011",
+            "securecafe_floorplan_id": "527010"
+          },
+          "source_property_address": "2149B Elder Street, Reading, PA, 19605",
+          "source_property_id": "59503",
+          "source_property_name": "Townhomes at Spring Valley",
+          "source_url": "https://townhomesatspringvalley-mmgapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=59503&RequestBeforeLogin=true&isPropertyList=false",
+          "unit_number": "2142F"
+        },
+        {
+          "availability_date": "10/01/2026",
+          "floor_plan_name": "Two Bedroom Townhome",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "securecafe_apartment_id": "434021",
+            "securecafe_floorplan_id": "527010"
+          },
+          "source_property_address": "2149B Elder Street, Reading, PA, 19605",
+          "source_property_id": "59503",
+          "source_property_name": "Townhomes at Spring Valley",
+          "source_url": "https://townhomesatspringvalley-mmgapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=59503&RequestBeforeLogin=true&isPropertyList=false",
+          "unit_number": "2116G"
+        }
+      ],
+      "website": "http://www.mmgapts.com/spring-valley.htm"
+    },
+    {
+      "current_full_pipeline": {
+        "adapter": "rentmanager",
+        "errors": [],
+        "strict_native_positive_rent_rows": 8,
+        "tier": "TIER_1_API_RENTMANAGER_ILOVELEASING_PUBLIC",
+        "winning_page_url": "https://www.iloveleasing.com/pub/wapi/api/availability/"
+      },
+      "native_identity_rows": 8,
+      "native_positive_rent_rows": 8,
+      "property_boundary_evidence": {
+        "api_response_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+        "canonical_address": "11907 Apache Ave",
+        "canonical_city": "Savannah",
+        "canonical_state": "GA",
+        "canonical_zip": "31419",
+        "configured_final_host": "www.hickorygrovega.com",
+        "configured_final_url": "https://www.hickorygrovega.com/",
+        "gates": {
+          "all_emitted_rows_strict_native_positive": true,
+          "all_output_native_ids_present": true,
+          "all_output_source_urls_exact_api": true,
+          "all_output_unit_numbers_present": true,
+          "all_public_iloveleasing_routes_http_200": true,
+          "configured_city_visible": true,
+          "configured_http_200": true,
+          "configured_name_visible": true,
+          "configured_state_visible": true,
+          "current_pipeline_adapter_exact": true,
+          "current_pipeline_no_errors": true,
+          "current_pipeline_tier_exact": true,
+          "output_city_state_zip_exact": true,
+          "output_property_address_exact_normalized": true,
+          "output_property_name_exact": true,
+          "output_provenance_published_widget": true,
+          "published_iloveleasing_script": true,
+          "single_published_iloveleasing_settings": true,
+          "winning_url_exact_api": true
+        },
+        "output_addresses": [
+          "11907 Apache Ave, Savannah, GA 31419"
+        ],
+        "output_property_names": [
+          "hickorygrove"
+        ],
+        "public_api_statuses": {
+          "https://www.iloveleasing.com/pub/wapi/api/availability/": 200,
+          "https://www.iloveleasing.com/pub/wapi/api/init/": 200,
+          "https://www.iloveleasing.com/pub/wapi/api/widget/": 200
+        },
+        "published_luv_settings": [
+          [
+            "23F3FD90-5667-4B4C-93B3-28E13F9519D3",
+            "mgpfcqidi",
+            "mgpuarmjeml"
+          ]
+        ]
+      },
+      "property_id": 263127,
+      "property_name": "Hickory Grove",
+      "source_urls": [
+        "https://www.hickorygrovega.com/",
+        "https://www.iloveleasing.com/pub/wapi/api/availability/"
+      ],
+      "strict_verdict": "pass_exact_configured_published_iloveleasing_property_native_units",
+      "units": [
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnhpgmifobn"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "1002"
+        },
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnhgblsduqf"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "1103"
+        },
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom - Renovated",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lneuaddpfaf"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "1104"
+        },
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnjpgmifqkf"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "1302"
+        },
+        {
+          "availability_date": "2026-07-31",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnhteconilb"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "1305"
+        },
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom - Renovated",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnhteconimq"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "206"
+        },
+        {
+          "availability_date": "2026-06-01",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnjkcfnjuph"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "2026-06-30",
+          "floor_plan_name": "2  Bedroom",
+          "market_rent_high": 1550,
+          "rent": 1550,
+          "source_ids": {
+            "iloveleasing_unit_id": "lnhuaddppqf"
+          },
+          "source_property_address": "11907 Apache Ave, Savannah, GA 31419",
+          "source_property_id": "",
+          "source_property_name": "Hickory Grove Apartments",
+          "source_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "unit_number": "903"
+        }
+      ],
+      "website": "https://www.hickorygrovega.com/"
+    }
+  ]
+}

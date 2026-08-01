@@ -1,0 +1,38 @@
+{
+  "schema_version": "propai_shared_profile_coverage_v1",
+  "audited_on": "2026-08-01",
+  "target_profile_prefix": "gs://jugnu-canary/profiles/",
+  "target_numeric_profiles": 887,
+  "promotion_source": "gs://jugnu-canary/runs/2026-08-01-plan60-full549-v2/",
+  "promotion_summary": {
+    "strict_gcp_successes": 303,
+    "actionable_profiles_promoted": 243,
+    "created": 237,
+    "field_merged": 6,
+    "bootstrap_only_not_promoted": 60
+  },
+  "failed_no_data_frozen_244": {
+    "cohort_ids": 244,
+    "shared_profiles_present": 18,
+    "shared_profiles_actionable": 11,
+    "from_243_profile_promotion": 0,
+    "missing_shared_profile": 226
+  },
+  "plan_materialized_330": {
+    "cohort_ids": 330,
+    "shared_profiles_present": 233,
+    "shared_profiles_actionable": 233,
+    "from_243_profile_promotion": 225,
+    "missing_shared_profile": 97
+  },
+  "plan_full_cohort_549": {
+    "cohort_ids": 549,
+    "shared_profiles_present": 267,
+    "shared_profiles_actionable": 257,
+    "from_243_profile_promotion": 243,
+    "missing_shared_profile": 282
+  },
+  "failed_no_data_plan_cohort_overlap": 0,
+  "caveat": "The final plan worker counter was 365 after one post-364 admission, but only 330 IDs were materialized into one authoritative local ledger. Exact shared-profile coverage cannot be claimed for the unreconciled 35-ID tail.",
+  "policy": "Local probe success is not automatically a reusable production route. Only generation-pinned, schema-valid profiles with a concrete winner/path/endpoint were promoted."
+}

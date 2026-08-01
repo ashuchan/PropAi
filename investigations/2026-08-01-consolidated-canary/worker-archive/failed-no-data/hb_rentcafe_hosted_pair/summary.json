@@ -1,0 +1,129 @@
+{
+  "results": [
+    {
+      "property_id": 218786,
+      "property_name": "Coopers Landing Apartments",
+      "url": "https://www.rentcafe.com/apartments/mi/kalamazoo/coopers-landing-apartments/default.aspx",
+      "status": 200,
+      "body_bytes": 580045,
+      "body_sha256": "5ed43453527b127ce8b41b65289c47bb643f548efa492958240ae09dcb2671ed",
+      "identity": {
+        "name_visible": true,
+        "street_visible": true,
+        "city_zip_visible": true
+      },
+      "provider_markers": [
+        "rentcafe",
+        "onlineleasing",
+        "myolepropertyid",
+        "unitid",
+        "floorplanid",
+        "fp-unit"
+      ],
+      "property_ids": [
+        "480033"
+      ],
+      "unit_ids": [
+        "5816378",
+        "5816379",
+        "5816380",
+        "5816381",
+        "5816382",
+        "5816383",
+        "5816384",
+        "5816385",
+        "5816386",
+        "6758163",
+        "6758164",
+        "6758165",
+        "20305231",
+        "27112645",
+        "27112646",
+        "27112647",
+        "27112648",
+        "28950723",
+        "28950724",
+        "34525031",
+        "34525032",
+        "34525033",
+        "34525034",
+        "34525035",
+        "45280290",
+        "45280291",
+        "45280292"
+      ],
+      "floorplan_ids": [
+        "2330097",
+        "2330102",
+        "2330105",
+        "2330112",
+        "2330113",
+        "2330116",
+        "2330117",
+        "2330118",
+        "2330123",
+        "2330127",
+        "2330128",
+        "2330129",
+        "2330130",
+        "2330131",
+        "2330134",
+        "2330136",
+        "2330144",
+        "2330146",
+        "6152052",
+        "6152058"
+      ],
+      "hyperbrowser_sessions": 1,
+      "session_options": {
+        "solve_captchas": false,
+        "stealth": false,
+        "fingerprint_rotation": false,
+        "residential_proxy": true
+      },
+      "llm": false,
+      "paid_canary": false
+    },
+    {
+      "property_id": 69558,
+      "property_name": "Spring Hill Apartments",
+      "url": "https://www.rentcafe.com/apartments/nj/summit/spring-hill-apartments/default.aspx",
+      "status": 200,
+      "body_bytes": 363316,
+      "body_sha256": "97b5f8660041797a4229f60d9491b5a93eda122ddc55c13f033cce0563e46378",
+      "identity": {
+        "name_visible": true,
+        "street_visible": true,
+        "city_zip_visible": true
+      },
+      "provider_markers": [
+        "rentcafe",
+        "onlineleasing",
+        "floorplanid"
+      ],
+      "property_ids": [],
+      "unit_ids": [],
+      "floorplan_ids": [],
+      "hyperbrowser_sessions": 1,
+      "session_options": {
+        "solve_captchas": false,
+        "stealth": false,
+        "fingerprint_rotation": false,
+        "residential_proxy": true
+      },
+      "llm": false,
+      "paid_canary": false
+    }
+  ],
+  "summary": {
+    "targets": 2,
+    "http_200": 2,
+    "identity_exact": 2,
+    "hyperbrowser_sessions": 2,
+    "captcha_solving": false,
+    "stealth": false,
+    "fingerprint_rotation": false,
+    "llm": false,
+    "paid_canary": false
+  }
+}

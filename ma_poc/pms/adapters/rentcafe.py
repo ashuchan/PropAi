@@ -34,10 +34,12 @@ Key findings:
 from __future__ import annotations
 
 import asyncio
+import html as _html
 import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote_plus
 
 from ma_poc.config.feature_flags import (
     enable_rentcafe_availunits_fast,
@@ -77,6 +79,7 @@ try:
     from ma_poc.pms.signal_engine.models import (
         SourceSignal as _RCSourceSignal,
     )
+
     _rentcafe_qualifier = _create_rq()
 except Exception:
     _rentcafe_qualifier = None  # type: ignore[assignment]
@@ -202,36 +205,58 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         # right plan without using it as an identity anchor.
         floorplan_id = str(item_lc.get("floorplanid") or "").strip()
         source_ids = {"rentcafe_floorplan_id": floorplan_id} if floorplan_id else {}
+        apartment_id = str(item_lc.get("apartmentid") or "").strip()
+        if apartment_id:
+            # The Yardi/RentCafe ``apartmentAvailabilities`` response uses
+            # ``apartmentId`` for the stable physical-unit identity.  Keep it
+            # separate from the shared floor-plan ID so strict recovery can
+            # prove that these are native apartments rather than plan rows.
+            source_ids["securecafe_apartment_id"] = apartment_id
         unit_number_str = str(
-            item_lc.get("apartmentname")
-            or item_lc.get("unitnumber")
-            or item_lc.get("unit_number")
-            or ""
+            item_lc.get("apartmentname") or item_lc.get("unitnumber") or item_lc.get("unit_number") or ""
         )
+        is_apartment_availability = bool(apartment_id and unit_number_str.strip())
+        if is_apartment_availability and not avail_count:
+            # A row inside the apartment availability roster represents one
+            # published apartment; unlike the floor-plan catalogue, it does
+            # not carry ``availableUnitsCount``.
+            avail_count = "1"
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=name,
-                bed_label=bed_label_from(beds, name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
-                sqft=sqft,
-                unit_number=unit_number_str,
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                availability_status="AVAILABLE" if avail_count and avail_count != "0" else "UNAVAILABLE",
-                available_units=avail_count,
-                availability_date=avail_date,
-                source_api_url=url,
-                extraction_tier="TIER_1_API_RENTCAFE",
-                source_ids=source_ids,
-            )
+        unit = make_unit_dict(
+            floor_plan_name=name,
+            bed_label=bed_label_from(beds, name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=sqft,
+            unit_number=unit_number_str,
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            deposit=str(item_lc.get("deposit") or ""),
+            concession=str(item_lc.get("specials") or ""),
+            availability_status=(
+                "AVAILABLE"
+                if is_apartment_availability or (avail_count and avail_count != "0")
+                else "UNAVAILABLE"
+            ),
+            available_units=avail_count,
+            availability_date=avail_date,
+            source_api_url=url,
+            extraction_tier="TIER_1_API_RENTCAFE",
+            source_ids=source_ids,
         )
+        source_property_id = str(item_lc.get("propertyid") or "").strip()
+        if source_property_id:
+            unit["source_property_id"] = source_property_id
+        source_portal_url = str(item_lc.get("applyonlineurl") or "").strip()
+        if source_portal_url:
+            unit["source_portal_url"] = source_portal_url
+        units.append(unit)
     return units
 
 
 _RENTCAFE_WRAPPER_KEYS = (
     "data",
     "results",
+    "apartmentAvailabilities",
     "floorplans",
     "floorPlans",
     "Floorplans",
@@ -305,6 +330,14 @@ def _is_rentcafe_response(body: Any) -> bool:
     # equality check only matched lowercase "rentcafe". Lowercase the value too.
     if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
+    # Public Yardi proxy endpoints use this native apartment roster shape
+    # without the usual ``api=rentcafe`` sentinel.  Require both property and
+    # apartment identities plus plan/rent fields before routing it here.
+    if {"propertyid", "apartmentid", "apartmentname", "floorplanid"} <= set(first_lc) and {
+        "minimumrent",
+        "maximumrent",
+    } & set(first_lc):
+        return True
     # Phase 4: delegate field-combination checks to the RentCafe-scoped
     # SourceQualifier so all FieldCombination definitions stay in defaults.py.
     # Fallback: inline checks when the signal engine is unavailable.
@@ -315,20 +348,34 @@ def _is_rentcafe_response(body: Any) -> bool:
         )
         return _rentcafe_qualifier.qualify(sig).qualifies
     # Fallback: inline field-combination checks (signal engine unavailable).
-    _fp_keys: frozenset[str] = frozenset({
-        "floorplanname", "floorplanid", "minimumrent",
-        "maximumrent", "availableunitscount", "availabilityurl",
-    })
+    _fp_keys: frozenset[str] = frozenset(
+        {
+            "floorplanname",
+            "floorplanid",
+            "minimumrent",
+            "maximumrent",
+            "availableunitscount",
+            "availabilityurl",
+        }
+    )
     if len(_fp_keys & set(first_lc.keys())) >= 3:
         return True
-    _unit_id_keys: frozenset[str] = frozenset({
-        "rentcafeapartmentid", "rentcafefloorplanid", "rentcafepropertyid",
-    })
+    _unit_id_keys: frozenset[str] = frozenset(
+        {
+            "rentcafeapartmentid",
+            "rentcafefloorplanid",
+            "rentcafepropertyid",
+        }
+    )
     if len(_unit_id_keys & set(first_lc.keys())) >= 2:
         return True
-    _unit_rent_keys: frozenset[str] = frozenset({
-        "rentcafeapartmentid", "unitrent", "marketrent",
-    })
+    _unit_rent_keys: frozenset[str] = frozenset(
+        {
+            "rentcafeapartmentid",
+            "unitrent",
+            "marketrent",
+        }
+    )
     return len(_unit_rent_keys & set(first_lc.keys())) >= 2
 
 
@@ -368,8 +415,7 @@ def _securecafe_swap_verdict(
     anon = [u for u in portal if not unit_has_real_anchor(u)]
     if anon:
         return False, (
-            f"{len(anon)}/{n_portal} portal rows have no per-apartment "
-            f"identity (catalogue has {n_cat} plans)"
+            f"{len(anon)}/{n_portal} portal rows have no per-apartment identity (catalogue has {n_cat} plans)"
         )
 
     declared = 0
@@ -459,6 +505,9 @@ _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_LIST_EMPTY = f"{_TIER_BASE}_LIST_EMPTY"
 _TIER_PARSE_ZERO = f"{_TIER_BASE}_PARSE_ZERO"
+_TIER_APPLICANT_V2_CAPTURED = "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_CAPTURED"
+_TIER_APPLICANT_V2_DIRECT = "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT"
+_TIER_APPLICANT_V2_HYPERBROWSER = "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_HYPERBROWSER"
 
 # 2026-05-31 — paths that the detector misroute most often actually
 # hosts unit data on. Mirrors the Knock _KNOCK_EMPTY_FALLTHROUGH_PATHS
@@ -475,9 +524,7 @@ _RENTCAFE_SHAPE_REJECTED_FALLTHROUGH_PATHS: tuple[str, ...] = (
 )
 
 
-def _rentcafe_shape_rejected_emit_subpage_hints(
-    result: Any, base_url: str
-) -> None:
+def _rentcafe_shape_rejected_emit_subpage_hints(result: Any, base_url: str) -> None:
     """Append floor-plan family URLs as subpage hints on ``result``.
 
     Mirrors knock.py ``_knock_empty_emit_subpage_hints`` exactly so
@@ -534,6 +581,358 @@ def _classify_rentcafe_failure(api_responses: list[dict[str, Any]]) -> tuple[str
     )
 
 
+async def _try_rentcafe_layout_tab_handoff(
+    page: Page,
+    ctx: AdapterContext,
+) -> AdapterResult | None:
+    """Run the exact layout-tab adapter only when its two-token marker exists.
+
+    The coarse RentCafe adapter often reaches a useful getFloorplans catalogue
+    first.  On the layout-tab theme, however, the public unit roster lives at
+    ``/availableunits`` or the per-plan detail pages handled by
+    :class:`RentCafeLayoutTabAdapter`.  A plan catalogue is evidence, not a
+    reason to make that more-specific route unreachable.
+
+    Acceptance is deliberately stricter than post-process admission: at least
+    one row must carry canonical apartment identity *and* a positive numeric
+    rent.  This prevents a waitlist/plan-only layout from replacing either a
+    native RentCafe roster or its useful plan catalogue.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+    from ma_poc.pms.adapters._probe import body_html_from_ctx
+    from ma_poc.pms.adapters.rentcafe_layout_tab import (
+        RentCafeLayoutTabAdapter,
+        is_rentcafe_layout_tab_html,
+    )
+
+    html = body_html_from_ctx(ctx)
+    if not is_rentcafe_layout_tab_html(html):
+        return None
+
+    candidate = await RentCafeLayoutTabAdapter().extract(page, ctx)
+    has_strict_unit = any(
+        isinstance(unit, dict)
+        and unit_has_real_anchor(unit)
+        and any(
+            isinstance(unit.get(field), (int, float))
+            and not isinstance(unit.get(field), bool)
+            and unit[field] > 0
+            for field in ("rent_low", "rent_high", "market_rent_low", "market_rent_high")
+        )
+        for unit in (candidate.units or [])
+    )
+    return candidate if has_strict_unit else None
+
+
+async def _try_rentcafe_vanity_availableunits(
+    ctx: AdapterContext,
+    result: AdapterResult,
+) -> AdapterResult | None:
+    """Fetch RentCafe's same-origin ``/availableunits`` roster once.
+
+    This is the bounded, direct half of the RentCafe fast flag.  It runs
+    before the broad SecureCafe/anchor/drill fallbacks and accepts only rows
+    carrying canonical apartment identity plus a positive numeric rent.
+
+    The direct request can never reach Web Unlocker: ``unlocker=False`` is
+    explicit, the proxy map is empty, and the retry is an ordinary re-GET of
+    the same public URL.  When that exact route answers with a transient
+    403/429 and the operator explicitly selected ``FETCH_BACKEND=hyperbrowser``,
+    retry it once through Hyperbrowser's clean residential browser.  CAPTCHA
+    solving is hard-disabled in that backend.  A cross-host redirect is
+    declined so a management-company portfolio route cannot leak a sibling
+    property's roster.
+    """
+    attempted_attr = "_rentcafe_vanity_availableunits_attempted"
+    if bool(getattr(ctx, attempted_attr, False)):
+        return None
+    try:
+        setattr(ctx, attempted_attr, True)
+    except Exception:
+        pass
+
+    origin = _origin_from_ctx(ctx)
+    if not origin:
+        return None
+    roster_url = f"{origin.rstrip('/')}/availableunits"
+
+    used_hyperbrowser = False
+    try:
+        from urllib.parse import urlparse
+
+        from ma_poc.pms.adapters._probe import probe_get
+
+        response = await asyncio.to_thread(
+            probe_get,
+            roster_url,
+            timeout=20,
+            unlocker=False,
+            proxies={},
+            verify=True,
+            retries=1,
+        )
+        status = int(getattr(response, "status_code", 0) or 0)
+        if status == 200:
+            body = str(getattr(response, "text", "") or "")
+            if not body:
+                return None
+            final_url = str(getattr(response, "url", "") or roster_url)
+            expected_host = urlparse(roster_url).netloc.casefold().removeprefix("www.")
+            final_host = urlparse(final_url).netloc.casefold().removeprefix("www.")
+            if not expected_host or final_host != expected_host:
+                return None
+        elif status in {403, 429}:
+            from ma_poc.config.feature_flags import hb_enabled
+
+            if not hb_enabled():
+                return None
+            from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+            hb_status, hb_body = await hb_raw_get(
+                roster_url,
+                str(getattr(ctx, "property_id", "") or "?"),
+                same_origin_only=True,
+            )
+            if hb_status != 200 or not hb_body:
+                return None
+            body = str(hb_body)
+            final_url = roster_url
+            used_hyperbrowser = True
+        else:
+            return None
+    except Exception as exc:
+        log.debug(
+            "rentcafe vanity availableunits miss pid=%s err=%s: %s",
+            getattr(ctx, "property_id", None),
+            type(exc).__name__,
+            str(exc)[:100],
+        )
+        return None
+
+    # Import locally to avoid rentcafe <-> rentcafe_layout_tab module-load
+    # recursion.  The first parser covers the normal same-origin roster; the
+    # second covers the uncommon case where the same-origin route renders the
+    # SecureCafe table without redirecting away from the property host.
+    from ma_poc.core.identity import unit_has_real_anchor
+    from ma_poc.extraction.post_process import post_process
+    from ma_poc.pms.adapters.rentcafe_layout_tab import (
+        parse_rentcafe_lt_applyga,
+    )
+
+    rows = parse_rentcafe_lt_applyga(body, final_url)
+    if not rows:
+        rows = parse_securecafe_availableunits(body, final_url)
+    if not rows:
+        return None
+
+    processed = post_process(rows, property_id=getattr(ctx, "property_id", None))
+
+    def _strict_unit(row: dict[str, Any]) -> bool:
+        if not unit_has_real_anchor(row):
+            return False
+        return any(
+            isinstance(row.get(field), (int, float))
+            and not isinstance(row.get(field), bool)
+            and row[field] > 0
+            for field in (
+                "rent_low",
+                "rent_high",
+                "market_rent_low",
+                "market_rent_high",
+            )
+        )
+
+    admitted = [row for row in processed.admitted if _strict_unit(row)]
+    if not admitted:
+        return None
+
+    result.units = admitted
+    result.plan_summaries = processed.plan_summaries
+    result.tier_used = (
+        "TIER_1_DOM_RENTCAFE_AVAILABLEUNITS_ROSTER_HYPERBROWSER"
+        if used_hyperbrowser
+        else "TIER_1_DOM_RENTCAFE_AVAILABLEUNITS_ROSTER"
+    )
+    result.winning_url = final_url
+    result.confidence = min(0.95, 0.75 + 0.01 * len(admitted))
+    return result
+
+
+_INLINE_AVAILABLE_UNITS_RE = re.compile(
+    r"\bvar\s+available_units\s*=\s*(\[.*?\])\s*;",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def parse_rentcafe_inline_available_units(
+    html: str,
+    source_url: str,
+) -> list[dict[str, Any]]:
+    """Parse RentCafe's inline ``var available_units`` apartment roster.
+
+    This is distinct from the plan catalogue handled by the normal RentCafe
+    API parser. Every admitted object must carry a per-apartment ``UnitId``,
+    a human unit code, its parent ``FloorPlanID``, and a positive per-unit
+    rent. Those requirements keep a floor-plan array from becoming a false
+    unit-level success merely because it contains a generic ``ID`` field.
+    """
+    if "available_units" not in html:
+        return []
+    match = _INLINE_AVAILABLE_UNITS_RE.search(html)
+    if not match:
+        return []
+    try:
+        payload = json.loads(match.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(payload, list):
+        return []
+
+    def _text(value: Any) -> str:
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value or "").strip()
+
+    units: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_codes: set[str] = set()
+    for row in payload:
+        if not isinstance(row, dict) or row.get("bRestrictPublish") is True:
+            continue
+        apartment_id = _text(row.get("UnitId"))
+        unit_code = _text(row.get("UnitCode"))
+        floorplan_id = _text(row.get("FloorPlanID"))
+        floorplan_name = _text(row.get("FloorPlanName"))
+        rent_low = money_to_int(_text(row.get("IpmDisplayMinRent") or row.get("MinRent") or row.get("Rent")))
+        rent_high = money_to_int(_text(row.get("IpmDisplayMaxRent") or row.get("MaxRent"))) or rent_low
+
+        # UnitId is an integer in this server-rendered contract. Requiring it
+        # in addition to UnitCode prevents plan-only objects from entering via
+        # the more permissive unit-number fallback.
+        if (
+            not apartment_id.isdigit()
+            or not unit_code
+            or not any(ch.isdigit() for ch in unit_code)
+            or not floorplan_id
+            or not floorplan_name
+            or not rent_low
+            or rent_low <= 0
+        ):
+            continue
+        id_key = apartment_id.casefold()
+        code_key = unit_code.casefold()
+        if id_key in seen_ids or code_key in seen_codes:
+            # Ambiguous cardinality is worse than a miss: do not certify a
+            # roster where one purported identity describes multiple rows.
+            return []
+        seen_ids.add(id_key)
+        seen_codes.add(code_key)
+
+        available_date = _text(row.get("AvailableDate"))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=floorplan_name,
+                bed_label=bed_label_from(
+                    int(float(row["Beds"])) if row.get("Beds") is not None else None,
+                    floorplan_name,
+                ),
+                bedrooms=_text(row.get("Beds")),
+                bathrooms=_text(row.get("Baths")),
+                sqft=_text(row.get("SquareFeet")),
+                unit_number=unit_code,
+                rent_low=rent_low,
+                rent_high=rent_high,
+                deposit=_text(row.get("DepositCol") or row.get("Deposit")),
+                availability_status="AVAILABLE",
+                availability_date=available_date.split("T", 1)[0],
+                source_api_url=source_url,
+                extraction_tier="TIER_1_DOM_RENTCAFE_INLINE_AVAILABLE_UNITS",
+                source_ids={
+                    "securecafe_apartment_id": apartment_id,
+                    "securecafe_floorplan_id": floorplan_id,
+                },
+            )
+        )
+    return units
+
+
+def _try_rentcafe_inline_available_units(
+    ctx: AdapterContext,
+    result: AdapterResult,
+) -> AdapterResult | None:
+    """Prefer a strict apartment roster already present in the fetched body."""
+    from ma_poc.core.identity import unit_has_real_anchor
+    from ma_poc.extraction.post_process import post_process
+    from ma_poc.pms.adapters._probe import body_html_from_ctx
+
+    rows = parse_rentcafe_inline_available_units(
+        body_html_from_ctx(ctx),
+        str(getattr(ctx, "base_url", "") or ""),
+    )
+    if not rows:
+        return None
+    processed = post_process(rows, property_id=getattr(ctx, "property_id", None))
+    admitted = [row for row in processed.admitted if unit_has_real_anchor(row)]
+    if len(admitted) != len(rows):
+        return None
+    result.units = admitted
+    result.plan_summaries = processed.plan_summaries
+    result.tier_used = "TIER_1_DOM_RENTCAFE_INLINE_AVAILABLE_UNITS"
+    result.winning_url = str(getattr(ctx, "base_url", "") or "")
+    result.confidence = min(0.96, 0.80 + 0.01 * len(admitted))
+    return result
+
+
+async def _try_brookfield_unit_handoff(
+    ctx: AdapterContext,
+    result: AdapterResult,
+    plan_summaries: list[dict[str, Any]] | None = None,
+) -> AdapterResult | None:
+    """Promote only Brookfield's strictly bound per-apartment ``getUnits``.
+
+    The companion ``getFloorplans`` route is plan-level and must never win
+    this handoff.  The recovery module requires the exact Brookfield host, an
+    embedded property object matching the canonical name and street address,
+    and a complete roster of unique apartment IDs/numbers with positive rent.
+    """
+    from ma_poc.extraction.post_process import post_process
+    from ma_poc.pms.adapters._rentcafe_brookfield_units import (
+        recover_brookfield_units,
+    )
+
+    rows, source_url = await recover_brookfield_units(ctx)
+    if not rows:
+        return None
+    processed = post_process(rows, property_id=getattr(ctx, "property_id", None))
+    if processed.n_admitted != len(rows) or processed.plan_summaries:
+        return None
+    result.units = processed.admitted
+    result.plan_summaries = list(plan_summaries or [])
+    result.tier_used = "TIER_1_API_RENTCAFE_BROOKFIELD_UNITS"
+    result.winning_url = source_url
+    result.confidence = min(0.95, 0.75 + 0.01 * processed.n_admitted)
+    return result
+
+
+def _preserve_rentcafe_plan_catalogue(
+    recovered: AdapterResult,
+    plans: list[dict[str, Any]],
+) -> None:
+    """Attach de-duplicated native RentCafe plan rows to a layout-tab winner."""
+    merged = [row for row in (recovered.plan_summaries or []) if isinstance(row, dict)]
+    seen = {_plan_key(row) for row in merged if _plan_key(row)}
+    for row in plans:
+        if not isinstance(row, dict):
+            continue
+        key = _plan_key(row)
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        merged.append(row)
+    recovered.plan_summaries = merged
+
+
 class RentCafeAdapter:
     """RentCafe (Yardi) PMS adapter."""
 
@@ -543,9 +942,19 @@ class RentCafeAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from RentCafe API responses captured during page load."""
         result = AdapterResult(tier_used=_TIER_BASE)
+        inline_result = _try_rentcafe_inline_available_units(ctx, result)
+        if inline_result is not None:
+            return inline_result
         all_units: list[dict[str, str]] = []
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+        applicant_result = _try_captured_securecafe_applicant(
+            api_responses,
+            ctx,
+            result,
+        )
+        if applicant_result is not None:
+            return applicant_result
         for resp in api_responses:
             body = resp.get("body")
             if not _is_rentcafe_response(body):
@@ -607,9 +1016,33 @@ class RentCafeAdapter:
                 #     what the flag still exists for.
                 # See config/feature_flags.enable_rentcafe_plan_securecafe_drill
                 # for the full argument.
-                _has_unit_level = any(
-                    str(u.get("unit_number") or "").strip() for u in pp.admitted
-                )
+                _has_unit_level = any(str(u.get("unit_number") or "").strip() for u in pp.admitted)
+                if not _has_unit_level:
+                    layout_result = await _try_rentcafe_layout_tab_handoff(page, ctx)
+                    if layout_result is not None:
+                        _preserve_rentcafe_plan_catalogue(
+                            layout_result,
+                            pp.plan_summaries,
+                        )
+                        return layout_result
+                    if enable_rentcafe_availunits_fast():
+                        vanity_result = await _try_rentcafe_vanity_availableunits(
+                            ctx,
+                            result,
+                        )
+                        if vanity_result is not None:
+                            _preserve_rentcafe_plan_catalogue(
+                                vanity_result,
+                                pp.plan_summaries,
+                            )
+                            return vanity_result
+                    brookfield_result = await _try_brookfield_unit_handoff(
+                        ctx,
+                        result,
+                        pp.plan_summaries,
+                    )
+                    if brookfield_result is not None:
+                        return brookfield_result
                 # #80: the FAST availableunits path (opt-in, default-OFF pending
                 # canary yield measurement) fires here too. When the full drill
                 # is enabled it takes precedence (it reaches the CF-walled subset
@@ -636,19 +1069,13 @@ class RentCafeAdapter:
                         # fully-leased plans' UNAVAILABLE rows erased — and
                         # ``result.errors`` empty. The portal may only WIN when
                         # it is demonstrably not a downgrade.
-                        _accepted, _reason = _securecafe_swap_verdict(
-                            pp.admitted, sc_pp.admitted
-                        )
+                        _accepted, _reason = _securecafe_swap_verdict(pp.admitted, sc_pp.admitted)
                         if sc_pp.n_admitted > 0 and _accepted:
                             # MERGE, never overwrite: the catalogue carries the
                             # fully-leased plans (availableUnitsCount == 0) that
                             # an availability list structurally cannot.
-                            result.units = _merge_portal_over_catalogue(
-                                pp.admitted, sc_pp.admitted
-                            )
-                            result.plan_summaries = (
-                                sc_pp.plan_summaries or pp.plan_summaries
-                            )
+                            result.units = _merge_portal_over_catalogue(pp.admitted, sc_pp.admitted)
+                            result.plan_summaries = sc_pp.plan_summaries or pp.plan_summaries
                             # DISTINCT tier string, non-negotiable: both call
                             # sites used to stamp ``_SECURECAFE``.
                             # ``result.errors`` is not persisted and the v2
@@ -659,10 +1086,12 @@ class RentCafeAdapter:
                             # keeps ``_SECURECAFE`` — cross-run tier
                             # comparisons (1,344/4,982 on 2026-07-12) depend
                             # on that string not moving.
-                            result.tier_used = f"{_TIER_BASE}_SECURECAFE_FROM_PLAN"
-                            result.confidence = min(
-                                0.92, 0.7 + 0.04 * sc_pp.n_admitted
-                            )
+                            if result.tier_used not in {
+                                _TIER_APPLICANT_V2_DIRECT,
+                                _TIER_APPLICANT_V2_HYPERBROWSER,
+                            }:
+                                result.tier_used = f"{_TIER_BASE}_SECURECAFE_FROM_PLAN"
+                            result.confidence = min(0.92, 0.7 + 0.04 * sc_pp.n_admitted)
                             return result
                         # Rejected: keep the catalogue, keep the base tier, and
                         # SAY SO with both counts. A silent rejection is how
@@ -672,9 +1101,7 @@ class RentCafeAdapter:
                             getattr(ctx, "property_id", None),
                             _reason,
                         )
-                        result.errors.append(
-                            f"rentcafe: securecafe_from_plan swap rejected — {_reason}"
-                        )
+                        result.errors.append(f"rentcafe: securecafe_from_plan swap rejected — {_reason}")
                 # Unit-level already present, or securecafe drill-down
                 # unavailable: return the network getFloorplans result.
                 # Stage 2: surface unit-level AND plan-level lists. The
@@ -683,9 +1110,7 @@ class RentCafeAdapter:
                 # only plan-level data as SUCCESS_PLAN_LEVEL.
                 result.units = pp.admitted
                 result.plan_summaries = pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
                 result.confidence = min(0.95, 0.7 + 0.05 * pp.n_admitted)
                 result.tier_used = _TIER_BASE
                 return result
@@ -697,6 +1122,23 @@ class RentCafeAdapter:
                 f"RENTCAFE_VALIDITY_REJECTED: {len(all_units)} parsed rows "
                 f"failed unit_validity (no numeric dimension)"
             )
+
+        # Exact-theme handoff for the empty/shape-rejected branch.  It sits
+        # after native API parsing so a real RentCafe unit roster always wins,
+        # but before broader probes so the theme's purpose-built one-request
+        # ``/availableunits`` path gets first opportunity.
+        layout_result = await _try_rentcafe_layout_tab_handoff(page, ctx)
+        if layout_result is not None:
+            return layout_result
+
+        if enable_rentcafe_availunits_fast():
+            vanity_result = await _try_rentcafe_vanity_availableunits(ctx, result)
+            if vanity_result is not None:
+                return vanity_result
+
+        brookfield_result = await _try_brookfield_unit_handoff(ctx, result)
+        if brookfield_result is not None:
+            return brookfield_result
 
         # 2026-05-13 (C3 RentCafe SHAPE_REJECTED, teammate analysis):
         # before classifying as a failure, probe the property's own
@@ -710,6 +1152,7 @@ class RentCafeAdapter:
         wp_units = await _try_rentcafe_wp_probe(ctx, result)
         if wp_units:
             from ma_poc.extraction.post_process import post_process
+
             pp = post_process(wp_units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
                 result.units = pp.admitted
@@ -725,11 +1168,16 @@ class RentCafeAdapter:
         sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
         if sc_units:
             from ma_poc.extraction.post_process import post_process
+
             pp = post_process(sc_units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
                 result.units = pp.admitted
                 result.plan_summaries = pp.plan_summaries
-                result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                if result.tier_used not in {
+                    _TIER_APPLICANT_V2_DIRECT,
+                    _TIER_APPLICANT_V2_HYPERBROWSER,
+                }:
+                    result.tier_used = f"{_TIER_BASE}_SECURECAFE"
                 result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
                 return result
 
@@ -741,18 +1189,16 @@ class RentCafeAdapter:
         # dependent, so parse the already-rendered page HTML.
         try:
             from ma_poc.pms.adapters.generic import _get_page_html
+
             _rc_html = await _get_page_html(page, ctx)
         except Exception:
             _rc_html = ""
         if _rc_html and "fp-unit" in _rc_html:
-            hosted = parse_rentcafe_hosted_table(
-                _rc_html, str(getattr(ctx, "base_url", "") or "")
-            )
+            hosted = parse_rentcafe_hosted_table(_rc_html, str(getattr(ctx, "base_url", "") or ""))
             if hosted:
                 from ma_poc.extraction.post_process import post_process
-                pp = post_process(
-                    hosted, property_id=getattr(ctx, "property_id", None)
-                )
+
+                pp = post_process(hosted, property_id=getattr(ctx, "property_id", None))
                 if pp.n_admitted > 0:
                     result.units = pp.admitted
                     result.plan_summaries = pp.plan_summaries
@@ -768,14 +1214,11 @@ class RentCafeAdapter:
         # can miss these (base-URL discovery fails or the portal fetch is
         # CF/proxy-blocked), yet the same rows are already in ``_rc_html``.
         if _rc_html and "AvailUnitRow" in _rc_html:
-            inline_units = parse_securecafe_availableunits(
-                _rc_html, str(getattr(ctx, "base_url", "") or "")
-            )
+            inline_units = parse_securecafe_availableunits(_rc_html, str(getattr(ctx, "base_url", "") or ""))
             if inline_units:
                 from ma_poc.extraction.post_process import post_process
-                pp = post_process(
-                    inline_units, property_id=getattr(ctx, "property_id", None)
-                )
+
+                pp = post_process(inline_units, property_id=getattr(ctx, "property_id", None))
                 if pp.n_admitted > 0:
                     result.units = pp.admitted
                     result.plan_summaries = pp.plan_summaries
@@ -797,10 +1240,11 @@ class RentCafeAdapter:
             try:
                 from ma_poc.pms.adapters._rentcafe_nestin import (
                     is_nestin_template,
+                    is_rentcafe_applicant_shell,
                     recover_rentcafe_nestin_per_plan,
                 )
 
-                if is_nestin_template(_rc_html):
+                if is_nestin_template(_rc_html) or is_rentcafe_applicant_shell(_rc_html):
                     # Pass the live Playwright page so detail-page fetches
                     # use the browser's CF-cleared session (probe_get hits
                     # CF-403 even with static cf_clearance cookies; verified
@@ -810,12 +1254,12 @@ class RentCafeAdapter:
                         _rc_html,
                         str(getattr(ctx, "base_url", "") or ""),
                         page=page,
+                        property_id=str(getattr(ctx, "property_id", "") or ""),
                     )
                     if nestin_units:
                         from ma_poc.extraction.post_process import post_process
-                        pp = post_process(
-                            nestin_units, property_id=getattr(ctx, "property_id", None)
-                        )
+
+                        pp = post_process(nestin_units, property_id=getattr(ctx, "property_id", None))
                         if pp.n_admitted > 0:
                             result.units = pp.admitted
                             result.plan_summaries = pp.plan_summaries
@@ -828,8 +1272,7 @@ class RentCafeAdapter:
                 # Recovery must never block scrape — log + fall through to
                 # failure classification.
                 result.errors.append(
-                    f"rentcafe-nestin-error: {type(nestin_exc).__name__}: "
-                    f"{str(nestin_exc)[:120]}"
+                    f"rentcafe-nestin-error: {type(nestin_exc).__name__}: {str(nestin_exc)[:120]}"
                 )
 
         # 2026-05-27 (612-failure-grind row 2): anchor-walk fallback. ~34
@@ -841,15 +1284,11 @@ class RentCafeAdapter:
             anchor_units = await _try_rentcafe_anchor_walk(page, ctx, result)
         except Exception as aw_exc:  # never crash adapter
             anchor_units = []
-            result.errors.append(
-                f"rentcafe-anchor-walk-error: {type(aw_exc).__name__}: "
-                f"{str(aw_exc)[:120]}"
-            )
+            result.errors.append(f"rentcafe-anchor-walk-error: {type(aw_exc).__name__}: {str(aw_exc)[:120]}")
         if anchor_units:
             from ma_poc.extraction.post_process import post_process
-            pp = post_process(
-                anchor_units, property_id=getattr(ctx, "property_id", None)
-            )
+
+            pp = post_process(anchor_units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
                 result.units = pp.admitted
                 result.plan_summaries = pp.plan_summaries
@@ -940,6 +1379,7 @@ def _origin_from_ctx(ctx: AdapterContext) -> str:
         candidate = getattr(ctx, "base_url", "") or ""
     try:
         from urllib.parse import urlparse
+
         p = urlparse(candidate)
     except Exception:
         return ""
@@ -948,9 +1388,37 @@ def _origin_from_ctx(ctx: AdapterContext) -> str:
     return f"{p.scheme}://{p.netloc}"
 
 
-async def _try_rentcafe_wp_probe(
-    ctx: AdapterContext, result: AdapterResult
-) -> list[dict[str, str]]:
+def _effective_property_page_url(ctx: AdapterContext) -> str:
+    """Return the exact effective property page, including its path.
+
+    SecureCafe discovery must not collapse a path-scoped property URL onto a
+    portfolio homepage. A portfolio root can publish dozens of sibling
+    leasing slugs; probing the first sibling with inventory can otherwise
+    attach that sibling's units to the configured property.
+    """
+    candidate = ""
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is not None:
+        candidate = str(getattr(fr, "final_url", "") or "")
+    if not candidate:
+        candidate = str(getattr(ctx, "base_url", "") or "")
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+
+        parsed = urlsplit(candidate)
+    except Exception:
+        return ""
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    path = parsed.path or "/"
+    # Preserve path-scoped property pages, but keep a bare origin canonical at
+    # the origin form used by the direct probe and historical fixtures.
+    if path == "/" and not parsed.query:
+        path = ""
+    return urlunsplit((parsed.scheme, parsed.netloc, path, parsed.query, ""))
+
+
+async def _try_rentcafe_wp_probe(ctx: AdapterContext, result: AdapterResult) -> list[dict[str, str]]:
     """SHAPE_REJECTED fallback: probe ``<origin>/wp-json/middleware/v1/getFloorplans/``
     directly with the property ID extracted from the rendered HTML.
 
@@ -980,6 +1448,7 @@ async def _try_rentcafe_wp_probe(
     api_url = f"{origin}/wp-json/middleware/v1/getFloorplans/?propertyId[]={prop_id}"
     try:
         import httpx
+
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -998,8 +1467,7 @@ async def _try_rentcafe_wp_probe(
             return []
     except Exception as exc:
         result.errors.append(
-            f"rentcafe-wp-probe-error: prop_id={prop_id!r} "
-            f"{type(exc).__name__}: {str(exc)[:120]}"
+            f"rentcafe-wp-probe-error: prop_id={prop_id!r} {type(exc).__name__}: {str(exc)[:120]}"
         )
         return []
 
@@ -1008,9 +1476,7 @@ async def _try_rentcafe_wp_probe(
         return []
     units = parse_rentcafe_floorplans(items, api_url)
     if units:
-        result.api_responses.append(
-            {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
-        )
+        result.api_responses.append({"url": api_url, "status": 200, "body": payload, "via": "wp_probe"})
         result.winning_url = api_url
     return units
 
@@ -1057,7 +1523,12 @@ _SECURECAFE_URL_RE = re.compile(
 # the same Yardi tenant.
 
 _WORD_NUM = {
-    "studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "studio": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
 }
 
 # 2026-07-12: the name group was ``[^<\-]{1,80}?`` — it forbade '-', so
@@ -1076,31 +1547,47 @@ _SECURECAFE_FP_HDR_RE = re.compile(
     re.IGNORECASE,
 )
 
-_SECURECAFE_UNIT_ROW_RE = re.compile(
-    r"<tr[^>]*class='AvailUnitRow'.*?</tr>", re.IGNORECASE | re.DOTALL
+_SECURECAFE_UNIT_ROW_RE = re.compile(r"<tr[^>]*class='AvailUnitRow'.*?</tr>", re.IGNORECASE | re.DOTALL)
+# Legacy Cool Springs (PID 253788) publishes native apartment codes such as
+# ``1_0412``. Excluding underscore truncated every row to ``1`` and the
+# collision guard then demoted a real roster. Keep the class narrow while
+# preserving that provider-observed identifier character.
+_SC_APT_RE = re.compile(
+    r"data-label=['\"]?Apartment['\"]?[^>]*>\s*#?\s*([A-Za-z0-9_-]+)",
+    re.I,
 )
-_SC_APT_RE = re.compile(r"data-label=['\"]?Apartment['\"]?[^>]*>\s*#?\s*([A-Za-z0-9-]+)", re.I)
 _SC_SQFT_RE = re.compile(r"data-label=['\"]?Sq\.?Ft\.?['\"]?[^>]*>\s*([\d,]+)", re.I)
 _SC_RENT_RE = re.compile(
     r"data-label=['\"]?Rent['\"]?[^>]*>\s*\$?\s*([\d,]+)\s*(?:-\s*\$?\s*([\d,]+))?", re.I
 )
+# Modern SecureCafe wraps the visible price in one or more ``span`` elements
+# (live FND probes: Parks Residential and Redwood Delta Township).  The legacy
+# expression above expects the first character after ``>`` to be ``$`` or a
+# digit, so it preserved the real unit number/sqft but silently emitted a null
+# rent for every row.  Capture the whole cell as a narrow fallback and strip
+# tags before reading the advertised range.
+_SC_RENT_CELL_RE = re.compile(r"data-label=['\"]?Rent['\"]?[^>]*>(.*?)</td>", re.I | re.S)
 # 2026-05-18: securecafe AvailUnitRow has a ``data-label='Date Available'``
 # cell (inner text e.g. "Available" or a "6/25/26" date). The parser
 # previously ignored it ⇒ TIER_1_API_RENTCAFE_SECURECAFE (21.6k units)
 # had 0% available_date. Cell may wrap the value in a <span>; capture
 # the inner HTML and strip tags. schema_v2._format_date normalizes
 # "Available"/"M/D/YY" forms.
-_SC_DATE_RE = re.compile(
-    r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S
-)
+_SC_DATE_RE = re.compile(r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S)
+_SC_DATE_RE = re.compile(r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S)
+# The visible Date Available cell is frequently the generic token
+# ``Available`` while the same row's public Apply action carries the exact
+# unit move-in date (``...&MoveInDate=8/31/2026``).  Treat that action value as
+# source data, not as a scrape-date inference.  This closes the RP-future ->
+# capture-date gap without inventing a date when neither source publishes one.
+_SC_MOVE_IN_DATE_RE = re.compile(r"(?:[?&]|&amp;)MoveInDate=([^&'\"<>\s]+)", re.IGNORECASE)
+_SC_GENERIC_AVAILABLE_RE = re.compile(r"(?:available(?:\s+now)?|now|immediate(?:ly)?)", re.IGNORECASE)
 # 2026-07-16: many securecafe AvailUnitRow layouts carry a
 # ``<td ... data-label='Deposit'>$200</td>`` cell (verified live on
 # parksrichardson.securecafe.com — column present on some properties, absent
 # on others). Capture it — the deposit field was dropped despite being a
 # RealPage priority field and already plumbed through make_unit_dict + v2.
-_SC_DEPOSIT_RE = re.compile(
-    r"data-label=['\"]?Deposit['\"]?[^>]*>\s*\$?\s*([\d,]+)", re.I
-)
+_SC_DEPOSIT_RE = re.compile(r"data-label=['\"]?Deposit['\"]?[^>]*>\s*\$?\s*([\d,]+)", re.I)
 # 2026-05-22: every AvailUnitRow carries a "Apply Now" button whose onclick
 # is ``SetTermsUrl('rentaloptions.aspx?UnitID=<u>&FloorPlanID=<fp>&...')``.
 # The FloorPlanID is the stable Yardi plan ID — same value as apts247's
@@ -1110,9 +1597,7 @@ _SC_DEPOSIT_RE = re.compile(
 # bed + bath + name). Without this join, ~6 apts247-backed properties
 # stamp SUCCESS_PLAN_LEVEL despite having unit-level data — they only
 # lack sqft.
-_SC_FPID_RE = re.compile(
-    r"rentaloptions\.aspx[^'\"]*?[?&]FloorPlanID=(\d+)", re.IGNORECASE
-)
+_SC_FPID_RE = re.compile(r"rentaloptions\.aspx[^'\"]*?[?&]FloorPlanID=(\d+)", re.IGNORECASE)
 
 
 def _securecafe_base_from_match(m: re.Match[str]) -> str:
@@ -1129,15 +1614,10 @@ def _securecafe_base_from_match(m: re.Match[str]) -> str:
     So when the regex matches a ``.securecafenet.com`` URL we still
     rewrite the synthesized base onto ``.securecafe.com``: same
     ``<sub>`` and ``<slug>``, different host."""
-    return (
-        f"https://{m.group('sub')}.securecafe.com"
-        f"/onlineleasing/{m.group('slug')}"
-    )
+    return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
 
 
-def _find_all_securecafe_bases(
-    html: str, ctx: AdapterContext
-) -> list[str]:
+def _find_all_securecafe_bases(html: str, ctx: AdapterContext) -> list[str]:
     """Return ALL distinct ``<sub>.securecafe.com/onlineleasing/<slug>``
     bases found across the rendered HTML + captured network responses +
     origin fallback. Preserves source-order (so the first occurrence
@@ -1234,9 +1714,32 @@ def _sc_applicant_exact_area(floor_plan: dict[str, Any]) -> int | None:
     return min_area if min_present else max_area
 
 
-def parse_securecafe_applicant_floorplans(
-    payload: Any, source_url: str
-) -> list[dict[str, Any]]:
+_SC_APPLICANT_PLACEHOLDER_CODE_RE = re.compile(
+    r"^(?:WAIT(?:LIST)?|MODEL|OFFICE|ADMIN)",
+    re.IGNORECASE,
+)
+
+
+def _sc_applicant_physical_unit_code(value: Any, status: Any = "") -> str:
+    """Return a publishable applicant-portal apartment code, or ``""``.
+
+    Yardi also emits wait-list/model/office pricing rows with apartment-like
+    IDs, rents and areas.  Require a numeric-bearing physical code and reject
+    those explicit placeholder families and statuses.
+    """
+    code = str(value or "").strip()
+    status_key = str(status or "").strip().casefold()
+    if (
+        not code
+        or not any(ch.isdigit() for ch in code)
+        or _SC_APPLICANT_PLACEHOLDER_CODE_RE.match(code)
+        or status_key in {"waitlist", "model", "office", "admin"}
+    ):
+        return ""
+    return code
+
+
+def parse_securecafe_applicant_floorplans(payload: Any, source_url: str) -> list[dict[str, Any]]:
     """Parse the RentCafe "applicant portal" FloorPlansV2 API.
 
     This is the React-SPA replacement for the legacy ``availableunits.aspx``
@@ -1294,28 +1797,48 @@ def parse_securecafe_applicant_floorplans(
             for u in avail:
                 if not isinstance(u, dict):
                     continue
+                unit_code = _sc_applicant_physical_unit_code(
+                    u.get("unitcode") or u.get("UnitCode"),
+                    u.get("Status") or u.get("status"),
+                )
+                if not unit_code:
+                    continue
                 rent = _sc_applicant_int(
-                    u.get("DisplayMinRent")
-                    or u.get("startingRent")
-                    or fp.get("MinimumRent")
+                    u.get("DisplayMinRent") or u.get("startingRent") or fp.get("MinimumRent")
                 )
-                units.append(
-                    make_unit_dict(
-                        floor_plan_name=name,
-                        bedrooms=beds_s,
-                        bathrooms=baths_s,
-                        sqft=sqft_s,
-                        unit_number=str(u.get("unitcode") or u.get("UnitCode") or ""),
-                        rent_low=rent,
-                        rent_high=rent,
-                        deposit=deposit,
-                        availability_date=str(
-                            u.get("AvailableDate") or u.get("availableDate") or ""
-                        ),
-                    )
+                if rent is None:
+                    continue
+                rent_high = _sc_applicant_int(u.get("DisplayMaxRent") or u.get("startingRent")) or rent
+                unit_area = _sc_applicant_int(u.get("Area") or u.get("SquareFeet") or u.get("HomeSqFt"))
+                unit_deposit = _sc_applicant_int(u.get("Deposit"))
+                apartment_id = str(u.get("id") or u.get("UnitID") or "").strip()
+                floorplan_id = str(fp.get("FloorPlanID") or "").strip()
+                source_ids: dict[str, Any] = {}
+                if apartment_id.isdigit():
+                    source_ids["securecafe_apartment_id"] = apartment_id
+                if floorplan_id:
+                    source_ids["securecafe_floorplan_id"] = floorplan_id
+                unit_row = make_unit_dict(
+                    floor_plan_name=name,
+                    bedrooms=beds_s,
+                    bathrooms=baths_s,
+                    sqft=str(unit_area) if unit_area is not None else sqft_s,
+                    unit_number=unit_code,
+                    rent_low=rent,
+                    rent_high=rent_high,
+                    deposit=(f"${unit_deposit:,}" if unit_deposit else deposit),
+                    availability_date=str(u.get("AvailableDate") or u.get("availableDate") or ""),
+                    availability_status="AVAILABLE",
+                    source_api_url=source_url,
+                    extraction_tier=("TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2"),
+                    source_ids=source_ids,
                 )
+                unit_row["source_property_id"] = str(fp.get("PropertyID") or "").strip()
+                unit_row["source_property_name"] = str(fp.get("PropertyName") or "").strip()
+                units.append(unit_row)
         elif name:
             fp_lo = _sc_applicant_int(fp.get("MinimumRent"))
+            floorplan_id = str(fp.get("FloorPlanID") or "").strip()
             units.append(
                 make_unit_dict(
                     floor_plan_name=name,
@@ -1325,9 +1848,752 @@ def parse_securecafe_applicant_floorplans(
                     rent_low=fp_lo,
                     rent_high=_sc_applicant_int(fp.get("MaximumRent")) or fp_lo,
                     deposit=deposit,
+                    source_api_url=source_url,
+                    extraction_tier=("TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_PLAN_LEVEL"),
+                    source_ids=({"securecafe_floorplan_id": floorplan_id} if floorplan_id else {}),
                 )
             )
-    return units
+    return _demote_cross_plan_duplicate_unit_codes(units)
+
+
+def _demote_cross_plan_duplicate_unit_codes(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Demote a unit code repeated across different floor plans.
+
+    One apartment cannot belong to multiple plans.  A cross-plan collision is
+    therefore a pricing-row ordinal, not a physical unit identity.  Collapse
+    it to one plan row while retaining the observed rent envelope.
+    """
+    code_plans: dict[str, set[tuple[str, str]]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("unit_number") or "").strip().casefold()
+        if not code:
+            continue
+        source_ids = row.get("source_ids") or {}
+        plan_key = (
+            str(row.get("floor_plan_name") or "").strip().casefold(),
+            str(source_ids.get("securecafe_floorplan_id") or "").strip(),
+        )
+        code_plans.setdefault(code, set()).add(plan_key)
+
+    ambiguous = {code for code, plans in code_plans.items() if len(plans) > 1}
+    if not ambiguous:
+        seen: set[tuple[tuple[str, str], str]] = set()
+        deduped: list[dict[str, Any]] = []
+        for row in rows:
+            source_ids = row.get("source_ids") or {}
+            plan_key = (
+                str(row.get("floor_plan_name") or "").strip().casefold(),
+                str(source_ids.get("securecafe_floorplan_id") or "").strip(),
+            )
+            code = str(row.get("unit_number") or "").strip().casefold()
+            key = (plan_key, code)
+            if code and key in seen:
+                continue
+            if code:
+                seen.add(key)
+            deduped.append(row)
+        return deduped
+
+    out: list[dict[str, Any]] = []
+    honest_seen: set[tuple[tuple[str, str], str]] = set()
+    plan_rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        source_ids = row.get("source_ids") or {}
+        plan_key = (
+            str(row.get("floor_plan_name") or "").strip().casefold(),
+            str(source_ids.get("securecafe_floorplan_id") or "").strip(),
+        )
+        code = str(row.get("unit_number") or "").strip().casefold()
+        if code not in ambiguous:
+            key = (plan_key, code)
+            if code and key in honest_seen:
+                continue
+            if code:
+                honest_seen.add(key)
+            out.append(row)
+            continue
+
+        current = plan_rows.get(plan_key)
+        low = row.get("market_rent_low")
+        high = row.get("market_rent_high")
+        if current is None:
+            current = dict(row)
+            current["unit_number"] = ""
+            current["unit_name"] = ""
+            current["availability_date"] = ""
+            current["available_date"] = ""
+            current["extraction_tier"] = "TIER_1_API_RENTCAFE_SECURECAFE_PLAN_LEVEL_AMBIGUOUS_UNIT_CODE"
+            current["data_quality_flag"] = "PLAN_LEVEL_AMBIGUOUS_UNIT_CODE"
+            gaps = list(current.get("data_gaps") or [])
+            if "unit_number" not in gaps:
+                gaps.append("unit_number")
+            current["data_gaps"] = gaps
+            plan_rows[plan_key] = current
+            out.append(current)
+            continue
+
+        lows = [
+            value
+            for value in (current.get("market_rent_low"), low)
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        ]
+        highs = [
+            value
+            for value in (current.get("market_rent_high"), high, low)
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        ]
+        if lows:
+            current["market_rent_low"] = min(lows)
+        if highs:
+            current["market_rent_high"] = max(highs)
+        current["rent_range"] = format_rent_range(
+            current.get("market_rent_low"),
+            current.get("market_rent_high"),
+        )
+    return out
+
+
+_SC_APPLICANT_GENERIC_NAME_TOKENS = frozenset(
+    {
+        "apartment",
+        "apartments",
+        "home",
+        "homes",
+        "townhome",
+        "townhomes",
+        "townhouse",
+        "townhouses",
+        "community",
+    }
+)
+
+
+def _sc_applicant_property_name_key(value: Any) -> str:
+    """Conservative property-name key used for cross-host API scoping."""
+    text = str(value or "").casefold().replace("'", "")
+    tokens = re.findall(r"[a-z0-9]+", text)
+    if tokens and tokens[0] == "the":
+        tokens = tokens[1:]
+    return "".join(token for token in tokens if token not in _SC_APPLICANT_GENERIC_NAME_TOKENS)
+
+
+def _sc_applicant_context_body(ctx: AdapterContext) -> str:
+    fetch_result = getattr(ctx, "fetch_result", None)
+    body = getattr(fetch_result, "body", "") if fetch_result is not None else ""
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", errors="replace")
+    return str(body or "").replace("\\/", "/")
+
+
+def _sc_applicant_candidate_published(
+    ctx: AdapterContext,
+    applicant_subdomain: str,
+    site_name: str,
+) -> bool:
+    """True when the archived property body publishes this exact Yardi tenant."""
+    body = _sc_applicant_context_body(ctx)
+    if not body:
+        return False
+    return bool(
+        re.search(
+            rf"https?://{re.escape(applicant_subdomain)}\.securecafe(?:net)?\.com/"
+            rf"(?:onlineleasing|residentservices)/{re.escape(site_name)}(?:[/?#\"']|$)",
+            body,
+            re.IGNORECASE,
+        )
+    )
+
+
+_SC_APPLICANT_ADDRESS_NOISE = frozenset(
+    {
+        "apartment",
+        "apartments",
+        "avenue",
+        "ave",
+        "boulevard",
+        "blvd",
+        "circle",
+        "court",
+        "ct",
+        "drive",
+        "dr",
+        "east",
+        "e",
+        "highway",
+        "hwy",
+        "lane",
+        "ln",
+        "north",
+        "n",
+        "parkway",
+        "pkwy",
+        "road",
+        "rd",
+        "south",
+        "s",
+        "street",
+        "st",
+        "suite",
+        "unit",
+        "west",
+        "w",
+    }
+)
+
+
+def _sc_applicant_theme_host_matches_context(
+    theme: dict[str, Any],
+    ctx: AdapterContext,
+) -> bool:
+    """True only when the theme website is the canonical property host."""
+    from urllib.parse import urlsplit
+
+    theme_website = str(theme.get("propertyWebsiteUrl") or "").strip()
+    try:
+        theme_host = (
+            urlsplit(theme_website if "://" in theme_website else f"//{theme_website}").hostname or ""
+        ).casefold()
+        context_host = (urlsplit(str(getattr(ctx, "base_url", "") or "")).hostname or "").casefold()
+    except (TypeError, ValueError):
+        return False
+    return bool(
+        theme_host and context_host and theme_host.removeprefix("www.") == context_host.removeprefix("www.")
+    )
+
+
+def _sc_applicant_theme_address_matches_context(
+    theme: dict[str, Any],
+    ctx: AdapterContext,
+) -> bool:
+    """Conservatively match a theme address to canonical property metadata."""
+    expected_address = str(getattr(ctx, "address", "") or "").strip()
+    theme_address = " ".join(
+        part
+        for part in (
+            str(theme.get("propertyaddress") or "").strip(),
+            str(theme.get("propertyaddress2") or "").strip(),
+        )
+        if part
+    )
+    if not expected_address or not theme_address:
+        return False
+
+    expected_number = re.search(r"\b\d+[a-z]?\b", expected_address.casefold())
+    theme_number = re.search(r"\b\d+[a-z]?\b", theme_address.casefold())
+    if expected_number is None or theme_number is None or expected_number.group(0) != theme_number.group(0):
+        return False
+
+    def _street_tokens(value: str) -> set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", value.casefold())
+            if not token.isdigit() and len(token) >= 3 and token not in _SC_APPLICANT_ADDRESS_NOISE
+        }
+
+    if not (_street_tokens(expected_address) & _street_tokens(theme_address)):
+        return False
+
+    location_pairs = (
+        (getattr(ctx, "city", ""), theme.get("propertycity")),
+        (getattr(ctx, "state", ""), theme.get("propertystate")),
+        (getattr(ctx, "zip_code", ""), theme.get("propertyzip")),
+    )
+    observed_location = False
+    for expected, observed in location_pairs:
+        expected_key = re.sub(r"[^a-z0-9]+", "", str(expected or "").casefold())
+        if not expected_key:
+            continue
+        observed_location = True
+        observed_key = re.sub(r"[^a-z0-9]+", "", str(observed or "").casefold())
+        if observed_key != expected_key:
+            return False
+    return observed_location
+
+
+def _sc_applicant_theme_matches_context(
+    theme: dict[str, Any],
+    ctx: AdapterContext,
+    applicant_subdomain: str,
+    site_name: str,
+) -> bool:
+    """Fail closed unless the Applicant theme belongs to this property page."""
+    theme_name = str(theme.get("propertyname") or "").strip()
+    section_name = str(theme.get("sectionname") or "").strip()
+    expected_name = _sc_applicant_property_name_key(str(getattr(ctx, "property_name", "") or ""))
+    theme_name_keys = {
+        key
+        for key in (
+            _sc_applicant_property_name_key(theme_name),
+            _sc_applicant_property_name_key(section_name),
+        )
+        if key
+    }
+    if expected_name:
+        if expected_name not in theme_name_keys:
+            return False
+        # A portal link published by the archived property page is already an
+        # exact tenant+slug boundary.  Candidates discovered only by a fresh
+        # same-origin homepage read (or a captured response) need a second
+        # independent boundary so a same-name portfolio sibling cannot win.
+        if _sc_applicant_candidate_published(ctx, applicant_subdomain, site_name):
+            return True
+        return _sc_applicant_theme_host_matches_context(
+            theme,
+            ctx,
+        ) or _sc_applicant_theme_address_matches_context(theme, ctx)
+
+    # Some 07-31 cohort rows have a blank canonical name.  In that case,
+    # require substantially stronger page-scoped evidence: the exact portal
+    # tenant+slug must be published by the archived page, the theme's own
+    # website must equal (or be published by) that page, and the page must
+    # repeat either the theme identity or its city+ZIP.
+    if not _sc_applicant_candidate_published(
+        ctx,
+        applicant_subdomain,
+        site_name,
+    ):
+        return False
+
+    from urllib.parse import urlsplit
+
+    body = _sc_applicant_context_body(ctx)
+    body_lower = body.casefold()
+    body_key = _sc_applicant_property_name_key(body)
+    theme_website = str(theme.get("propertyWebsiteUrl") or "").strip()
+    try:
+        theme_host = (
+            urlsplit(theme_website if "://" in theme_website else f"//{theme_website}").hostname or ""
+        ).casefold()
+        context_host = (urlsplit(str(getattr(ctx, "base_url", "") or "")).hostname or "").casefold()
+    except (TypeError, ValueError):
+        return False
+    theme_host_key = theme_host.removeprefix("www.")
+    context_host_key = context_host.removeprefix("www.")
+    website_proof = bool(
+        theme_host_key and (theme_host_key == context_host_key or theme_host_key in body_lower)
+    )
+    city = str(theme.get("propertycity") or "").strip().casefold()
+    zip_code = str(theme.get("propertyzip") or "").strip().casefold()
+    location_proof = bool(city and zip_code and city in body_lower and zip_code in body_lower)
+    name_proof = bool(theme_name_keys and any(key in body_key for key in theme_name_keys))
+    return website_proof and (location_proof or name_proof)
+
+
+def _stamp_sc_applicant_theme_provenance(
+    rows: list[dict[str, Any]],
+    ctx: AdapterContext,
+    applicant_subdomain: str,
+    site_name: str,
+    theme: dict[str, Any],
+    candidate_base: str,
+) -> bool:
+    """Attach auditable property-boundary facts from a scoped theme."""
+    published = _sc_applicant_candidate_published(ctx, applicant_subdomain, site_name)
+    if not rows or (
+        not published
+        and not _sc_applicant_theme_matches_context(
+            theme,
+            ctx,
+            applicant_subdomain,
+            site_name,
+        )
+    ):
+        return False
+    address_parts = [
+        str(theme.get("propertyaddress") or "").strip(),
+        str(theme.get("propertyaddress2") or "").strip(),
+        str(theme.get("propertycity") or "").strip(),
+        str(theme.get("propertystate") or "").strip(),
+        str(theme.get("propertyzip") or "").strip(),
+    ]
+    address = ", ".join(part for part in address_parts if part)
+    for row in rows:
+        row["source_property_provenance"] = (
+            "published_applicant_theme" if published else "property_matched_applicant_theme"
+        )
+        row["source_portal_url"] = candidate_base
+        row["source_property_section_name"] = str(theme.get("sectionname") or "").strip()
+        row["source_property_website"] = str(theme.get("propertyWebsiteUrl") or "").strip()
+        row["source_property_address"] = address
+        if address:
+            row["property_address"] = address
+    return True
+
+
+def _stamp_sc_applicant_vanity_shell_provenance(
+    rows: list[dict[str, Any]],
+    ctx: AdapterContext,
+    applicant_subdomain: str,
+) -> bool:
+    """Stamp an exact vanity-domain → Applicant-shell relationship.
+
+    A modern Yardi vanity URL can itself render the generic Applicant SPA
+    shell while its public API lives at
+    ``<vanity-label>.securecafeapplicant.com``.  The shell contains neither a
+    native property ID nor a portal link, so merely seeing ``Applicant
+    Portal`` is not property provenance.  Accept this relationship only when:
+
+    * the archived property body has the exact RentCafe Applicant title and
+      an Applicant JS/chunk bundle;
+    * the canonical website is a simple single-label vanity host (optionally
+      ``www``); and
+    * that vanity label exactly equals the Applicant API subdomain.
+
+    The API payload is independently required to repeat one native property
+    ID and the canonical property name on every plan before this helper is
+    called.  This helper never makes a mismatching payload acceptable.
+    """
+    if not rows:
+        return False
+    body = _sc_applicant_context_body(ctx)
+    try:
+        from ma_poc.pms.adapters._rentcafe_nestin import (
+            is_rentcafe_applicant_shell,
+        )
+
+        if not is_rentcafe_applicant_shell(body):
+            return False
+    except Exception:
+        return False
+
+    from urllib.parse import urlsplit
+
+    portal_url = str(getattr(ctx, "base_url", "") or "").strip()
+    try:
+        website_host = (urlsplit(portal_url).hostname or "").casefold().rstrip(".")
+    except (TypeError, ValueError):
+        return False
+    if website_host.startswith("www."):
+        website_host = website_host[4:]
+    labels = website_host.split(".")
+    if len(labels) != 2 or not all(labels):
+        return False
+    vanity_label = labels[0]
+    api_label = str(applicant_subdomain or "").strip().casefold()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,126}", vanity_label):
+        return False
+    if vanity_label != api_label:
+        return False
+
+    for row in rows:
+        row["source_property_provenance"] = "vanity_applicant_shell"
+        row["source_portal_url"] = portal_url
+    return True
+
+
+def _sc_applicant_payload_matches_property(
+    payload: Any,
+    property_name: str,
+    property_id: str = "",
+) -> bool:
+    """Fail closed unless every applicant plan belongs to one property."""
+    expected = _sc_applicant_property_name_key(property_name)
+    if not expected or not isinstance(payload, dict):
+        return False
+    plans = payload.get("floorPlanList") or payload.get("FloorPlanList") or []
+    if not isinstance(plans, list) or not plans:
+        return False
+    observed_names: set[str] = set()
+    observed_ids: set[str] = set()
+    for entry in plans:
+        if not isinstance(entry, dict):
+            return False
+        floor_plan = entry.get("floorPlan") or entry.get("FloorPlan") or {}
+        if not isinstance(floor_plan, dict):
+            return False
+        name_key = _sc_applicant_property_name_key(floor_plan.get("PropertyName"))
+        if not name_key:
+            return False
+        observed_names.add(name_key)
+        native_id = str(floor_plan.get("PropertyID") or "").strip()
+        if native_id:
+            observed_ids.add(native_id)
+    if observed_names != {expected}:
+        return False
+    return not property_id or observed_ids == {property_id}
+
+
+def _sc_applicant_has_strict_unit(rows: list[dict[str, Any]]) -> bool:
+    """True only for a physical apartment identity with positive rent."""
+    return any(
+        str(row.get("unit_number") or "").strip()
+        and isinstance(row.get("market_rent_low"), (int, float))
+        and not isinstance(row.get("market_rent_low"), bool)
+        and row["market_rent_low"] > 0
+        for row in rows
+        if isinstance(row, dict)
+    )
+
+
+def _try_captured_securecafe_applicant(
+    api_responses: list[dict[str, Any]],
+    ctx: AdapterContext,
+    result: AdapterResult,
+) -> AdapterResult | None:
+    """Promote an exact, property-bound Applicant V2 captured roster."""
+    from urllib.parse import parse_qs, urlsplit
+
+    from ma_poc.core.identity import unit_has_real_anchor
+    from ma_poc.extraction.post_process import post_process
+
+    property_name = str(getattr(ctx, "property_name", "") or "").strip()
+    if not property_name:
+        return None
+    for response in api_responses or []:
+        if not isinstance(response, dict):
+            continue
+        try:
+            status = int(response.get("status") or 200)
+        except (TypeError, ValueError):
+            continue
+        if status != 200:
+            continue
+        url = str(response.get("url") or "")
+        try:
+            parsed = urlsplit(url)
+        except (TypeError, ValueError):
+            continue
+        host = (parsed.hostname or "").casefold()
+        path = parsed.path.casefold().rstrip("/")
+        if (
+            not host.endswith(".securecafeapplicant.com")
+            or path != "/onlineleasing/api/floorplan/getfloorplanandavailableunits"
+        ):
+            continue
+        native_ids = parse_qs(parsed.query).get("propertyId", [])
+        native_property_id = str(native_ids[0] if native_ids else "").strip()
+        if not re.fullmatch(r"\d{1,16}", native_property_id):
+            continue
+
+        payload: Any = response.get("body")
+        if isinstance(payload, bytes):
+            payload = payload.decode("utf-8", errors="replace")
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+        if not _sc_applicant_payload_matches_property(
+            payload,
+            property_name,
+            native_property_id,
+        ):
+            continue
+        rows = parse_securecafe_applicant_floorplans(payload, url)
+        if not _sc_applicant_has_strict_unit(rows):
+            continue
+        _stamp_sc_applicant_vanity_shell_provenance(
+            rows,
+            ctx,
+            host.removesuffix(".securecafeapplicant.com"),
+        )
+        processed = post_process(
+            rows,
+            property_id=getattr(ctx, "property_id", None),
+        )
+        admitted = [
+            row
+            for row in processed.admitted
+            if unit_has_real_anchor(row) and _sc_applicant_has_strict_unit([row])
+        ]
+        if not admitted:
+            continue
+        result.units = admitted
+        result.plan_summaries = processed.plan_summaries
+        result.api_responses.append(response)
+        result.tier_used = _TIER_APPLICANT_V2_CAPTURED
+        result.winning_url = url
+        result.confidence = min(0.97, 0.82 + 0.01 * len(admitted))
+        return result
+    return None
+
+
+async def _try_securecafe_applicant_candidate(
+    candidate_base: str,
+    ctx: AdapterContext,
+    result: AdapterResult,
+    *,
+    allow_hyperbrowser: bool = True,
+) -> list[dict[str, Any]]:
+    """Resolve one exact SecureCafe Applicant V2 public inventory.
+
+    Direct requests explicitly disable Web Unlocker.  If the public API is a
+    403/429/JS shell and Hyperbrowser is selected, one capped raw browser GET
+    is allowed; ``hb_raw_get`` owns the sole per-property session reservation.
+    """
+    match = _SECURECAFE_URL_RE.search(candidate_base or "")
+    property_name = str(getattr(ctx, "property_name", "") or "").strip()
+    if match is None:
+        return []
+
+    from urllib.parse import quote, urlencode
+
+    subdomain = match.group("sub").casefold()
+    site_name = match.group("slug").casefold()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,126}", subdomain):
+        return []
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,126}", site_name):
+        return []
+
+    host = f"{subdomain}.securecafeapplicant.com"
+    theme_url = (
+        f"https://{host}/onlineleasing/api/themeloader/"
+        f"getcustomcolorsfilename?siteName={quote(site_name, safe='')}"
+    )
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+
+        try:
+            theme_response = await asyncio.to_thread(
+                probe_get,
+                theme_url,
+                timeout=20,
+                unlocker=False,
+                proxies={},
+                verify=True,
+                retries=1,
+            )
+        except Exception as exc:
+            result.errors.append(
+                f"rentcafe-applicant-theme-direct-error: {type(exc).__name__}: {str(exc)[:100]}"
+            )
+            theme_response = None
+
+        native_property_id = ""
+        theme_payload: dict[str, Any] = {}
+        theme_name = ""
+        if int(getattr(theme_response, "status_code", 0) or 0) == 200:
+            try:
+                decoded_theme = json.loads(str(getattr(theme_response, "text", "") or ""))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                decoded_theme = None
+            if isinstance(decoded_theme, dict):
+                theme_payload = decoded_theme
+                native_property_id = str(theme_payload.get("propertyId") or "").strip()
+                theme_name = str(theme_payload.get("propertyname") or "").strip()
+                if (
+                    not re.fullmatch(r"\d{1,16}", native_property_id)
+                    or not theme_name
+                    or not _sc_applicant_theme_matches_context(
+                        theme_payload,
+                        ctx,
+                        subdomain,
+                        site_name,
+                    )
+                ):
+                    return []
+
+        # A page-published application href can supply the native ID when the
+        # theme endpoint is walled.  The final payload still must repeat the
+        # same ID and canonical name on every floor plan.
+        if not native_property_id:
+            fetch_result = getattr(ctx, "fetch_result", None)
+            page_body = getattr(fetch_result, "body", "") if fetch_result is not None else ""
+            if isinstance(page_body, bytes):
+                page_body = page_body.decode("utf-8", errors="replace")
+            native_property_id = str(_find_rentcafe_property_id(str(page_body or "")) or "")
+        if not re.fullmatch(r"\d{1,16}", native_property_id):
+            return []
+
+        api_query = urlencode(
+            {
+                "propertyId": native_property_id,
+                "RequestBeforeLogin": "true",
+                "isPropertyList": "false",
+            }
+        )
+        api_url = f"https://{host}/onlineleasing/api/floorplan/getfloorplanandavailableunits?{api_query}"
+        payload: Any = None
+        via = "securecafe_applicant_direct"
+        api_status = 0
+        try:
+            api_response = await asyncio.to_thread(
+                probe_get,
+                api_url,
+                timeout=20,
+                unlocker=False,
+                proxies={},
+                verify=True,
+                retries=1,
+            )
+            api_status = int(getattr(api_response, "status_code", 0) or 0)
+            if api_status == 200:
+                payload = json.loads(str(getattr(api_response, "text", "") or ""))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            payload = None
+        except Exception as exc:
+            result.errors.append(
+                f"rentcafe-applicant-api-direct-error: {type(exc).__name__}: {str(exc)[:100]}"
+            )
+            payload = None
+
+        if payload is None and api_status in {0, 200, 403, 429}:
+            from ma_poc.config.feature_flags import hb_enabled
+
+            attempted_attr = "_rentcafe_applicant_hb_attempted"
+            if allow_hyperbrowser and hb_enabled() and not bool(getattr(ctx, attempted_attr, False)):
+                setattr(ctx, attempted_attr, True)
+                from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                canonical_id = str(getattr(ctx, "property_id", "") or "")
+                hb_status, hb_body = await hb_raw_get(
+                    api_url,
+                    canonical_id or "?",
+                )
+                if hb_status == 200 and hb_body:
+                    try:
+                        payload = json.loads(hb_body)
+                        via = "securecafe_applicant_hyperbrowser"
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        payload = None
+        if payload is None:
+            return []
+        expected_payload_name = theme_name or property_name
+        if not expected_payload_name or not _sc_applicant_payload_matches_property(
+            payload,
+            expected_payload_name,
+            native_property_id,
+        ):
+            return []
+        rows = parse_securecafe_applicant_floorplans(payload, api_url)
+        if not _sc_applicant_has_strict_unit(rows):
+            return []
+        if theme_payload:
+            _stamp_sc_applicant_theme_provenance(
+                rows,
+                ctx,
+                subdomain,
+                site_name,
+                theme_payload,
+                candidate_base,
+            )
+        _stamp_sc_applicant_vanity_shell_provenance(rows, ctx, subdomain)
+        result.api_responses.append(
+            {
+                "url": api_url,
+                "status": 200,
+                "body": payload,
+                "via": via,
+            }
+        )
+        result.winning_url = api_url
+        result.tier_used = (
+            _TIER_APPLICANT_V2_HYPERBROWSER
+            if via == "securecafe_applicant_hyperbrowser"
+            else _TIER_APPLICANT_V2_DIRECT
+        )
+        return rows
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return []
+    except Exception as exc:
+        result.errors.append(f"rentcafe-applicant-direct-error: {type(exc).__name__}: {str(exc)[:100]}")
+        return []
 
 
 def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str, Any]]:
@@ -1364,11 +2630,28 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
             if rent_m:
                 rent_low = money_to_int(rent_m.group(1))
                 rent_high = money_to_int(rent_m.group(2)) if rent_m.group(2) else rent_low
+            else:
+                rent_cell = _SC_RENT_CELL_RE.search(row)
+                if rent_cell:
+                    rent_text = re.sub(r"<[^>]+>", " ", rent_cell.group(1))
+                    rent_tokens = re.findall(r"[\d,]+", rent_text)
+                    if rent_tokens:
+                        rent_low = money_to_int(rent_tokens[0])
+                        rent_high = money_to_int(rent_tokens[1]) if len(rent_tokens) > 1 else rent_low
             date_m = _SC_DATE_RE.search(row)
             avail_date = ""
             if date_m:
                 avail_date = re.sub(r"<[^>]+>", " ", date_m.group(1))
                 avail_date = re.sub(r"\s+", " ", avail_date).strip()
+            # SecureCafe often renders only ``Available`` in the display cell
+            # but puts the exact date in SetTermsUrl / the Apply href.  Prefer
+            # the exact action value only when the cell is blank or generic;
+            # a concrete visible date remains authoritative.
+            move_in_m = _SC_MOVE_IN_DATE_RE.search(row)
+            if move_in_m and (not avail_date or _SC_GENERIC_AVAILABLE_RE.fullmatch(avail_date)):
+                action_date = unquote_plus(_html.unescape(move_in_m.group(1))).strip()
+                if action_date:
+                    avail_date = action_date
             dep_m = _SC_DEPOSIT_RE.search(row)
             deposit = f"${dep_m.group(1)}" if dep_m else ""
             # Capture the FloorPlanID from the rentaloptions onclick — used
@@ -1397,7 +2680,7 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
                     source_ids=source_ids,
                 )
             )
-    return units
+    return _demote_cross_plan_duplicate_unit_codes(units)
 
 
 # ── RentCafe anchor-walk fallback ───────────────────────────────────────────
@@ -1421,6 +2704,19 @@ _RC_ANCHOR_DRILL_RE = re.compile(
     r"""rentcafe-listings|listings|availableunits)/?[^"']*)["']""",
     re.IGNORECASE,
 )
+_RC_HOSTED_PROPERTY_PATH_RE = re.compile(
+    r"^/apartments/[^/]+/[^/]+/[^/]+(?:/default\.aspx)?/?$",
+    re.IGNORECASE,
+)
+_RC_HOSTED_PROPERTY_ID_RE = re.compile(
+    r"myOlePropertyId\s*=\s*(\d+)",
+    re.IGNORECASE,
+)
+
+
+def _rentcafe_hosted_property_ids(html: str) -> set[str]:
+    """Return native RentCafe property IDs published in hosted markup."""
+    return set(_RC_HOSTED_PROPERTY_ID_RE.findall(str(html or "")))
 
 
 def _discover_rentcafe_anchors(html: str, origin: str, base_url: str) -> list[str]:
@@ -1435,10 +2731,23 @@ def _discover_rentcafe_anchors(html: str, origin: str, base_url: str) -> list[st
 
     try:
         host = urlparse(origin).netloc
+        parsed_base = urlparse(base_url or origin)
     except Exception:
         return []
     if not host:
         return []
+    host_name = host.partition(":")[0].casefold()
+    base_property_path = ""
+    if (
+        host_name == "rentcafe.com" or host_name.endswith(".rentcafe.com")
+    ) and _RC_HOSTED_PROPERTY_PATH_RE.fullmatch(parsed_base.path or ""):
+        # rentcafe.com is a shared listing portal. Its property pages contain
+        # same-host recommendations and regional search links, so the old
+        # same-host-only gate could walk from Coopers Landing (480033) into
+        # Winchell Way (1682177) and return the sibling property's units.
+        # A hosted property detail page needs no cross-listing anchor walk;
+        # retain only its own canonical path (queries are harmless).
+        base_property_path = (parsed_base.path or "").rstrip("/").casefold()
 
     out: list[str] = []
     seen: set[str] = set()
@@ -1453,10 +2762,13 @@ def _discover_rentcafe_anchors(html: str, origin: str, base_url: str) -> list[st
         else:
             full = urljoin(base_url or (origin + "/"), href)
         try:
-            ph = urlparse(full).netloc
+            parsed_full = urlparse(full)
+            ph = parsed_full.netloc
         except Exception:
             continue
         if ph != host:
+            continue
+        if base_property_path and (parsed_full.path or "").rstrip("/").casefold() != base_property_path:
             continue
         # Skip obvious dead-ends.
         low = full.lower()
@@ -1488,6 +2800,7 @@ async def _try_rentcafe_anchor_walk(
         return []
     try:
         from ma_poc.pms.adapters.generic import _get_page_html
+
         html = await _get_page_html(page, ctx)
     except Exception:
         html = ""
@@ -1506,6 +2819,7 @@ async def _try_rentcafe_anchor_walk(
     candidates = _discover_rentcafe_anchors(html, origin, base_url)
     if not candidates:
         return []
+    expected_hosted_property_ids = _rentcafe_hosted_property_ids(html)
 
     # Cap to 6 to bound the request burst (matches entrata_deep_probe).
     for cand in candidates[:6]:
@@ -1514,8 +2828,7 @@ async def _try_rentcafe_anchor_walk(
             r = await asyncio.to_thread(probe_get, cand, timeout=20)
         except Exception as exc:
             result.errors.append(
-                f"rentcafe-anchor-walk-fetch-error[{cand}]: "
-                f"{type(exc).__name__}: {str(exc)[:80]}"
+                f"rentcafe-anchor-walk-fetch-error[{cand}]: {type(exc).__name__}: {str(exc)[:80]}"
             )
             continue
         if getattr(r, "status_code", 0) != 200:
@@ -1535,6 +2848,18 @@ async def _try_rentcafe_anchor_walk(
         if "fp-unit" in body_text:
             units = parse_rentcafe_hosted_table(body_text, cand)
             if units:
+                candidate_property_ids = {
+                    str(unit.get("source_property_id") or "").strip()
+                    for unit in units
+                    if str(unit.get("source_property_id") or "").strip()
+                }
+                if expected_hosted_property_ids and candidate_property_ids != expected_hosted_property_ids:
+                    result.errors.append(
+                        "rentcafe-anchor-walk-property-mismatch"
+                        f"[{cand}]: expected={sorted(expected_hosted_property_ids)} "
+                        f"found={sorted(candidate_property_ids)}"
+                    )
+                    continue
                 result.winning_url = cand
                 return units
 
@@ -1555,9 +2880,7 @@ async def _try_rentcafe_anchor_walk(
     return []
 
 
-_YSI_UNITSLIST_RE = re.compile(
-    r"ysi\.unitsList\s*=\s*(\[.*?\])\s*;", re.DOTALL
-)
+_YSI_UNITSLIST_RE = re.compile(r"ysi\.unitsList\s*=\s*(\[.*?\])\s*;", re.DOTALL)
 
 
 def parse_rentcafe_ysi_unitslist(html: str, source_url: str) -> list[dict[str, Any]]:
@@ -1635,11 +2958,11 @@ async def _try_rentcafe_securecafe_probe(
     Returns parsed unit dicts on success, ``[]`` on any failure.
 
     ``fast_direct_only`` (#80): the bounded, cost-safe variant used by the
-    plan-level site behind ``enable_rentcafe_availunits_fast``. It runs ONLY the
-    Attempt-1 DIRECT leg with ``unlocker=False`` (no internal ``timeout+95``
-    escalation), no proxied leg, no Web-Unlocker leg, and caps candidate bases
-    at 2. Worst case ~25-50s instead of the full ladder's ~1,365-1,535s. Reach
-    is limited to the non-CF-walled subset; the caller's merge guard makes the
+    plan-level site behind ``enable_rentcafe_availunits_fast``. It first runs
+    the established ``availableunits.aspx`` DIRECT leg with ``unlocker=False``
+    (no internal ``timeout+95`` escalation), then may try the direct Applicant
+    V2 fallback for the same candidate. It runs no proxied or Web-Unlocker leg
+    and caps candidate bases at 2. The caller's merge guard makes the
     fall-through safe.
     """
     html = ""
@@ -1670,12 +2993,16 @@ async def _try_rentcafe_securecafe_probe(
         # securecafe directly. So: re-fetch the property's own homepage
         # via curl_cffi (bypasses CF + gives raw server HTML) and scan
         # that for the securecafe bases.
-        origin = _origin_from_ctx(ctx)
-        if origin:
+        property_page_url = _effective_property_page_url(ctx)
+        if property_page_url:
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
-                _hr = await asyncio.to_thread(probe_get, origin, timeout=20)
+                _hr = await asyncio.to_thread(
+                    probe_get,
+                    property_page_url,
+                    timeout=20,
+                )
                 if _hr.status_code == 200 and _hr.text:
                     bases = _find_all_securecafe_bases(_hr.text, ctx)
             except Exception as _hp_exc:
@@ -1709,6 +3036,7 @@ async def _try_rentcafe_securecafe_probe(
     au_url = ""
     page_html = ""
     import os as _os
+
     proxy_available = bool(_os.environ.get("PROBE_PROXY_URL", "").strip())
     # #80 fast path: cap bases at 2 and run only the DIRECT leg (below).
     for candidate_base in bases[: (2 if fast_direct_only else 3)]:
@@ -1728,9 +3056,7 @@ async def _try_rentcafe_securecafe_probe(
                 # safe plain re-GET recovers it (probe_get forces unlocker=False
                 # under COMPLIANCE_MODE, so retries can never reach a solver).
                 _direct_kw["retries"] = 2
-            r = await asyncio.to_thread(
-                probe_get, candidate_au, timeout=25, **_direct_kw
-            )
+            r = await asyncio.to_thread(probe_get, candidate_au, timeout=25, **_direct_kw)
             if r.status_code == 200:
                 body_text = r.text or ""
         except Exception as exc:
@@ -1752,7 +3078,52 @@ async def _try_rentcafe_securecafe_probe(
                     f"rentcafe-securecafe-proxied-fetch-error[{candidate_base}]: "
                     f"{type(exc).__name__}: {str(exc)[:80]}"
                 )
-        # Attempt 3: WEB UNLOCKER (2026-07-16, Lever 1). Direct + proxied both
+        # Attempt 3: migrated Applicant V2 API.  The exact candidate base,
+        # native property ID and payload property name must all agree.  A
+        # direct API response is allowed on the fast path; its one-session HB
+        # fallback is not.
+        if "AvailUnitRow" not in body_text:
+            applicant_rows = await _try_securecafe_applicant_candidate(
+                candidate_base,
+                ctx,
+                result,
+                allow_hyperbrowser=not fast_direct_only,
+            )
+            if applicant_rows:
+                return applicant_rows
+
+        # Attempt 4: Hyperbrowser RAW same-origin GET.  Exact 2026-07-31 FND
+        # evidence: 54/68 RentCafe failures expose an exact SecureCafe base in
+        # their archived landing HTML, while direct/proxied curl gets a CF
+        # shell on a meaningful subset.  One clean HB session (CAPTCHA solving
+        # hard-disabled in hyperbrowser_backend._session_options) returned
+        # canonical AvailUnitRow rosters on three independently probed members:
+        # Cumberland Links, Parks Residential, and Redwood Delta Township.
+        #
+        # Keep this behind FETCH_BACKEND=hyperbrowser and outside the
+        # ``fast_direct_only`` path.  hb_raw_get now shares the provider's
+        # per-property session cap, returns empty on exhaustion, and always
+        # closes its session.  No retry, solver, identity rotation, or Web
+        # Unlocker is involved.
+        if "AvailUnitRow" not in body_text and not fast_direct_only:
+            try:
+                from ma_poc.config.feature_flags import hb_enabled
+
+                if hb_enabled():
+                    from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                    hb_status, hb_body = await hb_raw_get(
+                        candidate_au,
+                        str(getattr(ctx, "property_id", "") or ""),
+                    )
+                    if hb_status == 200 and "AvailUnitRow" in hb_body:
+                        body_text = hb_body
+            except Exception as exc:
+                result.errors.append(
+                    f"rentcafe-securecafe-hb-fetch-error[{candidate_base}]: "
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
+        # Attempt 5: WEB UNLOCKER (2026-07-16, Lever 1). Direct + proxied both
         # miss SecureCafe's HTTP-200 CF/JS challenge shells — Yardi's Cloudflare
         # tenant returns a 200 challenge body (not a 403), so probe_get's
         # _looks_blocked gate never escalates and the drill silently sees no
@@ -1767,6 +3138,7 @@ async def _try_rentcafe_securecafe_probe(
                     web_unlocker_get,
                     web_unlocker_key,
                 )
+
                 if web_unlocker_key():
                     # 2026-07-27: OFF-LOADED to a thread. This was a bare
                     # synchronous call inside an ``async def`` — no await, no
@@ -1781,9 +3153,7 @@ async def _try_rentcafe_securecafe_probe(
                     # probe_get on the loop → mean property 305s against a
                     # 600s cap → victims rotate), and it is independent of
                     # PR #110 and of the flag above.
-                    wu = await asyncio.to_thread(
-                        web_unlocker_get, candidate_au, timeout=120
-                    )
+                    wu = await asyncio.to_thread(web_unlocker_get, candidate_au, timeout=120)
                     if wu.status_code == 200 and "AvailUnitRow" in (wu.text or ""):
                         body_text = wu.text or ""
             except Exception as exc:
@@ -1839,9 +3209,7 @@ async def _try_rentcafe_securecafe_probe(
         # JSON), data-attr-sprinkled marketing templates, or English-prose
         # marketing copy ("1 Bedroom, 1 Bathroom 700 sq. ft.").
         if any(not u.get("sqft") or str(u.get("sqft")) == "0" for u in units):
-            _enrich_securecafe_units_with_vanity_floorplans(
-                units, ctx, html, result
-            )
+            _enrich_securecafe_units_with_vanity_floorplans(units, ctx, html, result)
         # Final pass — for units still missing sqft after every
         # enrichment path returned empty, declare the operator does not
         # publish sqft. This is honest provenance: the SC drill produced
@@ -1868,9 +3236,7 @@ async def _try_rentcafe_securecafe_probe(
 # is 3-5 digits. Tight enough to avoid false matches on unit numbers or
 # rent values (which carry $ or , markers); restricted to the plan-name
 # field so this never sees raw row markup.
-_SC_PLAN_NAME_SQFT_RE = re.compile(
-    r"\b\d+\s*x\s*\d+(?:\.\d+)?\s+(\d{3,5})\b", re.IGNORECASE
-)
+_SC_PLAN_NAME_SQFT_RE = re.compile(r"\b\d+\s*x\s*\d+(?:\.\d+)?\s+(\d{3,5})\b", re.IGNORECASE)
 
 
 def extract_sqft_from_sc_plan_name(plan_name: str) -> str:
@@ -1912,9 +3278,7 @@ def _enrich_securecafe_units_from_plan_name(
 # ─── operator-not-published sqft flag (final safety net, 2026-05-23) ─────
 
 
-def _flag_securecafe_units_operator_sqft_gap(
-    units: list[dict[str, Any]], result: AdapterResult
-) -> int:
+def _flag_securecafe_units_operator_sqft_gap(units: list[dict[str, Any]], result: AdapterResult) -> int:
     """Stamp ``data_gaps=["sqft"]`` + ``data_quality_flag="SQFT_NOT_
     PUBLISHED"`` on every unit that STILL lacks sqft after the full
     enrichment chain (plan-name regex → WP-cards → apts247 API).
@@ -1979,8 +3343,7 @@ def _enrich_securecafe_units_with_wp_cards(
         )
     except Exception as exc:
         result.errors.append(
-            f"rentcafe-securecafe-wpcards-import-error: "
-            f"{type(exc).__name__}: {str(exc)[:80]}"
+            f"rentcafe-securecafe-wpcards-import-error: {type(exc).__name__}: {str(exc)[:80]}"
         )
         return
     if not has_wp_floorplan_cards(page_html):
@@ -1991,8 +3354,7 @@ def _enrich_securecafe_units_with_wp_cards(
     n = merge_wp_cards_into_securecafe(units, plans)
     if n:
         result.errors.append(
-            f"securecafe-wpcards-enrich: filled fields on {n} units "
-            f"from {len(plans)} WP plan cards"
+            f"securecafe-wpcards-enrich: filled fields on {n} units from {len(plans)} WP plan cards"
         )
 
 
@@ -2004,9 +3366,7 @@ def _enrich_securecafe_units_with_wp_cards(
 # (the stable Yardi plan ID — same value as SecureCafe's FloorPlanID).
 # Probed 2026-05-22 on longwoodsouthernhills.com (4 plans, 700/1080/1100/
 # 1080 sq_ft) and waterfordvillagetn.com (5 plans, 900-1200 sq_ft).
-_APTS247_API_KEY_RE = re.compile(
-    r"""window\.api_key\s*=\s*['"]([a-f0-9]{20,80})['"]""", re.IGNORECASE
-)
+_APTS247_API_KEY_RE = re.compile(r"""window\.api_key\s*=\s*['"]([a-f0-9]{20,80})['"]""", re.IGNORECASE)
 _APTS247_MARKER_RE = re.compile(r"apts247\.info", re.IGNORECASE)
 
 
@@ -2023,9 +3383,7 @@ def find_apts247_api_key(html: str) -> str:
     return m.group(1) if m else ""
 
 
-def fetch_apts247_floorplans(
-    origin: str, api_key: str, timeout: int = 15
-) -> list[dict[str, Any]]:
+def fetch_apts247_floorplans(origin: str, api_key: str, timeout: int = 15) -> list[dict[str, Any]]:
     """GET ``{origin}/api/v3/floorplans/all/?api_key=<key>`` → plan list.
 
     Returns a list of plan dicts (each carrying ``sq_ft``, ``bed``,
@@ -2066,9 +3424,7 @@ def _normalize_plan_name(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def merge_apts247_into_securecafe(
-    units: list[dict[str, Any]], plans: list[dict[str, Any]]
-) -> int:
+def merge_apts247_into_securecafe(units: list[dict[str, Any]], plans: list[dict[str, Any]]) -> int:
     """Fill missing sqft (+ bed/bath/floor_plan_name when blank) on each
     SecureCafe unit from the apts247 plan list.
 
@@ -2171,8 +3527,7 @@ def _enrich_securecafe_units_with_apts247(
                 api_key = find_apts247_api_key(fp_page.text)
         except Exception as exc:
             result.errors.append(
-                f"rentcafe-securecafe-apts247-keyfetch-error: "
-                f"{type(exc).__name__}: {str(exc)[:80]}"
+                f"rentcafe-securecafe-apts247-keyfetch-error: {type(exc).__name__}: {str(exc)[:80]}"
             )
             return
     if not api_key:
@@ -2184,8 +3539,7 @@ def _enrich_securecafe_units_with_apts247(
     if n:
         # Diagnostic only — does not alter tier or confidence.
         result.errors.append(
-            f"securecafe-apts247-enrich: filled fields on {n} units "
-            f"from {len(plans)} apts247 plans"
+            f"securecafe-apts247-enrich: filled fields on {n} units from {len(plans)} apts247 plans"
         )
 
 
@@ -2403,9 +3757,7 @@ def parse_vanity_floorplans_for_sqft(html: str) -> list[dict[str, Any]]:
                 if sqft is None or sqft <= 0:
                     continue
                 rent_lo_raw = entry.get("MinRent") or entry.get("minRent")
-                rent_hi_raw = (
-                    entry.get("MaxRent") or entry.get("maxRent") or rent_lo_raw
-                )
+                rent_hi_raw = entry.get("MaxRent") or entry.get("maxRent") or rent_lo_raw
                 try:
                     rent_lo = int(float(rent_lo_raw)) if rent_lo_raw else None
                 except (TypeError, ValueError):
@@ -2414,9 +3766,7 @@ def parse_vanity_floorplans_for_sqft(html: str) -> list[dict[str, Any]]:
                     rent_hi = int(float(rent_hi_raw)) if rent_hi_raw else None
                 except (TypeError, ValueError):
                     rent_hi = None
-                name = str(
-                    entry.get("Name") or entry.get("name") or entry.get("FpName") or ""
-                ).strip()
+                name = str(entry.get("Name") or entry.get("name") or entry.get("FpName") or "").strip()
                 out.append(
                     {
                         "beds": beds,
@@ -2557,9 +3907,7 @@ def _normalise_floorplan_join_name(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
-def merge_vanity_floorplans_into_securecafe(
-    units: list[dict[str, Any]], plans: list[dict[str, Any]]
-) -> int:
+def merge_vanity_floorplans_into_securecafe(units: list[dict[str, Any]], plans: list[dict[str, Any]]) -> int:
     """Fill an absent SecureCafe unit sqft from its property's floor-plan page.
 
     A plan area is copied only when it has an unambiguous relationship to the
@@ -2601,19 +3949,13 @@ def merge_vanity_floorplans_into_securecafe(
             # Several plans can share bedroom/bath counts.  Use their public
             # plan labels only when the unit label identifies exactly one of
             # them; rent is not a foreign key and must not break this tie.
-            unit_plan_name = _normalise_floorplan_join_name(
-                u.get("floor_plan_name")
-            )
+            unit_plan_name = _normalise_floorplan_join_name(u.get("floor_plan_name"))
             named_matches = [
                 candidate
                 for candidate in candidates
-                if unit_plan_name
-                and _normalise_floorplan_join_name(candidate.get("name"))
-                == unit_plan_name
+                if unit_plan_name and _normalise_floorplan_join_name(candidate.get("name")) == unit_plan_name
             ]
-            sqft_values = {
-                str(candidate.get("sqft") or "") for candidate in named_matches
-            }
+            sqft_values = {str(candidate.get("sqft") or "") for candidate in named_matches}
             if len(named_matches) != 1 or len(sqft_values) != 1:
                 continue
             chosen = named_matches[0]

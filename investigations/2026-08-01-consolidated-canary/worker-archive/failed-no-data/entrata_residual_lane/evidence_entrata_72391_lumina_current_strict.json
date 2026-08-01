@@ -1,0 +1,1420 @@
+{
+  "result_type": "strict_current_parent_published_entrata_snippet_details",
+  "capture_timestamp_utc": "2026-08-01T09:31:49.181872+00:00",
+  "property": {
+    "property_id": 72391,
+    "apartmentid": "72391",
+    "name": "Lumina",
+    "address": "301 Washington St",
+    "city": "Conshohocken",
+    "state": "PA",
+    "zip": "19428",
+    "website": "https://liveatlumina.com/"
+  },
+  "provider": "entrata_prospectportal_snippet",
+  "hyperbrowser_sessions_used": 0,
+  "parent_page": {
+    "requested_url": "https://liveatlumina.com/pricing",
+    "final_url": "https://www.liveatlumina.com/pricing",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://www.liveatlumina.com/pricing",
+        "body_bytes": 276041,
+        "body_sha256": "4a212355d6a7a0220fbb7e87985b108b1dc48489905ddca857393c0f8773993f",
+        "accepted": true
+      }
+    ],
+    "identity": {
+      "name_match": true,
+      "address_match": false,
+      "street_number_and_zip_match": false
+    },
+    "published_iframe_src": "//entratasnipit.liveatlumina.com/conshohocken/lumina/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=07/08/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&"
+  },
+  "snippet_index": {
+    "url": "https://entratasnipit.liveatlumina.com/conshohocken/lumina/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=07/08/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&&host_domain=www.liveatlumina.com",
+    "attempts": [
+      {
+        "attempt": 1,
+        "status_code": 200,
+        "final_url": "https://entratasnipit.liveatlumina.com/conshohocken/lumina/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=07/08/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&&host_domain=www.liveatlumina.com",
+        "body_bytes": 197697,
+        "body_sha256": "59521fe081af0faf491c86efbc1ed175a052c924a58e49a29f298cf781747792",
+        "accepted": true
+      }
+    ],
+    "identity": {
+      "name_match": true,
+      "address_match": true,
+      "street_number_and_zip_match": false
+    },
+    "entrata_property_ids": [
+      "100171538"
+    ],
+    "published_detail_urls": [
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060005/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060007/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060009/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060010/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060013/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060016/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060018/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059993/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059994/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059995/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059996/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059998/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059999/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060019/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060020/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060021/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+    ]
+  },
+  "detail_fetches": [
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139127,
+          "body_sha256": "8ef36bdd377bad0b2f37a079b5cbf285a053227c567a3520bd8bb33691e38c38",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142875,
+          "body_sha256": "79b60ea70dbae69453af06a1b10961bab332bb064a28c79dc8a6db880b9de677",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060005/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060005/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060005/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139149,
+          "body_sha256": "95a8fa52acf30665fd62343aa90f1f4b8e6aa0fe4ceb11dc3ae66430a09f4540",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060007/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060007/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060007/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139127,
+          "body_sha256": "88097094da7f61dbad15d9a1ced19fdab4d96036c4ab87490677b86ace3668b1",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142855,
+          "body_sha256": "5ed3506ff2cf85401748377c636981cd3845e06c3018c85d197f0c447ef8cbca",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060009/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060009/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060009/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139149,
+          "body_sha256": "f8179a0668d638a85078998ab0465def3c0f2cf5260d75cddedbcf04757b7563",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060010/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060010/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060010/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139123,
+          "body_sha256": "980aacce289c8b1953fc62c66b1815e548c6b49d20da2ab2b6d5c3e9a8f31577",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 144466,
+          "body_sha256": "5da748c90b1becc93f66392428277703e3342fafc75adeb5d3aa3a34461f52be",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 2
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 146228,
+          "body_sha256": "c7d929a820a01bc66e71da382eae476209f0cec0a54216578cfb7367f2468ef3",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 3
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060013/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060013/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060013/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139125,
+          "body_sha256": "4cb8ebfefb741b314a3d88ad89e3e002db1634071a669204b06f2379e14c3121",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 149673,
+          "body_sha256": "28ecabbd9f97ef5b16a13a7da7a3b36f8a03c614553353ea1ee1287526ae8137",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 5
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 146230,
+          "body_sha256": "81783de1abd83ebcbf398ae208a781ee53a8e5341c509d2c1166f52cd4575475",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 3
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060016/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060016/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060016/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139121,
+          "body_sha256": "b3256f1c76dd0523d2cd0681aeffff1b393f8bd13afe7360004c3fac4b3fb127",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142750,
+          "body_sha256": "d9d0f21fd6434d1dcee86c881e0fcba7dff6aead65408f167ead5d5dce56ee64",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060018/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060018/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060018/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139143,
+          "body_sha256": "9d39d78bc92f6fedf3d0bb5718f1e9c5940417cc851069f4e2b141d974347055",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 144496,
+          "body_sha256": "235ac9af898c685ee2a4d61251d8ef093bcc68c107b8be7fcfc14c8a363abab1",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 2
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059993/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059993/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059993/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139126,
+          "body_sha256": "0d8120719e14ec6eaa7c1d8ae2ed38e7a761dd367bd5d6ad79d7b214c3d25d72",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059994/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059994/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059994/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139295,
+          "body_sha256": "b89b06b224cdb1365f64695427dd4b89752a55d1a5a8441429bd6affc3ff9cba",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059995/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059995/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059995/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139148,
+          "body_sha256": "97e8464e38fcdd976a845bd4f6b45932136bc5fd03bccd2d88d2ec8306a6de38",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059996/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059996/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059996/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139124,
+          "body_sha256": "dd2dbd0000ff93dd559c40512775c127791bc36020576893a41e44cffa8de703",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142755,
+          "body_sha256": "3430b0f0dcabe58a7c31f98160a7032a8cd51834efb667e61d4a4cfe98885d96",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059998/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059998/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059998/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139146,
+          "body_sha256": "50af7e9306372d677076bb2f016e28099dc68b687723631b7cea6770071bac03",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059999/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059999/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059999/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139124,
+          "body_sha256": "e1d3bc4bcbbf748196732d08810c069ed695d76f9b68ec83aa49d0cc30d205c3",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139128,
+          "body_sha256": "4546f354e25f6115b7807091634c3df912a85f9b69355dbfb6ba4a53642554e1",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142760,
+          "body_sha256": "e602666f47683a85837ad412ec3bdb9f3e6d1d6c52450918dff4526b60612602",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139148,
+          "body_sha256": "b56d93ec141787ab12d419931ebb5f7f57c62a3cc37f9a2fca6180efe369cc26",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 142766,
+          "body_sha256": "3e41d14806124d8cf602a9beb2da92ddc781ab89257a12299680ea9bec726b74",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 1
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060019/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060019/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060019/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139124,
+          "body_sha256": "ca267117fad3a2b943e520e11e96c463530a8f16b619ea79986edd7a8778e14b",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060020/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060020/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060020/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139266,
+          "body_sha256": "3cf9b8f9e47392a5aa428f212ac4d12a84fd9a8b3060f0a8e3c769ebb5032f6e",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    },
+    {
+      "published_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060021/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060021/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060021/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "body_bytes": 139146,
+          "body_sha256": "1f45df8d332a292adf1c7c85e53e579063223ac08e5b95d434723f6c77db002e",
+          "accepted": true
+        }
+      ],
+      "strict_native_positive_rent_rows": 0
+    }
+  ],
+  "property_identity_match": true,
+  "strict_gates": {
+    "exact_parent_url_and_name": true,
+    "snippet_name_address_or_street_zip": true,
+    "iframe_published_by_exact_parent": true,
+    "details_published_by_exact_snippet": true,
+    "detail_routes_same_snippet_origin": true,
+    "native_unit_numbers": 21,
+    "native_entrata_uids": 21,
+    "native_floorplan_ids": 21,
+    "positive_rent_rows": 21,
+    "distinct_units": 21,
+    "distinct_uids": 21,
+    "sibling_or_cross_property_rows": 0
+  },
+  "contamination_verdict": "pass_exact_parent_published_snippet_details_native_ids_positive_rents",
+  "native_identity_rows": 21,
+  "native_positive_rent_rows": 21,
+  "source_urls": [
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+    "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+  ],
+  "native_rows": [
+    {
+      "floor_plan_name": "Pegasus Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "912",
+      "unit_number": "2411",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,548",
+      "market_rent_low": 2548,
+      "market_rent_high": 2548,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-24",
+      "available_date": "2026-09-24",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060004/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021600",
+        "entrata_fpid": "1060004"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Polaris Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "600",
+      "unit_number": "1106",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,127",
+      "market_rent_low": 2127,
+      "market_rent_high": 2127,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-01",
+      "available_date": "2026-08-01",
+      "lease_term": "12mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060008/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021356",
+        "entrata_fpid": "1060008"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Rigel Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "737",
+      "unit_number": "2314",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,357",
+      "market_rent_low": 2357,
+      "market_rent_high": 2357,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-01",
+      "available_date": "2026-08-01",
+      "lease_term": "13mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021359",
+        "entrata_fpid": "1060011"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Rigel Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "737",
+      "unit_number": "1130",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,307",
+      "market_rent_low": 2307,
+      "market_rent_high": 2307,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-29",
+      "available_date": "2026-09-29",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060011/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021316",
+        "entrata_fpid": "1060011"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Rigel Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "737",
+      "unit_number": "2106",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,062",
+      "market_rent_low": 2062,
+      "market_rent_high": 2062,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-31",
+      "available_date": "2026-08-31",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021325",
+        "entrata_fpid": "1060012"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Rigel Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "737",
+      "unit_number": "1207",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,142",
+      "market_rent_low": 2142,
+      "market_rent_high": 2142,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-05",
+      "available_date": "2026-09-05",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021390",
+        "entrata_fpid": "1060012"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Rigel Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "737",
+      "unit_number": "1411",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,167",
+      "market_rent_low": 2167,
+      "market_rent_high": 2167,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-17",
+      "available_date": "2026-09-17",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060012/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021432",
+        "entrata_fpid": "1060012"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "1229",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,212",
+      "market_rent_low": 2212,
+      "market_rent_high": 2212,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-01",
+      "available_date": "2026-08-01",
+      "lease_term": "12mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021312",
+        "entrata_fpid": "1060014"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "3217",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,212",
+      "market_rent_low": 2212,
+      "market_rent_high": 2212,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-08",
+      "available_date": "2026-08-08",
+      "lease_term": "12mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021603",
+        "entrata_fpid": "1060014"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "2102",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,252",
+      "market_rent_low": 2252,
+      "market_rent_high": 2252,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-10",
+      "available_date": "2026-08-10",
+      "lease_term": "12mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021342",
+        "entrata_fpid": "1060014"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "2305",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,227",
+      "market_rent_low": 2227,
+      "market_rent_high": 2227,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-08-29",
+      "available_date": "2026-08-29",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021604",
+        "entrata_fpid": "1060014"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "1208",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,217",
+      "market_rent_low": 2217,
+      "market_rent_high": 2217,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-10-15",
+      "available_date": "2026-10-15",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060014/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021391",
+        "entrata_fpid": "1060014"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "3207",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,042",
+      "market_rent_low": 2042,
+      "market_rent_high": 2042,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-01",
+      "available_date": "2026-09-01",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021516",
+        "entrata_fpid": "1060015"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "1118",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,032",
+      "market_rent_low": 2032,
+      "market_rent_high": 2032,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-08",
+      "available_date": "2026-09-08",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021366",
+        "entrata_fpid": "1060015"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Sirius Renovated",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "686",
+      "unit_number": "1233",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,042",
+      "market_rent_low": 2042,
+      "market_rent_high": 2042,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-10-31",
+      "available_date": "2026-10-31",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060015/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021407",
+        "entrata_fpid": "1060015"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Vega Luxury",
+      "bed_label": "1 Bedroom",
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "940",
+      "unit_number": "3301",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,602",
+      "market_rent_low": 2602,
+      "market_rent_high": 2602,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-10-23",
+      "available_date": "2026-10-23",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060017/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021327",
+        "entrata_fpid": "1060017"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Ara Renovated",
+      "bed_label": "2 Bedroom",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1204",
+      "unit_number": "1419",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,899",
+      "market_rent_low": 2899,
+      "market_rent_high": 2899,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-09",
+      "available_date": "2026-09-09",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021438",
+        "entrata_fpid": "1059992"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Ara Renovated",
+      "bed_label": "2 Bedroom",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1204",
+      "unit_number": "1219",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,874",
+      "market_rent_low": 2874,
+      "market_rent_high": 2874,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-10-28",
+      "available_date": "2026-10-28",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059992/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021397",
+        "entrata_fpid": "1059992"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Lynx Luxury",
+      "bed_label": "2 Bedroom",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1157",
+      "unit_number": "1225",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$3,024",
+      "market_rent_low": 3024,
+      "market_rent_high": 3024,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-18",
+      "available_date": "2026-09-18",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1059997/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021581",
+        "entrata_fpid": "1059997"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Lyra Renovated",
+      "bed_label": "2 Bedroom",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1011",
+      "unit_number": "1426",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,649",
+      "market_rent_low": 2649,
+      "market_rent_high": 2649,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-10-03",
+      "available_date": "2026-10-03",
+      "lease_term": "14mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060001/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021442",
+        "entrata_fpid": "1060001"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    },
+    {
+      "floor_plan_name": "Phoenix Renovated",
+      "bed_label": "2 Bedroom",
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1131",
+      "unit_number": "1220",
+      "unit_name": "",
+      "floor": "",
+      "building": "",
+      "rent_range": "$2,779",
+      "market_rent_low": 2779,
+      "market_rent_high": 2779,
+      "deposit": "",
+      "concession": "",
+      "concession_text": null,
+      "concession_text_clean": null,
+      "_concession_quality": null,
+      "concession_value": null,
+      "concession_source": null,
+      "offer_banner": null,
+      "offer_type": null,
+      "offer_target": null,
+      "offer_value": null,
+      "offer_conditions": null,
+      "availability_status": "AVAILABLE",
+      "available_units": "",
+      "availability_date": "2026-09-15",
+      "available_date": "2026-09-15",
+      "lease_term": "15mo lease",
+      "move_in_date": "",
+      "source_api_url": "https://entratasnipit.liveatlumina.com/Apartments/module/property_floorplans/property%5Bid%5D/100171538/property_floorplan[id]/1060006/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+      "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "source_ids": {
+        "entrata_uid": "5021344",
+        "entrata_fpid": "1060006"
+      },
+      "data_gaps": [],
+      "data_quality_flag": ""
+    }
+  ],
+  "shared_ledger": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "sha256_before": "450154025ef060d9152eee50ff109847be4e9786d1baef2bc0326dadc82093ab",
+    "rows_before": 163,
+    "property_present_before": false
+  }
+}

@@ -1,0 +1,16 @@
+HTTP/2 403 
+server: CloudFront
+date: Sat, 01 Aug 2026 15:17:38 GMT
+content-type: text/html
+content-length: 5928
+x-px-blocked: 1
+x-cache: LambdaGeneratedResponse from cloudfront
+via: 1.1 547f7cdba09e78bc8afb08c8e31cc370.cloudfront.net (CloudFront)
+x-amz-cf-pop: DFW57-P5
+x-amz-cf-id: y6gAwjL_8L4zxK0XQgZqbmv4h8JWoBRJ5qNPQ0RGQGdcL2Y8WWLNGA==
+x-xss-protection: 1
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-dns-prefetch-control: off
+

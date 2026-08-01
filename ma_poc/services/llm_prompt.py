@@ -44,6 +44,24 @@ _RENT_SANITY_MAX = 50_000
 _VALID_STATUSES = frozenset({"AVAILABLE", "UNAVAILABLE", "WAITLIST", "UNKNOWN"})
 
 
+def _coerce_exact_rent(value: Any) -> float | None:
+    """Parse one scalar advertised rent, never a range or prose claim."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().replace(",", "")
+    match = re.fullmatch(r"\$?\s*(\d+(?:\.\d+)?)", cleaned)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:  # pragma: no cover - regex guarantees a number
+        return None
+
+
 def rank_api_responses(api_responses: list[dict]) -> list[dict]:
     """Rank API responses by overlap with unit-like field names. Return top 3."""
     if not api_responses:
@@ -124,21 +142,8 @@ def normalize_units(raw_units: list[dict]) -> list[dict]:
 
         rent_low = u.get("market_rent_low") or u.get("asking_rent")
         rent_high = u.get("market_rent_high") or rent_low
-        if rent_low is not None:
-            try:
-                unit["market_rent_low"] = float(rent_low)
-            except (ValueError, TypeError):
-                unit["market_rent_low"] = None
-        else:
-            unit["market_rent_low"] = None
-
-        if rent_high is not None:
-            try:
-                unit["market_rent_high"] = float(rent_high)
-            except (ValueError, TypeError):
-                unit["market_rent_high"] = None
-        else:
-            unit["market_rent_high"] = None
+        unit["market_rent_low"] = _coerce_exact_rent(rent_low)
+        unit["market_rent_high"] = _coerce_exact_rent(rent_high)
 
         for key in ("market_rent_low", "market_rent_high"):
             val = unit.get(key)

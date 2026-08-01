@@ -1,0 +1,16 @@
+[
+  {
+    "body": "{\"message\":\"Could not find number for https://lamphouseapts.com/\"}",
+    "captcha_detected": false,
+    "content_type": "application/json; charset=utf-8",
+    "status": 200,
+    "url": "https://api.myfiona.com/v1/tracking-numbers/swapTarget?websiteUrl=https%3A%2F%2Flamphouseapts.com%2F"
+  },
+  {
+    "body": "{\"backoff\":3600,\"errorCode\":2,\"refreshDuration\":10800000,\"refreshPeriod\":260000}",
+    "captcha_detected": false,
+    "content_type": "application/json; charset=UTF-8",
+    "status": 200,
+    "url": "https://www.google.com/pagead/attribution/wcm?cc=ZZ&dn=6088027889&cl=m9WCCKSVnZoBEOvVxOQC&dma=0"
+  }
+]

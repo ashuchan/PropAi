@@ -1,0 +1,357 @@
+{
+  "results": [
+    {
+      "adapter": "knock",
+      "contamination_verdict": "pass_exact_visible_name_address_native_positive_rent_unique_identity",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/north-carolina/duke-manor/",
+      "identity_evidence": {
+        "canonical_address": "311 S Lasalle St",
+        "canonical_name": "Duke Manor",
+        "distinct_final_unit_ids": 169,
+        "llm_calls": 0,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "property_identity_match": true,
+        "provider_boundary_single_id": true,
+        "rows_with_native_identity": 169,
+        "rows_with_native_identity_and_positive_rent": 169,
+        "source_property_ids": [
+          "2010515"
+        ],
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2010515/units"
+        ],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "lasalle"
+        ]
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "11BX",
+          "identity": {
+            "unit_id": "knock_unit_id-5f9fc3ce-f175-48cd-ae1b-91b8e72b9538",
+            "unit_number": "N"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1045,
+            "market_rent_low": 1045
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010515/units",
+          "source_ids": {
+            "knock_unit_id": "5f9fc3ce-f175-48cd-ae1b-91b8e72b9538"
+          },
+          "source_property_id": "2010515"
+        },
+        {
+          "floor_plan_name": "11BX",
+          "identity": {
+            "unit_id": "knock_unit_id-43e6cd76-fe01-4cb3-9175-046b8195ddc9",
+            "unit_number": "P"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1070,
+            "market_rent_low": 1070
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010515/units",
+          "source_ids": {
+            "knock_unit_id": "43e6cd76-fe01-4cb3-9175-046b8195ddc9"
+          },
+          "source_property_id": "2010515"
+        },
+        {
+          "floor_plan_name": "11BX",
+          "identity": {
+            "unit_id": "knock_unit_id-85a6e206-5522-4f54-976b-50fd0c089d3a",
+            "unit_number": "Q"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1045,
+            "market_rent_low": 1045
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010515/units",
+          "source_ids": {
+            "knock_unit_id": "85a6e206-5522-4f54-976b-50fd0c089d3a"
+          },
+          "source_property_id": "2010515"
+        },
+        {
+          "floor_plan_name": "21AX",
+          "identity": {
+            "unit_id": "knock_unit_id-f0858206-0d42-4ce3-905c-02acbfa07006",
+            "unit_number": "L"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1210,
+            "market_rent_low": 1210
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010515/units",
+          "source_ids": {
+            "knock_unit_id": "f0858206-0d42-4ce3-905c-02acbfa07006"
+          },
+          "source_property_id": "2010515"
+        },
+        {
+          "floor_plan_name": "11BX",
+          "identity": {
+            "unit_id": "knock_unit_id-b2884a3d-86a0-4ab9-b225-9418e51f5af1",
+            "unit_number": "F"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1025,
+            "market_rent_low": 1025
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010515/units",
+          "source_ids": {
+            "knock_unit_id": "b2884a3d-86a0-4ab9-b225-9418e51f5af1"
+          },
+          "source_property_id": "2010515"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 34303,
+      "property_identity_match": true,
+      "property_name": "Duke Manor",
+      "scrape_url": "https://gscapts.com/apartments/north-carolina/duke-manor/",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 169,
+      "website": "http://www.gscapts.com/apartments/Durham_NC/zip_27705/gsc/4506"
+    },
+    {
+      "adapter": "knock",
+      "contamination_verdict": "pass_exact_visible_name_address_native_positive_rent_unique_identity",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/north-carolina/booker-creek-townhouse-apartments/",
+      "identity_evidence": {
+        "canonical_address": "2525 Booker Creek Rd",
+        "canonical_name": "Booker Creek Townhouse Apartments",
+        "distinct_final_unit_ids": 7,
+        "llm_calls": 0,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "property_identity_match": true,
+        "provider_boundary_single_id": true,
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "source_property_ids": [
+          "2010508"
+        ],
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2010508/units"
+        ],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "booker",
+          "creek"
+        ]
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "unit_id": "knock_unit_id-02b8c1be-ebb2-48e5-8feb-780d680eb41f",
+            "unit_number": "C"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010508/units",
+          "source_ids": {
+            "knock_unit_id": "02b8c1be-ebb2-48e5-8feb-780d680eb41f"
+          },
+          "source_property_id": "2010508"
+        },
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "unit_id": "knock_unit_id-4b9f6ed6-a59e-4655-8773-ad82a5388670",
+            "unit_number": "D"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010508/units",
+          "source_ids": {
+            "knock_unit_id": "4b9f6ed6-a59e-4655-8773-ad82a5388670"
+          },
+          "source_property_id": "2010508"
+        },
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "unit_id": "knock_unit_id-86bcb15c-aa01-4f62-bda7-b1d7df704fbf",
+            "unit_number": "A"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010508/units",
+          "source_ids": {
+            "knock_unit_id": "86bcb15c-aa01-4f62-bda7-b1d7df704fbf"
+          },
+          "source_property_id": "2010508"
+        },
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "unit_id": "knock_unit_id-d5152a9e-3fbf-4c1c-b92f-e473b75cc93f",
+            "unit_number": "E"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010508/units",
+          "source_ids": {
+            "knock_unit_id": "d5152a9e-3fbf-4c1c-b92f-e473b75cc93f"
+          },
+          "source_property_id": "2010508"
+        },
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "unit_id": "knock_unit_id-d772d53a-41ce-4776-b3e4-03cb0d187dbb",
+            "unit_number": "B"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2010508/units",
+          "source_ids": {
+            "knock_unit_id": "d772d53a-41ce-4776-b3e4-03cb0d187dbb"
+          },
+          "source_property_id": "2010508"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 221995,
+      "property_identity_match": true,
+      "property_name": "Booker Creek Townhouse Apartments",
+      "scrape_url": "https://gscapts.com/apartments/north-carolina/booker-creek-townhouse-apartments/",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 7,
+      "website": "http://www.gscapts.com/apartments/Chapel_Hill_NC/zip_27514/gsc/4508"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "contamination_verdict": "pass_exact_visible_name_address_native_positive_rent_unique_identity",
+      "errors": [],
+      "final_url": "https://bellrockmarketstation.com/",
+      "identity_evidence": {
+        "canonical_address": "24002 Colonial Pkwy",
+        "canonical_name": "Bellrock Market Station",
+        "distinct_final_unit_ids": 26,
+        "llm_calls": 0,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "property_identity_match": true,
+        "provider_boundary_single_id": true,
+        "rows_with_native_identity": 26,
+        "rows_with_native_identity_and_positive_rent": 26,
+        "source_property_ids": [],
+        "source_urls": [
+          "https://bellrockmarketstation.com/floorplans/a1/",
+          "https://bellrockmarketstation.com/floorplans/a2/",
+          "https://bellrockmarketstation.com/floorplans/a3/",
+          "https://bellrockmarketstation.com/floorplans/a4/",
+          "https://bellrockmarketstation.com/floorplans/a5/",
+          "https://bellrockmarketstation.com/floorplans/b1/",
+          "https://bellrockmarketstation.com/floorplans/b2/",
+          "https://bellrockmarketstation.com/floorplans/b3/",
+          "https://bellrockmarketstation.com/floorplans/b4/",
+          "https://bellrockmarketstation.com/floorplans/c1/"
+        ],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "colonial"
+        ]
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "A1",
+          "identity": {
+            "unit_number": "4231"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1280,
+            "market_rent_low": 1280
+          },
+          "source_api_url": "https://bellrockmarketstation.com/floorplans/a1/",
+          "source_ids": {},
+          "source_property_id": ""
+        },
+        {
+          "floor_plan_name": "A1",
+          "identity": {
+            "unit_number": "4105"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1330,
+            "market_rent_low": 1330
+          },
+          "source_api_url": "https://bellrockmarketstation.com/floorplans/a1/",
+          "source_ids": {},
+          "source_property_id": ""
+        },
+        {
+          "floor_plan_name": "A1",
+          "identity": {
+            "unit_number": "4304"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1230,
+            "market_rent_low": 1230
+          },
+          "source_api_url": "https://bellrockmarketstation.com/floorplans/a1/",
+          "source_ids": {},
+          "source_property_id": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "identity": {
+            "unit_number": "4212"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1315,
+            "market_rent_low": 1315
+          },
+          "source_api_url": "https://bellrockmarketstation.com/floorplans/a2/",
+          "source_ids": {},
+          "source_property_id": ""
+        },
+        {
+          "floor_plan_name": "A2",
+          "identity": {
+            "unit_number": "6210"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1315,
+            "market_rent_low": 1315
+          },
+          "source_api_url": "https://bellrockmarketstation.com/floorplans/a2/",
+          "source_ids": {},
+          "source_property_id": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 252891,
+      "property_identity_match": true,
+      "property_name": "Bellrock Market Station",
+      "scrape_url": "https://www.livebellrock.com/apartments/tx/katy/bellrock-market-station/",
+      "status": 200,
+      "tier": "TIER_1_DOM_JONAH_RESOURCE_JSON",
+      "units": 26,
+      "website": "https://www.livebellrock.com/apartments/tx/katy/bellrock-market-station/"
+    }
+  ]
+}

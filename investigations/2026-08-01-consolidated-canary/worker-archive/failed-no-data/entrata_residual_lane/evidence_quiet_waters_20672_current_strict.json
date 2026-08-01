@@ -1,0 +1,212 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_detail_modal",
+    "capture_timestamp_utc": "2026-08-01T13:12:01.575483+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      20672
+    ],
+    "native_positive_rent_rows": 3,
+    "captcha_solving": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 20672,
+      "property_name": "Quiet Waters Landing",
+      "website": "https://www.quietwaterslanding.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 3,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_published_same_property_entrata_modal_native_ids_positive_rents_casefold_deduped",
+      "identity_evidence": {
+        "canonical_name": "Quiet Waters Landing",
+        "canonical_address": "1293 Thom Ct",
+        "current_page_name_match": true,
+        "current_page_full_address_match": true,
+        "current_listing_published_exact_detail_link": true,
+        "current_listing_property_floorplan_binding": "817607",
+        "current_listing_provider_property_binding": "1183189",
+        "rows_with_native_identity": 3,
+        "rows_with_native_identity_and_positive_rent": 3,
+        "raw_provider_rows_before_casefold_dedupe": 4,
+        "source_urls": [
+          "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "2d"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1483,
+            "market_rent_high": 1483
+          },
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "3A"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1494,
+            "market_rent_high": 1494
+          },
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "3D"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1460,
+            "market_rent_high": 1460
+          },
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "A1-1BD/1BA",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "2d",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,483",
+          "market_rent_low": 1483,
+          "market_rent_high": 1483,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A1-1BD/1BA",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "3A",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,494",
+          "market_rent_low": 1494,
+          "market_rent_high": 1494,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-11-16",
+          "available_date": "2026-11-16",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A1-1BD/1BA",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "unit_number": "3D",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,460",
+          "market_rent_low": 1460,
+          "market_rent_high": 1460,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-21",
+          "available_date": "2026-08-21",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:10:39.464996+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_deep_inspect_20672_a1_modal_current.json",
+        "capture_artifact_sha256": "19469d7d77646b1c9d253e40e3bf42d7896dd315df24568aa3052ff29b5488c0",
+        "html_sha256": "89ffc7477c5d348750b063d81990aa54f66391ea5e2443b1d645eedf9e5f1054",
+        "title": "A1-1BD/1BA | 1 Bed Apartment | Quiet Waters Landing",
+        "final_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/",
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": true,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false,
+        "modal_response": {
+          "url": "https://www.quietwaterslanding.com/?module=check_availability&is_secure=1&property[id]=1183189&action=view_unit_spaces&property_floorplan[id]=817607&is_valid_rent=1&lease_term_name=3-15mo%20lease&popup_lease_term_name=3-15%20months%20lease&cached_rate_available=1&min_rent=$1,460&max_rent=$3,307&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+          "status": 200,
+          "body_bytes": 36950,
+          "body_sha256": "40817f7fd5855c9a584108c6b79110779a95da66e01d66319aae738ff0ac32b8"
+        }
+      },
+      "published_route_provenance": {
+        "listing_capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_deep_inspect_20672_conventional_current.json",
+        "listing_capture_sha256": "126c15a6730718bcdb990082f3d6948a8a032d3482bdf97b839a83d80870b202",
+        "listing_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+        "published_detail_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/floorplans/a1-1bd1ba-817607/fp_name/occupancy_type/conventional/"
+      }
+    }
+  ]
+}

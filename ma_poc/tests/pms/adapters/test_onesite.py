@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -35,16 +36,82 @@ class _DummyPage:
 
 
 @pytest.mark.asyncio
-async def test_onesite_extract_happy_path() -> None:
+async def test_onesite_floorplan_fixture_is_preserved_as_plan_catalogue() -> None:
     responses = _load_fixture("293707.json")
     adapter = OneSiteAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
-    assert len(result.units) >= 1
-    first = result.units[0]
+    assert result.units == []
+    assert len(result.plan_summaries) >= 1
+    first = result.plan_summaries[0]
     assert first["rent_range"]
     assert "ONESITE" in first["extraction_tier"]
+    assert first["unit_number"] == ""
+    assert "PLAN_LEVEL" in result.tier_used
+
+
+@pytest.mark.asyncio
+async def test_onesite_extracts_current_response_units_envelope_and_date() -> None:
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/9178700/units",
+            "body": {
+                "response": {
+                    "units": [
+                        {
+                            "id": 17635300,
+                            "unitNumber": "3891-2",
+                            "rent": 975,
+                            "squareFeet": 650,
+                            "internalAvailableDate": "2026-08-02 00:00 -0500",
+                        }
+                    ]
+                }
+            },
+        }
+    ]
+    result = await OneSiteAdapter().extract(  # type: ignore[arg-type]
+        _DummyPage(), _make_ctx(responses)
+    )
+
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "3891-2"
+    assert result.units[0]["availability_date"] == "2026-08-02"
+
+
+@pytest.mark.asyncio
+async def test_onesite_prefers_exact_swifty_native_units_when_api_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._swifty_floorplans.recover_swifty_floorplans",
+        AsyncMock(
+            return_value=[
+                {
+                    "unit_number": "308",
+                    "floor_plan_name": "A3",
+                    "bedrooms": "1",
+                    "bathrooms": "1",
+                    "sqft": "544",
+                    "market_rent_low": 1200,
+                    "market_rent_high": 1200,
+                    "availability_status": "AVAILABLE",
+                    "availability_date": "09-09-2026",
+                    "source_api_url": "https://example.test/wp-admin/admin-ajax.php",
+                    "extraction_tier": "TIER_1_DOM_SWIFTY_UNIT_AJAX",
+                }
+            ]
+        ),
+    )
+    result = await OneSiteAdapter().extract(  # type: ignore[arg-type]
+        _DummyPage(), _make_ctx([])
+    )
+
+    assert result.tier_used == "TIER_1_DOM_SWIFTY_UNIT_AJAX"
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "308"
+    assert result.units[0]["availability_date"] == "09-09-2026"
 
 
 @pytest.mark.asyncio
@@ -183,8 +250,7 @@ async def test_onesite_emits_no_response_when_no_realpage_responses() -> None:
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.units == []
     assert result.tier_used == "TIER_1_API_ONESITE_NO_RESPONSE", (
-        f"expected NO_RESPONSE label so retry/fallback fires; "
-        f"got {result.tier_used!r}"
+        f"expected NO_RESPONSE label so retry/fallback fires; got {result.tier_used!r}"
     )
 
 
@@ -203,23 +269,21 @@ async def test_onesite_emits_empty_when_floorplans_list_is_empty() -> None:
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.units == []
     assert result.tier_used == "TIER_1_API_ONESITE_EMPTY", (
-        f"expected EMPTY label (responses captured but no rows); "
-        f"got {result.tier_used!r}"
+        f"expected EMPTY label (responses captured but no rows); got {result.tier_used!r}"
     )
 
 
 @pytest.mark.asyncio
-async def test_onesite_real_data_keeps_bare_success_label() -> None:
-    """Regression guard — real /floorplans data (the 293707 fixture
-    shape) still produces the bare ``TIER_1_API_ONESITE`` label so
-    Path B/C does NOT retry on a successful extraction."""
+async def test_onesite_real_floorplans_data_keeps_plan_level_label() -> None:
+    """A real ``/floorplans`` catalogue must not masquerade as units."""
     responses = _load_fixture("293707.json")
     adapter = OneSiteAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert len(result.units) >= 1
-    assert result.tier_used == "TIER_1_API_ONESITE", (
-        f"real data must keep the bare success label; got {result.tier_used!r}"
+    assert result.units == []
+    assert len(result.plan_summaries) >= 1
+    assert result.tier_used == "TIER_1_API_ONESITE_PLAN_LEVEL", (
+        f"real floorplans must keep the plan label; got {result.tier_used!r}"
     )
 
 
@@ -229,6 +293,7 @@ async def test_onesite_empty_label_in_empty_exit_registry() -> None:
     ``is_empty_exit`` so the Path B/C retry hook in scraper.py
     actually fires on them."""
     from ma_poc.pms.empty_exit import is_empty_exit
+
     assert is_empty_exit("TIER_1_API_ONESITE_NO_RESPONSE") is True
     assert is_empty_exit("TIER_1_API_ONESITE_EMPTY") is True
     # Bare success label must NOT trigger retry.

@@ -1,0 +1,321 @@
+{
+  "lane": "appfolio_wix_residual",
+  "scope": {
+    "target_properties": 19,
+    "target_current_adapter_counts": {
+      "appfolio": 10,
+      "wix_nopms": 9
+    },
+    "target_property_ids": [
+      3788,
+      19538,
+      23494,
+      25443,
+      44955,
+      46179,
+      47845,
+      47909,
+      56567,
+      69282,
+      71345,
+      118965,
+      237787,
+      241145,
+      251514,
+      260761,
+      263732,
+      271721,
+      282696
+    ]
+  },
+  "provenance": {
+    "initial_requested_snapshot": {
+      "strict_unique_recovered_properties": 186,
+      "ledger_sha256": "04718e2e24b3710bb6d9b9714ffe8e1a183a510b0f87d72496086fd96b9d2a8a",
+      "remaining_sha256": "c1971ef86edae3f10d72ed161a3f25b398de56cc63cf2aa79a099c85602643ac",
+      "entry_hash_assertions_passed": true
+    },
+    "execution_race_note": "The 19-property run began only after the exact 186-snapshot hashes passed. Another lane rebuilt the shared files during execution, so the serialized all-19 artifact observed an interim 187-row snapshot. Probe results and source hashes are unaffected; final net-new membership is reconciled separately against the later authoritative 192 snapshot below.",
+    "final_authoritative_reconciliation_snapshot": {
+      "strict_unique_recovered_properties": 192,
+      "ledger_rows_excluding_header": 192,
+      "remaining_rows_excluding_header": 152,
+      "ledger_sha256": "cae354f94c95160693b3ac6f8398ecae9b239fd23ff0aa0eb1ab180741645da8",
+      "remaining_sha256": "2921bec79df9251d735e92c90f16485d475c8861c51d937370ffde88e4ef72d4",
+      "all_19_target_ids_absent_from_ledger": true,
+      "all_19_target_ids_present_in_remaining": true
+    },
+    "source_snapshot": {
+      "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+      "dirty_source": true,
+      "critical_source_stable_during_positive_repeat_gate": true,
+      "critical_file_sha256": {
+        "ma_poc/pms/scraper.py": "af17060303489326f4b37a2e8aecf1f39666aa3481026c9b32d6632c6e89e5e6",
+        "ma_poc/pms/detector.py": "f57cbd5e4141276f411a27a78545c5a18d2bd442020fc12f1e54d09418b8018b",
+        "ma_poc/pms/adapters/appfolio.py": "0d8ff57e4b2ac486c4cc6cd45ae8492d70a6e51ec42266fc80256818e1fa44c2",
+        "ma_poc/pms/adapters/wix_nopms.py": "63bd08fcf88df973bea3717f310a3a26ae5304aa197dba8d8be5aead6a03d389",
+        "ma_poc/pms/adapters/_universal_recovery.py": "c1ab0a161e872749a78d06b6eddd93c1439c4170b6278795ce08aa93cff70f80",
+        "ma_poc/pms/adapters/_wix_iframe_walker.py": "e27db38be7c1fb0a7fdd9c9adab0d077dd77aa2eb00823cf3edc6ea28b12cea2",
+        "ma_poc/pms/adapters/entrata.py": "f7491d8250592810458433f499db0d257783d8ab964b0dcc3b1671e4020e02f3"
+      }
+    }
+  },
+  "guardrails": {
+    "current_configured_route": "scrape_jugnu",
+    "full_pipeline_not_helper_only": true,
+    "llm_enabled": false,
+    "captcha_solving": false,
+    "web_unlocker_call_count": 0,
+    "hyperbrowser_call_count": 0,
+    "flaresolverr": false,
+    "fingerprint_rotation": false,
+    "proxy": false,
+    "paid_canary": false
+  },
+  "artifacts": {
+    "all_19_current_configured_route": {
+      "path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/current_configured_route_full_e2e.json",
+      "sha256": "e638733645a5a2bcb123f0914611ada3f33af232d72d9ce2a074b4ae928c9dbe"
+    },
+    "prior_current_direct_corroboration": {
+      "path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/current_live_scraper_e2e.json",
+      "sha256": "1c381fa46b4c2fe1374e10169a60a72bf017656057659e1342a52f2c64a16ad4",
+      "counts_toward_strict_positive": false
+    },
+    "stadium_repeat_gate": {
+      "path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/stadium_current_full_pipeline_repeat3.json",
+      "sha256": "7baaaa808376f07297cb3b671d01a545b342ee4a427a93c7d8d7ee6e51717bda"
+    },
+    "lc_sobro_repeat_gate": {
+      "path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/lc_sobro_current_full_pipeline_repeat3.json",
+      "sha256": "3d98bfeb59ced832f70fec8ddc1f7914fdf6da45e3cd27e6702f84e9218990b8"
+    }
+  },
+  "strict_result": {
+    "strict_accept_ids": [
+      19538
+    ],
+    "strict_accept_count": 1,
+    "strict_net_new_ids_against_192_snapshot": [
+      19538
+    ],
+    "strict_net_new_count": 1,
+    "explicit_reject_ids": [
+      3788,
+      23494,
+      25443,
+      44955,
+      46179,
+      47845,
+      47909,
+      56567,
+      69282,
+      71345,
+      118965,
+      237787,
+      241145,
+      251514,
+      260761,
+      263732,
+      271721,
+      282696
+    ],
+    "explicit_reject_count": 18
+  },
+  "strict_accepts": [
+    {
+      "property_id": 19538,
+      "property_name": "Stadium Apartments",
+      "configured_url": "http://www.stadiumapartmentshuntsville.com/",
+      "canonical_address": "2999 Woodway Dr SW, Huntsville, AL 35805",
+      "winning_adapter": "appfolio",
+      "winning_tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "source_url": "https://abbottpropertiesmultifamily.appfolio.com/listings",
+      "source_property_ids": [],
+      "source_property_id_note": "AppFolio SSR exposes native listing IDs but no separate property ID; blank preserved.",
+      "repeat_gate": {
+        "configured_route_full_pipeline_repeats": 3,
+        "strict_passes": 3,
+        "strict_rows_each_repeat": 3,
+        "identical_rows_across_repeats": true,
+        "critical_source_stable": true
+      },
+      "property_boundary": {
+        "every_row_exact_street_and_zip": true,
+        "every_row_native_listing_id": true,
+        "every_row_positive_rent": true,
+        "account_roster_rows": 46,
+        "exact_address_rows_kept": 3,
+        "sibling_rows_dropped": 43,
+        "filter_reason": "address_filter_applied",
+        "no_sibling_contamination": true,
+        "helper_roster_counts_toward_recovery": false
+      },
+      "accepted_rows": [
+        {
+          "appfolio_listing_id": "949",
+          "unit_number": "949",
+          "unit_id": "2999-woodway-dr-sw-huntsville-al-35805-949",
+          "unit_name": "2999 Woodway Dr SW, Huntsville, AL 35805",
+          "sqft": 553,
+          "market_rent": 872
+        },
+        {
+          "appfolio_listing_id": "1005",
+          "unit_number": "1005",
+          "unit_id": "2999-woodway-dr-sw-huntsville-al-35805-1005",
+          "unit_name": "2999 Woodway Dr SW, Huntsville, AL 35805",
+          "sqft": 800,
+          "market_rent": 1047
+        },
+        {
+          "appfolio_listing_id": "1006",
+          "unit_number": "1006",
+          "unit_id": "2999-woodway-dr-sw-huntsville-al-35805-1006",
+          "unit_name": "2999 Woodway Dr SW, Huntsville, AL 35805",
+          "sqft": 650,
+          "market_rent": 912
+        }
+      ],
+      "ledger_reconciliation": {
+        "absent_from_192_ledger": true,
+        "present_in_192_remaining": true,
+        "net_new": true
+      },
+      "strict_verdict": "pass_exact_property_appfolio_native_ids_positive_rents_no_sibling_contamination"
+    }
+  ],
+  "explicit_rejections": [
+    {
+      "property_id": 3788,
+      "property_name": "Citadel Village",
+      "current_result": "0 strict unit rows; AppFolio address filter kept 0 and dropped 147 account-roster rows.",
+      "rejection": "No exact target-property listing survived the contamination boundary.",
+      "minimum_code_lever": "None justified: retain the exact-address filter; widening the account roster would admit sibling properties."
+    },
+    {
+      "property_id": 23494,
+      "property_name": "Indian Village",
+      "current_result": "0 strict unit rows; Wix brochure page and same-page /apartments route exposed no provider-native inventory.",
+      "rejection": "Marketing content is not native unit evidence.",
+      "minimum_code_lever": "No safe strict lever until an exact-property provider-native inventory surface is published."
+    },
+    {
+      "property_id": 25443,
+      "property_name": "Lee Square",
+      "current_result": "0 strict unit rows; AppFolio empty; published /floor-plans/rents page found.",
+      "rejection": "No native unit identity with positive rent reached the configured pipeline.",
+      "minimum_code_lever": "Traverse the exact published rents subpage direct-first, but keep plan summaries rejected unless native unit IDs appear."
+    },
+    {
+      "property_id": 44955,
+      "property_name": "Fulton Woods",
+      "current_result": "0 strict unit rows; AppFolio/Duda address filter kept 0 and dropped 83 roster rows.",
+      "rejection": "No exact target-property listing survived the contamination boundary.",
+      "minimum_code_lever": "None justified: retain the address filter and do not count sibling account listings."
+    },
+    {
+      "property_id": 46179,
+      "property_name": "East Hampton",
+      "current_result": "0 strict unit rows; Wix syndication-only result with no provider-native URL.",
+      "rejection": "No current native identity surface.",
+      "minimum_code_lever": "No safe strict lever until a provider-native exact-property inventory link exists."
+    },
+    {
+      "property_id": 47845,
+      "property_name": "Casa De Caro",
+      "current_result": "0 strict unit rows; AppFolio address filter kept 0 and dropped 33 roster rows.",
+      "rejection": "No exact target-property listing survived the contamination boundary.",
+      "minimum_code_lever": "None justified: widening the roster would create sibling contamination."
+    },
+    {
+      "property_id": 47909,
+      "property_name": "Westerville Park Apartment Homes",
+      "current_result": "0 strict unit rows; redetected wix_floor_plans, tier TIER_1_DOM_WIX_FLOOR_PLANS, error 'no live page'.",
+      "rejection": "Even recovered Wix cards would be plan summaries without proven native unit IDs.",
+      "minimum_code_lever": "Pass the configured static body into the Wix plan-card parser; still reject as strict unless a provider-native unit surface is discovered."
+    },
+    {
+      "property_id": 56567,
+      "property_name": "Park Forest Apartments",
+      "current_result": "0 strict unit rows; AppFolio empty; exact-site /Available-Units page and nevinsre tenant link found.",
+      "rejection": "No exact-address native unit rows reached the current pipeline.",
+      "minimum_code_lever": "Try the exact published Available-Units subpage before tenant-account synthesis and require exact address plus native listing ID."
+    },
+    {
+      "property_id": 69282,
+      "property_name": "Vista Del Plaza",
+      "current_result": "0 strict unit rows; only a wrgorman tenant sign-in link was exposed.",
+      "rejection": "Tenant login is not current property inventory.",
+      "minimum_code_lever": "No safe strict lever without an exact-property native listings surface."
+    },
+    {
+      "property_id": 71345,
+      "property_name": "Westgate Village Townhouses",
+      "current_result": "0 strict unit rows; Wix syndication-only result with no provider-native inventory URL.",
+      "rejection": "No native unit identity surface.",
+      "minimum_code_lever": "No safe strict lever until an exact-property provider-native route is published."
+    },
+    {
+      "property_id": 118965,
+      "property_name": "16 Bennett",
+      "current_result": "0 strict unit rows; Wix syndication-only result with no provider-native inventory URL.",
+      "rejection": "No native unit identity surface.",
+      "minimum_code_lever": "No safe strict lever until an exact-property provider-native route is published."
+    },
+    {
+      "property_id": 237787,
+      "property_name": "Heritage Amity Commons",
+      "current_result": "Configured fetch returned 200, but full route hit the 120-second bound; prior current direct run emitted 0 and exact-address filtering dropped all 12 account rows.",
+      "rejection": "Neither run produced exact-property native units; the timeout is not a positive.",
+      "minimum_code_lever": "Deduplicate and cap tenant-only link hops so the route deterministically preserves the address-filtered empty result."
+    },
+    {
+      "property_id": 241145,
+      "property_name": "Fourth & Selden",
+      "current_result": "0 strict unit rows; AppFolio empty; exact-site /availability route found.",
+      "rejection": "No native unit identity with positive rent reached the pipeline.",
+      "minimum_code_lever": "Traverse the exact published availability page direct-first and retain the native-ID requirement."
+    },
+    {
+      "property_id": 251514,
+      "property_name": "LC SoBro I",
+      "current_result": "Three-run configured-route repeat gate produced 0/3 strict passes: one Entrata plan-level SSR result and two Entrata no-response results; prior current direct result was 24 plans and 0 units.",
+      "rejection": "An isolated earlier unit-level sample was not stable and is not accepted; repeat evidence is plan-only/no-response.",
+      "minimum_code_lever": "Make the published /nashville/lc-sobro/conventional/ route direct-first with bounded deterministic per-plan detail drilling; count only Entrata UID/fpid/unit-number rows with positive rent."
+    },
+    {
+      "property_id": 260761,
+      "property_name": "Westridge Lofts",
+      "current_result": "0 strict unit rows; AppFolio address filter kept 0 and dropped 222 roster rows; exact-site availability and floor-plan routes found.",
+      "rejection": "No exact target-property listing survived; account-wide rows are contamination.",
+      "minimum_code_lever": "Probe exact published subpages before account synthesis, but do not weaken the exact-address filter."
+    },
+    {
+      "property_id": 263732,
+      "property_name": "Hoyt Tower",
+      "current_result": "0 strict unit rows; Wix syndication-only result with no provider-native inventory URL.",
+      "rejection": "No native unit identity surface.",
+      "minimum_code_lever": "No safe strict lever until an exact-property provider-native route is published."
+    },
+    {
+      "property_id": 271721,
+      "property_name": "The Millennium on Monroe",
+      "current_result": "0 strict unit rows; Wix syndication-only result; exact-site /properties-for-rent page found but no provider-native unit source.",
+      "rejection": "Static property marketing rows cannot satisfy native unit identity.",
+      "minimum_code_lever": "Traverse the published page for provider discovery, but reject page-local rows unless it exposes native unit IDs and positive rents."
+    },
+    {
+      "property_id": 282696,
+      "property_name": "Allen Ranch Estates",
+      "current_result": "0 strict unit rows; Wix syndication-only result with no provider-native inventory URL.",
+      "rejection": "No native unit identity surface.",
+      "minimum_code_lever": "No safe strict lever until an exact-property provider-native route is published."
+    }
+  ],
+  "repo_mutation": {
+    "repository_files_edited_by_lane": false,
+    "shared_ledger_or_builder_edited_by_lane": false,
+    "lane_output_only": true
+  }
+}

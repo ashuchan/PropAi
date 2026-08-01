@@ -16,58 +16,87 @@ log = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-TARGET_JSONLD_TYPES: frozenset[str] = frozenset({
-    "Apartment",
-    "ApartmentUnit",
-    "ApartmentComplex",
-    "Offer",
-    "FloorPlan",
-    "Residence",
-    "SingleFamilyResidence",
-    # Phase 6.4 (2026-05-21): broader Schema.org coverage. Several
-    # captured HARs in the actionable_html_extractor bucket use these
-    # lodging-coherent types instead of Apartment, and the existing
-    # ``_jsonld_item_has_unit_signal`` already gates on the presence
-    # of unit dimensions (offers/numberOfRooms/floorSize) so noise
-    # from unrelated lodging pages is rejected cheaply.
-    # Deliberately omitted: ``Hotel``, ``LodgingBusiness`` — those
-    # tend to describe whole-building hotel inventory, not multifamily
-    # unit listings, and pull in genuine noise.
-    "Accommodation",
-    "House",
-    "Suite",
-})
+TARGET_JSONLD_TYPES: frozenset[str] = frozenset(
+    {
+        "Apartment",
+        "ApartmentUnit",
+        "ApartmentComplex",
+        "Offer",
+        "FloorPlan",
+        "Residence",
+        "SingleFamilyResidence",
+        # Phase 6.4 (2026-05-21): broader Schema.org coverage. Several
+        # captured HARs in the actionable_html_extractor bucket use these
+        # lodging-coherent types instead of Apartment, and the existing
+        # ``_jsonld_item_has_unit_signal`` already gates on the presence
+        # of unit dimensions (offers/numberOfRooms/floorSize) so noise
+        # from unrelated lodging pages is rejected cheaply.
+        # Deliberately omitted: ``Hotel``, ``LodgingBusiness`` — those
+        # tend to describe whole-building hotel inventory, not multifamily
+        # unit listings, and pull in genuine noise.
+        "Accommodation",
+        "House",
+        "Suite",
+    }
+)
 
 _RENT_MIN = 200
 _RENT_MAX = 50_000
 
 _UNIT_ID_KEYS: tuple[str, ...] = (
-    "unit_number", "unitNumber", "UnitNumber",
-    "unit_id", "unitId", "unit_name", "unitName",
-    "label", "id", "ID",
+    "unit_number",
+    "unitNumber",
+    "UnitNumber",
+    "unit_id",
+    "unitId",
+    "unit_name",
+    "unitName",
+    "label",
+    "id",
+    "ID",
     # 2026-05-24 (prod fingerprint patches): Repli360 admin endpoint
     # /admin/get_apartmentsync_data_for_floorplan_multi_template ships
     # the per-unit identifier as "customlink". Safe-narrow alias —
     # "customlink" is Repli360-specific and doesn't appear elsewhere
     # in our sampled payloads. Affects ~17 not-full props.
-    "customlink", "customLink", "CustomLink",
+    "customlink",
+    "customLink",
+    "CustomLink",
     # Spherexx /api/unit Pascal-case variant. "Number" alone is too
     # generic to alias globally, but at the per-unit walker level
     # it's safe — the candidate must already pass the unit-shape gate
     # before this list is consulted.
-    "Number", "number",
+    "Number",
+    "number",
 )
 
-_RENT_KEYS: frozenset[str] = frozenset({
-    "price", "minRent", "askingRent", "rent", "monthlyRent",
-    "minPrice", "startingPrice", "base_rent", "baseRent",
-    "display_price", "displayPrice", "monthly_rent",
-    "rentTerms", "pricing", "market_rent",
-    # 2026-05-24 (prod fingerprint patches):
-    # Spherexx /api/unit Pascal-case
-    "PriceMin", "PriceMax", "pricemin", "pricemax",
-    "PriceMinimum", "PriceMaximum",
-})
+_RENT_KEYS: frozenset[str] = frozenset(
+    {
+        "price",
+        "minRent",
+        "askingRent",
+        "rent",
+        "monthlyRent",
+        "minPrice",
+        "startingPrice",
+        "base_rent",
+        "baseRent",
+        "display_price",
+        "displayPrice",
+        "monthly_rent",
+        "rentTerms",
+        "pricing",
+        "market_rent",
+        # 2026-05-24 (prod fingerprint patches):
+        # Spherexx /api/unit Pascal-case
+        "PriceMin",
+        "PriceMax",
+        "pricemin",
+        "pricemax",
+        "PriceMinimum",
+        "PriceMaximum",
+    }
+)
 
 # ── Low-level helpers ──────────────────────────────────────────────────────────
 
@@ -151,14 +180,20 @@ def _find_list(obj: Any, keys: tuple[str, ...]) -> list:
 # normalize_field_key() collapses vendor variants (camelCase / PascalCase /
 # snake_case / vendor abbreviations) these are the field-names that count.
 # An item with >= 2 canonical signals is treated as unit-shaped.
-_CANON_UNIT_SIGNAL_KEYS: frozenset[str] = frozenset({
-    "rent", "min_rent", "max_rent",
-    "sqft",
-    "bedrooms", "bathrooms",
-    "floor_plan_name",
-    "unit_number", "unit_id",
-    "available_date",
-})
+_CANON_UNIT_SIGNAL_KEYS: frozenset[str] = frozenset(
+    {
+        "rent",
+        "min_rent",
+        "max_rent",
+        "sqft",
+        "bedrooms",
+        "bathrooms",
+        "floor_plan_name",
+        "unit_number",
+        "unit_id",
+        "available_date",
+    }
+)
 
 # Defensive cap on the recursive walker. The Razz blob is ~1 MB but well-
 # structured; pathological pages (mis-rendered SPAs, infinitely nested
@@ -202,17 +237,28 @@ _MEDIA_FILE_EXT_RE = re.compile(
 
 # A dict carrying one of these keys with an ``image/`` | ``video/`` | ``audio/``
 # | ``font/`` | ``application/`` value is a file descriptor, not a dwelling.
-_MEDIA_MIME_RE = re.compile(
-    r"^\s*(?:image|video|audio|font|application)/", re.IGNORECASE
-)
+_MEDIA_MIME_RE = re.compile(r"^\s*(?:image|video|audio|font|application)/", re.IGNORECASE)
 _MIME_KEYS: tuple[str, ...] = (
-    "mimeType", "mime_type", "mimetype", "MimeType",
-    "contentType", "content_type", "ContentType", "mime",
+    "mimeType",
+    "mime_type",
+    "mimetype",
+    "MimeType",
+    "contentType",
+    "content_type",
+    "ContentType",
+    "mime",
 )
 _FILENAME_KEYS: tuple[str, ...] = (
-    "name", "fileName", "file_name", "filename", "Name",
-    "originalFilename", "original_filename", "original_file_name",
-    "title", "label",
+    "name",
+    "fileName",
+    "file_name",
+    "filename",
+    "Name",
+    "originalFilename",
+    "original_filename",
+    "original_file_name",
+    "title",
+    "label",
 )
 
 # Evidence that an item describes a DWELLING. This is _CANON_UNIT_SIGNAL_KEYS
@@ -221,13 +267,19 @@ _FILENAME_KEYS: tuple[str, ...] = (
 # zero here while any genuine unit or floor plan scores at least one.
 # ``size`` is NOT evidence: it is exactly the overloaded key (bytes vs sqft)
 # that produced this defect.
-_DWELLING_EVIDENCE_KEYS: frozenset[str] = frozenset({
-    "rent", "min_rent", "max_rent",
-    "sqft",
-    "bedrooms", "bathrooms",
-    "unit_number", "unit_id",
-    "available_date",
-})
+_DWELLING_EVIDENCE_KEYS: frozenset[str] = frozenset(
+    {
+        "rent",
+        "min_rent",
+        "max_rent",
+        "sqft",
+        "bedrooms",
+        "bathrooms",
+        "unit_number",
+        "unit_id",
+        "available_date",
+    }
+)
 
 
 def _has_dwelling_evidence(item: dict) -> bool:
@@ -348,9 +400,7 @@ def find_unit_arrays(blob: Any, min_signals: int = 2) -> list[list[dict]]:
         if isinstance(node, list):
             # If this list itself is unit-shaped, capture it; do NOT recurse
             # into its items (each item would just yield itself again).
-            if node and any(
-                _item_has_unit_signals(it, min_signals) for it in node[:5]
-            ):
+            if node and any(_item_has_unit_signals(it, min_signals) for it in node[:5]):
                 results.append([it for it in node if isinstance(it, dict)])
                 continue
             # Otherwise, look inside for nested unit arrays.
@@ -371,9 +421,20 @@ def _extract_rent(u: dict) -> tuple[int | None, int | None]:
     nested lists ``{rentTerms: [{rent: 1200, term: 12}]}``.
     """
     _LO_KEYS = (
-        "price", "minRent", "askingRent", "rent", "monthlyRent",
-        "minPrice", "startingPrice", "base_rent", "baseRent",
-        "display_price", "monthly_rent", "market_rent", "rentTerms", "pricing",
+        "price",
+        "minRent",
+        "askingRent",
+        "rent",
+        "monthlyRent",
+        "minPrice",
+        "startingPrice",
+        "base_rent",
+        "baseRent",
+        "display_price",
+        "monthly_rent",
+        "market_rent",
+        "rentTerms",
+        "pricing",
     )
     _HI_KEYS = ("maxRent", "price_max", "max_price", "maxPrice", "rent_max")
 
@@ -386,8 +447,7 @@ def _extract_rent(u: dict) -> tuple[int | None, int | None]:
             continue
         if isinstance(v, dict):
             lo = _money_to_int(
-                v.get("min") or v.get("low") or v.get("amount")
-                or v.get("effectiveRent") or v.get("value")
+                v.get("min") or v.get("low") or v.get("amount") or v.get("effectiveRent") or v.get("value")
             )
             hi = _money_to_int(v.get("max") or v.get("high"))
             if lo:
@@ -489,10 +549,16 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
     # accommodations/houses/suites with only metadata as silent
     # no-ops.
     if any(
-        x in (
-            "Apartment", "FloorPlan", "Residence", "Offer",
+        x
+        in (
+            "Apartment",
+            "FloorPlan",
+            "Residence",
+            "Offer",
             "SingleFamilyResidence",
-            "Accommodation", "House", "Suite",
+            "Accommodation",
+            "House",
+            "Suite",
         )
         for x in t_list
         if isinstance(x, str)
@@ -509,11 +575,15 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
     except Exception:
         return False
     _unit_signal_canon = {
-        "rent", "min_rent", "max_rent",
+        "rent",
+        "min_rent",
+        "max_rent",
         "sqft",
-        "bedrooms", "bathrooms",
+        "bedrooms",
+        "bathrooms",
         "floor_plan_name",
-        "unit_number", "unit_id",
+        "unit_number",
+        "unit_id",
         "available_date",
     }
     for k, v in item.items():
@@ -535,29 +605,21 @@ def _is_low_signal_units(units: list[dict]) -> bool:
         return True
     for u in units:
         has_rent = bool(
-            u.get("rent_range") or u.get("market_rent_low")
-            or u.get("market_rent_high") or u.get("rent")
+            u.get("rent_range") or u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent")
         )
-        has_id = bool(
-            (u.get("unit_number") or "").strip() or (u.get("unit_id") or "").strip()
-        )
+        has_id = bool((u.get("unit_number") or "").strip() or (u.get("unit_id") or "").strip())
         if has_rent or has_id:
             return False
     return True
 
 
-def _units_below_expected(
-    units: list[dict], expected: int | None, floor_ratio: float = 0.2
-) -> bool:
+def _units_below_expected(units: list[dict], expected: int | None, floor_ratio: float = 0.2) -> bool:
     """True if units is materially smaller than the known expected count."""
     if not expected or expected <= 0 or not units:
         return False
     if len(units) >= max(1, int(expected * floor_ratio)):
         return False
-    return all(
-        not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent"))
-        for u in units
-    )
+    return all(not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent")) for u in units)
 
 
 # ── SightMap dedicated parser ──────────────────────────────────────────────────
@@ -610,24 +672,26 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict]:
         else:
             bed_label = ""
 
-        units_out.append({
-            "floor_plan_name": str(name),
-            "bed_label": bed_label,
-            "bedrooms": str(beds) if beds is not None else "",
-            "bathrooms": str(baths) if baths is not None else "",
-            "sqft": sqft,
-            "unit_number": str(u.get("unit_number") or u.get("label") or ""),
-            "floor": str(u.get("floor_id") or ""),
-            "building": str(u.get("building") or ""),
-            "rent_range": f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
-            "deposit": "",
-            "concession": str(u.get("specials_description") or ""),
-            "availability_status": "AVAILABLE",
-            "available_units": "1",
-            "availability_date": str(u.get("available_on") or u.get("display_available_on") or ""),
-            "source_api_url": url,
-            "extraction_tier": "TIER_1_API_SIGHTMAP",
-        })
+        units_out.append(
+            {
+                "floor_plan_name": str(name),
+                "bed_label": bed_label,
+                "bedrooms": str(beds) if beds is not None else "",
+                "bathrooms": str(baths) if baths is not None else "",
+                "sqft": sqft,
+                "unit_number": str(u.get("unit_number") or u.get("label") or ""),
+                "floor": str(u.get("floor_id") or ""),
+                "building": str(u.get("building") or ""),
+                "rent_range": f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
+                "deposit": "",
+                "concession": str(u.get("specials_description") or ""),
+                "availability_status": "AVAILABLE",
+                "available_units": "1",
+                "availability_date": str(u.get("available_on") or u.get("display_available_on") or ""),
+                "source_api_url": url,
+                "extraction_tier": "TIER_1_API_SIGHTMAP",
+            }
+        )
     return units_out
 
 
@@ -642,6 +706,7 @@ def _to_iso_date(s: Any) -> str | None:
     if not s:
         return None
     import re as _re
+
     m = _re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
     if m:
         return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
@@ -653,6 +718,7 @@ def _to_iso_date(s: Any) -> str | None:
         return f"{int(yy):04d}-{int(mm):02d}-{int(dd):02d}"
     try:
         from datetime import datetime
+
         return datetime.fromisoformat(s.replace("Z", "+00:00")).date().isoformat()
     except (ValueError, TypeError):
         return None
@@ -661,9 +727,11 @@ def _to_iso_date(s: Any) -> str | None:
 def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
     """Parse RealPage API responses (api.ws.realpage.com).
 
-    Handles two endpoint shapes:
+    Handles three endpoint shapes:
       /floorplans → {response: {floorplans: [...]}}
       /units      → {response: [{unitNumber, rent, availableDate, ...}]}
+      /units      → {response: {units: [{unitNumber, rent,
+                                             internalAvailableDate, ...}]}}
 
     Returns records in the internal shape (unit_id / market_rent_low /
     market_rent_high). Use ``realpage_units_to_adapter_shape`` for the
@@ -688,23 +756,36 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
             sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
             lo = _money_to_int(fp.get("minRent") or fp.get("rentMin"))
             hi = _money_to_int(fp.get("maxRent") or fp.get("rentMax")) or lo
-            out.append({
-                "unit_id": fp_id,
-                "market_rent_low": lo,
-                "market_rent_high": hi,
-                "available_date": None,
-                "lease_link": None,
-                "concessions": None,
-                "amenities": None,
-                "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or None,
-                "_sqft": sqft_v,
-                "_floor_plan": fp_name or fp_id,
-                "_bedrooms": beds,
-            })
+            out.append(
+                {
+                    "unit_id": fp_id,
+                    "market_rent_low": lo,
+                    "market_rent_high": hi,
+                    "available_date": None,
+                    "lease_link": None,
+                    "concessions": None,
+                    "amenities": None,
+                    "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or None,
+                    "_sqft": sqft_v,
+                    "_floor_plan": fp_name or fp_id,
+                    "_bedrooms": beds,
+                }
+            )
         return out
 
+    unit_rows: list[Any] | None = None
     if isinstance(resp, list):
-        for u in resp:
+        unit_rows = resp
+    elif isinstance(resp, dict) and isinstance(resp.get("units"), list):
+        # The current public api.ws.realpage.com v2 endpoint wraps its roster
+        # one level deeper than the older response-list form.  The July 31
+        # audit found this exact envelope on both OneSite and RealPage OLL
+        # properties; treating it as a floor-plan response drops every native
+        # apartment and its future availability date.
+        unit_rows = resp["units"]
+
+    if unit_rows is not None:
+        for u in unit_rows:
             if not isinstance(u, dict):
                 continue
             uid = str(u.get("unitNumber") or u.get("unit_number") or u.get("unitId") or "")
@@ -715,22 +796,31 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
             if lo is not None and (lo < _RENT_MIN or lo > _RENT_MAX):
                 continue
             sqft_v = u.get("sqft") or u.get("squareFeet")
-            out.append({
-                "unit_id": uid,
-                "market_rent_low": lo,
-                "market_rent_high": hi,
-                "available_date": _to_iso_date(u.get("availableDate") or u.get("available_date")),
-                "lease_link": u.get("applyOnlineUrl") or None,
-                "concessions": u.get("concessions") or u.get("specials") or None,
-                "amenities": None,
-                "floorplan_image_url": (
-                    u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None
-                ),
-                "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
-                # B3 (2026-05-16): unwrap dict-shaped floorPlanName.
-                "_floor_plan": _unwrap_name(u.get("floorPlanName")) or _unwrap_name(u.get("floorplanName")) or "",
-                "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
-            })
+            out.append(
+                {
+                    "unit_id": uid,
+                    "market_rent_low": lo,
+                    "market_rent_high": hi,
+                    "available_date": _to_iso_date(
+                        u.get("availableDate")
+                        or u.get("available_date")
+                        or u.get("internalAvailableDate")
+                        or u.get("dateAvailable")
+                    ),
+                    "lease_link": u.get("applyOnlineUrl") or None,
+                    "concessions": u.get("concessions") or u.get("specials") or None,
+                    "amenities": None,
+                    "floorplan_image_url": (
+                        u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None
+                    ),
+                    "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
+                    # B3 (2026-05-16): unwrap dict-shaped floorPlanName.
+                    "_floor_plan": _unwrap_name(u.get("floorPlanName"))
+                    or _unwrap_name(u.get("floorplanName"))
+                    or "",
+                    "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
+                }
+            )
         return out
 
     return out
@@ -758,33 +848,43 @@ def realpage_units_to_adapter_shape(body: Any, url: str) -> list[dict]:
         else:
             bed_label = ""
         sqft = u.get("_sqft")
-        out.append({
-            "floor_plan_name": str(name),
-            "bed_label": bed_label,
-            "bedrooms": str(beds) if beds not in (None, "") else "",
-            "bathrooms": "",
-            "sqft": str(sqft) if sqft is not None else "",
-            "unit_number": str(u.get("unit_id") or ""),
-            "floor": "",
-            "building": "",
-            "rent_range": rent_range,
-            "deposit": "",
-            "concession": str(u.get("concessions") or ""),
-            "availability_status": "AVAILABLE",
-            "available_units": "",
-            "availability_date": str(u.get("available_date") or ""),
-            "source_api_url": url,
-            "extraction_tier": "TIER_1_API",
-        })
+        out.append(
+            {
+                "floor_plan_name": str(name),
+                "bed_label": bed_label,
+                "bedrooms": str(beds) if beds not in (None, "") else "",
+                "bathrooms": "",
+                "sqft": str(sqft) if sqft is not None else "",
+                "unit_number": str(u.get("unit_id") or ""),
+                "floor": "",
+                "building": "",
+                "rent_range": rent_range,
+                "deposit": "",
+                "concession": str(u.get("concessions") or ""),
+                "availability_status": "AVAILABLE",
+                "available_units": "",
+                "availability_date": str(u.get("available_date") or ""),
+                "source_api_url": url,
+                "extraction_tier": "TIER_1_API",
+            }
+        )
     return out
 
 
 # ── Main generic API parser ────────────────────────────────────────────────────
 
 _LIST_KEYS = (
-    "floorPlans", "floor_plans", "FloorPlans",
-    "units", "Units", "apartments", "Apartments",
-    "availabilities", "Availabilities", "results", "items",
+    "floorPlans",
+    "floor_plans",
+    "FloorPlans",
+    "units",
+    "Units",
+    "apartments",
+    "Apartments",
+    "availabilities",
+    "Availabilities",
+    "results",
+    "items",
 )
 
 
@@ -850,8 +950,20 @@ def _emit_signal_inspection(
         # tokens almost certainly represents per-unit data even if the alias
         # table missed it.
         _UNIT_SHAPE_TOKENS = (
-            "bed", "bath", "rent", "price", "sqft", "sq_ft", "sqf", "size",
-            "area", "unit", "floor", "plan", "available", "vacant",
+            "bed",
+            "bath",
+            "rent",
+            "price",
+            "sqft",
+            "sq_ft",
+            "sqf",
+            "size",
+            "area",
+            "unit",
+            "floor",
+            "plan",
+            "available",
+            "vacant",
         )
 
         from ma_poc.pms.signal_engine.floor_plan_signals import (
@@ -877,6 +989,7 @@ def _emit_signal_inspection(
                             unmatched_unit_shape.append(k)
 
         from ma_poc.observability.events import EventKind, emit
+
         emit(
             EventKind.SIGNAL_INSPECTION,
             pid,
@@ -910,13 +1023,24 @@ def _emit_signal_inspection(
 #: ``availableOn``. Adding a new vendor's FK key here extends the pair
 #: detector automatically.
 _PLAN_FK_KEYS: tuple[str, ...] = (
-    "layoutId", "layout_id", "layoutid",
-    "floorPlanId", "floor_plan_id", "floorplanid", "floorplanId",
-    "planId", "plan_id",
-    "fpId", "fp_id",
-    "unitTypeId", "unit_type_id", "unittypeid",
-    "modelId", "model_id",
-    "templateId", "template_id",
+    "layoutId",
+    "layout_id",
+    "layoutid",
+    "floorPlanId",
+    "floor_plan_id",
+    "floorplanid",
+    "floorplanId",
+    "planId",
+    "plan_id",
+    "fpId",
+    "fp_id",
+    "unitTypeId",
+    "unit_type_id",
+    "unittypeid",
+    "modelId",
+    "model_id",
+    "templateId",
+    "template_id",
 )
 
 #: Per-unit signal keys that mark a list as the AUTHORITATIVE unit list
@@ -924,14 +1048,32 @@ _PLAN_FK_KEYS: tuple[str, ...] = (
 #: these keys has per-apartment data the plan-list doesn't have.
 _PER_UNIT_SIGNAL_KEYS: tuple[str, ...] = (
     # availability date / status
-    "available_date", "availableOn", "available_on", "availableDate",
-    "moveInDate", "move_in_date", "readyDate", "ready_date",
-    "available", "leased", "occupied", "reserved", "noticeGiven",
+    "available_date",
+    "availableOn",
+    "available_on",
+    "availableDate",
+    "moveInDate",
+    "move_in_date",
+    "readyDate",
+    "ready_date",
+    "available",
+    "leased",
+    "occupied",
+    "reserved",
+    "noticeGiven",
     # per-unit rent (vs plan-level rent range)
-    "displayPrice", "display_price", "price", "monthlyRent",
-    "monthly_rent", "askingRent", "asking_rent",
+    "displayPrice",
+    "display_price",
+    "price",
+    "monthlyRent",
+    "monthly_rent",
+    "askingRent",
+    "asking_rent",
     # per-unit identity
-    "unitNumber", "unit_number", "unitId", "unit_id",
+    "unitNumber",
+    "unit_number",
+    "unitId",
+    "unit_id",
 )
 
 
@@ -1010,10 +1152,7 @@ def _detect_plan_unit_pair(
         # Plan-shape: items have an ``id`` field. Permissive here — the
         # cross-reference count filters false positives below.
         if "id" in keys:
-            ids = {
-                it.get("id") for it in lst
-                if isinstance(it, dict) and it.get("id") is not None
-            }
+            ids = {it.get("id") for it in lst if isinstance(it, dict) and it.get("id") is not None}
             if ids:
                 candidates_as_plan.append((lst, ids))
 
@@ -1056,8 +1195,7 @@ def _merge_units_with_plans(
     Returns a new list — the input dicts are not mutated.
     """
     plan_index: dict[Any, dict] = {
-        p["id"]: p for p in plan_list
-        if isinstance(p, dict) and p.get("id") is not None
+        p["id"]: p for p in plan_list if isinstance(p, dict) and p.get("id") is not None
     }
     out: list[dict] = []
     for u in unit_list:
@@ -1074,8 +1212,15 @@ def _merge_units_with_plans(
         merged = dict(plan)
         plan_id_seed = plan.get("id") if isinstance(plan, dict) else None
         merged.pop("id", None)
-        for skip in ("createdAt", "modifiedAt", "deletedAt", "deletedByVendor",
-                     "integrationId", "images", "description"):
+        for skip in (
+            "createdAt",
+            "modifiedAt",
+            "deletedAt",
+            "deletedByVendor",
+            "integrationId",
+            "images",
+            "description",
+        ):
             merged.pop(skip, None)
         # 2026-05-25 (canary 1ef1060 regression #1 — pid=107 Villas at
         # Pinecrest signature): also strip the plan's ``label`` field
@@ -1118,11 +1263,7 @@ def _merge_units_with_plans(
         # plan-level fallbacks and merges 345 distinct units into
         # 2 plan buckets via dedup.
         unit_id_seed = u.get("id") if isinstance(u, dict) else None
-        if (
-            unit_id_seed not in (None, "")
-            and "unit_number" not in merged
-            and "unitNumber" not in merged
-        ):
+        if unit_id_seed not in (None, "") and "unit_number" not in merged and "unitNumber" not in merged:
             merged["unit_number"] = unit_id_seed
         # Restore the unit's ``id`` field (we popped the plan's id but
         # the unit may have had its own ``id`` that the overlay above
@@ -1228,9 +1369,7 @@ def parse_api_responses(
                 _pair = None
             if _pair is not None:
                 _plan_list, _unit_list, _fk_key = _pair
-                candidates = _merge_units_with_plans(
-                    _unit_list, _plan_list, _fk_key
-                )
+                candidates = _merge_units_with_plans(_unit_list, _plan_list, _fk_key)
 
         # RC-TRACE (2026-05-15 PM): sampled trace event for offline alias
         # analysis. Emits keys_observed + keys_matched + keys_unmatched_unit_shape
@@ -1244,8 +1383,9 @@ def parse_api_responses(
             data,
             candidates if isinstance(candidates, list) else [],
             qualifier_admitted=bool(candidates),
-            qualifier_reason=("admitted_via_keyed_walker_or_fallback"
-                              if candidates else "no_candidates_resolved"),
+            qualifier_reason=(
+                "admitted_via_keyed_walker_or_fallback" if candidates else "no_candidates_resolved"
+            ),
             property_id=property_id,  # Bug #10 fix: per-PID sampling
         )
 
@@ -1261,53 +1401,136 @@ def parse_api_responses(
                 skipped_media += 1
                 continue
 
-            name = _get(item,
-                "floorPlanName", "floor_plan_name", "name", "planName",
-                "unitType", "unit_type", "title", "FloorPlanName",
-                "floorplan_name", "floorplan-name",
+            name = _get(
+                item,
+                "floorPlanName",
+                "floor_plan_name",
+                "name",
+                "planName",
+                "unitType",
+                "unit_type",
+                "title",
+                "FloorPlanName",
+                "floorplan_name",
+                "floorplan-name",
             )
-            rent_lo = _get(item,
-                "minRent", "rent_min", "min_rent", "startingFrom",
-                "starting_rent", "askingRent", "rent", "minPrice",
-                "startingPrice", "MinRent", "price", "base_rent",
-                "baseRent", "display_price", "displayPrice",
-                "monthlyRent", "monthly_rent",
+            rent_lo = _get(
+                item,
+                "minRent",
+                "rent_min",
+                "min_rent",
+                "startingFrom",
+                "starting_rent",
+                "askingRent",
+                "rent",
+                "minPrice",
+                "startingPrice",
+                "MinRent",
+                "price",
+                "base_rent",
+                "baseRent",
+                "display_price",
+                "displayPrice",
+                "monthlyRent",
+                "monthly_rent",
                 # 2026-05-24 (prod fingerprint): Spherexx /api/unit
-                "PriceMin", "pricemin", "PriceMinimum", "priceminimum",
+                "PriceMin",
+                "pricemin",
+                "PriceMinimum",
+                "priceminimum",
             )
-            rent_hi = _get(item,
-                "maxRent", "rent_max", "max_rent", "maxAskingRent",
-                "endingAt", "MaxRent", "max_price", "maxPrice", "price_max",
+            rent_hi = _get(
+                item,
+                "maxRent",
+                "rent_max",
+                "max_rent",
+                "maxAskingRent",
+                "endingAt",
+                "MaxRent",
+                "max_price",
+                "maxPrice",
+                "price_max",
                 # 2026-05-24 (prod fingerprint): Spherexx /api/unit
-                "PriceMax", "pricemax", "PriceMaximum", "pricemaximum",
+                "PriceMax",
+                "pricemax",
+                "PriceMaximum",
+                "pricemaximum",
             )
-            beds = _get(item,
-                "bedrooms", "beds", "bedroom_count", "numBedrooms",
-                "bd", "Bedrooms", "BedroomCount", "bedroomCount",
-                "num_bedrooms", "no_of_bedroom", "no_of_bedrooms",
+            beds = _get(
+                item,
+                "bedrooms",
+                "beds",
+                "bedroom_count",
+                "numBedrooms",
+                "bd",
+                "Bedrooms",
+                "BedroomCount",
+                "bedroomCount",
+                "num_bedrooms",
+                "no_of_bedroom",
+                "no_of_bedrooms",
                 # 2026-05-24 (prod fingerprint): Spherexx /api/unit
-                "Bed", "bed",
+                "Bed",
+                "bed",
             )
-            baths = _get(item,
-                "bathrooms", "baths", "bathroom_count", "numBathrooms",
-                "ba", "Bathrooms", "BathroomCount", "bathroomCount",
+            baths = _get(
+                item,
+                "bathrooms",
+                "baths",
+                "bathroom_count",
+                "numBathrooms",
+                "ba",
+                "Bathrooms",
+                "BathroomCount",
+                "bathroomCount",
                 # 2026-05-24 (prod fingerprint): Spherexx /api/unit
-                "Bath", "bath",
+                "Bath",
+                "bath",
             )
-            sqft = _get(item,
-                "sqft", "squareFeet", "square_feet", "minSqft", "size",
-                "SquareFeet", "Sqft", "SqFt", "sqftMin", "area", "square_footage",
-                "squareFootage", "display_area", "displayArea",
+            sqft = _get(
+                item,
+                "sqft",
+                "squareFeet",
+                "square_feet",
+                "minSqft",
+                "size",
+                "SquareFeet",
+                "Sqft",
+                "SqFt",
+                "sqftMin",
+                "area",
+                "square_footage",
+                "squareFootage",
+                "display_area",
+                "displayArea",
             )
             sqft_max = _get(item, "maxSqft", "sqftMax", "squareFeetMax", "max_area")
-            avail = _get(item,
-                "availableCount", "available_count", "numAvailable",
-                "unitsAvailable", "AvailableCount", "units_available",
+            avail = _get(
+                item,
+                "availableCount",
+                "available_count",
+                "numAvailable",
+                "unitsAvailable",
+                "AvailableCount",
+                "units_available",
             )
-            avail_dt = _get(item,
-                "availableDate", "available_date", "moveInDate", "moveInReady",
-                "availableFrom", "AvailableDate", "NextAvailDate",
-                "available_on", "availableOn", "display_available_on", "readyDate",
+            avail_dt = _get(
+                item,
+                "availableDate",
+                "available_date",
+                "availabilityDate",
+                "availability_date",
+                "internalAvailableDate",
+                "dateAvailable",
+                "moveInDate",
+                "moveInReady",
+                "availableFrom",
+                "AvailableDate",
+                "NextAvailDate",
+                "available_on",
+                "availableOn",
+                "display_available_on",
+                "readyDate",
             )
             status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
             # 2026-07-11 status sweep: TIER_1_5_EMBEDDED shipped 16,400/16,568
@@ -1339,8 +1562,7 @@ def parse_api_responses(
                     _af = _avail_flag.strip().lower()
                     if _af in ("true", "yes", "y", "1", "now", "available"):
                         flag_status = "AVAILABLE"
-                    elif _af in ("false", "no", "n", "0", "unavailable",
-                                 "occupied", "leased"):
+                    elif _af in ("false", "no", "n", "0", "unavailable", "occupied", "leased"):
                         flag_status = "UNAVAILABLE"
                     else:
                         _dm = re.search(r"(\d{4}-\d{2}-\d{2})", _avail_flag)
@@ -1353,16 +1575,28 @@ def parse_api_responses(
             # database PK on JSON shapes where ``id`` is non-unit semantics.
             # Razz/MyRazz uses ``id`` directly as the unit identifier (e.g.
             # ``{id: '21110', rent: {...}, sqft: {...}}``).
-            unit_num = _get(item,
-                "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
-                "label", "display_unit_number", "unitCode", "unit_code",
+            unit_num = _get(
+                item,
+                "unitNumber",
+                "unit_number",
+                "unitId",
+                "unit_id",
+                "UnitNumber",
+                "label",
+                "display_unit_number",
+                "unitCode",
+                "unit_code",
                 # 2026-05-24 (prod fingerprint): Spherexx /api/unit ships
                 # the Pascal-case "Number" field; Repli360 admin endpoint
                 # /admin/get_apartmentsync_data_for_floorplan_multi_template
                 # ships "customlink". Both narrow + safe. Placed AFTER
                 # the standard unit_number/unit_id but BEFORE the generic
                 # "id" fallback so they take priority when present.
-                "Number", "number", "customlink", "customLink", "CustomLink",
+                "Number",
+                "number",
+                "customlink",
+                "customLink",
+                "CustomLink",
                 "id",
             )
             # As-displayed unit label (capture-only). NARROW on purpose: only
@@ -1372,18 +1606,30 @@ def parse_api_responses(
             # name into a unit-label column. "label" already appears in the
             # unit_number chain above and stays there; this is a parallel
             # capture that changes no existing unit_number resolution.
-            unit_disp = _get(item,
-                "unit_name", "unitName", "unit_label", "unitLabel",
-                "display_unit_number", "displayUnitNumber",
-                "unit_display_name", "unitDisplayName",
+            unit_disp = _get(
+                item,
+                "unit_name",
+                "unitName",
+                "unit_label",
+                "unitLabel",
+                "display_unit_number",
+                "displayUnitNumber",
+                "unit_display_name",
+                "unitDisplayName",
             )
             floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
             building = _get(item, "building", "buildingName", "BuildingName", "building_name")
             plan_type = _get(item, "floorPlanType", "type", "bedBath", "BedBath")
             deposit = _get(item, "deposit", "securityDeposit", "SecurityDeposit", "security_deposit")
-            concession = _get(item,
-                "concession", "special", "promotion", "Concession", "Special",
-                "specials_description", "specialsDescription",
+            concession = _get(
+                item,
+                "concession",
+                "special",
+                "promotion",
+                "Concession",
+                "Special",
+                "specials_description",
+                "specialsDescription",
             )
 
             if not any([name, beds, sqft, rent_lo]):
@@ -1415,25 +1661,29 @@ def parse_api_responses(
             else:
                 bed_label = plan_type or "?"
 
-            units.append({
-                "floor_plan_name": name,
-                "bed_label": bed_label,
-                "bedrooms": beds,
-                "bathrooms": baths,
-                "sqft": sqft_display,
-                "unit_number": unit_num,
-                "unit_name": unit_disp,
-                "floor": floor_num,
-                "building": building,
-                "rent_range": rent_display,
-                "deposit": deposit,
-                "concession": concession,
-                "availability_status": status or flag_status or ("AVAILABLE" if (avail and avail != "0") else ""),
-                "available_units": avail,
-                "availability_date": avail_dt,
-                "source_api_url": url,
-                "extraction_tier": "TIER_1_API",
-            })
+            units.append(
+                {
+                    "floor_plan_name": name,
+                    "bed_label": bed_label,
+                    "bedrooms": beds,
+                    "bathrooms": baths,
+                    "sqft": sqft_display,
+                    "unit_number": unit_num,
+                    "unit_name": unit_disp,
+                    "floor": floor_num,
+                    "building": building,
+                    "rent_range": rent_display,
+                    "deposit": deposit,
+                    "concession": concession,
+                    "availability_status": status
+                    or flag_status
+                    or ("AVAILABLE" if (avail and avail != "0") else ""),
+                    "available_units": avail,
+                    "availability_date": avail_dt,
+                    "source_api_url": url,
+                    "extraction_tier": "TIER_1_API",
+                }
+            )
 
     has_real = any(u.get("unit_number") or u.get("rent_range") for u in units)
     stub_count = 0
@@ -1445,7 +1695,10 @@ def parse_api_responses(
     log.debug(
         "parse_api_responses: %d APIs → %d units "
         "(skipped: %d no-fields, %d stubs, %d media-file descriptors)",
-        len(api_responses), len(units), skipped_no_fields, stub_count,
+        len(api_responses),
+        len(units),
+        skipped_no_fields,
+        stub_count,
         skipped_media,
     )
     return units

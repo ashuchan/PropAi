@@ -8,6 +8,8 @@ AppFolio iframe, fetches it in-session, and reuses parse_appfolio_listings_ssr.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
@@ -557,6 +559,60 @@ async def test_property_group_is_read_off_the_availability_subpage() -> None:
 
 
 @pytest.mark.asyncio
+async def test_scoped_data_listings_url_is_read_off_availability_subpage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Westwater publishes scope as a plugin data attribute, not config JS."""
+    base_url = "https://westwatervillage.com/"
+    account_url = "https://olympicmanagement.appfolio.com/listings"
+    published_url = (
+        f"{account_url}?filters%5Bproperty_list%5D=Westwater+Village"
+    )
+    canonical_url = (
+        f"{account_url}?filters%5Bproperty_list%5D=Westwater%20Village"
+    )
+    availability_html = (
+        '<div class="apflp-listings" data-listings-url="'
+        f'{published_url}"></div>'
+    )
+    fetched: list[str] = []
+
+    async def fake_fetch(url: str) -> tuple[int, str]:
+        fetched.append(url)
+        return 200, {
+            f"{base_url.rstrip('/')}/availability": availability_html,
+            canonical_url: _APPFOLIO_SSR,
+            account_url: _ACCOUNT_ROSTER_SSR,
+        }.get(url, "")
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_fetch_status",
+        fake_fetch,
+    )
+    ctx = _ctx(
+        base_url,
+        "2300 Evergreen Park Dr SW",
+        "98502",
+    )
+    ctx.fetch_result = SimpleNamespace(
+        body=(
+            b"<a href='https://olympicmanagement.appfolio.com/"
+            b"connect/users/sign_in'>Resident portal</a>"
+        ),
+        final_url=base_url,
+    )
+
+    units = await recover_appfolio_embed(
+        None,
+        ctx,  # type: ignore[arg-type]
+    )
+
+    assert len(units) == 2
+    assert canonical_url in fetched
+    assert account_url not in fetched
+
+
+@pytest.mark.asyncio
 async def test_scoped_response_with_no_listings_is_a_real_answer() -> None:
     """Cherry Tree's scoped query returns "No vacancies found matching your
     search criteria" — that is SUCCESS_NO_AVAILABILITY, not permission to
@@ -762,3 +818,198 @@ async def test_published_index_keeps_its_single_address_passthrough() -> None:
         _ctx("https://614central.com/", "1 Nowhere St", "99999"),  # type: ignore[arg-type]
     )
     assert len(units) == 1
+
+
+# ── 2026-08-01 Wix HtmlComponent -> AppFolio bridge ────────────────────
+
+_WIX_DATA_URL = (
+    "https://siteassets.parastorage.com/pages/pages/thunderbolt?"
+    "module=thunderbolt-features&amp;contentType=application%2Fjson&amp;"
+    "externalBaseUrl=https%3A%2F%2Fwww.liveallureva.com&amp;pageId=apply.json"
+)
+_WIX_DATA_FETCH_URL = _WIX_DATA_URL.replace("&amp;", "&")
+_ALLURE_COMPONENT = (
+    "https://www-liveallureva-com.filesusr.com/html/"
+    "e33590_4d6cfb9278a484e9c8585275a02a7110.html"
+)
+_ALLURE_SCOPED = (
+    "https://tbco.appfolio.com/listings?"
+    "filters%5Bproperty_list%5D=Allure%20WEBSITE"
+)
+
+
+def _nested_card(
+    listing_id: str,
+    uid: str,
+    address: str,
+    title: str,
+    *,
+    description: str = "",
+) -> str:
+    return f"""
+    <div class="listing-item js-listing-item" id="listing_{listing_id}">
+      <div class="js-listing-blurb-rent">$1,755</div>
+      <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 854</div>
+      <div class="js-listing-available">9/17/26</div>
+      <span class="js-listing-address">{address}</span>
+      <h2 class="js-listing-title"><a href="/listings/detail/{uid}">{title}</a></h2>
+      <p>{description}</p>
+    </div>
+    """
+
+
+@pytest.mark.asyncio
+async def test_wix_page_data_bridge_recovers_units_and_drops_waitlists() -> None:
+    """Production shape: entry -> labelled route -> Wix JSON -> filesusr config.
+
+    Stable listable UUIDs are retained and an explicit no-home waitlist card
+    is not promoted into a physical unit.
+    """
+    route = "https://www.liveallureva.com/apply"
+    entry = (
+        '<script src="https://static.wixstatic.com/site.js"></script>'
+        f'<a href="{route}">Apply</a>'
+    )
+    route_body = f'<link href="{_WIX_DATA_URL}" rel="prefetch">'
+    data_body = _ALLURE_COMPONENT.replace("/", r"\/")
+    component_body = """
+    <script>document.write("//tbco.appfolio.com/javascripts/listing.js")</script>
+    <script>Appfolio.Listing({
+      hostUrl: 'tbco.appfolio.com', propertyGroup: 'Allure WEBSITE'
+    });</script>
+    """
+    real_uid = "7067fbe8-f7c7-47a6-b7ae-8e84aa8fb1a1"
+    wait_uid = "9cf59ac5-4d21-472c-bee2-8332cec34272"
+    listings = (
+        _nested_card(
+            "2507",
+            real_uid,
+            "4614 Monroe Way Apt 207, Fredericksburg, VA 22407",
+            "Essex",
+        )
+        + _nested_card(
+            "1765",
+            wait_uid,
+            "4660 Monroe Way, Fredericksburg, VA 22407",
+            "Essex Waitlist",
+            description="Waitlist only - no specific home",
+        )
+    )
+    page = _FakePage(
+        url="https://www.liveallureva.com/",
+        live=[],
+        responses={
+            route: route_body,
+            _WIX_DATA_FETCH_URL: data_body,
+            _ALLURE_COMPONENT: component_body,
+            _ALLURE_SCOPED: listings,
+        },
+    )
+    ctx = _ctx(
+        "https://www.liveallureva.com/", "4660 Monroe Way", "22407"
+    )
+    ctx.property_name = "The Allure at Jefferson I"
+    ctx.fetch_result = SimpleNamespace(body=entry)
+
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+
+    assert len(units) == 1
+    assert units[0]["source_ids"]["appfolio_listable_uid"] == real_uid
+    assert units[0]["floor_plan_name"] == "Essex"
+    assert units[0]["_floor_plan_name_provenance"] == (
+        "appfolio.listing_title_nested_widget"
+    )
+
+
+@pytest.mark.asyncio
+async def test_wix_bridge_uses_group_titles_to_remove_foreign_roster_rows() -> None:
+    """Vestawood's live scoped URL leaks Green Springs; keep only its title group."""
+    component = (
+        "https://www-vestawood-com.filesusr.com/html/"
+        "846122_41ca195ea86f1c06a8602d1cb165b24a.html"
+    )
+    scoped = (
+        "https://redrockrg.appfolio.com/listings?"
+        "filters%5Bproperty_list%5D=Vestawood"
+    )
+    entry = (
+        '<script src="https://static.wixstatic.com/site.js"></script>'
+        f'<iframe src="{component}"></iframe>'
+    )
+    component_body = """
+    <script>document.write("//redrockrg.appfolio.com/javascripts/listing.js")</script>
+    <script>Appfolio.Listing({
+      hostUrl: 'redrockrg.appfolio.com', propertyGroup: 'Vestawood'
+    });</script>
+    """
+    vesta_uid = "646d0d24-80a2-4419-a32b-3ee5a1ec678a"
+    foreign_uid = "451f84c3-53e7-4299-9d88-a9ea4bb8efd2"
+    listings = (
+        _nested_card(
+            "840",
+            vesta_uid,
+            "1714 Vestawood Court, Apt. B, Birmingham, AL 35216",
+            "Vestawood Apartments - Vestavia Hills, AL",
+        )
+        + _nested_card(
+            "264",
+            foreign_uid,
+            "2249 Green Springs Hwy S., Apt. B, Birmingham, AL 35205",
+            "Green Springs Village Apartments",
+        )
+    )
+    page = _FakePage(
+        url="https://www.vestawood.com/",
+        live=[],
+        responses={component: component_body, scoped: listings},
+    )
+    ctx = _ctx("https://www.vestawood.com/", "1716 Vestawood Ct", "35216")
+    ctx.property_name = "Vestawood Apartments"
+    ctx.fetch_result = SimpleNamespace(body=entry)
+
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+
+    assert len(units) == 1
+    assert units[0]["source_ids"]["appfolio_listable_uid"] == vesta_uid
+    assert "Green Springs" not in units[0]["unit_name"]
+    # The listing title is the property label here, not a floor-plan name.
+    assert units[0]["floor_plan_name"] == ""
+
+
+@pytest.mark.asyncio
+async def test_wix_bridge_declines_multizip_roster_without_group_title_scope() -> None:
+    """A published propertyGroup is not trusted when the returned rows contradict it."""
+    component = (
+        "https://www-liveallureva-com.filesusr.com/html/"
+        "e33590_4d6cfb9278a484e9c8585275a02a7110.html"
+    )
+    entry = (
+        '<script src="https://static.wixstatic.com/site.js"></script>'
+        f'<iframe src="{component}"></iframe>'
+    )
+    component_body = """
+    <script>document.write("//tbco.appfolio.com/javascripts/listing.js")</script>
+    <script>Appfolio.Listing({
+      hostUrl: 'tbco.appfolio.com', propertyGroup: 'Allure WEBSITE'
+    });</script>
+    """
+    listings = _nested_card(
+        "1",
+        "7067fbe8-f7c7-47a6-b7ae-8e84aa8fb1a1",
+        "10 Other Street Apt 2, Richmond, VA 23220",
+        "Essex",
+    )
+    page = _FakePage(
+        url="https://www.liveallureva.com/",
+        live=[],
+        responses={component: component_body, _ALLURE_SCOPED: listings},
+    )
+    ctx = _ctx(
+        "https://www.liveallureva.com/", "4660 Monroe Way", "22407"
+    )
+    ctx.fetch_result = SimpleNamespace(body=entry)
+
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+
+    assert units == []

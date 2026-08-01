@@ -105,10 +105,12 @@ from ma_poc.pms.adapters._harbor_group import (
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
+    extract_managebuilding_rentals_index,
     extract_units_from_data_attr_cards,
     extract_units_from_dom,
     extract_units_from_html_tables,
     extract_with_hints,
+    is_managebuilding_rentals_index_url,
 )
 from ma_poc.pms.adapters._jetengine_repeater import (
     detect_jetengine_repeater as _detect_jetengine,
@@ -154,7 +156,16 @@ from ma_poc.pms.adapters._parsing import (
     rent_in_sanity_range,
 )
 from ma_poc.pms.adapters._udr import (
+    canonical_udr_url_from_html as _canonical_udr_url,
+)
+from ma_poc.pms.adapters._udr import (
+    is_udr_url as _is_udr_url,
+)
+from ma_poc.pms.adapters._udr import (
     parse_udr_jsonld as _parse_udr,
+)
+from ma_poc.pms.adapters._udr import (
+    udr_pricing_urls as _udr_pricing_urls,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.g5 import (
@@ -790,13 +801,208 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     return None
 
 
-def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
+_PLAN_CATALOGUE_URL_RE = _re.compile(
+    r"(?:floor[-_]?plans?|public_floor_plans|suggestedfloorplans)",
+    _re.IGNORECASE,
+)
+_PLAN_NAMED_KEYS: frozenset[str] = frozenset(
+    {
+        "floorplanname",
+        "floor_plan_name",
+        "floorplan_name",
+        "floorplan-name",
+        "planname",
+        "floorplanid",
+        "floor_plan_id",
+        "floorplan_id",
+    }
+)
+_EXPLICIT_APARTMENT_KEYS: frozenset[str] = frozenset(
+    {
+        "unitnumber",
+        "unit_number",
+        "unitcode",
+        "unit_code",
+        "apartmentnumber",
+        "apartment_number",
+        "apartmentname",
+        "apartment_name",
+        "display_unit_number",
+        "unit_name",
+        "number",
+        "customlink",
+    }
+)
+
+
+def _item_is_plan_catalogue_row(item: dict[str, Any], url: str) -> bool:
+    """Return whether a generic API item is a floor-plan, not an apartment.
+
+    Three public v1 false-success families share this exact ambiguity:
+
+    * Apts247 ``/api/v1/floorplans/`` objects use bare ``id`` for the plan;
+    * Entrata flat catalogues use ``id`` beside explicit floor-plan keys; and
+    * GoUnion ``public_floor_plans`` calls the plan key ``unitId``.
+
+    A plan-channel URL or explicit plan-named field is necessary, and an
+    apartment-number/code field is a fail-open override.  This keeps real
+    unit arrays nested beneath a floor-plan response eligible: those rows
+    carry ``number``/``unitNumber``/``unitCode`` even though their parent URL
+    contains ``floorplans``.
+    """
+    if not isinstance(item, dict):
+        return False
+    lowered = {str(key).lower(): value for key, value in item.items()}
+    is_plan_channel = bool(_PLAN_CATALOGUE_URL_RE.search(str(url or ""))) or bool(
+        _PLAN_NAMED_KEYS.intersection(lowered)
+    )
+    if not is_plan_channel:
+        return False
+    if any(
+        lowered.get(key) not in (None, "", [], {})
+        for key in _EXPLICIT_APARTMENT_KEYS
+    ):
+        return False
+    return any(
+        lowered.get(key) not in (None, "", [], {})
+        for key in ("id", "unitid", "floorplanid", "floor_plan_id", "floorplan_id")
+    )
+
+
+def _response_is_plan_catalogue(
+    items: list[Any],
+    url: str,
+) -> bool:
+    """Fail closed only when every structured item is plan-scoped."""
+    structured = [item for item in items if isinstance(item, dict)]
+    return bool(structured) and all(
+        _item_is_plan_catalogue_row(item, url) for item in structured
+    )
+
+
+def _find_plan_catalogue_items(body: Any, url: str) -> list[dict[str, Any]]:
+    """Resolve only common, explicit plan-list envelopes.
+
+    ``find_unit_list`` correctly rejects the Apts247 all-plans/no-units
+    envelope, so the generic safety gate needs a separate narrow walker to
+    preserve those rows before the broad parser sees them.  No recursive
+    heuristic is used: only direct lists, named plan/object envelopes, and
+    Entrata's exact ``widget_data.content.floor_plans.floor_plans`` path.
+
+    That final path matters because the generic adapter runs after a detected
+    Entrata adapter returns a plan-only result.  The Entrata adapter correctly
+    treats each row's bare ``id`` as a floor-plan id, but the broad generic
+    parser otherwise sees the same captured widget response and turns those
+    ids back into apartment numbers (PID 39378 / Andante, 2026-07-31).
+    """
+    candidates: Any = body if isinstance(body, list) else None
+    envelope_proves_plan_catalogue = False
+    if isinstance(body, dict):
+        # SightMap's response has sibling ``floor_plans`` and ``units`` lists.
+        # When the apartment roster is explicitly empty, its plan ids are not
+        # apartment ids.  PID 41935 returned floor_plans=4, units=0; the broad
+        # fallback otherwise promoted 547190/547191/547194/547196 as units.
+        sightmap_data = body.get("data")
+        if isinstance(sightmap_data, dict):
+            sightmap_plans = sightmap_data.get("floor_plans")
+            sightmap_units = sightmap_data.get("units")
+            if (
+                isinstance(sightmap_plans, list)
+                and sightmap_plans
+                and isinstance(sightmap_units, list)
+                and not sightmap_units
+            ):
+                candidates = sightmap_plans
+                envelope_proves_plan_catalogue = True
+        for key in (
+            "objects",
+            "floorplans",
+            "floorPlans",
+            "floor_plans",
+            "allPlans",
+            "plans",
+        ):
+            value = body.get(key)
+            if isinstance(value, list):
+                candidates = value
+                break
+        if candidates is None:
+            for wrapper_key in ("data", "response", "result"):
+                wrapper = body.get(wrapper_key)
+                if not isinstance(wrapper, dict):
+                    continue
+                for key in (
+                    "objects",
+                    "floorplans",
+                    "floorPlans",
+                    "floor_plans",
+                    "allPlans",
+                    "plans",
+                ):
+                    value = wrapper.get(key)
+                    if isinstance(value, list):
+                        candidates = value
+                        break
+                if candidates is not None:
+                    break
+        if candidates is None:
+            widget_data = body.get("widget_data")
+            content = (
+                widget_data.get("content")
+                if isinstance(widget_data, dict)
+                else None
+            )
+            floor_plans = (
+                content.get("floor_plans")
+                if isinstance(content, dict)
+                else None
+            )
+            nested_plans = (
+                floor_plans.get("floor_plans")
+                if isinstance(floor_plans, dict)
+                else None
+            )
+            if isinstance(nested_plans, list):
+                candidates = nested_plans
+        if candidates is None:
+            # Knock Doorway returns one semantic envelope containing both
+            # ``layouts`` (floor plans) and ``units`` (apartments).  When the
+            # latter is explicitly empty, a recursive generic walk otherwise
+            # picks the layouts and promotes their UUIDs to unit numbers.
+            # PID 234133 returned layouts=12, units=0 on 2026-07-31.
+            units_data = body.get("units_data")
+            if isinstance(units_data, dict):
+                layouts = units_data.get("layouts")
+                apartment_units = units_data.get("units")
+                if (
+                    isinstance(layouts, list)
+                    and layouts
+                    and isinstance(apartment_units, list)
+                    and not apartment_units
+                ):
+                    candidates = layouts
+                    envelope_proves_plan_catalogue = True
+    structured = [item for item in (candidates or []) if isinstance(item, dict)]
+    return (
+        structured
+        if envelope_proves_plan_catalogue
+        or _response_is_plan_catalogue(structured, url)
+        else []
+    )
+
+
+def parse_generic_api(
+    items: list[dict[str, Any]],
+    url: str,
+    *,
+    force_plan_catalogue: bool = False,
+) -> list[dict[str, Any]]:
     """Parse a generic list of unit/floorplan dicts using broad key name matching.
 
     Ported from the main scraper parse_api_responses() with PMS-specific branches
     removed (all PMS parsers moved to their own adapters).
     """
-    units: list[dict[str, str]] = []
+    units: list[dict[str, Any]] = []
     seen: set[str] = set()
 
     for item in items:
@@ -840,7 +1046,7 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
             "sq_ft",
             "maximumSquareFeet",
         )
-        unit_num = get_field(
+        explicit_unit_num = get_field(
             item,
             "unitNumber",
             "unit_number",
@@ -851,6 +1057,24 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
             "id",
             "unit_name",
         )
+        is_plan_catalogue_row = force_plan_catalogue or _item_is_plan_catalogue_row(
+            item, url
+        )
+        plan_source_id = ""
+        if is_plan_catalogue_row:
+            plan_source_id = get_field(
+                item,
+                "floorPlanId",
+                "floorplanId",
+                "floor_plan_id",
+                "floorplan_id",
+                "unitId",
+                "unit_id",
+                "id",
+            )
+            unit_num = ""
+        else:
+            unit_num = explicit_unit_num
         rent_lo_str = get_field(
             item,
             "minRent",
@@ -906,7 +1130,7 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
         # "MODULE_CONCESSIONMANAGER" and "[Riedman] Lease Magnet - Pop-Up"
         # that the 2026-04-19 run surfaced as fake units. Also drops
         # unit_number stop-words ("Left", "s", etc).
-        if is_junk_floor_plan(name):
+        if is_junk_floor_plan(name) and not is_plan_catalogue_row:
             continue
         if is_junk_unit_number(unit_num):
             # Prefer to clear the unit number rather than drop the whole
@@ -924,8 +1148,24 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
         rent_lo = money_to_int(rent_lo_str)
         rent_hi = money_to_int(rent_hi_str)
 
+        if is_plan_catalogue_row and rent_lo is None:
+            # Apts247 commonly publishes ``From $1750``.  The strict generic
+            # money helper intentionally rejects prefixed prose, but losing a
+            # valid plan row defeats this branch's preservation contract.
+            nums = [
+                int(token.replace(",", ""))
+                for token in _re.findall(r"\d[\d,]*", str(rent_lo_str or ""))
+                if token.replace(",", "").isdigit()
+            ]
+            sane = [value for value in nums if rent_in_sanity_range(value)]
+            rent_lo = min(sane) if sane else None
+            rent_hi = max(sane) if sane else rent_lo
+
         # Rent sanity check
-        if not rent_in_sanity_range(rent_lo) or not rent_in_sanity_range(rent_hi):
+        if not is_plan_catalogue_row and (
+            not rent_in_sanity_range(rent_lo)
+            or not rent_in_sanity_range(rent_hi)
+        ):
             continue
 
         bl = bed_label_from(beds, name)
@@ -947,11 +1187,24 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
                 rent_high=rent_hi or rent_lo,
                 deposit=deposit_str,
                 concession=concession_str,
-                availability_status=status_str.upper() if status_str else "AVAILABLE",
+                availability_status=(
+                    status_str.upper()
+                    if status_str
+                    else ("" if is_plan_catalogue_row else "AVAILABLE")
+                ),
                 available_units=avail_str,
                 availability_date=avail_dt,
                 source_api_url=url,
-                extraction_tier="TIER_1_API",
+                extraction_tier=(
+                    "TIER_1_API_GENERIC_PLAN_LEVEL"
+                    if is_plan_catalogue_row
+                    else "TIER_1_API"
+                ),
+                source_ids=(
+                    {"api_floorplan_id": plan_source_id}
+                    if plan_source_id
+                    else {}
+                ),
             )
         )
 
@@ -1088,7 +1341,41 @@ class GenericAdapter:
         filtering) but **before** ``_stash_provenanced_units`` (so the
         observability snapshot reflects the same set the run output ships).
         """
-        result = await self._extract_inner(page, ctx)
+        # Exact Swifty WordPress roster recovery runs before the broad generic
+        # cascade.  This is deliberately here (as well as in the universal
+        # recovery chain): page-less production scrapes keep that broader
+        # chain behind ENABLE_BODY_RESOLVER, while GenericAdapter is always the
+        # fallback after an empty/misrouted primary.  A site such as 946 MLK
+        # currently detects as Knock, whose Doorway inventory is empty, but its
+        # captured page publishes a same-origin Swifty unit table with native
+        # IDs, rents, and explicit dates.  The helper's exact plugin/action and
+        # same-host endpoint gates make non-Swifty pages a zero-I/O no-op.
+        try:
+            from ma_poc.pms.adapters._swifty_floorplans import (
+                SWIFTY_TIER,
+                recover_swifty_floorplans,
+            )
+
+            _swifty_units = await recover_swifty_floorplans(ctx)
+        except Exception as _swifty_exc:
+            _swifty_units = []
+            log.debug(
+                "generic Swifty recovery raised property=%s err=%s",
+                getattr(ctx, "property_id", "?"),
+                _swifty_exc,
+            )
+
+        if _swifty_units:
+            result = AdapterResult(
+                units=_swifty_units,
+                tier_used=SWIFTY_TIER,
+                winning_url=(
+                    str(_swifty_units[0].get("source_api_url") or "") or None
+                ),
+                confidence=min(0.94, 0.74 + 0.04 * len(_swifty_units)),
+            )
+        else:
+            result = await self._extract_inner(page, ctx)
         try:
             self._phase5_post_merge(result, ctx)
         except Exception:
@@ -1209,6 +1496,7 @@ class GenericAdapter:
             "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
             "TIER_2_JSONLD": SourceId.JSON_LD,
             "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_1_DOM_MANAGEBUILDING": SourceId.DOM_CASCADE,
             "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
             "TIER_4_LLM_DOM": SourceId.LLM_DOM_TARGETED,
             "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
@@ -1276,6 +1564,7 @@ class GenericAdapter:
             "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
             "TIER_2_JSONLD": SourceId.JSON_LD,
             "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_1_DOM_MANAGEBUILDING": SourceId.DOM_CASCADE,
             "TIER_3_DOM_LLM": SourceId.LLM_DOM_TARGETED,
             "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
             "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
@@ -1726,32 +2015,108 @@ class GenericAdapter:
         # when the signal engine is available, has_unit_signals() otherwise.
         # This replaces the Phase 1 dual-run and removes the lazy import.
         t0 = _time.monotonic()
+        plan_catalogue_response_ids: set[int] = set()
+        captured_plan_rows: list[dict[str, Any]] = []
         for resp in api_responses:
             body = resp.get("body")
-            items = _find_unit_list(body)
             url = resp.get("url", "")
+            # SightMap's unit response intentionally carries sibling
+            # ``floor_plans[]`` and ``units[]`` arrays.  Classifying the
+            # former before the dedicated SightMap join runs would mark the
+            # *whole response* plan-only and discard its real unit roster.
+            # Leave that known host to the dedicated parser below.
+            sightmap_data = (
+                body.get("data") if isinstance(body, dict) else None
+            )
+            sightmap_has_units = bool(
+                isinstance(sightmap_data, dict)
+                and isinstance(sightmap_data.get("units"), list)
+                and sightmap_data["units"]
+            )
+            plan_items = (
+                []
+                if "sightmap.com" in str(url).lower() and sightmap_has_units
+                else _find_plan_catalogue_items(body, url)
+            )
+            # Apts247, Entrata and GoUnion all expose a plan catalogue whose
+            # plan primary key is named ``id``/``unitId``.  Record the plans,
+            # but keep this response out of both generic unit parsers: the
+            # broad parser has the same bare-id fallback and was the exact
+            # path that re-promoted all three v1 false-success families.
+            if plan_items:
+                captured_plan_rows.extend(
+                    parse_generic_api(
+                        plan_items,
+                        url,
+                        force_plan_catalogue=True,
+                    )
+                )
+                plan_catalogue_response_ids.add(id(resp))
+                continue
+            items = _find_unit_list(body)
             if not _api_signal_qualifies(resp, items):
                 continue
             units = parse_generic_api(items, url)
             if units:
                 all_units.extend(units)
                 result.api_responses.append(resp)
+
+        if captured_plan_rows:
+            try:
+                from ma_poc.extraction.post_process import post_process
+
+                plan_pp = post_process(
+                    captured_plan_rows,
+                    property_id=getattr(ctx, "property_id", None),
+                )
+                existing_plan_keys = {
+                    (
+                        str(row.get("floor_plan_name") or "").strip().casefold(),
+                        str((row.get("source_ids") or {}).get("api_floorplan_id") or "").strip(),
+                    )
+                    for row in (result.plan_summaries or [])
+                    if isinstance(row, dict)
+                }
+                for row in plan_pp.plan_summaries:
+                    key = (
+                        str(row.get("floor_plan_name") or "").strip().casefold(),
+                        str((row.get("source_ids") or {}).get("api_floorplan_id") or "").strip(),
+                    )
+                    if key not in existing_plan_keys:
+                        existing_plan_keys.add(key)
+                        result.plan_summaries.append(row)
+            except Exception as exc:
+                result.errors.append(
+                    f"generic-plan-catalogue-preserve-error: {type(exc).__name__}: "
+                    f"{str(exc)[:80]}"
+                )
         _narrow_ms = int((_time.monotonic() - t0) * 1000)
         if api_responses:
             _log_attempt(
                 "generic:api_narrow",
                 "ran_units" if all_units else "ran_empty",
                 units=len(all_units),
-                reason="" if all_units else "no items matched unit-signal heuristic",
+                reason=(
+                    ""
+                    if all_units
+                    else (
+                        f"preserved {len(captured_plan_rows)} plan-catalogue row(s)"
+                        if captured_plan_rows
+                        else "no items matched unit-signal heuristic"
+                    )
+                ),
                 duration_ms=_narrow_ms,
             )
         else:
             _log_attempt("generic:api_narrow", "skipped", reason="no captured API responses", duration_ms=0)
 
         # Sub-tier 2: broad parser + host-specific (SightMap/RealPage) -----
-        if not all_units and api_responses:
+        unit_api_responses = [
+            resp for resp in api_responses if id(resp) not in plan_catalogue_response_ids
+        ]
+        if not all_units and unit_api_responses:
             t0 = _time.monotonic()
-            for resp in api_responses:
+            for resp in unit_api_responses:
                 url = resp.get("url") or ""
                 body = resp.get("body")
                 host_units: list[dict[str, str]] = []
@@ -1773,7 +2138,7 @@ class GenericAdapter:
                     result.api_responses.append(resp)
             if not all_units:
                 try:
-                    broad = _dr_parse_api_responses(list(api_responses)) or []
+                    broad = _dr_parse_api_responses(list(unit_api_responses)) or []
                 except Exception as exc:
                     broad = []
                     result.errors.append(f"daily-runner-parser-error: {exc}")
@@ -1795,7 +2160,7 @@ class GenericAdapter:
                             None,
                         )
                         if first_url:
-                            for resp in api_responses:
+                            for resp in unit_api_responses:
                                 if resp.get("url") == first_url:
                                     result.api_responses.append(resp)
                                     break
@@ -1833,6 +2198,60 @@ class GenericAdapter:
         # / static-site cases where no XHR fires during load.
         html = await _get_page_html(page, ctx)
         if html:
+            # ── ManageBuilding full rentals index ──────────────────────────────────────────
+            # The homepage exposes only a featured SUBSET (Le Mirage: 5 of
+            # 10), so this is final-URL gated to /Resident/public/rentals.
+            # On that complete index every a.featured-listing has a unique
+            # numeric detail id plus beds/baths/rent/sqft. The id is retained
+            # as UNIT_VOLATILE source evidence rather than promoted into the
+            # daily-join unit_id.
+            _fetch_result = getattr(ctx, "fetch_result", None)
+            _resolved_html_url = (
+                getattr(_fetch_result, "final_url", None) or ctx.base_url
+            )
+            if (
+                not result.units
+                and is_managebuilding_rentals_index_url(_resolved_html_url)
+            ):
+                t0 = _time.monotonic()
+                try:
+                    _managebuilding_units = extract_managebuilding_rentals_index(
+                        html, _resolved_html_url
+                    )
+                except Exception as _mb_exc:
+                    _managebuilding_units = []
+                    result.errors.append(
+                        "managebuilding-index-error: "
+                        f"{type(_mb_exc).__name__}: {str(_mb_exc)[:80]}"
+                    )
+                _log_attempt(
+                    "generic:managebuilding_rentals_index",
+                    "ran_units" if _managebuilding_units else "ran_empty",
+                    units=len(_managebuilding_units),
+                    reason=(
+                        "numeric listing href + data beds/baths/rent/square-feet"
+                        if _managebuilding_units
+                        else "eligible rentals index had no complete featured listings"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if _managebuilding_units:
+                    # A normal planner pass cannot yet see dict-valued
+                    # source_ids (from_legacy_unit intentionally keeps only
+                    # scalar fields), so it would report identity=0 and launch
+                    # the same unnecessary detail crawl this exact index parse
+                    # replaces. The host/path/card gates above are the
+                    # deterministic completeness gate; post_process uses the
+                    # source-id registry to classify every row as unit-level.
+                    result.units = _managebuilding_units
+                    result.tier_used = "TIER_1_DOM_MANAGEBUILDING"
+                    result.winning_url = _resolved_html_url
+                    result.confidence = min(
+                        0.95, 0.82 + 0.01 * len(_managebuilding_units)
+                    )
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+
             # ── Sub-tier 2.5 (2026-05-21): AIR Communities AEM adapter ──
             # AIR runs the entire 76-community / 27K-unit portfolio on a
             # single Adobe Experience Manager stack with a deterministic
@@ -1925,7 +2344,24 @@ class GenericAdapter:
                     fp_url = prop_base.rstrip("/") + "/floor-plans"
                     fp_resp = _hgm_pg(fp_url, timeout=15, unlocker=False)
                     fp_html = (fp_resp.text or "") if fp_resp.status_code == 200 else ""
-                    plan_slugs = _parse_hgm_floor_plans(fp_html, base_url=prop_base)
+                    # The current HGM ``/floor-plans`` route can render a
+                    # marketing shell with no plan anchors, while the already-
+                    # fetched property landing page still contains the exact
+                    # ``/{plan}/listing`` links.  Merge both SSR documents;
+                    # every resulting request is rebuilt under ``prop_base``.
+                    seed_html = html if isinstance(html, str) else ""
+                    plan_slugs = list(
+                        dict.fromkeys(
+                            _parse_hgm_floor_plans(
+                                fp_html,
+                                base_url=prop_base,
+                            )
+                            + _parse_hgm_floor_plans(
+                                seed_html,
+                                base_url=prop_base,
+                            )
+                        )
+                    )
                     for _slug in plan_slugs:
                         units_url = f"{prop_base.rstrip('/')}/{_slug}/units"
                         u_resp = _hgm_pg(units_url, timeout=15, unlocker=False)
@@ -2336,12 +2772,18 @@ class GenericAdapter:
             # displayed unit number that auditors look for. The pre-fix
             # generic DOM tier was extracting unitid=<8-digit> from the
             # URL param (audit row #41 — Cambridge Woods unit
-            # "13664212"). Gated on udr.com domain to avoid polluting
-            # other Schema.org Apartment ItemLists. Try first so it
-            # wins over the generic embedded walker for UDR.
-            if "udr.com" in (ctx.base_url or "").lower():
+            # "13664212"). Gated on UDR's exact hosts, or an official
+            # UDR rel=canonical on a vanity homepage, to avoid polluting
+            # other Schema.org Apartment ItemLists. Try first so it wins
+            # over the generic embedded walker for UDR.
+            _u_base = (
+                ctx.base_url
+                if _is_udr_url(ctx.base_url or "")
+                else _canonical_udr_url(html)
+            )
+            if _u_base:
                 try:
-                    udr_units = _parse_udr(html, source_url=ctx.base_url)
+                    udr_units = _parse_udr(html, source_url=_u_base)
                 except Exception as _ux:
                     udr_units = []
                     result.errors.append(f"udr-parse-error: {_ux}")
@@ -2351,26 +2793,8 @@ class GenericAdapter:
                 # before giving up (Edgewater: 0 → 1 real unit; the
                 # plan-text fallback was emitting 3 plan-level rows).
                 if not udr_units:
-                    _u_base = (ctx.base_url or "").rstrip("/")
-                    if _u_base and "/apartments-pricing" not in _u_base:
-                        from urllib.parse import urlparse as _u_urlparse
-
-                        _u_cands: list[str] = [_u_base + "/apartments-pricing/"]
-                        try:
-                            _u_p = _u_urlparse(_u_base)
-                            _u_segs = [s for s in _u_p.path.split("/") if s]
-                            # UDR URL shape is /{market}/{area}/{community}/…;
-                            # catalog rows sometimes point at a junk leaf
-                            # (Cambridge Woods → /contact-us/, 404s the naive
-                            # append). Also try the 3-segment community root.
-                            if len(_u_segs) > 3:
-                                _u_root = (
-                                    f"{_u_p.scheme}://{_u_p.netloc}/"
-                                    + "/".join(_u_segs[:3])
-                                )
-                                _u_cands.append(_u_root + "/apartments-pricing/")
-                        except Exception:
-                            pass
+                    _u_cands = _udr_pricing_urls(_u_base)
+                    if _u_cands:
                         try:
                             from ma_poc.pms.adapters._probe import probe_get
 
@@ -2388,6 +2812,7 @@ class GenericAdapter:
                                     _u_html, source_url=_u_pricing
                                 )
                                 if udr_units:
+                                    result.winning_url = _u_pricing
                                     result.errors.append(
                                         "udr: recovered via "
                                         f"/apartments-pricing/ hop ({_u_pricing})"

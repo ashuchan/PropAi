@@ -1,0 +1,245 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:48:22.923193+00:00",
+    "strict_unit_qualified_properties": 2,
+    "strict_unit_qualified_property_ids": [
+      7980,
+      68952
+    ],
+    "native_positive_rent_rows": 3,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 7980,
+      "property_name": "Tesota Morningside",
+      "website": "https://www.tesotamorningside.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 2,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_unique_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "Tesota Morningside",
+        "canonical_address": "3958 Montgomery Blvd NE",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "1271493",
+        "current_listing_property_floorplan_binding": "844423",
+        "rows_with_native_identity": 2,
+        "rows_with_native_identity_and_positive_rent": 2,
+        "source_urls": [
+          "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "87"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 971,
+            "market_rent_high": 971
+          },
+          "source_api_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional"
+        },
+        {
+          "identity": {
+            "unit_number": "166"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 971,
+            "market_rent_high": 971
+          },
+          "source_api_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "A1A",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "585",
+          "unit_number": "87",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$971",
+          "market_rent_low": 971,
+          "market_rent_high": 971,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-28",
+          "available_date": "2026-08-28",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "A1A",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "585",
+          "unit_number": "166",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$971",
+          "market_rent_low": 971,
+          "market_rent_high": 971,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-11",
+          "available_date": "2026-09-11",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:46:38.465777+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_7980_current.json",
+        "capture_artifact_sha256": "6b9dc8ba7b46e4a83866031270f29c4449f2e6475f4322ba5fc268848acbd065",
+        "listing_html_sha256": "aa12707c1785f387965789a61b207cc8b29aa9d5992bba76b714a9eb2c80ced2",
+        "page_html_sha256": "b62951a4ba26d8a123b3e196ebb863abc3a3a028ecb32991a74edcce07289345",
+        "endpoint_html_sha256": "9d70f6604a546060b6b03c958e82d7e0124d3a247439620b139a38cfa3ae6c85",
+        "published_endpoint": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": false,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    },
+    {
+      "property_id": 68952,
+      "property_name": "Wy'East Pointe",
+      "website": "https://www.livewyeast.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 1,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_unique_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "Wy'East Pointe",
+        "canonical_address": "812 SE 136TH AVE",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "219049",
+        "current_listing_property_floorplan_binding": "543242",
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_urls": [
+          "https://www.livewyeast.com/?module=check_availability&is_secure=1&property[id]=219049&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,395&max_rent=$1,406&min_advertised_base_rent=1395&max_advertised_base_rent=1406&min_deposit=500.0000&max_deposit=1500.0000&is_valid_rent=1&lease_term_name=12-16mo lease&popup_lease_term_name=12-16 months lease&property_floorplan[id]=543242&move_in_date=2026-08-01&occupancy_type=conventional"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "G078"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1395,
+            "market_rent_high": 1395
+          },
+          "source_api_url": "https://www.livewyeast.com/?module=check_availability&is_secure=1&property[id]=219049&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,395&max_rent=$1,406&min_advertised_base_rent=1395&max_advertised_base_rent=1406&min_deposit=500.0000&max_deposit=1500.0000&is_valid_rent=1&lease_term_name=12-16mo lease&popup_lease_term_name=12-16 months lease&property_floorplan[id]=543242&move_in_date=2026-08-01&occupancy_type=conventional"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Bronze",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "562",
+          "unit_number": "G078",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,395",
+          "market_rent_low": 1395,
+          "market_rent_high": 1395,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-09",
+          "available_date": "2026-08-09",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.livewyeast.com/?module=check_availability&is_secure=1&property[id]=219049&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,395&max_rent=$1,406&min_advertised_base_rent=1395&max_advertised_base_rent=1406&min_deposit=500.0000&max_deposit=1500.0000&is_valid_rent=1&lease_term_name=12-16mo lease&popup_lease_term_name=12-16 months lease&property_floorplan[id]=543242&move_in_date=2026-08-01&occupancy_type=conventional",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:46:38.714905+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_68952_current.json",
+        "capture_artifact_sha256": "f2647e4e0e530a2444bf428a2dbb394a83c72d14f198050a01b18b8754528247",
+        "listing_html_sha256": "4b3249ef61b26787b2d8c2e9a61e79f8857ecb1ad9faee8b97a01dca48691215",
+        "page_html_sha256": "cedd23a3786165c6800b9bb1125e750ec620d654cd50317450ffde41cce6fcce",
+        "endpoint_html_sha256": "db24d56239d85d245245580e1d1fa161da57340a26c53d30382b279e0fccf706",
+        "published_endpoint": "https://www.livewyeast.com/?module=check_availability&is_secure=1&property[id]=219049&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,395&max_rent=$1,406&min_advertised_base_rent=1395&max_advertised_base_rent=1406&min_deposit=500.0000&max_deposit=1500.0000&is_valid_rent=1&lease_term_name=12-16mo lease&popup_lease_term_name=12-16 months lease&property_floorplan[id]=543242&move_in_date=2026-08-01&occupancy_type=conventional",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": false,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

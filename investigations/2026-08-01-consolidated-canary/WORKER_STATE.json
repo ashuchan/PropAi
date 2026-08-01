@@ -1,0 +1,71 @@
+{
+  "schema_version": "propai_consolidated_worker_state_v1",
+  "captured_on": "2026-08-01",
+  "origin_main_commit": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+  "integration_branch": "codex/consolidated-canary-2026-08-01",
+  "source_branches": {
+    "failed_no_data": "codex/failed-no-data-recovery",
+    "plan_to_unit": "codex/plan-level-unit-recovery",
+    "availability_date": "codex/availability-date-preservation"
+  },
+  "failed_no_data": {
+    "cohort": 344,
+    "strict_ledger_rows": 243,
+    "post_ledger_supplement_rows": 1,
+    "strict_total": 244,
+    "strict_percent": 70.93,
+    "target_75_percent_rows": 258,
+    "gap_to_75_percent": 14,
+    "ledger_sha256": "475f209464568dbc9e8c4bf9ddccb694241b297e3d37b2820b4fbf2877f352f7",
+    "ledger_summary_sha256": "ce0bff2916d6a2fd5d980d914816c53e3ffebebe0e688c41b78a4892909c1d55"
+  },
+  "plan_to_unit": {
+    "cohort": 549,
+    "last_materialized_ledger_rows": 330,
+    "last_materialized_ledger_sha256": "b428382a1ff33375cca65f7088eff566b2a1be02792a8e5cbb33e50eff1afb6f",
+    "worker_strict_total": 365,
+    "worker_strict_percent": 66.48,
+    "unreconciled_post_ledger_admissions": 35,
+    "prior_gcp_canary_strict": 303,
+    "prior_gcp_canary_strict_percent": 55.19,
+    "prior_gcp_audit_sha256": "6ff15ea6e1d70800e5707d554b7a481fdea01e703beceff27113f20461c28a0f",
+    "cohort_sha256": "b40f11a8329c751e6d1ba4bf7eda16e8139eb3422c2acb3de0856dae8755e0c8",
+    "prior_gcp_run_prefix": "gs://jugnu-canary/runs/2026-08-01-plan60-full549-v2/",
+    "prior_gcp_profile_prefix": "gs://jugnu-canary/profiles/plan60-full549-v2/"
+  },
+  "profiles": {
+    "strict_success_profiles": 303,
+    "actionable_on_generation_pinned_read": 243,
+    "bootstrap_only_on_generation_pinned_read": 60,
+    "availability_link_only_profiles_recovered_by_new_classifier": 3,
+    "promotion_gate": "strict SUCCESS + nonempty units + real_id_units > 0 + reusable route",
+    "old_215_88_snapshot_is_stale": true,
+    "promotion_executed": true,
+    "profiles_created": 237,
+    "profiles_field_merged": 6,
+    "target_numeric_profiles_after": 887,
+    "dry_run_manifest_sha256": "259c11e82280dc2260e7f02b8ea2523285f04f7e792e80298637f5ba42bd8f7c",
+    "execute_manifest_sha256": "de1c3ae8ec4a544f3ce551abb3f1ab96e9f14c5f2aa1f1e859e1f850e098c841"
+  },
+  "integration_tests": {
+    "focused_passed": 523,
+    "focused_skipped": 1,
+    "post_merge_regression_passed": 224,
+    "final_repair_gate_passed": 49,
+    "availability_and_property_boundary_passed": 403,
+    "full_suite_completed": true,
+    "full_suite_passed": 9640,
+    "full_suite_skipped": 48,
+    "full_suite_origin_main_baseline_failures": 3,
+    "origin_main_baseline_failure_scope": "pre-existing scripts layout categorization/main-guard checks",
+    "consolidated_canary_started": false
+  },
+  "consolidated_canary": {
+    "cohort_gcs_uri": "gs://jugnu-canary/property-list/properties_full_4982.csv",
+    "cohort_properties": 4982,
+    "cohort_sha256": "fc4959327f07a05e08a68cf1e1866ddf7968a916b9e967f9818391f3e154a8fa",
+    "cohort_gcs_generation": 1779135681674624,
+    "cloud_build_id": "5443ef29-ee50-46c0-bba2-6fd9ec041df3",
+    "run_started": false
+  }
+}

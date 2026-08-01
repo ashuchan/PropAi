@@ -712,17 +712,21 @@ def enable_rentcafe_plan_securecafe_drill() -> bool:
 
 
 def enable_rentcafe_availunits_fast() -> bool:
-    """RentCafe plan-only → SecureCafe ``availableunits`` FAST path (#80).
+    """RentCafe plan-only → unit-roster ``availableunits`` FAST path (#80).
 
-    Same site-(b) branch that ``enable_rentcafe_plan_securecafe_drill`` guards,
-    but a bounded, cost-safe variant: a SINGLE DIRECT ``availableunits.aspx``
-    fetch (``unlocker=False``, ``proxies={}``, ≤2 candidate bases) — no proxied
-    leg, no Web-Unlocker escalation. That is what makes it default-ON where the
-    full drill stays OFF: the full drill's ~1,365-1,535s worst case comes
-    entirely from the proxied + unlocker ladder (see
-    ``enable_rentcafe_plan_securecafe_drill``'s hazard-2 note); a lone DIRECT
-    call is ~25-50s and never triggers the internal ``timeout+95`` unlocker
-    escalation.
+    The fast flag enables two bounded direct surfaces before the expensive
+    RentCafe fallback ladder: the property's same-origin ``/availableunits``
+    whole roster, then at most two discovered SecureCafe
+    ``availableunits.aspx`` candidates. Every request explicitly passes
+    ``unlocker=False`` and ``proxies={}``; there is no proxied leg, Web Unlocker
+    escalation, CAPTCHA solver, FlareSolverr, or fingerprint rotation.
+
+    Local 2026-07-31 unresolved-replay probe (not a canary, LLM off): the
+    same-origin request returned strict unit rows for 31/75 RentCafe properties
+    (277 apartments). Eight already converted through slower fallbacks in the
+    old-code replay, leaving 23 net property conversions available from moving
+    this request ahead of those retries. The flag remains default OFF until a
+    canary measures production yield and latency.
 
     Data safety is IDENTICAL to the full drill — the same
     ``_securecafe_swap_verdict`` + ``_merge_portal_over_catalogue`` guard runs on

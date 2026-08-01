@@ -28,7 +28,8 @@ plan-level baseline only accepts a genuinely unit-level replacement.
 
 from __future__ import annotations
 
-from ma_poc.pms.scraper import rows_are_plan_level
+from ma_poc.pms.adapters.base import AdapterResult
+from ma_poc.pms.scraper import _retry_result_is_plan_level, rows_are_plan_level
 
 # ── The predicate the gate keys on ──────────────────────────────────────────
 
@@ -56,6 +57,15 @@ def test_empty_is_not_plan_level() -> None:
     the two conditions overlap and muddy which one fired."""
     assert rows_are_plan_level([]) is False
     assert rows_are_plan_level(None) is False
+
+
+def test_channel_split_plan_result_is_plan_level() -> None:
+    result = AdapterResult(
+        units=[],
+        plan_summaries=[{"floor_plan_name": "A1", "rent_low": 1500}],
+    )
+
+    assert _retry_result_is_plan_level(result) is True
 
 
 def test_post_format_inferred_ids_read_as_plan_level() -> None:
@@ -116,10 +126,10 @@ def test_scraper_gate_admits_plan_level_and_guards_the_overwrite() -> None:
     from ma_poc.pms import scraper
 
     src = inspect.getsource(scraper)
-    assert "_ur_plan_level_only = rows_are_plan_level(adapter_result.units)" in src, (
+    assert "_ur_plan_level_only = _retry_result_is_plan_level(adapter_result)" in src, (
         "universal recovery no longer computes the plan-level entry condition"
     )
-    assert "not adapter_result.units or _ur_plan_level_only" in src, (
+    assert "_retry_real_unit_count(adapter_result) == 0" in src, (
         "the gate reverted to empty-only; the 368 SecureCafe properties lose their route"
     )
     assert "_ur_accept" in src, (

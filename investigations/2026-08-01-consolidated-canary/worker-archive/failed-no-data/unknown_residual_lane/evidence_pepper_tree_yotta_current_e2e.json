@@ -1,0 +1,165 @@
+{
+  "generated_at_utc": "2026-08-01T11:01:51.438768+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "pepper_tree_yotta_current_source_full_pipeline",
+  "results": [
+    {
+      "adapter": "yotta",
+      "configured_final_url": "https://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+      "contamination_verdict": "pass_exact_configured_property_yotta_details_dba_and_native_unit_ids",
+      "errors": [],
+      "identity_evidence": {
+        "distinct_yotta_unit_ids": 13,
+        "rows_with_native_identity": 13,
+        "rows_with_native_identity_and_positive_rent": 13,
+        "source_property_ids": [
+          "55"
+        ],
+        "source_urls": [
+          "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-10-03",
+          "identity": {
+            "unit_number": "0215",
+            "yotta_unit_id": "9795"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 905,
+            "market_rent_low": 905
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-08-08",
+          "identity": {
+            "unit_number": "1016",
+            "yotta_unit_id": "9892"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 983,
+            "market_rent_low": 983
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "identity": {
+            "unit_number": "0819",
+            "yotta_unit_id": "9871"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 910,
+            "market_rent_low": 910
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "identity": {
+            "unit_number": "1015",
+            "yotta_unit_id": "9891"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 860,
+            "market_rent_low": 860
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-08-29",
+          "identity": {
+            "unit_number": "1019",
+            "yotta_unit_id": "9895"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1198,
+            "market_rent_low": 1198
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-09-12",
+          "identity": {
+            "unit_number": "0809",
+            "yotta_unit_id": "9861"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 913,
+            "market_rent_low": 913
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-08-08",
+          "identity": {
+            "unit_number": "0823",
+            "yotta_unit_id": "9875"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1075,
+            "market_rent_low": 1075
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        },
+        {
+          "availability_date": "2026-09-02",
+          "identity": {
+            "unit_number": "1001",
+            "yotta_unit_id": "9877"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 978,
+            "market_rent_low": 978
+          },
+          "source_api_url": "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
+          "source_property_id": "55"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 34785,
+      "property_identity_match": true,
+      "property_name": "Pepper Tree",
+      "provider_dba_id": "55",
+      "provider_details": {
+        "address": "2701 Longmire Drive",
+        "city": "College Station",
+        "name": "Pepper Tree",
+        "state": "TX",
+        "zip": "77845"
+      },
+      "strict_gates": {
+        "all_rows_native_and_positive_rent": true,
+        "configured_scheme_only_normalization": true,
+        "current_full_scraper_selected_yotta": true,
+        "current_full_scraper_selected_yotta_unit_tier": true,
+        "native_ids_unique": true,
+        "provider_details_http_200": true,
+        "provider_identity_matches_exact_configured_property": true,
+        "selected_route_http_200": true,
+        "sole_source_property_id_matches_dba": true,
+        "sole_source_url_matches_exact_dba": true
+      },
+      "tier": "TIER_1_API_YOTTA",
+      "units": 13,
+      "website": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55"
+    }
+  ]
+}

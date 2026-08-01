@@ -1,0 +1,41 @@
+{
+  "capture_date": "2026-08-01",
+  "baseline_ledger": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+  "baseline_ledger_rows": 133,
+  "baseline_ledger_unique_property_ids": 133,
+  "baseline_ledger_sha256": "75af6e7c8c65a59d414ffce2b57dbf67d2b676986103ea665dfb4137be532717",
+  "remaining_cohort": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+  "remaining_cohort_sha256": "a2ce21deef8b0118051621d7bec68f6a3fa7090a49cd4396f138ed7df950aaa1",
+  "consolidated_artifact": "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/evidence_appfolio_generic_current_strict_consolidated.json",
+  "net_new_ledger_rows_csv": "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/strict_appfolio_generic_net_new_ledger_rows.csv",
+  "qualified_property_ids": [
+    15014,
+    38107,
+    46576,
+    55709,
+    60145,
+    70255,
+    78597,
+    258661,
+    260505,
+    263498,
+    282381
+  ],
+  "overlap_with_baseline_ledger": [],
+  "net_new_strict_property_ids": [
+    15014,
+    38107,
+    46576,
+    55709,
+    60145,
+    70255,
+    78597,
+    258661,
+    260505,
+    263498,
+    282381
+  ],
+  "net_new_strict_properties": 11,
+  "net_new_native_positive_rent_units": 167,
+  "shared_ledger_modified": false
+}

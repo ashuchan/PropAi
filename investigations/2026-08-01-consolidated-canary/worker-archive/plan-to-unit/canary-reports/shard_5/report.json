@@ -1,0 +1,76 @@
+{
+  "run_date": "2026-08-01-plan60-full549-v2",
+  "generated_at": "2026-08-01T06:31:04.009884+00:00",
+  "totals": {
+    "properties": 6,
+    "succeeded": 4,
+    "failed": 2,
+    "carry_forward": 0,
+    "operator_transparency": 0,
+    "success_rate_pct": 66.67
+  },
+  "operator_transparency_detail": {
+    "count": 0,
+    "phrase_histogram": {},
+    "properties": []
+  },
+  "tier_distribution": {
+    "FAILED": 1,
+    "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL": 1,
+    "TIER_1_API_APTS247_PLAN_LEVEL": 1,
+    "TIER_1_API_RENTCAFE_SHAPE_REJECTED": 1,
+    "TIER_1_API_ENTRATA_NO_RESPONSE_PLAN_LEVEL": 1,
+    "TIER_1_API": 1
+  },
+  "verdict_distribution": {
+    "SUCCESS_PLAN_LEVEL": 5,
+    "FAILED_NO_DATA": 1
+  },
+  "field_fill_rates": {
+    "unit_id": 0.0,
+    "beds": 0.0,
+    "baths": 0.0,
+    "area": 0.0,
+    "rent_low": 0.0,
+    "available_date": 0.0,
+    "availability_status": 0.0,
+    "floor_plan_name": 0.0,
+    "floor": 0.0,
+    "building": 0.0,
+    "concession_text": 0.0,
+    "source_ids": 0.0
+  },
+  "data_quality": {
+    "total_units": 0,
+    "by_tier_family": {},
+    "real_id_units": 0,
+    "synthetic_id_units": 0,
+    "plan_level_units": 0
+  },
+  "pre_extraction_terminations": {},
+  "fetch_bot_blocked": {
+    "count": 0,
+    "property_ids": []
+  },
+  "fetch_captcha_detected": {
+    "count": 0,
+    "property_ids": []
+  },
+  "non_extracted_fields": [
+    "lease_term",
+    "move_in_date",
+    "pmc",
+    "website_design",
+    "phone",
+    "email_address",
+    "concessions"
+  ],
+  "cost": {},
+  "slo_violations": [
+    {
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.8333
+    }
+  ]
+}

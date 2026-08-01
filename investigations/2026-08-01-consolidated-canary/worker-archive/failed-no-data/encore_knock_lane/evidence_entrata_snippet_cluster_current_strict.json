@@ -1,0 +1,363 @@
+{
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "entrata_snippet_three_property_current_source_strict",
+  "results": [
+    {
+      "adapter": "entrata",
+      "contamination_verdict": "pass_exact_property_owned_iframe_single_property_id_native_units",
+      "identity_evidence": {
+        "floor_plan_name_samples": [
+          "Branson",
+          "Dylan",
+          "Dylan",
+          "Dylan",
+          "Dylan"
+        ],
+        "portal_urls": [
+          "https://entratasnipit.801polaris.com/columbus/801-polaris/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=06/23/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&&host_domain=www.801polaris.com"
+        ],
+        "rows_with_native_identity": 24,
+        "rows_with_native_identity_and_positive_rent": 24,
+        "source_property_ids": [
+          "1166646"
+        ],
+        "source_urls": [
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047423/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047424/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047428/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047430/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047431/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-08-22",
+          "floor_plan_name": "Branson",
+          "identity": {
+            "entrata_uid": "4951096",
+            "unit_number": "315"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1049
+          },
+          "source_api_url": "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166646"
+        },
+        {
+          "availability_date": "2026-08-19",
+          "floor_plan_name": "Dylan",
+          "identity": {
+            "entrata_uid": "4951132",
+            "unit_number": "442"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1241
+          },
+          "source_api_url": "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166646"
+        },
+        {
+          "availability_date": "2026-10-05",
+          "floor_plan_name": "Dylan",
+          "identity": {
+            "entrata_uid": "4951114",
+            "unit_number": "230"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1194
+          },
+          "source_api_url": "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166646"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Dylan",
+          "identity": {
+            "entrata_uid": "4951147",
+            "unit_number": "445"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1240
+          },
+          "source_api_url": "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166646"
+        },
+        {
+          "availability_date": "2026-09-28",
+          "floor_plan_name": "Dylan",
+          "identity": {
+            "entrata_uid": "4951107",
+            "unit_number": "329"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1219
+          },
+          "source_api_url": "https://entratasnipit.801polaris.com/Apartments/module/property_floorplans/property%5Bid%5D/1166646/property_floorplan[id]/1047422/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166646"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 59649,
+      "property_identity_match": true,
+      "property_name": "801 Polaris",
+      "strict_gates": {
+        "all_detail_sources_on_expected_property_child": true,
+        "all_emitted_rows_native_positive_and_priced": true,
+        "canonical_property_name_stamped_on_every_row": true,
+        "configured_root_http_200": true,
+        "configured_root_name_visible": true,
+        "current_full_scraper_selected_entrata": true,
+        "current_full_scraper_selected_snippet_unit_tier": true,
+        "one_expected_property_owned_portal": true,
+        "one_nonempty_source_property_id": true,
+        "strict_property_owned_iframe_provenance_on_every_row": true,
+        "visible_unit_numbers_globally_unique": true
+      },
+      "tier": "TIER_1_DOM_ENTRATA_SNIPPET_UNIT_LEVEL",
+      "units": 24,
+      "website": "https://801polaris.com/"
+    },
+    {
+      "adapter": "entrata",
+      "contamination_verdict": "pass_exact_property_owned_iframe_single_property_id_native_units",
+      "identity_evidence": {
+        "floor_plan_name_samples": [
+          "The Cleveland - Renovated",
+          "The Cleveland - Renovated",
+          "The Columbus - Renovated",
+          "The Columbus - Renovated",
+          "The Akron - Renovated"
+        ],
+        "portal_urls": [
+          "https://entratasnipit.liveemersonpark.com/westerville/emerson-park/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=07/21/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&&host_domain=www.liveemersonpark.com"
+        ],
+        "rows_with_native_identity": 19,
+        "rows_with_native_identity_and_positive_rent": 19,
+        "source_property_ids": [
+          "100012440"
+        ],
+        "source_urls": [
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052828/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052830/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052832/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052834/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052836/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052840/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-09-20",
+          "floor_plan_name": "The Cleveland - Renovated",
+          "identity": {
+            "entrata_uid": "4971913",
+            "unit_number": "5706KIP"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1435
+          },
+          "source_api_url": "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100012440"
+        },
+        {
+          "availability_date": "2026-09-22",
+          "floor_plan_name": "The Cleveland - Renovated",
+          "identity": {
+            "entrata_uid": "4971936",
+            "unit_number": "6908CLD"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1384
+          },
+          "source_api_url": "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100012440"
+        },
+        {
+          "availability_date": "2026-09-01",
+          "floor_plan_name": "The Columbus - Renovated",
+          "identity": {
+            "entrata_uid": "4971884",
+            "unit_number": "5757BCD"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1323
+          },
+          "source_api_url": "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100012440"
+        },
+        {
+          "availability_date": "2026-09-12",
+          "floor_plan_name": "The Columbus - Renovated",
+          "identity": {
+            "entrata_uid": "4971892",
+            "unit_number": "5878KIP"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1384
+          },
+          "source_api_url": "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100012440"
+        },
+        {
+          "availability_date": "2026-08-11",
+          "floor_plan_name": "The Akron - Renovated",
+          "identity": {
+            "entrata_uid": "4972015",
+            "unit_number": "6772BC"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1632
+          },
+          "source_api_url": "https://entratasnipit.liveemersonpark.com/Apartments/module/property_floorplans/property%5Bid%5D/100012440/property_floorplan[id]/1052826/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100012440"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 252116,
+      "property_identity_match": true,
+      "property_name": "Emerson Park",
+      "strict_gates": {
+        "all_detail_sources_on_expected_property_child": true,
+        "all_emitted_rows_native_positive_and_priced": true,
+        "canonical_property_name_stamped_on_every_row": true,
+        "configured_root_http_200": true,
+        "configured_root_name_visible": true,
+        "current_full_scraper_selected_entrata": true,
+        "current_full_scraper_selected_snippet_unit_tier": true,
+        "one_expected_property_owned_portal": true,
+        "one_nonempty_source_property_id": true,
+        "strict_property_owned_iframe_provenance_on_every_row": true,
+        "visible_unit_numbers_globally_unique": true
+      },
+      "tier": "TIER_1_DOM_ENTRATA_SNIPPET_UNIT_LEVEL",
+      "units": 19,
+      "website": "https://www.liveemersonpark.com/"
+    },
+    {
+      "adapter": "entrata",
+      "contamination_verdict": "pass_exact_property_owned_iframe_single_property_id_native_units",
+      "identity_evidence": {
+        "floor_plan_name_samples": [
+          "Fern",
+          "Brittany",
+          "Brittany",
+          "Chase",
+          "Leo with Loft"
+        ],
+        "portal_urls": [
+          "https://entratasnipit.luxe88apts.com/columbus/luxe-88/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=06/26/2026&locale_code=&is_collapsed=0&include_paragraph_content=0&is_show_map=0&&host_domain=luxe88apts.com"
+        ],
+        "rows_with_native_identity": 5,
+        "rows_with_native_identity_and_positive_rent": 5,
+        "source_property_ids": [
+          "1166658"
+        ],
+        "source_urls": [
+          "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047433/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047436/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047438/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-08-31",
+          "floor_plan_name": "Fern",
+          "identity": {
+            "entrata_uid": "4951512",
+            "unit_number": "25-8331"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1641
+          },
+          "source_api_url": "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166658"
+        },
+        {
+          "availability_date": "2026-09-26",
+          "floor_plan_name": "Brittany",
+          "identity": {
+            "entrata_uid": "4951474",
+            "unit_number": "25-8228"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1919
+          },
+          "source_api_url": "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166658"
+        },
+        {
+          "availability_date": "2026-09-09",
+          "floor_plan_name": "Brittany",
+          "identity": {
+            "entrata_uid": "4951363",
+            "unit_number": "20-8210"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1853
+          },
+          "source_api_url": "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166658"
+        },
+        {
+          "availability_date": "2026-09-14",
+          "floor_plan_name": "Chase",
+          "identity": {
+            "entrata_uid": "4951450",
+            "unit_number": "25-8134"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1965
+          },
+          "source_api_url": "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166658"
+        },
+        {
+          "availability_date": "2026-08-31",
+          "floor_plan_name": "Leo with Loft",
+          "identity": {
+            "entrata_uid": "4951527",
+            "unit_number": "25-8411"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 2362
+          },
+          "source_api_url": "https://entratasnipit.luxe88apts.com/Apartments/module/property_floorplans/property%5Bid%5D/1166658/property_floorplan[id]/1047432/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "1166658"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 258789,
+      "property_identity_match": true,
+      "property_name": "Luxe 88",
+      "strict_gates": {
+        "all_detail_sources_on_expected_property_child": true,
+        "all_emitted_rows_native_positive_and_priced": true,
+        "canonical_property_name_stamped_on_every_row": true,
+        "configured_root_http_200": true,
+        "configured_root_name_visible": true,
+        "current_full_scraper_selected_entrata": true,
+        "current_full_scraper_selected_snippet_unit_tier": true,
+        "one_expected_property_owned_portal": true,
+        "one_nonempty_source_property_id": true,
+        "strict_property_owned_iframe_provenance_on_every_row": true,
+        "visible_unit_numbers_globally_unique": true
+      },
+      "tier": "TIER_1_DOM_ENTRATA_SNIPPET_UNIT_LEVEL",
+      "units": 5,
+      "website": "https://luxe88apts.com/"
+    }
+  ],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/encore_knock_lane/entrata_snippet_cluster_current_full.json",
+  "source_artifact_sha256": "e0542d17328846424005f18ac10f555dbf392b73b0bbdbae7aed2b98868cc6e4"
+}

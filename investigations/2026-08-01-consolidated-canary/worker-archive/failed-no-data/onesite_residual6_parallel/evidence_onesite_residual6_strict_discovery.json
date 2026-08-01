@@ -1,0 +1,874 @@
+{
+  "fail_closed": {
+    "14295": {
+      "property_name": "Timber Ridge Apartment Homes",
+      "reason": "exact published OneSite workflow has zero native UnitIds",
+      "route": "https://www.myboulderapartment.com/ -> https://1736093.onlineleasing.realpage.com/ -> workflowstartup/v1/1101338/English",
+      "workflow": {
+        "floorplan_count": 8,
+        "floorplans": [
+          {
+            "available_units": 0,
+            "max_rent": 1475,
+            "min_rent": 1475,
+            "name": "Unique One Bedroom",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1500,
+            "min_rent": 1500,
+            "name": "Cascade",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1500,
+            "min_rent": 1500,
+            "name": "Tahoe",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1525,
+            "min_rent": 1525,
+            "name": "Alpine",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1725,
+            "min_rent": 1725,
+            "name": "Sierra",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1775,
+            "min_rent": 1775,
+            "name": "Unique Two Bedroom",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1825,
+            "min_rent": 1825,
+            "name": "Yukon",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2675,
+            "min_rent": 2675,
+            "name": "Three Bedroom",
+            "unit_ids": []
+          }
+        ],
+        "native_positive_rent_row_count": 0,
+        "raw": {
+          "content_sha256": "59019b2680ae1b0bb67d46238d8a2de9bf159a9e31b6a935c1089e8827411665",
+          "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/14295_workflow_1101338.json.gz",
+          "sha256": "c55f1e1588f7cf751bf37386f726c91ae7961593bf57740ec6144fee0db5d8e5"
+        },
+        "status": 200
+      }
+    },
+    "291774": {
+      "property_name": "Gallatin Village",
+      "reason": "exact published OneSite workflow has zero native UnitIds",
+      "route": "https://www.123taylor.com/gallatin-village -> https://8169363.onlineleasing.realpage.com/ -> workflowstartup/v1/4645221/English",
+      "workflow": {
+        "floorplan_count": 5,
+        "floorplans": [
+          {
+            "available_units": 0,
+            "max_rent": 1605,
+            "min_rent": 1605,
+            "name": "2/1",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1605,
+            "min_rent": 1605,
+            "name": "2/1 Deluxe",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1725,
+            "min_rent": 1725,
+            "name": "2/1.5",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1725,
+            "min_rent": 1725,
+            "name": "2/1.5 Deluxe",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2085,
+            "min_rent": 2085,
+            "name": "3/2 Deluxe",
+            "unit_ids": []
+          }
+        ],
+        "native_positive_rent_row_count": 0,
+        "raw": {
+          "content_sha256": "4f4a0d12279e6e4def20744400fcb4b7afffaadf6352bb15425cba57799230b3",
+          "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/291774_workflow_4645221.json.gz",
+          "sha256": "60a76946281aacfbad715907f4bbc94dbca76b6d8050f0cbf7a200c24dcc3446"
+        },
+        "status": 200
+      }
+    },
+    "67154": {
+      "clean_hyperbrowser": {
+        "artifact": {
+          "bytes": 6520,
+          "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/hb_southern_pine_clean_probe.json",
+          "sha256": "0b24f56a0846cec879688af223a86938c817622f2f6b6b20b2bb21ec4508c1b4"
+        },
+        "identity_page": {
+          "address_visible": true,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/67154_hb_page_0.html.gz",
+          "artifact_sha256": "94b6735d06c1d0c682a7425641fde93e95a0d752b5f1e8adb2a7220e3275b20a",
+          "body_bytes": 204786,
+          "body_sha256": "11ed248fa3c257026c0c49fb09c1ea301761a9a3ccc7365494086e545626ab5a",
+          "final_host": "southernpineapts.com",
+          "final_url": "https://southernpineapts.com/",
+          "markers": {
+            "appfolio": false,
+            "captcha": true,
+            "entrata": false,
+            "funnel": false,
+            "knock": false,
+            "onesite": true,
+            "rentcafe": false,
+            "rentmanager": false,
+            "resman": false
+          },
+          "name_visible": true,
+          "positive_rents": [],
+          "provider_urls": [
+            "https://9165349.onlineleasing.realpage.com/"
+          ],
+          "requested_url": "https://www.southernpineapts.com/",
+          "text_prefix": "Luxury Apartments For Rent Virginia Beach, VA | Southern Pine Join our waiting list! Let's Go \u00d7 Find Property: Pine Valley Oak Hill Oakmont Cypress Point Sage Valley Augusta Welcome! Amenities Floor Plans Gallery Residents Contact Apply Now Welcome! Amenities Floor Plans Gallery Residents Contact Apply Now Welcome! Amenities Floor Plans Gallery Residents Contact Apply Now SOUTHERN PINE APARTMENT HOMES Virginia Beach Luxury Living Welcome Home Floor Plans Facebook Instagram Our Floor Plans One Bedroom Pine Valley One Bedroom Oak Hill Two Bedroom Oakmont Two Bedroom Cypress Point Three Bedroom Sage Valley Three Bedroom Augusta Come see your new home today! Southern style meets luxury living at Southern Pine Apartments in Virginia Beach Our pet friendly* community offers a superior selection of 1-, 2-, and 3-bedroom apartments with fully equipped kitchens featuring stainless steel appliances and granite countertops, as well as over-sized walk-in closets, custom moldings and trim, and priv",
+          "title": "Luxury Apartments For Rent Virginia Beach, VA | Southern Pine",
+          "unit_number_candidates": [
+            "HOMES",
+            "ed",
+            "homes",
+            "s",
+            "y"
+          ]
+        },
+        "session_options": {
+          "adblock": true,
+          "solveCaptchas": false,
+          "useProxy": true,
+          "useStealth": false
+        },
+        "sessions": 1
+      },
+      "property_name": "Southern Pine Apartments",
+      "reason": "clean Hyperbrowser exposed exact current portal and identity page, but public page advertises a waiting list and the bound OneSite workflow has zero native UnitIds",
+      "route": "https://www.southernpineapts.com/ -> https://9165349.onlineleasing.realpage.com/ -> workflowstartup/v1/5440661/English",
+      "workflow": {
+        "floorplan_count": 6,
+        "floorplans": [
+          {
+            "available_units": 0,
+            "max_rent": 1875,
+            "min_rent": 1775,
+            "name": "Pine Valley",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 1925,
+            "min_rent": 1825,
+            "name": "Oak Hill",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2200,
+            "min_rent": 2100,
+            "name": "Oakmont",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2250,
+            "min_rent": 2150,
+            "name": "Cypress Point",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2500,
+            "min_rent": 2400,
+            "name": "Sage Valley",
+            "unit_ids": []
+          },
+          {
+            "available_units": 0,
+            "max_rent": 2625,
+            "min_rent": 2525,
+            "name": "Augusta",
+            "unit_ids": []
+          }
+        ],
+        "native_positive_rent_row_count": 0,
+        "raw": {
+          "content_sha256": "8b8603a2edca1ebf18b141db37de461b06c80322619b66b09b78d5622c108409",
+          "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/67154_workflow_5440661.json.gz",
+          "sha256": "c150f15e078cb976df408fd06393bd004bc72712edafb9415e406d37ec3866d9"
+        },
+        "status": 200
+      }
+    }
+  },
+  "generated_at_utc": "2026-08-01T15:56:04.095411+00:00",
+  "guardrails": {
+    "builder_edits": false,
+    "captcha_solving": false,
+    "direct_transport": "one fixed chrome116 fingerprint",
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions": 1,
+    "hyperbrowser_solve_captchas": false,
+    "hyperbrowser_use_stealth": false,
+    "ledger_edits": false,
+    "paid_canary": false,
+    "repo_source_edits": false,
+    "web_unlocker": false
+  },
+  "implementation_proposal": {
+    "priority_1_rpfp_cws": "When the exact current property page publishes RPFP_config with propertyId, pKey, apiUrl and apiKey, call PropertyDetails + floorplans + unfiltered units directly. Require PropertyDetails id/name/address to match canonical property; require every row active=true, leaseStatus=AVAILABLE_READY, native id and unitNumber, rent>0, and floorplanId joined to that exact property payload. Treat a null filtered-units response as non-authoritative only under these exact guards. Otherwise fail closed.",
+    "priority_2_page_local_native_text": "After a OneSite workflow returns zero native rows, allow same-origin page-local native unit text only when canonical name/address are visible and each row carries an explicit unit number/address plus positive rent inside an Available Units section. Never accept plan-only cards or external PMC-wide rosters. This pattern has one positive member in this cohort, so keep it marker-gated and do not apply cluster-wide without two additional positive probes.",
+    "priority_3_existing_workflow": "Retain the current sole-published-siteId OneSite workflow path. PID 39995 now returns a stable native unit across three repeats and should convert without a new provider route; preserve the UnitIds + positive-rent + payload SiteId guards."
+  },
+  "informational_search_only_not_counted": [
+    {
+      "purpose": "corroborated Tor View native unit labels; strict rows come from first-party page only",
+      "url": "https://www.apartments.com/tor-view-village-apartments-garnerville-ny/8t7d3e1/"
+    },
+    {
+      "purpose": "suggested CWS inventory existed; strict rows come from exact first-party-published CWS route only",
+      "url": "https://www.apartments.com/the-park-at-blanding-orange-park-fl/6vm0hht/"
+    },
+    {
+      "purpose": "syndicated units were not counted because exact official OneSite workflow exposed zero UnitIds",
+      "url": "https://www.homes.com/property/southern-pine-virginia-beach-va/hs0bp67r48se1/"
+    }
+  ],
+  "recoverable": {
+    "38677": {
+      "all_positive_rent": true,
+      "configured_page": {
+        "artifact": {
+          "bytes": 16417,
+          "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/38677_root_0_https_www.torviewvillageapts.com_.html.gz",
+          "sha256": "921c787544254c0ee169ab390cf7498e940c35b05cbf21bd42cbc9ae83b8f0e1"
+        },
+        "body_sha256": "5f19fadec5855a3d222066aaaaefdb1cdc6d5a4d1d9c89f5da2cc376eeec6eae",
+        "final_url": "https://www.torviewvillageapts.com/",
+        "status": 200
+      },
+      "distinct_unit_count": 5,
+      "identity_binding": {
+        "all_rows_use_property_published_street_names": true,
+        "canonical_address_visible": true,
+        "canonical_city_zip_visible": true,
+        "name_visible": true
+      },
+      "route": "current configured first-party page https://www.torviewvillageapts.com/",
+      "strict_native_rows": [
+        {
+          "floor_plan_name": "M Style",
+          "published_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-beautifully-renovated/7941626054.html",
+          "rent": 2930,
+          "unit_address_label": "11B Hasbrouck Drive",
+          "unit_number": "11B"
+        },
+        {
+          "floor_plan_name": "E Style",
+          "published_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-updated-large-bedroom/7941607121.html",
+          "rent": 2875,
+          "unit_address_label": "18B Kensington Circle",
+          "unit_number": "18B"
+        },
+        {
+          "floor_plan_name": "M Style",
+          "published_listing_url": "https://www.craigslist.org/view/d/garnerville-stunning-newly-renovated/rdsG57ET94bCeR7cvBycN2",
+          "rent": 3030,
+          "unit_address_label": "20C Kensington Circle",
+          "unit_number": "20C"
+        },
+        {
+          "floor_plan_name": "A Style",
+          "published_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-private-entrance-extra/7943277756.html",
+          "rent": 2625,
+          "unit_address_label": "21I Hasbrouck Drive",
+          "unit_number": "21I"
+        },
+        {
+          "floor_plan_name": "C Style",
+          "published_listing_url": "https://www.craigslist.org/view/d/garnerville-coxy-bedroom-balcony/cKsR2Dc1S2BRpyVM8mdAmx",
+          "rent": 2895,
+          "unit_address_label": "3A Kensington Circle",
+          "unit_number": "3A"
+        }
+      ]
+    },
+    "39995": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "native_positive_rows": [
+            {
+              "availability_status": "AVAILABLE",
+              "bathrooms": "1",
+              "bedrooms": "2",
+              "floor_plan_name": "B1",
+              "rent": 1263,
+              "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+              "source_property_id": "5272798",
+              "sqft": "900",
+              "unit_number": "52"
+            }
+          ],
+          "payload_site_id": "5272798",
+          "payload_site_id_matches": true,
+          "raw": {
+            "bytes": 2599,
+            "content_bytes": 8384,
+            "content_sha256": "93d864c1c8d3d5f9040e347594221afa8b8dd464f4dd0c7d894d37ef5a67b6c4",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/39995_workflow_repeat_1.json.gz",
+            "sha256": "5f0e3acd17ca03197ba7df1da8677b8929aac16ae1d8fea711f8d16a1db88627"
+          },
+          "requested_site_id": "5272798",
+          "status": 200
+        },
+        {
+          "attempt": 2,
+          "native_positive_rows": [
+            {
+              "availability_status": "AVAILABLE",
+              "bathrooms": "1",
+              "bedrooms": "2",
+              "floor_plan_name": "B1",
+              "rent": 1263,
+              "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+              "source_property_id": "5272798",
+              "sqft": "900",
+              "unit_number": "52"
+            }
+          ],
+          "payload_site_id": "5272798",
+          "payload_site_id_matches": true,
+          "raw": {
+            "bytes": 2596,
+            "content_bytes": 8384,
+            "content_sha256": "b0b3e6c19fd485b5d8b4cd3bc25d12761c654e606d6ada2ce5baaf7c659037b1",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/39995_workflow_repeat_2.json.gz",
+            "sha256": "bc1b867ff26da34852d2587e26b1784a703b73150b614f368bdcf796de5c0660"
+          },
+          "requested_site_id": "5272798",
+          "status": 200
+        },
+        {
+          "attempt": 3,
+          "native_positive_rows": [
+            {
+              "availability_status": "AVAILABLE",
+              "bathrooms": "1",
+              "bedrooms": "2",
+              "floor_plan_name": "B1",
+              "rent": 1263,
+              "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+              "source_property_id": "5272798",
+              "sqft": "900",
+              "unit_number": "52"
+            }
+          ],
+          "payload_site_id": "5272798",
+          "payload_site_id_matches": true,
+          "raw": {
+            "bytes": 2600,
+            "content_bytes": 8384,
+            "content_sha256": "fb402df576904d8b8cf291f764410ef67ebdd139130e7379d8c3f3b8cec35f3b",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/39995_workflow_repeat_3.json.gz",
+            "sha256": "f033ae329aff2830381b2e95d50f4904bffdc6ef14810004ea07f466a9043957"
+          },
+          "requested_site_id": "5272798",
+          "status": 200
+        }
+      ],
+      "repeat_count": 3,
+      "route": "configured South Pointe page -> published 9067331.onlineleasing.realpage.com -> widget siteId 5272798 -> workflowstartup/v1/5272798/English",
+      "stable_across_repeats": true,
+      "strict_native_rows": [
+        {
+          "availability_status": "AVAILABLE",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "B1",
+          "rent": 1263,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=<redacted>",
+          "source_property_id": "5272798",
+          "sqft": "900",
+          "unit_number": "52"
+        }
+      ]
+    },
+    "43520": {
+      "all_positive_rent": true,
+      "all_rows_join_exact_property_floorplans": true,
+      "distinct_native_unit_ids": 26,
+      "distinct_unit_numbers": 26,
+      "endpoint_results": {
+        "floorplans": {
+          "final_url": "https://api.ws.realpage.com/v2/property/9259508/floorplans",
+          "raw": {
+            "bytes": 1722,
+            "content_bytes": 27218,
+            "content_sha256": "c44cf3b35dc615bdfffebbd04d3c40305f06e4d3dd144364ff047b098c49de1c",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/43520_cws_floorplans.json.gz",
+            "sha256": "02aacf4b739dc6047369b14a5d0f5d904c2b8dc324a3a63b8da2b5fac1a255a3"
+          },
+          "status": 200
+        },
+        "property_details": {
+          "final_url": "https://api.ws.realpage.com/v2/property/9259508/PropertyDetails",
+          "raw": {
+            "bytes": 2799,
+            "content_bytes": 7806,
+            "content_sha256": "883feb61d0b45deb6a75339781021cb67c041401d519c4b5ec30a461b51ae370",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/43520_cws_property_details.json.gz",
+            "sha256": "5dd76e76ebeb8e88beecb20315a4525c816297bc6eaae5dbbe5cba5e8bb7386a"
+          },
+          "status": 200
+        },
+        "units_unfiltered": {
+          "final_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "raw": {
+            "bytes": 4992,
+            "content_bytes": 165330,
+            "content_sha256": "bb8e7c63d70ceea9d970b6f9c3ee10dd1b1496bde6fd3dc371dde0da2d798a2b",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/43520_cws_units_unfiltered.json.gz",
+            "sha256": "d42591e1aa430a8d6b6ef85e40be837e5e168aaf254dac33b69bb37afffdc31d"
+          },
+          "status": 200
+        },
+        "units_widget_filtered": {
+          "final_url": "https://api.ws.realpage.com/v2/property/9259508/units?available=true&honordisplayorder=true&siteid=9259508&bestprice=true&leaseterm=6,7,8,9,10,11,12,13,14&dateneeded=2026-08-01",
+          "raw": {
+            "bytes": 96,
+            "content_bytes": 81,
+            "content_sha256": "3877fcc458f2b4f1abf8334df471e960ed33f61c76be00bb206c321aad4849b0",
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/43520_cws_units_widget_filtered.json.gz",
+            "sha256": "55d703f5479ce2d57e1d398915a10fb1bfd1769273c86c236cad85c9b56736d2"
+          },
+          "status": 200
+        }
+      },
+      "property_details_identity": {
+        "address": {
+          "address1": "222 Blairmore Boulevard East",
+          "address2": "",
+          "cityName": "Orange Park",
+          "countryCode": "USA",
+          "countryName": "United States",
+          "countyName": "Clay",
+          "postalCode": "32073",
+          "stateCode": "FL",
+          "stateName": "Florida"
+        },
+        "exact_name_matches": true,
+        "id": "9259508",
+        "id_matches_published_property_id": true,
+        "name": "The Park at Blanding",
+        "street_city_state_zip_match": true
+      },
+      "published_config": {
+        "api_key_redacted": true,
+        "api_key_sha256": "df1c3cab68114273cb8f631dfef27cf2353a636865ef5f121a553d426ff7e2fd",
+        "official_page": {
+          "artifact": {
+            "bytes": 23845,
+            "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/43520_path_Floor-Plans.aspx_https_theparkatblanding.com_Floor-Plans.aspx.html.gz",
+            "sha256": "abebf04c5709c304920ccf7efbacae304216241100753c399447e8e5de83892b"
+          },
+          "body_sha256": "7f9794ea5eb0bc8a2e80de70a7f43a83bac6fcec4da1cdb5d47d15c58a114592",
+          "final_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "status": 200
+        },
+        "partner_property_id": "5586626",
+        "property_id": "9259508",
+        "property_key": "6O9425995018"
+      },
+      "route": "configured http://www.parkatblanding.com/ -> current official https://theparkatblanding.com/Floor-Plans.aspx -> embedded RPFP_config propertyId 9259508 -> api.ws.realpage.com/v2/property/9259508/units",
+      "strict_filter": "active is true AND leaseStatus == AVAILABLE_READY AND native id/number present AND rent > 0 AND floorplanId belongs to exact property floorplan payload",
+      "strict_native_rows": [
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447523",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "005"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447452",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "010"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447493",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "018"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447494",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "023"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447458",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "024"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447495",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "026"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447462",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "033"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447467",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "045"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447469",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "047"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447504",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "056"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447541",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "058"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447542",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "059"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447471",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "064"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447473",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "067"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447507",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "070"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447546",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "072"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447550",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "077"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447479",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "080"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447560",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "096"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447482",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "102"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447484",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "104"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447516",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "107"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1 Large",
+          "floorplan_id": "11500521",
+          "native_unit_id": "18447517",
+          "rent": 1300,
+          "sqft": 970,
+          "unit_number": "108"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "2",
+          "bedrooms": "3",
+          "floor_plan_name": "3x2",
+          "floorplan_id": "11500522",
+          "native_unit_id": "18447565",
+          "rent": 1249,
+          "sqft": 1070,
+          "unit_number": "109"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447486",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "112"
+        },
+        {
+          "active": true,
+          "availability_status": "AVAILABLE_READY",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2x1",
+          "floorplan_id": "11500520",
+          "native_unit_id": "18447488",
+          "rent": 1175,
+          "sqft": 930,
+          "unit_number": "114"
+        }
+      ],
+      "widget_filtered_endpoint_observation": {
+        "message": "No units were found with the given id.",
+        "response_is_null": true,
+        "status": 200
+      }
+    }
+  },
+  "scope": {
+    "cluster_generalization": "No route is generalized solely from one property. The existing OneSite workflow path was live-probed across all six. The Tor View page-local text pattern and Park RPFP unfiltered-CWS pattern each occur in only one member, so the implementation proposal gates them by exact published markers and fails closed elsewhere.",
+    "cluster_members_live_probed": 6,
+    "cohort": [
+      14295,
+      38677,
+      39995,
+      43520,
+      67154,
+      291774
+    ],
+    "not_recovered_pids": [
+      14295,
+      67154,
+      291774
+    ],
+    "recovered_pids": [
+      38677,
+      39995,
+      43520
+    ]
+  },
+  "source_artifacts": {
+    "direct_route_probe": {
+      "bytes": 177427,
+      "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/direct_route_probe.json",
+      "sha256": "f91a070abaae398e94549a9d08907c2cc32cf0b51a4b56a2d0c0c00e17167079"
+    },
+    "southern_pine_clean_hyperbrowser": {
+      "bytes": 6520,
+      "path": "/private/tmp/propai-fnd-vBkmT9/onesite_residual6_parallel/hb_southern_pine_clean_probe.json",
+      "sha256": "0b24f56a0846cec879688af223a86938c817622f2f6b6b20b2bb21ec4508c1b4"
+    }
+  }
+}

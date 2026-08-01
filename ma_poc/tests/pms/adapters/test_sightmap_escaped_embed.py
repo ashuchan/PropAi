@@ -16,6 +16,7 @@ OneSite props regress.
 from __future__ import annotations
 
 from ma_poc.pms.adapters.sightmap import (
+    _extract_sightmap_embed_codes,
     _normalize_sightmap_slashes,
     find_sightmap_embed_codes,
 )
@@ -28,6 +29,14 @@ _IMT = (
 )
 _IMT_U002F = (
     '{"sightmap_link":"https:\\u002f\\u002fsightmap.com\\u002fembed\\u002fdgow3rn8w2m"}'
+)
+_LINDLEY = (
+    '<script>window.propertyConfig = {"spaces_asset_name":"The Lindley",'
+    '"sightmap_url":"https:\\/\\/sightmap.com\\/embed\\/60p7x5j3v7n"};'
+    "</script>"
+)
+_UNTRUSTED_JSON_KEY = (
+    '{"unrelated_url":"https:\\/\\/sightmap.com\\/embed\\/shouldnotroute1"}'
 )
 _LITERAL = '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>'
 
@@ -44,6 +53,18 @@ def test_extracts_escaped_embed_code() -> None:
 
 def test_extracts_u002f_escaped_code() -> None:
     assert find_sightmap_embed_codes(_IMT_U002F) == ["dgow3rn8w2m"]
+
+
+def test_extracts_lindley_sightmap_url_live_shape() -> None:
+    assert find_sightmap_embed_codes(_LINDLEY) == ["60p7x5j3v7n"]
+
+
+def test_direct_probe_extracts_lindley_escaped_code() -> None:
+    assert _extract_sightmap_embed_codes(_LINDLEY) == ["60p7x5j3v7n"]
+
+
+def test_json_value_support_remains_key_scoped() -> None:
+    assert find_sightmap_embed_codes(_UNTRUSTED_JSON_KEY) == []
 
 
 def test_literal_embed_still_extracted() -> None:

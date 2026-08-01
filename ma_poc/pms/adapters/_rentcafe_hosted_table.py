@@ -35,6 +35,10 @@ from ma_poc.pms.adapters._parsing import make_unit_dict
 
 _TIER = "TIER_1_DOM_RENTCAFE_HOSTED"
 _MONEY_RE = re.compile(r"[\d,]+(?:\.\d+)?")
+# Live markup serializes the query separator either as ``&`` or the literal
+# JavaScript escape ``\u0026``.  The latter ends in a word character, so a
+# leading ``\b`` before ``myOlePropertyId`` incorrectly drops provenance.
+_PROPERTY_ID_RE = re.compile(r"myOlePropertyId\s*=\s*(\d+)", re.IGNORECASE)
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
@@ -95,6 +99,20 @@ def _digits(v: str) -> str:
     return m.group(0).replace(",", "") if m else ""
 
 
+def _is_waitlist_sentinel(v: str) -> bool:
+    """Reject RentCafe's priced waitlist placeholders as non-physical units.
+
+    Live Coopers Landing evidence (property 480033, 2026-08-01) exposes
+    labels such as ``WAIT1BD`` and ``WAITAPP`` as ``tr.fp-unit`` rows with
+    stable-looking IDs and rents.  They are application/waitlist inventory,
+    not apartment numbers, so admitting them would manufacture unit-level
+    success.  RentCafe removes punctuation inconsistently; compare a compact
+    form and fail closed for every WAIT-prefixed label.
+    """
+    compact = re.sub(r"[\s_-]+", "", str(v or "")).casefold()
+    return compact.startswith("wait")
+
+
 def parse_rentcafe_hosted_table(html: str, source_url: str) -> list[dict[str, Any]]:
     """Rendered RentCafe-hosted ``tr.fp-unit`` rows → unit-level dicts.
 
@@ -112,7 +130,7 @@ def parse_rentcafe_hosted_table(html: str, source_url: str) -> list[dict[str, An
     for row in rows:
         unum = str(row.get("data-unit-name") or "").strip()
         rlo, rhi = _rent_range(str(row.get("data-unit-rent") or ""))
-        if not unum or rlo is None:
+        if not unum or _is_waitlist_sentinel(unum) or rlo is None:
             continue
         uid = str(row.get("data-unit-id") or "").strip()
         key = uid or unum
@@ -129,18 +147,41 @@ def parse_rentcafe_hosted_table(html: str, source_url: str) -> list[dict[str, An
             if len(tds) > 1:
                 avail = _iso(tds[1].get_text(" ", strip=True))
 
-        out.append(
-            make_unit_dict(
-                unit_number=unum,
-                bedrooms=_digits(str(row.get("data-unit-beds") or "")),
-                bathrooms=_digits(str(row.get("data-unit-baths") or "")),
-                sqft=_digits(str(row.get("data-unit-size") or "")),
-                rent_low=rlo,
-                rent_high=rhi,
-                availability_status="AVAILABLE",
-                availability_date=avail,
-                source_api_url=source_url,
-                extraction_tier=_TIER,
-            )
+        floor_plan = row.find_parent(attrs={"data-floorplan-id": True})
+        floor_plan_id = ""
+        floor_plan_name = ""
+        if floor_plan is not None:
+            floor_plan_id = str(floor_plan.get("data-floorplan-id") or "").strip()
+            floor_plan_name = str(floor_plan.get("data-name") or "").strip()
+            if not floor_plan_name:
+                name_node = floor_plan.select_one(".fp-name")
+                if name_node is not None:
+                    floor_plan_name = name_node.get_text(" ", strip=True)
+
+        source_ids: dict[str, str] = {}
+        if uid:
+            # RentCafe/SecureCafe uses this native apartment identifier in
+            # the application URL; it is already registered UNIT_STABLE.
+            source_ids["securecafe_apartment_id"] = uid
+        if floor_plan_id:
+            source_ids["rentcafe_floorplan_id"] = floor_plan_id
+
+        unit = make_unit_dict(
+            floor_plan_name=floor_plan_name,
+            unit_number=unum,
+            bedrooms=_digits(str(row.get("data-unit-beds") or "")),
+            bathrooms=_digits(str(row.get("data-unit-baths") or "")),
+            sqft=_digits(str(row.get("data-unit-size") or "")),
+            rent_low=rlo,
+            rent_high=rhi,
+            availability_status="AVAILABLE",
+            availability_date=avail,
+            source_api_url=source_url,
+            extraction_tier=_TIER,
+            source_ids=source_ids,
         )
+        property_id = _PROPERTY_ID_RE.search(str(row))
+        if property_id:
+            unit["source_property_id"] = property_id.group(1)
+        out.append(unit)
     return out

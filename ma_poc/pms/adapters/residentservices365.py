@@ -7,7 +7,7 @@ template across instances:
   - Plan page: ``GET {domain}/Marketing/FloorPlans`` — SSR plan cards in
     ``.floorplan-tile`` containers.
   - Unit detail: ``GET {domain}/Marketing/FloorPlans/Units/{guid}`` — SSR
-    per-unit rows (unit-level drill, not yet exercised here; future).
+    per-unit rows with apartment identity and rent.
 
 Per-card DOM (verified live 2026-05-19 on rusticwoodsapts.com /
 waterfordpoint.us — selectors byte-identical):
@@ -19,12 +19,15 @@ waterfordpoint.us — selectors byte-identical):
   - ``.availability``           — "3 Units Available" | "1 Unit Available" |
                                    "Join Waitlist"
 
-Plan-level for this first cut; the per-unit ``/Units/{guid}`` drill is a
-follow-up enhancement (the GUID is captured but not yet fetched).
+The adapter prefers those unit-detail rows over the plan catalogue.  The
+detail drill also works when production dispatches ``page=None``: a bounded,
+same-property HTTP lane reads the public SSR pages without a browser, proxy,
+or challenge-bypass service.
 
-Probed cluster size: 4 in the 351-row deep-probe sample (16196, 1777,
-16754, 60939) — all the same template. Detector_hop_gap was the failure
-mode (jugnu tier=NONE because the CMS marker wasn't fingerprinted).
+The exact 2026-07-31 549-property plan-level cohort contained eight marker-
+positive sites.  Three exposed strict live unit rows through this drill at
+probe time; the other five are retained as zero-inventory/migrated controls,
+not promoted from plan-only data.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -46,6 +49,13 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 log = logging.getLogger(__name__)
+
+_RS365_MARKER = "365residentservices.com"
+_MAX_FLOORPLANS_BYTES = 1_000_000
+_MAX_DETAIL_BYTES = 1_500_000
+_MAX_DETAIL_PAGES = 16
+_DETAIL_FETCH_CONCURRENCY = 4
+_HTTP_TIMEOUT_SECONDS = 15.0
 
 # Self-fetch /Marketing/FloorPlans if the live page isn't already there;
 # parse the .floorplan-tile cards via DOMParser. Returns [] for non-365rs
@@ -82,7 +92,7 @@ _AVAIL_COUNT_RE = re.compile(r"(\d+)\s+Units?\s+Available", re.IGNORECASE)
 # data-rent-min / data-rent-max attrs). The plan-tile parser
 # captures the GUID but the legacy adapter never followed the link.
 _UNIT_DETAIL_HREF_RE = re.compile(
-    r'href="(/Marketing/FloorPlans/Units/[0-9a-f-]{36})"',
+    r'href="(/(?:Marketing/FloorPlans/Units|floorplan)/[0-9a-f-]{36})"',
     re.IGNORECASE,
 )
 
@@ -116,6 +126,46 @@ _UNIT_LIST_DIVIDER_RE = re.compile(
 )
 _UNIT_LI_RE = re.compile(r'<li[^>]*>([\s\S]*?)</li>', re.IGNORECASE)
 _TAG_STRIP_RE = re.compile(r'<[^>]+>')
+
+
+def _html_from_ctx(ctx: AdapterContext) -> str:
+    fetch_result = getattr(ctx, "fetch_result", None)
+    body = getattr(fetch_result, "body", None)
+    if isinstance(body, bytes):
+        return body.decode("utf-8", errors="replace")
+    return body if isinstance(body, str) else ""
+
+
+def _normalized_host(url: str) -> str:
+    try:
+        host = (urlparse(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+    return host.removeprefix("www.")
+
+
+def _same_property_host(left: str, right: str) -> bool:
+    """Treat http/https and a leading ``www.`` as the same property host."""
+    left_host = _normalized_host(left)
+    right_host = _normalized_host(right)
+    return bool(left_host and left_host == right_host)
+
+
+def _has_rs365_marker(html: str) -> bool:
+    return _RS365_MARKER in (html or "").lower()
+
+
+def _has_strict_unit_identity_and_rent(row: object) -> bool:
+    """Return true only for an apartment row, never a plan summary."""
+    if not isinstance(row, dict) or not str(row.get("unit_number") or "").strip():
+        return False
+    for field in ("market_rent_low", "market_rent_high"):
+        try:
+            if float(row.get(field) or 0) > 0:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def _plan_name(title: str, specs: str) -> str:
@@ -196,16 +246,22 @@ def parse_residentservices365_tiles(
 
 
 def find_unit_detail_urls(floorplans_html: str, base_url: str) -> list[str]:
-    """Extract per-plan ``/Marketing/FloorPlans/Units/{guid}`` URLs from the
-    plan-grid HTML. The Apollo/collapsar theme ships each .floorplan-tile
-    with an anchor (or "View Units" button) whose href points to the
-    plan's per-unit detail page. We return absolute URLs ready for fetch.
+    """Extract RS365 per-plan detail URLs from the plan-grid HTML.
+
+    Apollo/collapsar uses ``/Marketing/FloorPlans/Units/{guid}``; the newer
+    Gemini/cosmic themes use ``/floorplan/{guid}``.  Both routes render the
+    same strict ``.unit-details`` rows.  We return absolute URLs ready for a
+    same-property fetch.
 
     Returns an empty list if no matches found (older /Home/Index/* page
     that hasn't yet linked the FloorPlans grid — caller falls through to
     plan-level extraction).
     """
-    if not floorplans_html or "/Marketing/FloorPlans/Units/" not in floorplans_html:
+    lower_html = (floorplans_html or "").lower()
+    if not lower_html or not any(
+        marker in lower_html
+        for marker in ("/marketing/floorplans/units/", "/floorplan/")
+    ):
         return []
     try:
         p = urlparse(base_url)
@@ -379,29 +435,32 @@ class Residentservices365Adapter:
     _fingerprints: list[str] = ["365residentservices.com", "/Marketing/FloorPlans"]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Extract plan-level units from the SSR ``/Marketing/FloorPlans`` grid."""
+        """Extract strict units, with the plan catalogue as a fallback."""
         result = AdapterResult(tier_used="TIER_1_DOM_365RESIDENTSERVICES")
 
         evaluate = getattr(page, "evaluate", None)
-        if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("365rs: no live page to parse")
-            return result
-
-        try:
-            tiles = await evaluate(_RS365_DOM_JS)
-        except Exception as exc:
-            log.debug("365rs DOM evaluate failed err=%s", exc)
-            tiles = None
-
-        if not isinstance(tiles, list) or not tiles:
-            result.confidence = 0.0
-            result.errors.append(
-                "365rs: no .floorplan-tile blocks found at /Marketing/FloorPlans"
+        tiles: object = None
+        if callable(evaluate):
+            try:
+                tiles = await evaluate(_RS365_DOM_JS)
+            except Exception as exc:
+                log.debug("365rs DOM evaluate failed err=%s", exc)
+        units = (
+            parse_residentservices365_tiles(
+                tiles,
+                self._winning_url(page, ctx),
             )
-            return result
+            if isinstance(tiles, list) and tiles
+            else []
+        )
 
-        units = parse_residentservices365_tiles(tiles, self._winning_url(page, ctx))
+        # A page-less production dispatch is allowed to self-fetch only after
+        # the already-fetched property body proves this is the RS365 CMS. This
+        # prevents a stale detector label from turning into arbitrary traffic.
+        code_only = not callable(evaluate)
+        if code_only and not _has_rs365_marker(_html_from_ctx(ctx)):
+            result.errors.append("365rs: exact CMS marker absent in fetched body")
+            return result
 
         # 2026-05-25 (user-flagged via Village Square Wheaton pid 16196):
         # before falling back to plan-level, drill into each plan's
@@ -425,21 +484,19 @@ class Residentservices365Adapter:
             log.debug("365rs floorplans-self-fetch failed err=%s", exc)
             floorplans_html = ""
 
-        if floorplans_html:
-            detail_urls = find_unit_detail_urls(floorplans_html, floorplans_url)
-            for detail_url in detail_urls:
-                try:
-                    detail_html = await self._fetch_detail_html(detail_url)
-                except Exception as exc:
-                    log.debug(
-                        "365rs unit-detail fetch failed url=%s err=%s",
-                        detail_url, exc,
-                    )
-                    detail_html = ""
-                if not detail_html:
-                    continue
-                unit_blocks = parse_rs365_unit_blocks(detail_html, detail_url)
-                unit_level_drill.extend(unit_blocks)
+        if floorplans_html and (_has_rs365_marker(floorplans_html) or units):
+            detail_urls = [
+                url
+                for url in find_unit_detail_urls(floorplans_html, floorplans_url)
+                if _same_property_host(url, floorplans_url)
+            ][:_MAX_DETAIL_PAGES]
+            detail_documents = await self._fetch_detail_documents(detail_urls)
+            for detail_url, detail_html in detail_documents:
+                unit_level_drill.extend(
+                    row
+                    for row in parse_rs365_unit_blocks(detail_html, detail_url)
+                    if _has_strict_unit_identity_and_rent(row)
+                )
 
         # When the drill produced real unit-level rows, prefer them over
         # the plan-level summary. When the drill produced nothing (the
@@ -480,7 +537,16 @@ class Residentservices365Adapter:
             )
 
         result.confidence = 0.0
-        result.errors.append("365rs: no parseable plan data")
+        if code_only:
+            result.errors.append(
+                "365rs: bounded SSR drill found no canonical unit with rent"
+            )
+        elif not isinstance(tiles, list) or not tiles:
+            result.errors.append(
+                "365rs: no .floorplan-tile blocks found at /Marketing/FloorPlans"
+            )
+        else:
+            result.errors.append("365rs: no parseable plan data")
         return result
 
     @staticmethod
@@ -500,53 +566,138 @@ class Residentservices365Adapter:
                 current_url = ""
             if current_url.rstrip("/").endswith("/Marketing/FloorPlans"):
                 try:
-                    return await page.content()
+                    content = await page.content()
+                    if len(content.encode("utf-8")) <= _MAX_FLOORPLANS_BYTES:
+                        return content
                 except Exception:
                     pass
-        try:
-            import httpx
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-            }
-            async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True, headers=headers
-            ) as c:
-                r = await c.get(floorplans_url)
-            if r.status_code == 200:
-                return r.text
-        except Exception as exc:
-            log.debug("365rs floorplans httpx-fetch failed err=%s", exc)
-        return ""
+        html, final_url = await Residentservices365Adapter._bounded_html_get(
+            floorplans_url,
+            max_bytes=_MAX_FLOORPLANS_BYTES,
+        )
+        if final_url and not _same_property_host(floorplans_url, final_url):
+            log.debug(
+                "365rs floorplans redirect left property host requested=%s final=%s",
+                floorplans_url,
+                final_url,
+            )
+            return ""
+        return html
 
     @staticmethod
     async def _fetch_detail_html(detail_url: str) -> str:
         """Self-fetch a single /Marketing/FloorPlans/Units/{guid} detail
         page via httpx. Apollo CMS renders the full unit-details SSR
         DOM without JS execution."""
+        html, final_url = await Residentservices365Adapter._bounded_html_get(
+            detail_url,
+            max_bytes=_MAX_DETAIL_BYTES,
+        )
+        if final_url and not _same_property_host(detail_url, final_url):
+            log.debug(
+                "365rs detail redirect left property host requested=%s final=%s",
+                detail_url,
+                final_url,
+            )
+            return ""
+        return html
+
+    @staticmethod
+    async def _bounded_html_get(
+        url: str,
+        *,
+        max_bytes: int,
+    ) -> tuple[str, str]:
+        """Fetch one public HTML document with hard time and byte bounds.
+
+        This is deliberately plain HTTP: environment proxies are disabled and
+        no browser fingerprint, CAPTCHA solver, unlocker, or alternate fetch
+        service is involved.  The final URL is returned so callers can enforce
+        the same-property redirect boundary.
+        """
         try:
             import httpx
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-            }
+
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                return "", ""
             async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True, headers=headers
-            ) as c:
-                r = await c.get(detail_url)
-            if r.status_code == 200:
-                return r.text
+                timeout=httpx.Timeout(_HTTP_TIMEOUT_SECONDS),
+                follow_redirects=False,
+                trust_env=False,
+                headers={"Accept": "text/html,application/xhtml+xml"},
+            ) as client:
+                current_url = url
+                for _redirect in range(6):
+                    async with client.stream("GET", current_url) as response:
+                        final_url = str(response.url)
+                        if response.status_code in {301, 302, 303, 307, 308}:
+                            location = response.headers.get("location")
+                            if not location:
+                                return "", final_url
+                            next_url = urljoin(final_url, location)
+                            if not _same_property_host(url, next_url):
+                                return "", next_url
+                            current_url = next_url
+                            continue
+                        if not 200 <= response.status_code < 300:
+                            return "", final_url
+                        content_length = response.headers.get("content-length")
+                        if content_length:
+                            try:
+                                if int(content_length) > max_bytes:
+                                    return "", final_url
+                            except ValueError:
+                                pass
+                        chunks: list[bytes] = []
+                        total = 0
+                        async for chunk in response.aiter_bytes():
+                            total += len(chunk)
+                            if total > max_bytes:
+                                return "", final_url
+                            chunks.append(chunk)
+                        body = b"".join(chunks)
+                        encoding = response.encoding or "utf-8"
+                        try:
+                            return (
+                                body.decode(encoding, errors="replace"),
+                                final_url,
+                            )
+                        except LookupError:
+                            return (
+                                body.decode("utf-8", errors="replace"),
+                                final_url,
+                            )
+                return "", current_url
         except Exception as exc:
-            log.debug("365rs detail httpx-fetch failed err=%s", exc)
-        return ""
+            log.debug("365rs bounded HTTP fetch failed url=%s err=%s", url, exc)
+            return "", ""
+
+    @staticmethod
+    async def _fetch_detail_documents(
+        detail_urls: list[str],
+    ) -> list[tuple[str, str]]:
+        """Fetch at most 16 detail pages, with four requests in flight."""
+        import asyncio
+
+        semaphore = asyncio.Semaphore(_DETAIL_FETCH_CONCURRENCY)
+
+        async def fetch_one(url: str) -> tuple[str, str]:
+            async with semaphore:
+                try:
+                    return url, await Residentservices365Adapter._fetch_detail_html(
+                        url
+                    )
+                except Exception as exc:  # defensive isolation for one plan
+                    log.debug(
+                        "365rs unit-detail fetch failed url=%s err=%s",
+                        url,
+                        exc,
+                    )
+                    return url, ""
+
+        bounded = list(dict.fromkeys(detail_urls))[:_MAX_DETAIL_PAGES]
+        return list(await asyncio.gather(*(fetch_one(url) for url in bounded)))
 
     @staticmethod
     def _winning_url(page: Page, ctx: AdapterContext) -> str:
@@ -556,7 +707,12 @@ class Residentservices365Adapter:
         except Exception:
             candidate = ""
         if not candidate:
-            candidate = getattr(ctx, "base_url", "") or ""
+            fetch_result = getattr(ctx, "fetch_result", None)
+            candidate = (
+                getattr(fetch_result, "final_url", "")
+                or getattr(ctx, "base_url", "")
+                or ""
+            )
         try:
             p = urlparse(candidate)
         except Exception:

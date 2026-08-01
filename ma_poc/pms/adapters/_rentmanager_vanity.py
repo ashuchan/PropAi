@@ -16,9 +16,9 @@ Detection markers (any sufficient):
   * ``.suite-group-rate`` rate display class
   * Link to ``*.twa.rentmanager.com`` in body
 
-Output: plan-level units (one per ``.suite-group``) with rent range,
-bed/bath/sqft summary, availability. Skips groups with rent=$0
-(default empty placeholders).
+Output: real available apartments from inner ``.suite`` rows, plus one
+plan-level summary per ``.suite-group`` with rent range, bed/bath/sqft and
+availability. Skips groups with rent=$0 (default empty placeholders).
 """
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def _txt(el: Any) -> str:
 def parse_rentmanager_vanity_html(
     html: str, url: str
 ) -> list[dict[str, str]]:
-    """Parse RentManager-vanity SSR HTML into plan-level unit dicts.
+    """Parse RentManager-vanity SSR HTML into unit + plan-level dicts.
 
     Returns ``[]`` when no ``.suite-group`` containers are present, so
     the caller can fall through cleanly when detection misfires.
@@ -77,8 +77,8 @@ def parse_rentmanager_vanity_html(
       * ``sqft``: ``.suite-group-sqft .value`` (often blank)
       * ``rent_low``/``high``: parsed from ``.suite-group-rate .value``
         format ``"From: $790 - $860"`` or ``"$790"``
-      * ``available_units``: count of inner ``.suite`` children with a
-        real rate (skips header rows)
+      * ``available_units``: count of inner ``.suite`` children that are
+        actually available (not every priced unit in the property roster)
       * ``availability_status``: ``UNAVAILABLE`` when value is "N/A"
 
     Skips groups with rate "$0" (placeholder empty groups RentManager
@@ -95,6 +95,7 @@ def parse_rentmanager_vanity_html(
 
     units: list[dict[str, str]] = []
     seen_names: set[str] = set()
+    seen_suite_ids: set[str] = set()
     for grp in groups:
         # Floorplan name from h3
         name = _txt(grp.select_one(".suite-group-type, h3"))
@@ -149,47 +150,115 @@ def parse_rentmanager_vanity_html(
         ):
             status = "UNAVAILABLE"
 
-        # Count available .suite rows inside (excluding header columns)
+        # Inner rows are the actual apartment roster.  Older versions counted
+        # every priced row as "available", even when its button explicitly
+        # said Not Available (Wilmington Pointe: 189 priced rows, only 21
+        # available).  Emit only rows with a positive per-unit rent, a numeric
+        # physical unit token, a stable data-suite-id, and a non-disabled
+        # availability action.  Plan dimensions are safe context inherited by
+        # each apartment; identity and price remain row-local.
         suite_rows = grp.select(".suite-group-suites .suite[data-suite-id]")
-        avail_count = ""
-        if suite_rows:
-            # Count rows that have a real rate
-            real_count = sum(
-                1 for s in suite_rows
-                if _RM_MONEY_RE.search(
-                    _txt(s.select_one(".suite-rate, .suite-rate.item"))
+        available_rows: list[dict[str, str]] = []
+        for suite in suite_rows:
+            suite_id = str(suite.get("data-suite-id") or "").strip()
+            unit_number = _txt(suite.select_one(".suite-type.item"))
+            suite_rate_raw = _txt(suite.select_one(".suite-rate.item"))
+            suite_rent_values = _RM_MONEY_RE.findall(suite_rate_raw)
+            suite_rent = (
+                money_to_int(suite_rent_values[0])
+                if suite_rent_values
+                else None
+            )
+            suite_sqft_raw = _txt(suite.select_one(".suite-sqft.item"))
+            suite_sqft_match = _RM_NUM_RE.search(suite_sqft_raw)
+            suite_sqft = (
+                suite_sqft_match.group(1).replace(",", "")
+                if suite_sqft_match
+                else ""
+            )
+            suite_bath_raw = _txt(suite.select_one(".suite-bath.item"))
+            suite_bath_match = _RM_BATH_RE.search(suite_bath_raw)
+            suite_baths = suite_bath_match.group(1) if suite_bath_match else baths
+            availability_node = suite.select_one(".suite-availability.item")
+            availability_text = _txt(availability_node)
+            availability_lower = availability_text.casefold()
+            availability_classes = {
+                str(value).casefold()
+                for node in ([availability_node] if availability_node else [])
+                for value in (node.get("class") or [])
+            }
+            for child in availability_node.select("*") if availability_node else []:
+                availability_classes.update(
+                    str(value).casefold() for value in (child.get("class") or [])
+                )
+            unavailable = (
+                not availability_text
+                or "not available" in availability_lower
+                or "unavailable" in availability_lower
+                or "waitlist" in availability_lower
+                or "disabled" in availability_classes
+                or "not-available" in availability_classes
+            )
+            has_available_action = any(
+                token in availability_lower
+                for token in ("available", "inquire", "apply", "now")
+            ) or bool(re.search(r"\d{1,2}/\d{1,2}/\d{4}", availability_text))
+            try:
+                suite_sqft_value = int(suite_sqft)
+            except (TypeError, ValueError):
+                suite_sqft_value = 0
+            if (
+                unavailable
+                or not has_available_action
+                or not suite_id.isdigit()
+                or suite_id in seen_suite_ids
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .#/-]{0,30}", unit_number)
+                or not any(char.isdigit() for char in unit_number)
+                or not suite_rent
+                or not 150 <= suite_sqft_value <= 10_000
+            ):
+                continue
+            seen_suite_ids.add(suite_id)
+            available_rows.append(
+                make_unit_dict(
+                    floor_plan_name=name,
+                    bed_label=bed_label_from(beds, name),
+                    bedrooms=str(beds) if beds is not None else "",
+                    bathrooms=str(suite_baths),
+                    sqft=str(suite_sqft_value),
+                    unit_number=unit_number,
+                    rent_low=suite_rent,
+                    rent_high=suite_rent,
+                    availability_status="AVAILABLE",
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_RENTMANAGER_VANITY_UNIT",
+                    source_ids={"rentmanager_uid": suite_id},
                 )
             )
-            if real_count > 0:
-                avail_count = str(real_count)
+        avail_count = str(len(available_rows)) if available_rows else ""
 
         # Dedupe by floor_plan_name (some sites emit duplicate group containers)
         dedupe_key = name.strip().lower()
-        if dedupe_key in seen_names:
-            continue
-        seen_names.add(dedupe_key)
-
-        # Need at least one numeric dimension (rent or sqft) to clear validity
-        if not (rent_lo or rent_hi or sqft):
-            continue
-
-        units.append(
-            make_unit_dict(
-                floor_plan_name=name,
-                bed_label=bed_label_from(beds, name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths),
-                sqft=sqft,
-                unit_number="",
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                rent_low=rent_lo,
-                rent_high=rent_hi,
-                availability_status=status,
-                available_units=avail_count,
-                source_api_url=url,
-                extraction_tier="TIER_1_DOM_RENTMANAGER_VANITY",
+        if dedupe_key not in seen_names and (rent_lo or rent_hi or sqft):
+            seen_names.add(dedupe_key)
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=name,
+                    bed_label=bed_label_from(beds, name),
+                    bedrooms=str(beds) if beds is not None else "",
+                    bathrooms=str(baths),
+                    sqft=sqft,
+                    unit_number="",
+                    rent_range=format_rent_range(rent_lo, rent_hi),
+                    rent_low=rent_lo,
+                    rent_high=rent_hi,
+                    availability_status=status,
+                    available_units=avail_count,
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_RENTMANAGER_VANITY",
+                )
             )
-        )
+        units.extend(available_rows)
     return units
 
 
@@ -205,7 +274,7 @@ class RentManagerVanityAdapter:
     ]
 
     async def extract(
-        self, page: "Page", ctx: AdapterContext
+        self, page: Page, ctx: AdapterContext
     ) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_RENTMANAGER_VANITY")
         fr = getattr(ctx, "fetch_result", None)

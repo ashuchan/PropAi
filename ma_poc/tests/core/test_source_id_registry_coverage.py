@@ -66,11 +66,7 @@ def _literal_dict_keys(node: ast.AST) -> list[tuple[str, int]]:
     elif isinstance(node, ast.DictComp):
         for gen in node.generators:
             it = gen.iter
-            if (
-                isinstance(it, ast.Call)
-                and isinstance(it.func, ast.Attribute)
-                and it.func.attr == "items"
-            ):
+            if isinstance(it, ast.Call) and isinstance(it.func, ast.Attribute) and it.func.attr == "items":
                 out += _literal_dict_keys(it.func.value)
             else:
                 out += _literal_dict_keys(it)
@@ -98,14 +94,8 @@ def _scan_file(path: Path) -> list[tuple[str, int]]:
                         name = base.id
                     elif isinstance(base, ast.Attribute):
                         name = base.attr
-                    elif isinstance(base, ast.Subscript) and isinstance(
-                        base.slice, ast.Constant
-                    ):
-                        name = (
-                            "source_ids"
-                            if base.slice.value == "source_ids"
-                            else None
-                        )
+                    elif isinstance(base, ast.Subscript) and isinstance(base.slice, ast.Constant):
+                        name = "source_ids" if base.slice.value == "source_ids" else None
                     if name == "source_ids" and isinstance(t.slice.value, str):
                         found.append((t.slice.value, t.lineno))
                 # source_ids = {...}  /  self.source_ids = {...}
@@ -142,9 +132,7 @@ def _all_writers() -> dict[str, list[str]]:
             continue
         for key, lineno in _scan_file(path):
             rel = path.relative_to(_MA_POC.parent)
-            writers.setdefault(normalize_source_id_key(key), []).append(
-                f"{rel}:{lineno}"
-            )
+            writers.setdefault(normalize_source_id_key(key), []).append(f"{rel}:{lineno}")
     return writers
 
 
@@ -202,12 +190,11 @@ def test_registry_has_no_stale_entries_beyond_dead_and_apartment_id() -> None:
     working tree, and committing this PR alone would fail CI. Delete the
     allowlist entry in the diagnostics PR that lands the writer.
     """
-    allowed_writerless = {
-        k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.DEAD
-    } | {"apartment_id", "api_floorplan_id"}
-    stale = {
-        k for k in SOURCE_ID_SCOPES if k not in _WRITERS and k not in allowed_writerless
+    allowed_writerless = {k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.DEAD} | {
+        "apartment_id",
+        "api_floorplan_id",
     }
+    stale = {k for k in SOURCE_ID_SCOPES if k not in _WRITERS and k not in allowed_writerless}
     assert not stale, (
         f"Registered but written by nobody: {sorted(stale)}. Either the writer "
         f"was deleted (move the entry to DEAD) or the key was mistyped."
@@ -255,8 +242,7 @@ def test_per_unit_views_are_disjoint_from_every_other_scope() -> None:
     other = {
         k
         for k, s in SOURCE_ID_SCOPES.items()
-        if s
-        not in (SourceIdScope.UNIT_STABLE, SourceIdScope.UNIT_VOLATILE)
+        if s not in (SourceIdScope.UNIT_STABLE, SourceIdScope.UNIT_VOLATILE)
     }
     assert not (PER_UNIT_EVIDENCE_KEYS & other)
     assert not (set(PER_UNIT_IDENTITY_KEYS) & other)
@@ -476,13 +462,16 @@ def test_plan_marker_prevents_junk_unit_token_from_counting_as_real_anchor() -> 
     """Post-process plan provenance must win over a stale raw DOM token."""
     from ma_poc.core.identity import unit_has_real_anchor
 
-    assert unit_has_real_anchor(
-        {
-            "unit_number": "Left",
-            "data_quality_flag": "PLAN_LEVEL_NO_UNIT_ANCHOR",
-            "extraction_tier": "TIER_3_DOM_PLAN_LEVEL",
-        }
-    ) is False
+    assert (
+        unit_has_real_anchor(
+            {
+                "unit_number": "Left",
+                "data_quality_flag": "PLAN_LEVEL_NO_UNIT_ANCHOR",
+                "extraction_tier": "TIER_3_DOM_PLAN_LEVEL",
+            }
+        )
+        is False
+    )
 
 
 def test_unregistered_floorplan_suffix_key_is_still_caught() -> None:
@@ -515,6 +504,8 @@ _ADMISSION_EVIDENCE: dict[str, str] = {
     "venterra_unit_code": "fixtures 19/19 and 20/20",
     "realpage_oll_unit_id": "fixture 4/4 (UnitId= off the per-unit application URL)",
     "securecafe_apartment_id": "fixtures 7/7 and 18/18",
+    "knock_unit_id": "440 rows / 5 exact GSC props @ 1.000 (live 2026-08-01); "
+    "two consecutive public fetches returned identical UUID sets",
     "rently_full_address": "fixture 5/5 (Jodeco searchQuery) — scattered-site street "
     "address, unique + permanent per home (#29); rot unmeasured (address does not change)",
 }
@@ -529,12 +520,14 @@ _VOLATILE_EVIDENCE: dict[str, str] = {
     "so kept volatile (rently_full_address is the stable anchor)",
     "unit_id_engrain": "fixtures 24/24 (Lunaire) + 33 (Steeplechase) — Engrain per-unit id; "
     "rotation UNMEASURED so volatile (modern rows anchor on unit_number)",
+    "iloveleasing_unit_id": "Atlantico exact public widget: 3/3 distinct within each pull, "
+    "but all 3 ids rotated for the same visible unit labels between captures",
+    "managebuilding_listing_id": "Le Mirage complete rentals index: 10/10 distinct public "
+    "listing records; re-listing stability unmeasured, so classify-only",
 }
 
 
-@pytest.mark.parametrize(
-    ("key", "evidence"), sorted(_ADMISSION_EVIDENCE.items())
-)
+@pytest.mark.parametrize(("key", "evidence"), sorted(_ADMISSION_EVIDENCE.items()))
 def test_admitted_key_mints_a_real_anchor(key: str, evidence: str) -> None:
     """Every admitted per-unit key must actually produce a non-synthetic id.
 
@@ -559,9 +552,7 @@ def test_admitted_key_mints_a_real_anchor(key: str, evidence: str) -> None:
 def test_every_unit_stable_key_has_an_evidence_case() -> None:
     """No silent additions: UNIT_STABLE and the identity view must match, and
     the evidence-parametrised test above must cover every one of them."""
-    stable = {
-        k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.UNIT_STABLE
-    }
+    stable = {k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.UNIT_STABLE}
     assert stable == set(PER_UNIT_IDENTITY_KEYS)
     assert set(_ADMISSION_EVIDENCE) == stable, (
         "UNIT_STABLE keys without a measured-evidence entry in "
@@ -608,9 +599,7 @@ def test_every_volatile_key_has_an_evidence_case() -> None:
     two derived views had identical membership, so the split they exist to
     express was never exercised by any test.
     """
-    volatile = {
-        k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.UNIT_VOLATILE
-    }
+    volatile = {k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.UNIT_VOLATILE}
     assert volatile, "UNIT_VOLATILE is empty — the two-view split is untested"
     assert set(_VOLATILE_EVIDENCE) == volatile, (
         f"missing evidence: {sorted(volatile - set(_VOLATILE_EVIDENCE))}; "

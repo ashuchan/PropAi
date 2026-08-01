@@ -15,7 +15,7 @@ They disagreed in BOTH directions, and a scan of every key any adapter
 actually writes found the disagreement was the smaller problem: 10 real
 per-unit keys (``realpage_cws_unit_id``, ``entrata_uid``, ``sightmap_unit_id``,
 ``onsite_unit_id``, …) were in NEITHER list, while three keys in the lists
-(``knock_unit_id``, ``securecafe_id``, ``entrata_unit_id``) have NO writer
+(``securecafe_id``, ``entrata_unit_id``) have NO writer
 anywhere in the repo. The irony worth recording: identity carried the dead
 ``entrata_unit_id`` while the real Entrata key ``entrata_uid`` — 2,843 rows
 across 190 properties on 2026-07-12 — was missing from it.
@@ -241,7 +241,7 @@ class SourceIdScope(StrEnum):
 # ---------------------------------------------------------------------------
 
 SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
-    # ── UNIT_STABLE (12) — unique AND cross-run stable ───────────────────
+    # ── UNIT_STABLE (13) — unique AND cross-run stable ───────────────────
     # rently.py:120 — scattered-site (single-family / BTR) home: the street
     # ADDRESS is the permanent, unique per-home identity (#29 scattered-site
     # principle, same as AppFolio scattered listings). Without this the Rently
@@ -260,7 +260,14 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     "venterra_unit_code": SourceIdScope.UNIT_STABLE,
     "realpage_oll_unit_id": SourceIdScope.UNIT_STABLE,
     "securecafe_apartment_id": SourceIdScope.UNIT_STABLE,
-    # ── UNIT_VOLATILE (5) — unique, but MEASURED/ASSUMED to rotate ───────
+    # knock.py reads the provider UUID from each public Doorway unit object.
+    # Live 2026-08-01 measurement across five exact GSC properties: 440/440
+    # eligible rows non-empty and distinct within property; two consecutive
+    # public fetches returned identical UUID sets for every property. Visible
+    # labels were far less specific (Duke Manor 169 rows / 20 labels; Estes
+    # Park 61 / 17), so preserving the UUID prevents proven row collapse.
+    "knock_unit_id": SourceIdScope.UNIT_STABLE,
+    # ── UNIT_VOLATILE — unique, but MEASURED/ASSUMED to rotate ───────────
     # Evidence in the ROTATION MEASUREMENT block above. In verdict's
     # classify view (uniqueness is enough); NOT in identity's minting view.
     "appfolio_listing_id": SourceIdScope.UNIT_VOLATILE,  # 14.52%
@@ -274,7 +281,17 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     # Unique per apartment (classify evidence); rotation UNMEASURED, and the
     # modern rows already anchor on unit_number, so classify-only.
     "unit_id_engrain": SourceIdScope.UNIT_VOLATILE,
-    # ── UNIT_PENDING (4) — in NEITHER derived view ──────────────────────
+    # rentmanager.py:574 — public I Love Leasing availability-row id. Exact
+    # Atlantico measurements found 3/3 distinct ids within each pull, but all
+    # three changed for the same visible unit labels between captures. It may
+    # classify rows as units; it must not mint a cross-run identity anchor.
+    "iloveleasing_unit_id": SourceIdScope.UNIT_VOLATILE,
+    # _html_extract.py: ManageBuilding's complete rentals index exposes one
+    # numeric public detail-record id per active listing. It is unique within
+    # the observed index (Le Mirage: 10/10), but a re-listing may allocate a
+    # new record, so it is classify-only and never a daily-join anchor.
+    "managebuilding_listing_id": SourceIdScope.UNIT_VOLATILE,
+    # ── UNIT_PENDING — in NEITHER derived view ───────────────────────────
     # appfolio.py:818. Stronger than merely unmeasured: never non-empty in
     # ANY of the three artifact sets (228,708 units), so it is currently
     # unverifiable, not just unmeasured.
@@ -282,6 +299,52 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     "rentmanager_uid": SourceIdScope.UNIT_PENDING,  # rentmanager.py:242
     "rs365_unit_guid": SourceIdScope.UNIT_PENDING,  # residentservices365.py:349
     "rentpress_unit_code": SourceIdScope.UNIT_PENDING,  # _encoreskyline_units.py:203
+    # _doorloop_listings.py: native per-listing Mongo id. Three live provider
+    # accounts prove within-feed uniqueness, but cross-run stability has not
+    # yet been measured; visible unit_number remains the identity anchor.
+    "doorloop_listing_id": SourceIdScope.UNIT_PENDING,
+    # yotta.py: public GetFloorPlans rows expose a provider-native unitId.
+    # Four distinct live DBAs (55/57/58/59) prove within-property uniqueness,
+    # but cross-run stability has not yet been measured.
+    "yotta_unit_id": SourceIdScope.UNIT_PENDING,
+    # mri_prospectconnect.py: composite of provider-native building id and
+    # apartment id. Two exact live properties prove within-property uniqueness
+    # (Village Park 8/8; Charter Club 1/1), but the >=50-row and cross-run
+    # stability bar has not been met.
+    "mri_unit_id": SourceIdScope.UNIT_PENDING,
+    # _betternoi_public.py: UUID/id are read from each public API unit object.
+    # Two exact live properties prove within-property uniqueness, but cross-run
+    # stability is not yet measured; visible unit_number remains the anchor.
+    "betternoi_unit_uuid": SourceIdScope.UNIT_PENDING,
+    "betternoi_unit_id": SourceIdScope.UNIT_PENDING,
+    # _leaseleads_embed.py: public ``units.data`` rows expose the integrated
+    # PMS unit_id.  Current live probes across Tribeca, Lumina, and Emerson
+    # Park measured 64/64 non-empty and distinct within property.  Cross-run
+    # stability is not yet measured, so visible unit_number remains the
+    # identity anchor and this key stays pending.
+    "leaseleads_unit_id": SourceIdScope.UNIT_PENDING,
+    # _nesthub_public.py: numeric id bound across the first-party SSR roster,
+    # detail path, and canonical URL. It is unique within the observed exact
+    # property, but cross-run/re-listing stability is not yet measured; the
+    # provider-visible unit suffix remains the stable identity anchor.
+    "nesthub_listing_id": SourceIdScope.UNIT_PENDING,
+    # _showmojo_public.py: native 10-hex listing UID, unique across the exact
+    # observed provider account. Re-listing/cross-run stability is unmeasured;
+    # the full provider-published address remains the identity anchor.
+    "showmojo_listing_uid": SourceIdScope.UNIT_PENDING,
+    # _elise_applications_recovery.py: native apartment object id. Seven live
+    # exact-property probes produced 49/49 distinct values; cross-run
+    # stability is not measured, so the visible unit number remains anchor.
+    "elise_applications_unit_id": SourceIdScope.UNIT_PENDING,
+    # entrata.py beans-map rows carry both the ordinary Entrata unit uid and a
+    # separate map-listing record id. Tuscany Hills measured 13/13 distinct
+    # listing ids over three repeat pulls, but cross-run/re-listing stability
+    # is unmeasured; entrata_uid/unit_number already provide identity.
+    "entrata_beans_listing_id": SourceIdScope.UNIT_PENDING,
+    # Funnel/Nestio's public current-listings feed exposes one listing id per
+    # apartment. Three exact live properties proved within-feed uniqueness,
+    # but no two-run stability measurement exists yet.
+    "funnel_listing_id": SourceIdScope.UNIT_PENDING,
     # ── UNIT_TAUTOLOGICAL (2) — both currently in verdict's list; REMOVED ─
     # edificecms.py:322 writes literally ``unit_no`` — the value already in
     # unit_number. Measured 1.000 unique, but uniqueness is not the objection.
@@ -290,7 +353,7 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     # not even unique: property 271195 has '312' x3 and '207'/'210'/'306'/'302'
     # x2 (measured ratio 0.86). Admitting it would mint colliding anchors.
     "thinkreside_unit": SourceIdScope.UNIT_TAUTOLOGICAL,
-    # ── PLAN (20) ───────────────────────────────────────────────────────
+    # ── PLAN (21) ───────────────────────────────────────────────────────
     "sightmap_floor_plan_id": SourceIdScope.PLAN,
     "securecafe_floorplan_id": SourceIdScope.PLAN,
     "rentcafe_floorplan_id": SourceIdScope.PLAN,
@@ -310,6 +373,7 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     # the plan lookup key. Measured 0.279 (plancohort).
     "onsite_style_id": SourceIdScope.PLAN,
     "spherexx_floorplan_id": SourceIdScope.PLAN,
+    "betternoi_floorplan_uuid": SourceIdScope.PLAN,
     "wp_plan_slug": SourceIdScope.PLAN,
     "plan_code": SourceIdScope.PLAN,
     # WRITER-LESS IN THIS PR, on purpose. The only writer,
@@ -325,7 +389,7 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     # `apartment_id`. Remove it from that allowlist in the diagnostics PR that
     # introduces the writer.
     "api_floorplan_id": SourceIdScope.PLAN,
-    # ── PROPERTY (10) ───────────────────────────────────────────────────
+    # ── PROPERTY ────────────────────────────────────────────────────────
     "partner_property_id": SourceIdScope.PROPERTY,
     "property_id": SourceIdScope.PROPERTY,
     "realpage_oll_property_id": SourceIdScope.PROPERTY,
@@ -333,7 +397,21 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     "appfolio_database_name": SourceIdScope.PROPERTY,
     "operator": SourceIdScope.PROPERTY,
     "property_name": SourceIdScope.PROPERTY,
+    "betternoi_client_uuid": SourceIdScope.PROPERTY,
     "seo_url": SourceIdScope.PROPERTY,
+    # DoorLoop groups multiple apartment listings under this native building /
+    # property id. It repeats across units and must never classify a row alone.
+    "doorloop_property_id": SourceIdScope.PROPERTY,
+    # Exact provider boundary ids repeated across all rows for one recovered
+    # property/building. They must never establish apartment identity alone.
+    "entrata_property_id": SourceIdScope.PROPERTY,
+    "funnel_building_id": SourceIdScope.PROPERTY,
+    "funnel_community_id": SourceIdScope.PROPERTY,
+    # _showmojo_public.py: every accepted row shares the one account and RHR
+    # application site proved by the official manager chain. These establish
+    # provider/property scope, never per-unit identity.
+    "showmojo_account": SourceIdScope.PROPERTY,
+    "rhr_application_site_id": SourceIdScope.PROPERTY,
     # _appfolio_websites_duda.py:273. Per-unit for scattered-site portfolios
     # but CONSTANT across every unit of one building (3/30 measured props
     # constant, min within-property ratio 0.20). Never per-unit proof alone.
@@ -353,9 +431,7 @@ SOURCE_ID_SCOPES: Final[dict[str, SourceIdScope]] = {
     # "no availability" marker.
     "matched_phrase": SourceIdScope.NOT_AN_ID,
     "operator_published_state": SourceIdScope.NOT_AN_ID,
-    # ── DEAD (3) — named in a historical whitelist, written by nobody ────
-    # Sole occurrence is core/identity.py's own whitelist.
-    "knock_unit_id": SourceIdScope.DEAD,
+    # ── DEAD (2) — named in a historical whitelist, written by nobody ────
     # Sole occurrence is reporting/verdict.py's own whitelist. The REAL
     # SecureCafe key is ``securecafe_floorplan_id``, which is PLAN-level — only
     # the docstring warning kept this entry from being the #110 bug again.
@@ -399,6 +475,7 @@ PER_UNIT_IDENTITY_KEYS: Final[tuple[str, ...]] = (
     "venterra_unit_code",
     "realpage_oll_unit_id",
     "securecafe_apartment_id",
+    "knock_unit_id",
     # scattered-site (Rently single-family/BTR): the street address is the
     # permanent per-home daily-join anchor (#29). Listed last — a row carrying
     # a first-party unit id above should still prefer it.

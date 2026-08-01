@@ -59,7 +59,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
+from html import unescape
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -76,9 +79,155 @@ _UDR_NAME_RE = re.compile(
     r"^Apartment\s*#?\s*[A-Z0-9]+\s*[-–—]\s*([A-Z0-9][A-Z0-9\-]*)\s*$",
     re.IGNORECASE,
 )
+_UDR_NAME_PARTS_RE = re.compile(
+    r"^Apartment\s*#?\s*([A-Z0-9]+)\s*[-–—]\s*"
+    r"([A-Z0-9][A-Z0-9\-]*)\s*$",
+    re.IGNORECASE,
+)
 
 # Extract unitid URL param (preserved as source_id for provenance).
 _UDR_UNITID_RE = re.compile(r"[?&]unitid=(\d+)", re.IGNORECASE)
+
+_LINK_TAG_RE = re.compile(r"<link\b[^>]*>", re.IGNORECASE | re.DOTALL)
+_HTML_ATTR_RE = re.compile(
+    r"([:\w-]+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s\"'=<>`]+))",
+    re.IGNORECASE | re.DOTALL,
+)
+_UDR_HOSTS = frozenset({"udr.com", "www.udr.com"})
+
+
+def is_udr_url(url: str) -> bool:
+    """Return true only for an HTTPS URL on UDR's exact public hosts."""
+    try:
+        parsed = urlsplit(str(url or "").strip())
+        return (
+            parsed.scheme.lower() == "https"
+            and (parsed.hostname or "").lower().rstrip(".") in _UDR_HOSTS
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port is None
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def canonical_udr_url_from_html(html: str) -> str:
+    """Extract an official UDR canonical URL from a vanity-site homepage.
+
+    UDR serves some communities on a vanity domain while publishing a strict
+    ``rel=canonical`` link to the matching ``www.udr.com`` community page.
+    Only an HTTPS canonical on UDR's exact public hosts is accepted; lookalike
+    hosts, credentials, ports, relative URLs, query strings, and fragments are
+    rejected or stripped before this value can drive a cross-host probe.
+    """
+    if not html:
+        return ""
+
+    for tag in _LINK_TAG_RE.findall(html):
+        attrs: dict[str, str] = {}
+        for match in _HTML_ATTR_RE.finditer(tag):
+            value = next(
+                (part for part in match.groups()[1:] if part is not None),
+                "",
+            )
+            attrs[match.group(1).lower()] = unescape(value).strip()
+
+        rel_tokens = {token.lower() for token in attrs.get("rel", "").split()}
+        if "canonical" not in rel_tokens:
+            continue
+        href = attrs.get("href", "")
+        if not is_udr_url(href):
+            continue
+
+        parsed = urlsplit(href)
+        path = parsed.path or "/"
+        return urlunsplit(
+            (
+                "https",
+                (parsed.hostname or "").lower().rstrip("."),
+                path,
+                "",
+                "",
+            )
+        )
+    return ""
+
+
+def udr_pricing_urls(base_url: str) -> list[str]:
+    """Build tightly scoped pricing-page candidates for one UDR community."""
+    if not is_udr_url(base_url):
+        return []
+
+    parsed = urlsplit(base_url)
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if "apartments-pricing" in {segment.lower() for segment in segments}:
+        return []
+
+    origin = f"https://{(parsed.hostname or '').lower().rstrip('.')}"
+    clean_path = "/" + "/".join(segments) if segments else ""
+    candidates = [f"{origin}{clean_path}/apartments-pricing/"]
+
+    # UDR community URLs have /{market}/{area}/{community}/. Some catalog
+    # records point at a leaf such as /contact-us/; the community root is the
+    # first three path segments in that case.
+    if len(segments) > 3:
+        candidates.append(
+            f"{origin}/{'/'.join(segments[:3])}/apartments-pricing/"
+        )
+    return list(dict.fromkeys(candidates))
+# The same UDR pricing page carries a richer first-party view model beside
+# its Schema.org ItemList.  JSON-LD has identity/rent but no move-in date;
+# ``jsonObjPropertyViewModel`` has the exact unit-keyed ``AvailableDateLabel``
+# and rent-matrix MoveInDate.  All seven July-31 UDR date-gap properties use
+# this stable assignment (106/106 affected native units, live 2026-08-01).
+_UDR_VIEW_MODEL_MARKER = "window.udr.jsonObjPropertyViewModel = "
+
+
+def _udr_view_model_dates(html: str) -> dict[str, str]:
+    """Return ``marketing unit number -> explicit available date``.
+
+    The object is a JavaScript assignment whose value is strict JSON.  Decode
+    only the first JSON value after the marker so adjacent script statements
+    cannot contaminate parsing.  Visible ``AvailableDateLabel`` wins; the
+    first rent-matrix ``MoveInDate`` is an exact fallback.  Malformed or absent
+    data degrades to an empty mapping.
+    """
+    if not html:
+        return {}
+    start = html.find(_UDR_VIEW_MODEL_MARKER)
+    if start < 0:
+        return {}
+    start += len(_UDR_VIEW_MODEL_MARKER)
+    try:
+        payload, _ = json.JSONDecoder().raw_decode(html[start:].lstrip())
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+
+    out: dict[str, str] = {}
+    for floor_plan in payload.get("floorPlans") or []:
+        if not isinstance(floor_plan, dict):
+            continue
+        for unit in floor_plan.get("units") or []:
+            if not isinstance(unit, dict):
+                continue
+            unit_number = str(
+                unit.get("marketingName") or unit.get("lookUpName") or ""
+            ).strip()
+            if not unit_number:
+                continue
+            raw_date = str(unit.get("AvailableDateLabel") or "").strip()
+            if not raw_date:
+                for rent_option in unit.get("rentsMatrix") or []:
+                    if not isinstance(rent_option, dict):
+                        continue
+                    raw_date = str(rent_option.get("MoveInDate") or "").strip()
+                    if raw_date:
+                        break
+            if raw_date:
+                out[unit_number.upper()] = raw_date
+    return out
 
 
 def _format_udr_plan_code(raw_code: str) -> str:
@@ -137,6 +286,47 @@ def _extract_unit_from_udr_name(name: str) -> str:
     return s
 
 
+def _udr_name_parts(name: str) -> tuple[str, str] | None:
+    """Return UDR's ambiguous ``(#prefix, unit)`` name components."""
+    match = _UDR_NAME_PARTS_RE.match(str(name or "").strip())
+    if not match:
+        return None
+    return match.group(1).strip(), match.group(2).strip()
+
+
+def _udr_prefix_is_building(items: list[Any]) -> bool:
+    """Distinguish a physical building prefix from UDR's sequence label.
+
+    UDR uses the same JSON-LD name slot for two incompatible shapes:
+
+    * Cambridge Woods: ``Apartment #8 - 4020`` where ``8`` is only a page
+      sequence and the public unit is ``4020``.
+    * Arbor Park: ``Apartment #03R - 0202`` where ``03R`` is the building and
+      the public unit is ``03R-0202``.
+    * Vitruvian West: ``Apartment #1 - 124`` where numeric building prefixes
+      repeat across many apartments and the public unit is ``1-124``.
+
+    Alphanumeric prefixes are physical. Numeric prefixes are physical only
+    when repeated within the property ItemList; unique numeric prefixes remain
+    sequence labels. This property-level inference avoids inventing a prefix
+    from one ambiguous row while preserving the exact public IDs on the two
+    live repeated-building shapes above.
+    """
+    prefixes: list[str] = []
+    for list_item in items:
+        if not isinstance(list_item, dict):
+            continue
+        item = list_item.get("item")
+        if not isinstance(item, dict):
+            continue
+        parts = _udr_name_parts(str(item.get("name") or ""))
+        if parts:
+            prefixes.append(parts[0])
+    if any(not prefix.isdigit() for prefix in prefixes):
+        return True
+    return any(count > 1 for count in Counter(prefixes).values())
+
+
 def _is_udr_apartment_item(item: Any) -> bool:
     """Schema.org Apartment / Apartment+Product gate. UDR uses both
     spellings (``"@type": "Apartment"`` and ``"@type": ["Apartment",
@@ -183,6 +373,7 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
         return []
     units: list[dict[str, Any]] = []
     seen_unitids: set[str] = set()
+    view_model_dates = _udr_view_model_dates(html)
 
     for block in _walk_jsonld_blocks(html):
         # We want ItemList with itemListElement containing Apartment
@@ -199,6 +390,8 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
         if not isinstance(items, list):
             continue
 
+        prefix_is_building = _udr_prefix_is_building(items)
+
         for li in items:
             if not isinstance(li, dict):
                 continue
@@ -208,7 +401,13 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
             assert isinstance(item, dict)  # narrowed by _is_udr_apartment_item
 
             raw_name = str(item.get("name") or "").strip()
-            unit_number = _extract_unit_from_udr_name(raw_name)
+            name_parts = _udr_name_parts(raw_name)
+            building = name_parts[0] if prefix_is_building and name_parts else ""
+            unit_number = (
+                f"{name_parts[0]}-{name_parts[1]}"
+                if prefix_is_building and name_parts
+                else _extract_unit_from_udr_name(raw_name)
+            )
             if not unit_number:
                 continue
 
@@ -302,9 +501,15 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
                     bathrooms=baths_str,
                     sqft=str(sqft_val) if sqft_val else "",
                     unit_number=unit_number,
+                    building=building,
                     rent_range=format_rent_range(rent_val, rent_val),
                     availability_status=status,
-                    availability_date="",  # UDR JSON-LD doesn't carry move-in date
+                    # JSON-LD does not carry the move-in date, but UDR's
+                    # adjacent first-party view model does, keyed by the same
+                    # displayed marketing unit number.
+                    availability_date=view_model_dates.get(
+                        unit_number.upper(), ""
+                    ),
                     source_ids=(
                         {"udr_unitid": internal_unitid} if internal_unitid else {}
                     ),
@@ -316,6 +521,10 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "canonical_udr_url_from_html",
+    "is_udr_url",
     "parse_udr_jsonld",
+    "udr_pricing_urls",
+    "_udr_view_model_dates",
     "_extract_unit_from_udr_name",
 ]

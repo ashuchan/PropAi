@@ -41,6 +41,7 @@ from ma_poc.pms.adapters.resman import (
     ResManAdapter,
     _extract_unittypes,
     _ms_to_iso,
+    find_resman_applicant_url,
     find_resman_availability_url,
     parse_resman_unittypes,
 )
@@ -244,6 +245,20 @@ def test_find_availability_url_absent_and_empty() -> None:
     assert find_resman_availability_url("<html><body>nothing</body></html>") is None
 
 
+def test_find_one_exact_property_scoped_applicant_url() -> None:
+    applicant = "https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054"
+    assert find_resman_applicant_url(f'<a href="{applicant}">Apply</a>') == applicant
+
+
+def test_applicant_discovery_rejects_account_login_and_ambiguity() -> None:
+    login = "https://richmark.myresman.com/Portal/Access/SignIn/GRAND"
+    assert find_resman_applicant_url(f'<a href="{login}">Residents</a>') is None
+    assert find_resman_applicant_url(
+        '<a href="https://richmark.myresman.com/Portal/Applicants/New/ONE?a=1054">One</a>'
+        '<a href="https://richmark.myresman.com/Portal/Applicants/New/TWO?a=1054">Two</a>'
+    ) is None
+
+
 # --- ResManAdapter.extract ------------------------------------------------
 
 
@@ -275,6 +290,77 @@ async def test_resman_adapter_accepts_bytes_body(monkeypatch: pytest.MonkeyPatch
     ctx = _ctx(fetch_result=_FetchResult(body=_MARKETING_HTML.encode("utf-8")))
     result = await ResManAdapter().extract(_BarePage(), ctx)  # type: ignore[arg-type]
     assert len(result.units) == 3
+
+
+@pytest.mark.asyncio
+async def test_resman_adapter_uses_current_redirected_availability_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _unexpected_fetch(url: str) -> str:
+        raise AssertionError(f"must reuse fetched availability body: {url}")
+
+    monkeypatch.setattr("ma_poc.pms.adapters.resman._fetch", _unexpected_fetch)
+    ctx = _ctx(
+        base_url="https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054",
+        fetch_result=_FetchResult(body=_AVAILABILITY_HTML, final_url=_AVAIL_URL),
+    )
+
+    result = await ResManAdapter().extract(_BarePage(), ctx)  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_1_API_RESMAN"
+    assert len(result.units) == 3
+    assert result.winning_url == _AVAIL_URL
+
+
+@pytest.mark.asyncio
+async def test_resman_adapter_follows_exact_published_applicant_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    applicant = "https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054"
+    availability = (
+        "https://richmark.myresman.com/Portal/Applicants/Availability"
+        "?a=1054&p=57495da9-baae-4ba3-98c0-e62612db16c3"
+    )
+
+    async def _fake_fetch_page(url: str) -> tuple[str, str]:
+        assert url == applicant
+        return _AVAILABILITY_HTML, availability
+
+    monkeypatch.setattr("ma_poc.pms.adapters.resman._fetch_page", _fake_fetch_page)
+    ctx = _ctx(
+        fetch_result=_FetchResult(body=f'<a href="{applicant}">Apply</a>')
+    )
+
+    result = await ResManAdapter().extract(_BarePage(), ctx)  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_1_API_RESMAN"
+    assert len(result.units) == 3
+    assert result.winning_url == availability
+
+
+@pytest.mark.asyncio
+async def test_resman_applicant_cross_tenant_redirect_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    applicant = "https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054"
+    foreign = _AVAIL_URL.replace("implicity.myresman.com", "sibling.myresman.com")
+
+    async def _fake_fetch_page(url: str) -> tuple[str, str]:
+        return _AVAILABILITY_HTML, foreign
+
+    async def _empty_fetch(url: str) -> str:
+        return ""
+
+    monkeypatch.setattr("ma_poc.pms.adapters.resman._fetch_page", _fake_fetch_page)
+    monkeypatch.setattr("ma_poc.pms.adapters.resman._fetch", _empty_fetch)
+    ctx = _ctx(
+        fetch_result=_FetchResult(body=f'<a href="{applicant}">Apply</a>')
+    )
+
+    result = await ResManAdapter().extract(_BarePage(), ctx)  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_1_API_RESMAN_NO_PORTAL"
+    assert result.units == []
 
 
 @pytest.mark.asyncio

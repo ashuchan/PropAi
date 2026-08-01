@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -80,6 +81,20 @@ _DETAIL_SQFT_RE = re.compile(
 )
 _DETAIL_H1_RE = re.compile(
     r"<h1[^>]*>(?P<txt>[^<]{1,200})</h1>", re.IGNORECASE | re.DOTALL
+)
+_DETAIL_CURRENT_SQFT_RE = re.compile(
+    r"([0-9,]{3,5})\s*sq\.?\s*ft\.?\b", re.IGNORECASE
+)
+_DETAIL_CURRENT_AVAILABLE_RE = re.compile(
+    r"\bAvailable\s+(?P<value>Now|\d{1,2}/\d{1,2}/(?:\d{2}|\d{4}))\b",
+    re.IGNORECASE,
+)
+_DETAIL_CURRENT_RENT_RE = re.compile(
+    r"\bRent\s*:\s*\$([0-9,]{3,7})\b", re.IGNORECASE
+)
+_DETAIL_LISTABLE_UID_RE = re.compile(
+    r"/listings/detail/([0-9a-f]{8}-[0-9a-f-]{27})/?(?:[?#]|$)",
+    re.IGNORECASE,
 )
 
 # 2026-05-25 (deep-probe sqft=-1 cohort): AppFolio operators publish
@@ -375,6 +390,12 @@ def _normalize_street(s: str) -> str:
 def _extract_zip(s: str, *, prefer_last: bool = False) -> str:
     """Return the 5-digit ZIP from a string (strips +4 suffix), or ''.
 
+    A bare four-digit value is a CSV-parsed New England ZIP whose leading
+    zero was lost (for example ``6515`` is New Haven ``06515``).  Restore
+    that zero only for the non-address form used by ``ctx.zip_code``.  Full
+    listing addresses continue to require an explicit five-digit ZIP, so a
+    four-digit house number can never be promoted into one.
+
     ``prefer_last=True`` for full listing addresses. A five-digit HOUSE NUMBER
     is indistinguishable from a ZIP by shape, and it comes first:
 
@@ -390,6 +411,9 @@ def _extract_zip(s: str, *, prefer_last: bool = False) -> str:
     if prefer_last:
         matches = _APPFOLIO_ZIP_RE.findall(s)
         return matches[-1] if matches else ""
+    bare = str(s).strip()
+    if re.fullmatch(r"\d{4}", bare):
+        return f"0{bare}"
     m = _APPFOLIO_ZIP_RE.search(s)
     return m.group(1) if m else ""
 
@@ -799,7 +823,62 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     text = _DETAIL_TAG_RE.sub(" ", main_html)
     text = re.sub(r"\s+", " ", text).strip()
 
-    rent = _DETAIL_RENT_RE.search(text)
+    # AppFolio's current detail template has stable semantic classes.  The
+    # old whole-<main> regex sees embedded style/script text before the
+    # visible summary and misreads breakpoint numbers as bedrooms (17/19/28
+    # on four independently probed tenants); it also misses ``Sq. Ft.``
+    # because of the punctuation.  Prefer the property-local visible summary
+    # and rental-terms list, retaining the legacy regex path for older pages.
+    current_summary = ""
+    current_rental_terms = ""
+    current_title = ""
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        scope = soup.find("main") or soup
+        summary_tag = scope.select_one(".js-show-summary")
+        if summary_tag is not None:
+            current_summary = " ".join(
+                summary_tag.get_text(" ", strip=True).split()
+            )
+            terms_tag = scope.select_one(".js-show-rental-terms")
+            if terms_tag is not None:
+                current_rental_terms = " ".join(
+                    terms_tag.get_text(" ", strip=True).split()
+                )
+            title_tag = scope.select_one("h1.js-show-title")
+            if title_tag is not None:
+                # MAP is a nested anchor inside the h1, not part of the
+                # operator's address.  Direct text nodes preserve the title
+                # without mutating the parsed tree or retaining that label.
+                current_title = " ".join(
+                    " ".join(
+                        str(node).strip()
+                        for node in title_tag.find_all(
+                            string=True, recursive=False
+                        )
+                    ).split()
+                )
+                if not current_title:
+                    current_title = re.sub(
+                        r"\s+MAP\s*$",
+                        "",
+                        title_tag.get_text(" ", strip=True),
+                        flags=re.IGNORECASE,
+                    ).strip()
+    except Exception:
+        # BeautifulSoup is already a project dependency, but this parser has
+        # always degraded to regex-only extraction and must keep doing so.
+        current_summary = ""
+
+    rent = (
+        _DETAIL_CURRENT_RENT_RE.search(current_rental_terms)
+        if current_summary and current_rental_terms
+        else None
+    )
+    if rent is None:
+        rent = _DETAIL_RENT_RE.search(text)
     if not rent:
         return []
     try:
@@ -807,10 +886,11 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     except (TypeError, ValueError):
         return []
 
-    h1 = _DETAIL_H1_RE.search(html)
-    title = ""
-    if h1:
-        title = _DETAIL_TAG_RE.sub("", h1.group("txt")).strip()
+    title = current_title
+    if not title:
+        h1 = _DETAIL_H1_RE.search(html)
+        if h1:
+            title = _DETAIL_TAG_RE.sub("", h1.group("txt")).strip()
 
     # 2026-07-28: the detail-page h1 is a TITLE, not a plan name. Verified
     # live 2026-07-28 (pagewood.appfolio.com/listings/detail/<uuid>): the
@@ -824,9 +904,28 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     floor_plan_name = "" if title_is_address else title
     unit_name = title if title_is_address else ""
 
-    beds = _DETAIL_BED_RE.search(text)
-    baths = _DETAIL_BATH_RE.search(text)
-    sqft = _DETAIL_SQFT_RE.search(text)
+    specs_text = current_summary or text
+    beds = _DETAIL_BED_RE.search(specs_text)
+    baths = _DETAIL_BATH_RE.search(specs_text)
+    sqft = (
+        _DETAIL_CURRENT_SQFT_RE.search(specs_text)
+        if current_summary
+        else _DETAIL_SQFT_RE.search(specs_text)
+    )
+
+    availability_date = ""
+    if current_summary:
+        available = _DETAIL_CURRENT_AVAILABLE_RE.search(current_summary)
+        available_raw = available.group("value") if available else ""
+        if available_raw and available_raw.casefold() != "now":
+            for fmt in ("%m/%d/%y", "%m/%d/%Y"):
+                try:
+                    availability_date = datetime.strptime(
+                        available_raw, fmt
+                    ).date().isoformat()
+                    break
+                except ValueError:
+                    continue
 
     sqft_str = sqft.group(1).replace(",", "") if sqft else ""
     # 2026-05-25 sqft-gap probe (cohort: 1,095 units across ~104 props):
@@ -835,7 +934,9 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
     # validation.schema_gate._has_area treats the unit as area-present
     # and the verdict ships as SUCCESS, not SUCCESS_PLAN_LEVEL.
     unit: dict[str, Any] = {
-        "unit_number": "",
+        "unit_number": (
+            _extract_unit_from_address(title) if title_is_address else ""
+        ),
         "floor_plan_name": floor_plan_name,
         "unit_name": unit_name,
         "bedrooms": beds.group(1) if beds else "",
@@ -844,9 +945,14 @@ def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any
         "rent_range": f"${rent_val:,}",
         "market_rent_low": rent_val,
         "market_rent_high": rent_val,
+        "availability_status": "AVAILABLE" if current_summary else "",
+        "availability_date": availability_date,
         "source_api_url": source_url,
         "extraction_tier": "TIER_1_DOM_APPFOLIO_DETAIL",
     }
+    uid_match = _DETAIL_LISTABLE_UID_RE.search(source_url)
+    if uid_match is not None:
+        unit["source_ids"] = {"appfolio_listable_uid": uid_match.group(1)}
     if not sqft_str:
         unit["data_gaps"] = ["sqft"]
         unit["data_quality_flag"] = "SQFT_NOT_PUBLISHED"

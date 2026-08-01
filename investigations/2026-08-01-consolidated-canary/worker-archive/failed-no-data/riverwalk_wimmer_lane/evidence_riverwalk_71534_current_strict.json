@@ -1,0 +1,798 @@
+{
+  "cohort": "exact_2026-07-31_FAILED_NO_DATA_344",
+  "commit": "none",
+  "configured_identity": {
+    "address": "W165 N8910 Grand Ave",
+    "apartmentid": "71534",
+    "city": "Menomonee Falls",
+    "name": "Riverwalk on the Falls I",
+    "state": "WI",
+    "website": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+    "zip": "53051"
+  },
+  "full_pipeline_repeats": [
+    {
+      "adapter": "sightmap",
+      "detected_pms": "sightmap",
+      "distinct_unit_numbers": 8,
+      "emitted_rows": 8,
+      "errors": [],
+      "fallback_chain": [
+        "sightmap"
+      ],
+      "plan_summaries": 19,
+      "repeat": 1,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "units": [
+        {
+          "availability_date": "2026-09-30",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 1 - 2 Bed, 2 Bath (L2/L4)",
+          "market_rent_high": 2379,
+          "market_rent_low": 2379,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666019",
+            "sightmap_unit_id": "11156718"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1192",
+          "unit_number": "103"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1- 1 Bed 1 Bath (B)",
+          "market_rent_high": 1705,
+          "market_rent_low": 1705,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666021",
+            "sightmap_unit_id": "11156788"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "734",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "2026-09-24",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed, 1 Bath (B2)",
+          "market_rent_high": 1813,
+          "market_rent_low": 1813,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666022",
+            "sightmap_unit_id": "11156793"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "771",
+          "unit_number": "310"
+        },
+        {
+          "availability_date": "2026-09-04",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed 1 Bath (D)",
+          "market_rent_high": 2024,
+          "market_rent_low": 2024,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666018",
+            "sightmap_unit_id": "11156807"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "862",
+          "unit_number": "324"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 2 - 2 Bed 2 Bath B3",
+          "market_rent_high": 2082,
+          "market_rent_low": 2082,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666031",
+            "sightmap_unit_id": "11156834"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1148",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A4",
+          "market_rent_high": 2195,
+          "market_rent_low": 2195,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666033",
+            "sightmap_unit_id": "11156861"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1033",
+          "unit_number": "403"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1826,
+          "market_rent_low": 1826,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156869"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "417"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1785,
+          "market_rent_low": 1785,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156871"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "419"
+        }
+      ]
+    },
+    {
+      "adapter": "sightmap",
+      "detected_pms": "sightmap",
+      "distinct_unit_numbers": 8,
+      "emitted_rows": 8,
+      "errors": [],
+      "fallback_chain": [
+        "sightmap"
+      ],
+      "plan_summaries": 19,
+      "repeat": 2,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "units": [
+        {
+          "availability_date": "2026-09-30",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 1 - 2 Bed, 2 Bath (L2/L4)",
+          "market_rent_high": 2379,
+          "market_rent_low": 2379,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666019",
+            "sightmap_unit_id": "11156718"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1192",
+          "unit_number": "103"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1- 1 Bed 1 Bath (B)",
+          "market_rent_high": 1705,
+          "market_rent_low": 1705,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666021",
+            "sightmap_unit_id": "11156788"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "734",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "2026-09-24",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed, 1 Bath (B2)",
+          "market_rent_high": 1813,
+          "market_rent_low": 1813,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666022",
+            "sightmap_unit_id": "11156793"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "771",
+          "unit_number": "310"
+        },
+        {
+          "availability_date": "2026-09-04",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed 1 Bath (D)",
+          "market_rent_high": 2024,
+          "market_rent_low": 2024,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666018",
+            "sightmap_unit_id": "11156807"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "862",
+          "unit_number": "324"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 2 - 2 Bed 2 Bath B3",
+          "market_rent_high": 2082,
+          "market_rent_low": 2082,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666031",
+            "sightmap_unit_id": "11156834"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1148",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A4",
+          "market_rent_high": 2195,
+          "market_rent_low": 2195,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666033",
+            "sightmap_unit_id": "11156861"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1033",
+          "unit_number": "403"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1826,
+          "market_rent_low": 1826,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156869"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "417"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1785,
+          "market_rent_low": 1785,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156871"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "419"
+        }
+      ]
+    },
+    {
+      "adapter": "sightmap",
+      "detected_pms": "sightmap",
+      "distinct_unit_numbers": 8,
+      "emitted_rows": 8,
+      "errors": [],
+      "fallback_chain": [
+        "sightmap"
+      ],
+      "plan_summaries": 19,
+      "repeat": 3,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "units": [
+        {
+          "availability_date": "2026-09-30",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 1 - 2 Bed, 2 Bath (L2/L4)",
+          "market_rent_high": 2379,
+          "market_rent_low": 2379,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666019",
+            "sightmap_unit_id": "11156718"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1192",
+          "unit_number": "103"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1- 1 Bed 1 Bath (B)",
+          "market_rent_high": 1705,
+          "market_rent_low": 1705,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666021",
+            "sightmap_unit_id": "11156788"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "734",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "2026-09-24",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed, 1 Bath (B2)",
+          "market_rent_high": 1813,
+          "market_rent_low": 1813,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666022",
+            "sightmap_unit_id": "11156793"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "771",
+          "unit_number": "310"
+        },
+        {
+          "availability_date": "2026-09-04",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 1 - 1 Bed 1 Bath (D)",
+          "market_rent_high": 2024,
+          "market_rent_low": 2024,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666018",
+            "sightmap_unit_id": "11156807"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "862",
+          "unit_number": "324"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "Phase 2 - 2 Bed 2 Bath B3",
+          "market_rent_high": 2082,
+          "market_rent_low": 2082,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666031",
+            "sightmap_unit_id": "11156834"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1148",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A4",
+          "market_rent_high": 2195,
+          "market_rent_low": 2195,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666033",
+            "sightmap_unit_id": "11156861"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "1033",
+          "unit_number": "403"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1826,
+          "market_rent_low": 1826,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156869"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "417"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "market_rent_high": 1785,
+          "market_rent_low": 1785,
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325",
+          "source_ids": {
+            "sightmap_floor_plan_id": "666038",
+            "sightmap_unit_id": "11156871"
+          },
+          "source_property_address": null,
+          "source_property_id": null,
+          "source_property_name": null,
+          "sqft": "808",
+          "unit_number": "419"
+        }
+      ]
+    }
+  ],
+  "generated_at_utc": "2026-08-01T19:00:13.317279+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "direct_public_http_only": true,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER5_VISION": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "PROBE_PROXY_URL": "",
+      "WEB_UNLOCKER_KEY": ""
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr_calls": 0,
+    "hyperbrowser_calls": 0,
+    "llm_calls": 0,
+    "proxy_calls": 0,
+    "web_unlocker_calls": 0
+  },
+  "http_evidence": {
+    "current_floorplans": {
+      "body_bytes": 874300,
+      "body_sha256": "2ffb10a61e799d26d9f20300adcf224c6f269b84a2c138f428e46bc16168c9a9",
+      "final_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+      "html_gzip_artifact": "/private/tmp/propai-fnd-vBkmT9/riverwalk_wimmer_lane/71534_current_floorplans.html.gz",
+      "html_gzip_sha256": "15a4e9ec5b21eb0e751e89dabcd71884e17e2f6402d79ad848a729868c4bfe5a",
+      "requested_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+      "status": 200
+    },
+    "current_root": {
+      "body_bytes": 210971,
+      "body_sha256": "236a84230f0953ff515e9f8401bb6179a0acf9f1840492b2c7cf5693a91d338e",
+      "final_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls",
+      "requested_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls",
+      "status": 200
+    },
+    "stale_configured": {
+      "body_bytes": 84730,
+      "body_sha256": "cf7f68833b352e3d6426e9f9f095dba27737d2239fdc36b28f82d39b23eacf8e",
+      "final_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+      "requested_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+      "status": 404
+    }
+  },
+  "identity_checks": {
+    "canonical_link_visible": true,
+    "city_visible": true,
+    "property_name_visible": true,
+    "state_visible": true,
+    "street_visible": true,
+    "zip_visible": true
+  },
+  "lane": "riverwalk_wimmer_stale_canonical_current_sightmap_e2e",
+  "ledger_mutation": "none",
+  "materializer": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/riverwalk_wimmer_lane/materialize_riverwalk_71534_current_strict.py",
+    "sha256": "fc0c5505bd668978a3d6bf618e5fd38eaab705476a5b254bbc4c2cabc165dedd"
+  },
+  "paid_canary": false,
+  "push": "none",
+  "repeat_checks": {
+    "all_availability_dates": true,
+    "all_eight_emitted_and_strict": true,
+    "all_floorplan_names": true,
+    "all_positive_row_level_rents": true,
+    "all_sightmap_adapter": true,
+    "all_sightmap_detection": true,
+    "all_tier_1_sightmap": true,
+    "native_sightmap_ids_unique": true,
+    "natural_unit_numbers_unique": true,
+    "no_pipeline_errors": true,
+    "one_exact_source_each_repeat": true,
+    "same_units_each_repeat": true,
+    "three_repeats": true
+  },
+  "results": [
+    {
+      "adapter": "sightmap",
+      "contamination_verdict": "pass_exact_wimmer_current_canonical_name_street_city_state_zip_single_sightmap_three_full_pipeline_repeats",
+      "current_official_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls",
+      "identity_evidence": {
+        "configured_url_is_stale_404": true,
+        "current_canonical_is_live_200": true,
+        "distinct_native_sightmap_unit_ids": 8,
+        "distinct_native_unit_numbers": 8,
+        "identity_checks": {
+          "canonical_link_visible": true,
+          "city_visible": true,
+          "property_name_visible": true,
+          "state_visible": true,
+          "street_visible": true,
+          "zip_visible": true
+        },
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "source_urls": [
+          "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "2026-09-30",
+          "floor_plan_name": "Phase 1 - 2 Bed, 2 Bath (L2/L4)",
+          "identity": {
+            "sightmap_unit_id": "11156718",
+            "unit_number": "103"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2379,
+            "market_rent_low": 2379
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "floor_plan_name": "Phase 1- 1 Bed 1 Bath (B)",
+          "identity": {
+            "sightmap_unit_id": "11156788",
+            "unit_number": "305"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1705,
+            "market_rent_low": 1705
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-09-24",
+          "floor_plan_name": "Phase 1 - 1 Bed, 1 Bath (B2)",
+          "identity": {
+            "sightmap_unit_id": "11156793",
+            "unit_number": "310"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1813,
+            "market_rent_low": 1813
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-09-04",
+          "floor_plan_name": "Phase 1 - 1 Bed 1 Bath (D)",
+          "identity": {
+            "sightmap_unit_id": "11156807",
+            "unit_number": "324"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2024,
+            "market_rent_low": 2024
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "floor_plan_name": "Phase 2 - 2 Bed 2 Bath B3",
+          "identity": {
+            "sightmap_unit_id": "11156834",
+            "unit_number": "201"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2082,
+            "market_rent_low": 2082
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A4",
+          "identity": {
+            "sightmap_unit_id": "11156861",
+            "unit_number": "403"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2195,
+            "market_rent_low": 2195
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-08-25",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "identity": {
+            "sightmap_unit_id": "11156869",
+            "unit_number": "417"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1826,
+            "market_rent_low": 1826
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        },
+        {
+          "availability_date": "2026-10-07",
+          "floor_plan_name": "Phase 2 - 1 Bed 1 Bath A1",
+          "identity": {
+            "sightmap_unit_id": "11156871",
+            "unit_number": "419"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1785,
+            "market_rent_low": 1785
+          },
+          "source_api_url": "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 71534,
+      "property_identity_match": true,
+      "property_name": "Riverwalk on the Falls I",
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "units": 8,
+      "website": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/"
+    }
+  ],
+  "source_snapshot_after": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/sightmap.py": "afcbed2637ac3aa44113fb973726c3afb780208c37de55c4bb984749b420e3fa",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "59910a7890cb8209f7b2eaed70fc134e926bd0588ac5488437bf3fc3c4804799"
+  },
+  "source_snapshot_before": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/sightmap.py": "afcbed2637ac3aa44113fb973726c3afb780208c37de55c4bb984749b420e3fa",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "59910a7890cb8209f7b2eaed70fc134e926bd0588ac5488437bf3fc3c4804799"
+  },
+  "stale_404_foreign_knock_negative_controls": [
+    {
+      "city": "Pewaukee",
+      "is_exact_riverwalk": false,
+      "name": "Oakton Beach",
+      "official_website": "https://www.wimmercommunities.com/apartments/pewaukee/oakton-beach/",
+      "property_id": "2007994",
+      "state": "WI",
+      "street": "W289 N2183 Louis Ave Apt. 1",
+      "zip": "53072"
+    },
+    {
+      "city": "Hales Corners",
+      "is_exact_riverwalk": false,
+      "name": "Parkside",
+      "official_website": "https://www.wimmercommunities.com/apartments/hales-corners/parkside/",
+      "property_id": "2007989",
+      "state": "WI",
+      "street": "5992 South Kurtz Road",
+      "zip": "53130"
+    },
+    {
+      "city": "Hales Corners",
+      "is_exact_riverwalk": false,
+      "name": "Forest Ridge",
+      "official_website": "https://www.wimmercommunities.com/senior-living/forest-ridge/",
+      "property_id": "2008000",
+      "state": "WI",
+      "street": "11077 W Forest Home Ave",
+      "zip": "53130"
+    },
+    {
+      "city": "Greenfield",
+      "is_exact_riverwalk": false,
+      "name": "The Orchard",
+      "official_website": "https://www.wimmercommunities.com/apartments/wi/greenfield/the-orchard",
+      "property_id": "2007983",
+      "state": "WI",
+      "street": "9010 West Forest Home Avenue",
+      "zip": "53228"
+    },
+    {
+      "city": "Greenfield",
+      "is_exact_riverwalk": false,
+      "name": "Foxwood Crossing",
+      "official_website": "https://www.wimmercommunities.com/apartments/greenfield/foxwood-crossing/",
+      "property_id": "2007982",
+      "state": "WI",
+      "street": "4500 South 124th Street",
+      "zip": "53228"
+    },
+    {
+      "city": "Hales Corners",
+      "is_exact_riverwalk": false,
+      "name": "Whitnall Gardens",
+      "official_website": "https://www.wimmercommunities.com/apartments/wi/hales-corners/whitnall-gardens",
+      "property_id": "2007988",
+      "state": "WI",
+      "street": "9571 West Forest Home Avenue",
+      "zip": "53130"
+    }
+  ]
+}

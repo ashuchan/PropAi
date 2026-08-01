@@ -1,0 +1,19 @@
+{
+  "result_type": "net_new_strict_remaining29_entrata_ids_only",
+  "capture_timestamp_utc": "2026-08-01T09:33:37.481066+00:00",
+  "net_new_property_ids": [
+    9473,
+    43908,
+    70993,
+    72391,
+    247119,
+    276162,
+    298586
+  ],
+  "net_new_properties": 7,
+  "net_new_native_positive_rent_rows": 133,
+  "latest_ledger_sha256": "450154025ef060d9152eee50ff109847be4e9786d1baef2bc0326dadc82093ab",
+  "latest_ledger_rows": 163,
+  "shared_ledger_modified": false,
+  "consolidated_evidence_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/evidence_entrata_remaining29_current_strict_consolidated.json"
+}

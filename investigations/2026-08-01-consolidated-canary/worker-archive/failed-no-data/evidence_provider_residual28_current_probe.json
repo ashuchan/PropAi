@@ -1,0 +1,1044 @@
+{
+  "results": [
+    {
+      "adapter": "generic",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "final_host": "www.harborgroupmanagement.com",
+      "final_url": "https://www.harborgroupmanagement.com/apartments/fl/jacksonville/bridgepoint/",
+      "identity_evidence": {
+        "canonical_address": "1500 Monument Rd",
+        "canonical_name": "Bridgepoint I",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "monument"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 1,
+      "property_id": 540,
+      "property_name": "Bridgepoint I",
+      "source_adapter": "knock",
+      "status": 200,
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "https://www.hgliving.com/apartments/fl/jacksonville/bridgepoint/#/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "crystalwoodsapts.com",
+      "final_url": "https://crystalwoodsapts.com/",
+      "identity_evidence": {
+        "canonical_address": "4905 Southland Ave",
+        "canonical_name": "Crystal Woods of Alexandria",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "southland"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 2948,
+      "property_name": "Crystal Woods of Alexandria",
+      "source_adapter": "realpage_oll",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "www.crystalwoodsapts.com"
+    },
+    {
+      "adapter": "sightmap",
+      "errors": [
+        "sightmap-zero-info-dropped: 201 unit(s) had no positive rent (operator publishes no price for this unit) \u2014 skipped to prevent false-positive AVAILABLE rows"
+      ],
+      "final_host": "livebh.com",
+      "final_url": "https://livebh.com/apartments/parc-plaza-apartments/",
+      "identity_evidence": {
+        "canonical_address": "333 E Denton Dr",
+        "canonical_name": "Parc Plaza",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "denton"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 1,
+      "property_id": 8740,
+      "property_name": "Parc Plaza",
+      "source_adapter": "sightmap",
+      "status": 200,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME_PLAN_LEVEL",
+      "units": 0,
+      "website": "https://livebh.com/apartments/parc-plaza-apartments/"
+    },
+    {
+      "adapter": "onesite",
+      "errors": [],
+      "final_host": "www.myboulderapartment.com",
+      "final_url": "https://www.myboulderapartment.com/",
+      "identity_evidence": {
+        "canonical_address": "1025 Adams Cir",
+        "canonical_name": "Timber Ridge Apartment Homes",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "adams"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 8,
+      "property_id": 14295,
+      "property_name": "Timber Ridge Apartment Homes",
+      "source_adapter": "onesite",
+      "status": 200,
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "www.myboulderapartment.com"
+    },
+    {
+      "adapter": "generic",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "final_host": "townecrest.com",
+      "final_url": "https://townecrest.com/",
+      "identity_evidence": {
+        "canonical_address": "17500 Towne Crest Dr",
+        "canonical_name": "Towne Crest",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "towne",
+          "crest"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 16172,
+      "property_name": "Towne Crest",
+      "source_adapter": "realpage_oll",
+      "status": 200,
+      "tier": "TIER_1_API",
+      "units": 0,
+      "website": "http://www.townecrest.com/"
+    },
+    {
+      "adapter": "realpage_oll",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "final_host": "www.forestproperties.net",
+      "final_url": "https://www.forestproperties.net/property/availabilities/parke-place-village/",
+      "identity_evidence": {
+        "canonical_address": "44 New Zealand Rd",
+        "canonical_name": "Parke Place Townhomes",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "new",
+          "zealand"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 18194,
+      "property_name": "Parke Place Townhomes",
+      "source_adapter": "realpage_oll",
+      "status": 200,
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "https://www.forestproperties.net/property/availabilities/parke-place-village"
+    },
+    {
+      "adapter": "onesite",
+      "errors": [
+        "No RealPage/OneSite floorplan data found in captured API responses"
+      ],
+      "final_host": "www.torviewvillageapts.com",
+      "final_url": "https://www.torviewvillageapts.com/",
+      "identity_evidence": {
+        "canonical_address": "1 Kensington Cir",
+        "canonical_name": "Tor View Village",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kensington"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 38677,
+      "property_name": "Tor View Village",
+      "source_adapter": "onesite",
+      "status": 200,
+      "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+      "units": 0,
+      "website": "www.torviewvillageapts.com"
+    },
+    {
+      "adapter": "onesite",
+      "errors": [],
+      "final_host": "www.southpointehanahan.com",
+      "final_url": "https://www.southpointehanahan.com/",
+      "identity_evidence": {
+        "canonical_address": "6220 N Murray Dr",
+        "canonical_name": "South Pointe",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "murray"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 2,
+      "property_id": 39995,
+      "property_name": "South Pointe",
+      "source_adapter": "onesite",
+      "status": 200,
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "https://www.southpointehanahan.com/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "westwoodvillageapthomes.com",
+      "final_url": "https://westwoodvillageapthomes.com/en/",
+      "identity_evidence": {
+        "canonical_address": "2203 Beck Ave",
+        "canonical_name": "Westwood Village",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "beck"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 42571,
+      "property_name": "Westwood Village",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://westwoodvillageapthomes.com/en/"
+    },
+    {
+      "adapter": "onesite",
+      "errors": [],
+      "final_host": "theparkatblanding.com",
+      "final_url": "https://theparkatblanding.com/",
+      "identity_evidence": {
+        "canonical_address": "222 Blairmore Blvd E",
+        "canonical_name": "Park at Blanding",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "blairmore"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 9,
+      "property_id": 43520,
+      "property_name": "Park at Blanding",
+      "source_adapter": "onesite",
+      "status": 200,
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "http://www.parkatblanding.com/"
+    },
+    {
+      "adapter": "sightmap",
+      "errors": [
+        "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "final_host": "www.scullycompany.com",
+      "final_url": "https://www.scullycompany.com/apartments/pennsylvania/montgomery-county/norristown/hamilton-hall-2/",
+      "identity_evidence": {
+        "canonical_address": "449 Hamilton St",
+        "canonical_name": "Hamilton Hall",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "hamilton"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 43995,
+      "property_name": "Hamilton Hall",
+      "source_adapter": "sightmap",
+      "status": 200,
+      "tier": "TIER_1_API_SIGHTMAP_NO_RESPONSE",
+      "units": 0,
+      "website": "http://www.scullycompany.com/hamilton-hall-18.html"
+    },
+    {
+      "adapter": "knock",
+      "errors": [
+        "knock-adapter: Doorway API returned no units for community_id"
+      ],
+      "final_host": "www.wimmercommunities.com",
+      "final_url": "https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb",
+      "identity_evidence": {
+        "canonical_address": "9208 W Allerton Ave",
+        "canonical_name": "Westfield Apartments",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "allerton"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 48946,
+      "property_name": "Westfield Apartments",
+      "source_adapter": "knock",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "www.801polaris.com",
+      "final_url": "https://www.801polaris.com/",
+      "identity_evidence": {
+        "canonical_address": "801 Polaris Pkwy",
+        "canonical_name": "801 Polaris",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "polaris"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 59649,
+      "property_name": "801 Polaris",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://801polaris.com/"
+    },
+    {
+      "adapter": "sightmap",
+      "errors": [
+        "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "final_host": "www.scullycompany.com",
+      "final_url": "http://www.scullycompany.com/apartments/pennsylvania/lehigh-county/bridgeview/",
+      "identity_evidence": {
+        "canonical_address": "701 Harrison St",
+        "canonical_name": "Bridgeview",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "harrison"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 60141,
+      "property_name": "Bridgeview",
+      "source_adapter": "sightmap",
+      "status": 200,
+      "tier": "TIER_1_API_SIGHTMAP_NO_RESPONSE",
+      "units": 0,
+      "website": "http://www.scullycompany.com/bridgeview-14.html"
+    },
+    {
+      "adapter": "knock",
+      "errors": [
+        "knock-adapter: Doorway API returned no units for community_id"
+      ],
+      "final_host": "www.thiestalle.com",
+      "final_url": "https://www.thiestalle.com:443/properties/oakstreet-st-cloud.html",
+      "identity_evidence": {
+        "canonical_address": "417 15th Ave SE",
+        "canonical_name": "Oak Street Townhomes",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "15th",
+          "se"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 61459,
+      "property_name": "Oak Street Townhomes",
+      "source_adapter": "knock",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "http://www.thiestalle.com/properties/oakstreet-st-cloud.html"
+    },
+    {
+      "adapter": "sightmap",
+      "errors": [
+        "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "final_host": "www.scullycompany.com",
+      "final_url": "https://www.scullycompany.com/apartments/pennsylvania/philadelphia/center-city/avenir/",
+      "identity_evidence": {
+        "canonical_address": "42 S 15th St",
+        "canonical_name": "Avenir on Fifteenth",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "15th"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 63191,
+      "property_name": "Avenir on Fifteenth",
+      "source_adapter": "sightmap",
+      "status": 200,
+      "tier": "TIER_1_API_SIGHTMAP_NO_RESPONSE",
+      "units": 0,
+      "website": "http://avenirphilly.com/"
+    },
+    {
+      "adapter": null,
+      "errors": [],
+      "final_host": "www.southernpineapts.com",
+      "final_url": "https://www.southernpineapts.com/",
+      "identity_evidence": {
+        "canonical_address": "2520 Allie Nicole Cir",
+        "canonical_name": "Southern Pine Apartments",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "allie",
+          "nicole"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 67154,
+      "property_name": "Southern Pine Apartments",
+      "source_adapter": "onesite",
+      "status": 202,
+      "tier": null,
+      "units": 0,
+      "website": "www.southernpineapts.com"
+    },
+    {
+      "adapter": null,
+      "errors": [],
+      "final_host": "www.liveatmaya.com",
+      "final_url": "https://www.liveatmaya.com/",
+      "identity_evidence": {
+        "canonical_address": "535 S Kingsley Dr",
+        "canonical_name": "Maya",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kingsley"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 68497,
+      "property_name": "Maya",
+      "source_adapter": "knock",
+      "status": 404,
+      "tier": null,
+      "units": 0,
+      "website": "http://www.liveatmaya.com/"
+    },
+    {
+      "adapter": "knock",
+      "errors": [
+        "knock-adapter: no knockDoorway.init() call in HTML"
+      ],
+      "final_host": "coveatoverlakeapts.com",
+      "final_url": "https://coveatoverlakeapts.com/",
+      "identity_evidence": {
+        "canonical_address": "1837 Berra Blvd",
+        "canonical_name": "The Cove at Overlake",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "berra"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 224888,
+      "property_name": "The Cove at Overlake",
+      "source_adapter": "knock",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "http://www.coveatoverlakeapts.com/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "commonsatcowanboulevard.com",
+      "final_url": "https://commonsatcowanboulevard.com/",
+      "identity_evidence": {
+        "canonical_address": "2352 Cowan Blvd",
+        "canonical_name": "The Commons at Cowan Boulevard",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "cowan"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 228341,
+      "property_name": "The Commons at Cowan Boulevard",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "http://commonsatcowanboulevard.com/"
+    },
+    {
+      "adapter": "sightmap",
+      "errors": [
+        "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "final_host": "imtresidential.com",
+      "final_url": "https://imtresidential.com/properties/imt-belasera-at-superior/?utm_source=2020website&utm_medium=301redirect",
+      "identity_evidence": {
+        "canonical_address": "17720 Superior St",
+        "canonical_name": "IMT Belasera at Superior",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "superior"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 234945,
+      "property_name": "IMT Belasera at Superior",
+      "source_adapter": "sightmap",
+      "status": 200,
+      "tier": "TIER_1_API_SIGHTMAP_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.imtresidential.com/imtbelaseraatsuperior/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "www.liveemersonpark.com",
+      "final_url": "https://www.liveemersonpark.com/",
+      "identity_evidence": {
+        "canonical_address": "6735 Brookline Gardens Rd",
+        "canonical_name": "Emerson Park",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "brookline",
+          "gardens"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 252116,
+      "property_name": "Emerson Park",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://www.liveemersonpark.com/"
+    },
+    {
+      "adapter": "entrata",
+      "errors": [
+        "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+      ],
+      "final_host": "www.thepointatreston.com",
+      "final_url": "https://www.thepointatreston.com/",
+      "identity_evidence": {
+        "canonical_address": "1925 Roland Clarke Pl",
+        "canonical_name": "The Point at Reston",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "roland",
+          "clarke"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 253326,
+      "property_name": "The Point at Reston",
+      "source_adapter": "realpage_oll",
+      "status": 200,
+      "tier": "TIER_1_API_ENTRATA_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.thepointatreston.com/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "luxe88apts.com",
+      "final_url": "https://luxe88apts.com/",
+      "identity_evidence": {
+        "canonical_address": "1025 Luxe Ave",
+        "canonical_name": "Luxe 88",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "luxe"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 258789,
+      "property_name": "Luxe 88",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://luxe88apts.com/"
+    },
+    {
+      "adapter": "knock",
+      "errors": [
+        "knock-adapter: no knockDoorway.init() call in HTML"
+      ],
+      "final_host": "copperpointeapts.com",
+      "final_url": "https://copperpointeapts.com/",
+      "identity_evidence": {
+        "canonical_address": "6410 S New Braunfels Ave",
+        "canonical_name": "Copper Pointe",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "new",
+          "braunfels"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 261116,
+      "property_name": "Copper Pointe",
+      "source_adapter": "knock",
+      "status": 200,
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "https://copperpointeapts.com/"
+    },
+    {
+      "adapter": "entrata",
+      "errors": [
+        "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured during page load (false-positive detector signal or marketing-only shell)"
+      ],
+      "final_host": "www.thepointatkingston.com",
+      "final_url": "https://www.thepointatkingston.com/",
+      "identity_evidence": {
+        "canonical_address": "1 Kingston Collection Way",
+        "canonical_name": "The Point at Kingston",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "kingston",
+          "collection"
+        ],
+        "visible_identity_match": true
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 265143,
+      "property_name": "The Point at Kingston",
+      "source_adapter": "realpage_oll",
+      "status": 200,
+      "tier": "TIER_1_API_ENTRATA_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.thepointatkingston.com/"
+    },
+    {
+      "adapter": "encoreskyline_template",
+      "errors": [
+        "no /floorplans/{slug}/ anchors found"
+      ],
+      "final_host": "liveatwillowrun.com",
+      "final_url": "https://liveatwillowrun.com/en/",
+      "identity_evidence": {
+        "canonical_address": "1355 Bradley Blvd",
+        "canonical_name": "Bradley Pointe",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": false,
+        "name_visible_exact_normalized": false,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": true,
+        "street_words_checked": [
+          "bradley"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 0,
+      "property_id": 275898,
+      "property_name": "Bradley Pointe",
+      "source_adapter": "encoreskyline_template",
+      "status": 200,
+      "tier": "ENCORESKYLINE_NO_PLAN_LINKS",
+      "units": 0,
+      "website": "https://www.liveatbradleypointe.com/"
+    },
+    {
+      "adapter": "onesite",
+      "errors": [],
+      "final_host": "www.123taylor.com",
+      "final_url": "https://www.123taylor.com/gallatin-village",
+      "identity_evidence": {
+        "canonical_address": "20190 Murphy Rd",
+        "canonical_name": "Gallatin Village",
+        "distinct_effective_anchors": 0,
+        "llm_calls": 0,
+        "name_distinctive_tokens_visible": true,
+        "name_visible_exact_normalized": true,
+        "paid_unlocker_calls": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_id_keys": [],
+        "source_property_ids": [],
+        "source_urls": [],
+        "street_number_and_words_visible": false,
+        "street_words_checked": [
+          "murphy"
+        ],
+        "visible_identity_match": false
+      },
+      "native_samples": [],
+      "outcome": "NO_NATIVE_PRICED_UNITS",
+      "plans": 5,
+      "property_id": 291774,
+      "property_name": "Gallatin Village",
+      "source_adapter": "onesite",
+      "status": 200,
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "https://www.123taylor.com/gallatin-village"
+    }
+  ],
+  "target_adapters": [
+    "encoreskyline_template",
+    "knock",
+    "onesite",
+    "realpage_oll",
+    "sightmap"
+  ],
+  "targets": 28
+}

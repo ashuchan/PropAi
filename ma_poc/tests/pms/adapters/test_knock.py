@@ -115,3 +115,38 @@ def test_find_knock_ids_no_init_call_only_script_tag() -> None:
         "</body></html>"
     )
     assert find_knock_ids(html) == (None, None, None)
+
+
+def test_find_knock_ids_dynamic_dni_config() -> None:
+    """Harbor Group binds the same Knock ids through config variables."""
+    html = """
+    <script>
+      const config = {
+        dniLibrary: "https://doorway.knck.io/latest/doorway.min.js",
+        dniId: "91011ebb76019d4d",
+        dniApiKey: 'ad96e5d25f696e657111eb979d127cae'
+      };
+      window.knockDoorway.init(
+        config.dniApiKey, 'community', config.dniId
+      );
+    </script>
+    """
+
+    assert find_knock_ids(html) == (
+        "ad96e5d25f696e657111eb979d127cae",
+        "community",
+        "91011ebb76019d4d",
+    )
+
+
+def test_find_knock_ids_rejects_unrelated_dni_fields_without_doorway() -> None:
+    html = """
+    <script>
+      const config = {
+        dniId: "91011ebb76019d4d",
+        dniApiKey: "ad96e5d25f696e657111eb979d127cae"
+      };
+    </script>
+    """
+
+    assert find_knock_ids(html) == (None, None, None)

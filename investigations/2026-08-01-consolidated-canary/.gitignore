@@ -1,0 +1,7 @@
+# Raw profiles can contain public vendor query credentials. Their object
+# generations and hashes are committed in the promotion manifests instead.
+profile-snapshot/profiles/*.json
+
+# A tiny interrupted uv environment was copied with the worker evidence. It is
+# not part of the replay archive and is intentionally excluded.
+worker-archive/failed-no-data/*_venv_accidental_*/

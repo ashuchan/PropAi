@@ -302,3 +302,124 @@ def test_pp_ssr_fp_group_item_waitlist_status() -> None:
     assert units[0]["availability_status"] == "UNAVAILABLE"
     assert int(units[0]["market_rent_low"]) == 1500
     assert units[0]["sqft"] == "700"
+
+
+def test_pp_ssr_anchor_grid_details_marlowe_fee_transparency() -> None:
+    """Template D1: Marlowe's wrapper-less ``.grid-details`` row."""
+    html = """
+    <html><body>
+      <div class="grid-details">
+        <h4 class="fp-name show-available">
+          <a class="fp-name-link" href="/floorplans/a1-790000/">A1</a>
+        </h4>
+        <span class="available-units">10 Available</span>
+        <div class="details-col bed-bath">
+          <span class="title">Bed / Bath</span>
+          <span class="value">1 bd / 1 ba</span>
+        </div>
+        <div class="details-col rent">
+          <span class="title">Base Rent</span>
+          <div class="value fee-transparency-wrapper">
+            <span class="fee-transparency-text">
+              Total Monthly Leasing Price Starting from $1,570.06
+              <span class="pp-base-rent pp-base-rent-line">
+                <span class="pp-base-rent-label">Base Rent:</span>
+                <span class="pp-base-rent-amount">$1,455+/month</span>
+              </span>
+            </span>
+          </div>
+          <span class="lease-term-name">15mo lease</span>
+        </div>
+        <div class="details-col deposit"><span class="value">$300</span></div>
+        <div class="details-col sq-feet"><span class="value">715</span></div>
+      </div>
+    </body></html>
+    """
+
+    units = parse_entrata_prospectportal_html(html, "https://marlowe.example/")
+
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["floor_plan_name"] == "A1"
+    assert unit["bedrooms"] == "1"
+    assert unit["bathrooms"] == "1"
+    assert unit["sqft"] == "715"
+    assert unit["market_rent_low"] == 1455
+    assert unit["market_rent_high"] == 1455
+    assert unit["available_units"] == "10"
+    assert unit["lease_term"] == "15mo lease"
+    assert unit["extraction_tier"] == "TIER_1_DOM_ENTRATA_PP_ANCHOR_GRID"
+
+
+def test_pp_ssr_anchor_grid_details_avana_studio() -> None:
+    """A studio row with no explicit bath still keeps its rent + area."""
+    html = """
+    <div class="grid-details">
+      <h4><a class="fp-name-link" href="/floorplans/studio/">Studio (550 SF)</a></h4>
+      <span class="available-units">5 Available</span>
+      <div class="details-col bed-bath"><span class="value">Studio</span></div>
+      <div class="details-col rent">
+        <div class="value fee-transparency-wrapper">
+          Total Monthly Leasing Price $990
+          <span class="pp-base-rent-amount">$929+/month</span>
+        </div>
+      </div>
+      <div class="details-col sq-feet"><span class="value">550</span></div>
+    </div>
+    """
+
+    units = parse_entrata_prospectportal_html(html, "https://avana.example/")
+
+    assert len(units) == 1
+    assert units[0]["bedrooms"] == "0"
+    assert units[0]["sqft"] == "550"
+    assert units[0]["market_rent_low"] == 929
+    assert units[0]["available_units"] == "5"
+
+
+def test_pp_ssr_anchor_fp_row_white_furniture() -> None:
+    """Template D2: table-like ``li.fp-row`` with a dated availability."""
+    html = """
+    <ul>
+      <li class="fp-row col-7">
+        <div class="fp-col name">
+          <span class="fp-col-text">
+            <a class="fp-name-link" href="/floorplans/s1-1126662/">S1</a>
+          </span>
+          <div class="mobile-availability">
+            <button class="availability-link">Available Aug 05, 2026</button>
+          </div>
+        </div>
+        <div class="fp-col bed-bath"><span class="fp-col-text">Studio</span></div>
+        <div class="fp-col rent">
+          <div class="fp-col-text fee-transparency-wrapper">
+            <span class="fee-transparency-text">From $1,245 per month</span>
+          </div>
+        </div>
+        <div class="fp-col sq-feet"><span class="fp-col-text">616</span></div>
+      </li>
+    </ul>
+    """
+
+    units = parse_entrata_prospectportal_html(
+        html, "https://whitefurniture.example/"
+    )
+
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["floor_plan_name"] == "S1"
+    assert unit["bedrooms"] == "0"
+    assert unit["sqft"] == "616"
+    assert unit["market_rent_low"] == 1245
+    assert unit["availability_date"] == "Aug 05, 2026"
+
+
+def test_pp_ssr_anchor_grid_requires_price_or_area() -> None:
+    """A navigation-style plan anchor with only beds is not inventory."""
+    html = """
+    <div class="grid-details">
+      <a class="fp-name-link" href="/floorplans/a1/">A1</a>
+      <div class="details-col bed-bath"><span class="value">1 bd / 1 ba</span></div>
+    </div>
+    """
+    assert parse_entrata_prospectportal_html(html, "u") == []

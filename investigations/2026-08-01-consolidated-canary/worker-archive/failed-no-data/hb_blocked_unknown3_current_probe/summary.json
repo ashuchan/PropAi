@@ -1,0 +1,52 @@
+{
+  "targets": 1,
+  "hyperbrowser_sessions": 1,
+  "solve_captchas": false,
+  "stealth_enabled": false,
+  "unlocker_enabled": false,
+  "llm_enabled": false,
+  "results": [
+    {
+      "property_id": 48075,
+      "url": "https://www.edgefieldaptsva.com/",
+      "final_url": "https://lawsoncompanies.com/apartments/edgefield-apartments/?utm_source=redirect&utm_medium=redirect&utm_campaign=edgefieldaptsva.com",
+      "outcome": "OK",
+      "status": 200,
+      "body_bytes": 576154,
+      "body_sha256": "47a17eee861675f9c85cfb37e5d82c190d21d006377237517963245c67a3b766",
+      "network_responses": 14,
+      "network_urls": [
+        "https://maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true",
+        "https://app.cloudpano.com/api/tours/GaEleCORz/embeddedConfig",
+        "https://app.cloudpano.com/api/tours/de8tTpnPA/embeddedConfig",
+        "https://app.cloudpano.com/api/tours/wmed8nmCm/embeddedConfig",
+        "https://api.userway.org/api/v1/tunings/6HoLoxQpLW",
+        "https://app.cloudpano.com/cdn-cgi/speculation",
+        "https://listgrowth.ctctcdn.com/v1/c96c8d940e172f14456cef3d85473a0a.json",
+        "https://app.cloudpano.com/cdn-cgi/speculation",
+        "https://app.cloudpano.com/cdn-cgi/speculation",
+        "https://syndication.twitter.com/settings?session_id=7fb1268da57c221963e174282c9a07012497b9c7",
+        "https://app.cloudpano.com/api/tours/de8tTpnPA?isViewer=true",
+        "https://app.cloudpano.com/api/tours/GaEleCORz?isViewer=true",
+        "https://app.cloudpano.com/api/tours/wmed8nmCm?isViewer=true",
+        "https://cdn.userway.org/widgetapp/2026-07-07-10-43-48/locales/en-US.json"
+      ],
+      "challenge_markers": [],
+      "captcha_detected": false,
+      "provider_markers": [
+        "onesite",
+        "realpage"
+      ],
+      "candidate_urls": [
+        "https://api",
+        "https://api.w.org/",
+        "https://www.google.com/recaptcha/api.j",
+        "https://www.google.com/recaptcha/api2/anchor?ar=1&amp;k=6LcP7OMUAAAAAKaYGvrJF5K7waat26JdiIZu0DGR&amp;co=aHR0cHM6Ly9"
+      ],
+      "solve_captchas": false,
+      "llm_enabled": false,
+      "stealth_enabled": false,
+      "unlocker_enabled": false
+    }
+  ]
+}

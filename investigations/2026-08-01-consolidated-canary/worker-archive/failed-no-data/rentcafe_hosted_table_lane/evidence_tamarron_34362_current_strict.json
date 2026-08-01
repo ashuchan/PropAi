@@ -1,0 +1,677 @@
+{
+  "summary": {
+    "result_type": "rentcafe_hosted_table_strict_with_negative_controls",
+    "capture_timestamp_utc": "2026-08-01T15:03:57.550746+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      34362
+    ],
+    "native_positive_rent_rows": 10,
+    "live_cluster_members": 3,
+    "negative_controls": 2,
+    "hyperbrowser_sessions": 3,
+    "hyperbrowser_used_for_capture": true,
+    "residential_proxy": true,
+    "captcha_solving": false,
+    "stealth": false,
+    "fingerprint_rotation": false,
+    "web_unlocker": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 34362,
+      "property_name": "Tamarron",
+      "website": "https://www.thetamarronapts.com",
+      "current_official_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "rentcafe",
+      "tier": "TIER_1_DOM_RENTCAFE_HOSTED",
+      "units": 10,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_rentcafe_tamarron_property_1505175_native_hosted_rows_waitlist_and_cross_property_fail_closed_full_pipeline",
+      "identity_evidence": {
+        "canonical_name": "Tamarron",
+        "published_name": "Tamarron Apartments",
+        "published_address": "4410 N 99th Avenue",
+        "city_state_zip": "Phoenix, AZ 85037",
+        "current_page_identity_checks": {
+          "name": true,
+          "address": true,
+          "city": true,
+          "postal_code": true
+        },
+        "rentcafe_property_id": "1505175",
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "distinct_unit_numbers": 10,
+        "distinct_securecafe_apartment_ids": 10,
+        "source_urls": [
+          "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        ]
+      },
+      "strict_gates": {
+        "exact_current_property_identity": true,
+        "exact_rentcafe_property_id_1505175": true,
+        "all_rows_native_unit_number": true,
+        "all_rows_unique_securecafe_apartment_id": true,
+        "all_rows_numeric_rentcafe_floorplan_id": true,
+        "all_rows_native_floorplan_name": true,
+        "all_rows_positive_row_level_rent": true,
+        "full_pipeline_10_native_positive_rent_rows": true,
+        "direct_and_full_pipeline_row_sets_identical": true,
+        "coopers_27_waitlist_rows_rejected": true,
+        "rentcafe_shared_host_sibling_links_rejected": true,
+        "spring_hill_zero_live_inventory_rejected": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "2083",
+            "securecafe_apartment_id": "47011615",
+            "rentcafe_floorplan_id": "4259393"
+          },
+          "floor_plan_name": "A1",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1335,
+            "market_rent_high": 3659
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "1071",
+            "securecafe_apartment_id": "47012270",
+            "rentcafe_floorplan_id": "4259393"
+          },
+          "floor_plan_name": "A1",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1316,
+            "market_rent_high": 3621
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "2134",
+            "securecafe_apartment_id": "47011629",
+            "rentcafe_floorplan_id": "4259395"
+          },
+          "floor_plan_name": "B1",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1450,
+            "market_rent_high": 7952
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "2132",
+            "securecafe_apartment_id": "47011627",
+            "rentcafe_floorplan_id": "4259395"
+          },
+          "floor_plan_name": "B1",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1435,
+            "market_rent_high": 7866
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "2148",
+            "securecafe_apartment_id": "47011643",
+            "rentcafe_floorplan_id": "4259397"
+          },
+          "floor_plan_name": "B2",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1484,
+            "market_rent_high": 7993
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "2030",
+            "securecafe_apartment_id": "47012611",
+            "rentcafe_floorplan_id": "4259397"
+          },
+          "floor_plan_name": "B2",
+          "availability_date": "2026-08-06",
+          "positive_rent_evidence": {
+            "market_rent_low": 1476,
+            "market_rent_high": 8010
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "1032",
+            "securecafe_apartment_id": "47012524",
+            "rentcafe_floorplan_id": "4259401"
+          },
+          "floor_plan_name": "C1",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1901,
+            "market_rent_high": 6647
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "2035",
+            "securecafe_apartment_id": "47012616",
+            "rentcafe_floorplan_id": "4259401"
+          },
+          "floor_plan_name": "C1",
+          "availability_date": "2026-08-20",
+          "positive_rent_evidence": {
+            "market_rent_low": 1873,
+            "market_rent_high": 6901
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "1001",
+            "securecafe_apartment_id": "47012237",
+            "rentcafe_floorplan_id": "4259399"
+          },
+          "floor_plan_name": "B3",
+          "availability_date": "2026-08-31",
+          "positive_rent_evidence": {
+            "market_rent_low": 1765,
+            "market_rent_high": 9485
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        },
+        {
+          "identity": {
+            "unit_number": "1052",
+            "securecafe_apartment_id": "47012544",
+            "rentcafe_floorplan_id": "4259399"
+          },
+          "floor_plan_name": "B3",
+          "availability_date": "2026-09-22",
+          "positive_rent_evidence": {
+            "market_rent_low": 1695,
+            "market_rent_high": 8980
+          },
+          "source_property_id": "1505175",
+          "source_api_url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+        }
+      ],
+      "floorplan_name_and_date_semantics": {
+        "exact_published_floorplan_names": [
+          "A1",
+          "B1",
+          "B2",
+          "B3",
+          "C1"
+        ],
+        "exact_numeric_floorplan_ids": [
+          "4259393",
+          "4259395",
+          "4259397",
+          "4259399",
+          "4259401"
+        ],
+        "explicit_future_date_rows": 4,
+        "available_now_rows_with_blank_calendar_date": 6,
+        "names_are_native_parent_fp_item_data_name_values": true,
+        "dates_are_native_visible_hosted_table_values": true
+      },
+      "current_source_validation": {
+        "hyperbrowser_capture": {
+          "property_id": 34362,
+          "url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx",
+          "status": 200,
+          "body_bytes": 439119,
+          "body_sha256": "fb0b2ec2033f13f2a29dd4799b250a32b9c0bf466fa83c4a84b291264cf75852",
+          "identity": {
+            "name_visible": true,
+            "street_visible": true,
+            "city_zip_visible": true
+          },
+          "provider_markers": [
+            "rentcafe",
+            "onlineleasing",
+            "myolepropertyid",
+            "unitid",
+            "floorplanid",
+            "fp-unit"
+          ],
+          "candidate_urls": [
+            "https://cdngeneral.rentcafe.com/content/images/details-page-ds/floorplan-image-placeholder.svg",
+            "https://cdngeneral.rentcafe.com/content/images/equal-housing-opportunity.png",
+            "https://cdngeneral.rentcafe.com/dmslivecafe/2/3131/Decron_Corp_PMS-01.png?crop=(0,0,300,60)&amp;cropxunits=300&amp;cropyunits=60&amp;width=75&amp;quality=90",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011615\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011627\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011629\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011643\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012237\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/02/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012270\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012524\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012544\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/24/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012611\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/08/2026&#x27",
+            "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012616\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/22/2026&#x27",
+            "https://www.rentcafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+            "https://www.rentcafe.com/storage-units/us/az/gilbert/",
+            "https://www.rentcafe.com/storage-units/us/az/glendale/",
+            "https://www.rentcafe.com/storage-units/us/az/mesa/",
+            "https://www.rentcafe.com/storage-units/us/az/phoenix/",
+            "https://www.rentcafe.com/storage-units/us/az/scottsdale/",
+            "https://www.rentcafe.com/storage-units/us/az/tucson/"
+          ],
+          "hyperbrowser_sessions": 1,
+          "session_options": {
+            "solve_captchas": false,
+            "stealth": false,
+            "fingerprint_rotation": false,
+            "residential_proxy": true
+          },
+          "llm": false,
+          "paid_canary": false,
+          "compressed_path": "/private/tmp/propai-fnd-vBkmT9/hb_tamarron_34362/root.html.gz",
+          "compressed_sha256": "3fc0179ac081838e2d8ec09bce9d9257a760eb22268c96dc291dd32b47773256"
+        },
+        "direct_parser_native_positive_rent_rows": 10,
+        "full_pipeline": {
+          "adapter": "rentcafe",
+          "detected_pms": {
+            "pms": "rentcafe",
+            "confidence": 0.95,
+            "evidence": [
+              "host ends in rentcafe.com (www.rentcafe.com)"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "jsonld_first"
+          },
+          "tier": "TIER_1_DOM_RENTCAFE_HOSTED",
+          "errors": [],
+          "strict_native_positive_rent_rows": 10,
+          "distinct_native_unit_numbers": 10,
+          "distinct_native_unit_ids": 10,
+          "source_property_ids": [
+            "1505175"
+          ],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "minimal_production_lever": "refresh canonical property URL to the exact current RentCafe page; parse hosted native rows with provider IDs and fail closed on waitlists or shared-host sibling listings"
+      },
+      "contamination_negative_checks": {
+        "coopers_landing": {
+          "property_id": 218786,
+          "exact_identity": {
+            "name": true,
+            "address": true,
+            "city": true,
+            "postal_code": true
+          },
+          "published_rentcafe_property_id": "480033",
+          "raw_fp_unit_rows": 27,
+          "raw_unit_labels": [
+            "WAIT1BD",
+            "WAIT1BD",
+            "WAIT1BDL",
+            "WAIT1BL",
+            "WAIT1BBF",
+            "WAIT1_TH",
+            "WAIT1BED",
+            "WAIT1BED",
+            "WAIT1LFT",
+            "WAIT1LFT",
+            "WAIT1BED",
+            "WAITAPP",
+            "WAIT2BD",
+            "WAIT2BDL",
+            "WAIT2BD",
+            "WAIT2BDL",
+            "WAIT22",
+            "WAIT22BF",
+            "WAIT2BED",
+            "WAIT2BED",
+            "WAIT2LFT",
+            "WAIT2LFT",
+            "WAITAPP",
+            "WAITAPP",
+            "WAIT2BED",
+            "WAIT3_TH",
+            "WAIT3BD"
+          ],
+          "all_raw_labels_waitlist_sentinels": true,
+          "direct_rows_admitted": 0,
+          "full_pipeline_rows_admitted": 0,
+          "rejected_shared_host_sibling_urls": [
+            "https://www.rentcafe.com/apartments/mi/kalamazoo/arcadia-grove/default.aspx",
+            "https://www.rentcafe.com/apartments/mi/kalamazoo/candlewyck-apartments/default.aspx",
+            "https://www.rentcafe.com/apartments/mi/kalamazoo/winchell-way0/default.aspx"
+          ],
+          "known_rejected_sibling_property": {
+            "name": "Winchell Way",
+            "rentcafe_property_id": "1682177",
+            "rows_admitted": 0
+          },
+          "full_pipeline": {
+            "adapter": "generic",
+            "detected_pms": {
+              "pms": "rentcafe",
+              "confidence": 0.95,
+              "evidence": [
+                "host ends in rentcafe.com (www.rentcafe.com)"
+              ],
+              "pms_client_account_id": null,
+              "recommended_strategy": "jsonld_first"
+            },
+            "tier": "TIER_3_DOM",
+            "errors": [
+              "Generic parser found no units in captured API responses"
+            ],
+            "strict_native_positive_rent_rows": 0,
+            "distinct_native_unit_numbers": 0,
+            "distinct_native_unit_ids": 0,
+            "source_property_ids": [],
+            "validation_budget": {
+              "llm_api_calls": 0,
+              "llm_dom_calls": 0,
+              "llm_monolithic": 0,
+              "link_hop": 0,
+              "_cost_cap_usd": 0
+            }
+          }
+        },
+        "spring_hill": {
+          "property_id": 69558,
+          "exact_identity": {
+            "name": true,
+            "address": true,
+            "city": true,
+            "postal_code": true
+          },
+          "raw_fp_unit_rows": 0,
+          "direct_rows_admitted": 0,
+          "full_pipeline_rows_admitted": 0,
+          "full_pipeline": {
+            "adapter": "rentcafe",
+            "detected_pms": {
+              "pms": "rentcafe",
+              "confidence": 0.95,
+              "evidence": [
+                "host ends in rentcafe.com (www.rentcafe.com)"
+              ],
+              "pms_client_account_id": null,
+              "recommended_strategy": "jsonld_first"
+            },
+            "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+            "errors": [
+              "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+            ],
+            "strict_native_positive_rent_rows": 0,
+            "distinct_native_unit_numbers": 0,
+            "distinct_native_unit_ids": 0,
+            "source_property_ids": [],
+            "validation_budget": {
+              "llm_api_calls": 0,
+              "llm_dom_calls": 0,
+              "llm_monolithic": 0,
+              "link_hop": 0,
+              "_cost_cap_usd": 0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "cluster_boundary": {
+    "members": [
+      34362,
+      218786,
+      69558
+    ],
+    "direct_parser_rows": {
+      "34362": 10,
+      "218786": 0,
+      "69558": 0
+    },
+    "full_pipeline_strict_rows": {
+      "34362": 10,
+      "218786": 0,
+      "69558": 0
+    },
+    "anchor_candidates_after_shared_host_gate": {
+      "34362": [
+        "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx"
+      ],
+      "218786": [
+        "https://www.rentcafe.com/apartments/mi/kalamazoo/coopers-landing-apartments/default.aspx"
+      ],
+      "69558": [
+        "https://www.rentcafe.com/apartments/nj/summit/spring-hill-apartments/default.aspx"
+      ]
+    }
+  },
+  "capture_provenance": {
+    "tamarron": {
+      "property_id": 34362,
+      "url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx",
+      "status": 200,
+      "body_bytes": 439119,
+      "body_sha256": "fb0b2ec2033f13f2a29dd4799b250a32b9c0bf466fa83c4a84b291264cf75852",
+      "identity": {
+        "name_visible": true,
+        "street_visible": true,
+        "city_zip_visible": true
+      },
+      "provider_markers": [
+        "rentcafe",
+        "onlineleasing",
+        "myolepropertyid",
+        "unitid",
+        "floorplanid",
+        "fp-unit"
+      ],
+      "candidate_urls": [
+        "https://cdngeneral.rentcafe.com/content/images/details-page-ds/floorplan-image-placeholder.svg",
+        "https://cdngeneral.rentcafe.com/content/images/equal-housing-opportunity.png",
+        "https://cdngeneral.rentcafe.com/dmslivecafe/2/3131/Decron_Corp_PMS-01.png?crop=(0,0,300,60)&amp;cropxunits=300&amp;cropyunits=60&amp;width=75&amp;quality=90",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011615\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011627\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011629\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011643\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012237\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/02/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012270\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012524\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012544\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/24/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012611\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/08/2026&#x27",
+        "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012616\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/22/2026&#x27",
+        "https://www.rentcafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+        "https://www.rentcafe.com/storage-units/us/az/gilbert/",
+        "https://www.rentcafe.com/storage-units/us/az/glendale/",
+        "https://www.rentcafe.com/storage-units/us/az/mesa/",
+        "https://www.rentcafe.com/storage-units/us/az/phoenix/",
+        "https://www.rentcafe.com/storage-units/us/az/scottsdale/",
+        "https://www.rentcafe.com/storage-units/us/az/tucson/"
+      ],
+      "hyperbrowser_sessions": 1,
+      "session_options": {
+        "solve_captchas": false,
+        "stealth": false,
+        "fingerprint_rotation": false,
+        "residential_proxy": true
+      },
+      "llm": false,
+      "paid_canary": false
+    },
+    "pair": {
+      "results": [
+        {
+          "property_id": 218786,
+          "property_name": "Coopers Landing Apartments",
+          "url": "https://www.rentcafe.com/apartments/mi/kalamazoo/coopers-landing-apartments/default.aspx",
+          "status": 200,
+          "body_bytes": 580045,
+          "body_sha256": "5ed43453527b127ce8b41b65289c47bb643f548efa492958240ae09dcb2671ed",
+          "identity": {
+            "name_visible": true,
+            "street_visible": true,
+            "city_zip_visible": true
+          },
+          "provider_markers": [
+            "rentcafe",
+            "onlineleasing",
+            "myolepropertyid",
+            "unitid",
+            "floorplanid",
+            "fp-unit"
+          ],
+          "property_ids": [
+            "480033"
+          ],
+          "unit_ids": [
+            "5816378",
+            "5816379",
+            "5816380",
+            "5816381",
+            "5816382",
+            "5816383",
+            "5816384",
+            "5816385",
+            "5816386",
+            "6758163",
+            "6758164",
+            "6758165",
+            "20305231",
+            "27112645",
+            "27112646",
+            "27112647",
+            "27112648",
+            "28950723",
+            "28950724",
+            "34525031",
+            "34525032",
+            "34525033",
+            "34525034",
+            "34525035",
+            "45280290",
+            "45280291",
+            "45280292"
+          ],
+          "floorplan_ids": [
+            "2330097",
+            "2330102",
+            "2330105",
+            "2330112",
+            "2330113",
+            "2330116",
+            "2330117",
+            "2330118",
+            "2330123",
+            "2330127",
+            "2330128",
+            "2330129",
+            "2330130",
+            "2330131",
+            "2330134",
+            "2330136",
+            "2330144",
+            "2330146",
+            "6152052",
+            "6152058"
+          ],
+          "hyperbrowser_sessions": 1,
+          "session_options": {
+            "solve_captchas": false,
+            "stealth": false,
+            "fingerprint_rotation": false,
+            "residential_proxy": true
+          },
+          "llm": false,
+          "paid_canary": false
+        },
+        {
+          "property_id": 69558,
+          "property_name": "Spring Hill Apartments",
+          "url": "https://www.rentcafe.com/apartments/nj/summit/spring-hill-apartments/default.aspx",
+          "status": 200,
+          "body_bytes": 363316,
+          "body_sha256": "97b5f8660041797a4229f60d9491b5a93eda122ddc55c13f033cce0563e46378",
+          "identity": {
+            "name_visible": true,
+            "street_visible": true,
+            "city_zip_visible": true
+          },
+          "provider_markers": [
+            "rentcafe",
+            "onlineleasing",
+            "floorplanid"
+          ],
+          "property_ids": [],
+          "unit_ids": [],
+          "floorplan_ids": [],
+          "hyperbrowser_sessions": 1,
+          "session_options": {
+            "solve_captchas": false,
+            "stealth": false,
+            "fingerprint_rotation": false,
+            "residential_proxy": true
+          },
+          "llm": false,
+          "paid_canary": false
+        }
+      ],
+      "summary": {
+        "targets": 2,
+        "http_200": 2,
+        "identity_exact": 2,
+        "hyperbrowser_sessions": 2,
+        "captcha_solving": false,
+        "stealth": false,
+        "fingerprint_rotation": false,
+        "llm": false,
+        "paid_canary": false
+      }
+    },
+    "source_capture_hashes_verified": true,
+    "materializer": "/private/tmp/propai-fnd-vBkmT9/rentcafe_hosted_table_lane/materialize_tamarron_34362_current_strict.py",
+    "materializer_sha256": "7dd73c22a28571d5b06c58044a83259d4ee209d8ec03547a555b49fd676cb7f3"
+  },
+  "ledger_integrity": {
+    "before": {
+      "ledger": "e9e04b2c3c0c0e08a39191e7832f7af3f6e7a4269784c7470feadfd35ff648ca",
+      "summary": "c38fbc2e66fb4f3bde8f224930fcd72c1fe7b585ce2eb534727c3ce5d9ddbaac",
+      "remaining": "ccd9e55e046fbe6e64a9eb39fc4aad1e1cf50b081a4989adba61fbb999e8a274"
+    },
+    "after": {
+      "ledger": "e9e04b2c3c0c0e08a39191e7832f7af3f6e7a4269784c7470feadfd35ff648ca",
+      "summary": "c38fbc2e66fb4f3bde8f224930fcd72c1fe7b585ce2eb534727c3ce5d9ddbaac",
+      "remaining": "ccd9e55e046fbe6e64a9eb39fc4aad1e1cf50b081a4989adba61fbb999e8a274"
+    },
+    "unchanged_during_materialization": true
+  }
+}

@@ -1,8 +1,9 @@
 """Generalized plan→unit render lever + circuit-breaker (task #45, 2026-07-19).
 
 Pinned contract:
-- ``_is_plan_level``: rows present AND zero rows with a real unit_number —
-  platform-agnostic (the generalization of the Entrata-scoped #42 trigger).
+- ``_is_plan_level``: rows present AND zero rows with a canonical per-unit
+  identity — platform-agnostic (the generalization of the Entrata-scoped #42
+  trigger).
 - ``_is_entrata_plan_level`` unchanged in behavior (tier-scoped wrapper).
 - ``_plan_render_allowed``: circuit-breaker on
   ``profile.quality.plan_render_attempts_held`` — allow below the cap, block at
@@ -48,6 +49,71 @@ def test_is_plan_level_false_on_zero_units() -> None:
     j = _runner()
     assert j._is_plan_level({"units": []}) is False
     assert j._is_plan_level({}) is False
+
+
+def test_is_plan_level_true_on_canonical_plan_channel() -> None:
+    """Stage-2 moves plan rows out of ``units``; the render lever must still
+    recognise that as plan-level rather than empty."""
+    j = _runner()
+    result = {
+        "units": [],
+        "plan_summaries": [
+            {"floor_plan_name": "A1", "market_rent_low": 1500}
+        ],
+    }
+    assert j._is_plan_level(result) is True
+
+
+def test_unit_level_count_rejects_plan_scoped_numeric_id() -> None:
+    """A numeric Entrata floor-plan id is not an apartment identity."""
+    j = _runner()
+    result = {
+        "units": [
+            {
+                "unit_number": "819409",
+                "floor_plan_name": "A1",
+                "source_ids": {"entrata_fpid": "819409"},
+            }
+        ]
+    }
+    assert j._unit_level_row_count(result) == 0
+    assert j._is_plan_level(result) is True
+
+
+def test_route_shadow_counts_only_physical_units(tmp_path: Any) -> None:
+    """Plan summaries must keep the observe-only router on a recovery path."""
+    import json
+    from types import SimpleNamespace
+
+    j = _runner()
+    fetch_result = SimpleNamespace(
+        outcome="SUCCESS",
+        status=200,
+        body="Floorplan A1 rent $1500",
+        content_type="text/html",
+        network_log=[],
+        captcha_detected=False,
+    )
+    result = {
+        "units": [],
+        "plan_summaries": [
+            {"floor_plan_name": "A1", "market_rent_low": 1500}
+        ],
+    }
+
+    j._emit_route_shadow(
+        fetch_result,
+        result,
+        SimpleNamespace(property_id="plan-only"),
+        tmp_path,
+        None,
+        "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "SUCCESS_PLAN_LEVEL",
+    )
+
+    record = json.loads((tmp_path / "route_shadow.jsonl").read_text())
+    assert record["signals"]["units_extracted"] == 0
+    assert record["router_action"] != "STOP"
 
 
 def test_is_plan_level_false_when_any_unit_number() -> None:
