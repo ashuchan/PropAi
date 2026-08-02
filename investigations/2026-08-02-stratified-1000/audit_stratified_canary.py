@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import parse_qsl, urlsplit
 
 
 HERE = Path(__file__).resolve().parent
@@ -58,6 +59,7 @@ DEFAULT_FOCUSED_CONTRACT = (
 SYNTHETIC_PREFIXES = ("inferred_", "unkeyable_")
 HISTORY_KEY_RE = re.compile(r"^unitsha_[0-9a-f]{64}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SENSITIVE_QUERY_PARTS = ("auth", "key", "password", "secret", "signature", "token")
 NEGATIVE_STATUSES = {
     "UNAVAILABLE",
     "LEASED",
@@ -166,6 +168,19 @@ def single_explicit_date(value: Any) -> date | None:
             except ValueError:
                 continue
     return next(iter(parsed)) if len(parsed) == 1 else None
+
+
+def url_has_unredacted_secret(value: Any) -> bool:
+    try:
+        for key, raw_value in parse_qsl(urlsplit(text(value)).query, keep_blank_values=True):
+            if not any(part in key.casefold() for part in SENSITIVE_QUERY_PARTS):
+                continue
+            normalized = raw_value.strip().casefold().strip("<>[]")
+            if normalized not in {"", "redacted"}:
+                return True
+    except Exception:
+        return False
+    return False
 
 
 def apartment_id(prop: dict[str, Any]) -> str:
@@ -359,6 +374,8 @@ def manifest_for_property(
             if not isinstance(record, dict):
                 problems.append("non-object response record")
                 continue
+            if url_has_unredacted_secret(record.get("source_url")):
+                problems.append("source manifest contains an unredacted credential query value")
             rel = text(record.get("archive_body_path"))
             body_path = archive_path_for(property_json, rel)
             if not body_path.is_file():
@@ -450,6 +467,20 @@ def audit_unit(
             field="data_quality_flag",
             observed="SIGHTMAP_PLAN_PRESENCE",
             expected="marker only in floor_plans[]",
+        )
+    display_identity = " ".join(
+        text(unit.get(key)) for key in ("unit_id", "source_unit_id", "unit_name")
+    ).strip()
+    if re.search(r"\bWAIT(?:LIST)?(?:\b|[_-])", display_identity, flags=re.IGNORECASE):
+        add_issue(
+            issues,
+            prop,
+            "critical",
+            "WAITLIST_SENTINEL_IN_UNITS",
+            unit=unit,
+            field="unit_id,source_unit_id,unit_name",
+            observed=display_identity,
+            expected="waitlist/catalogue evidence outside physical units[]",
         )
 
     history = text(unit.get("unit_history_key"))
@@ -550,6 +581,17 @@ def audit_unit(
                 field="area_absence",
                 expected="explicit missing-area taxonomy",
             )
+    elif area is not None and area <= 0:
+        add_issue(
+            issues,
+            prop,
+            "high",
+            "NONPOSITIVE_PUBLISHED_AREA",
+            unit=unit,
+            field="area",
+            observed=area,
+            expected="positive source-published area or legacy -1/null absence",
+        )
     if area_low is not None or area_high is not None:
         if area_low is None or area_high is None or area_low <= 0 or area_high < area_low:
             add_issue(
@@ -657,6 +699,7 @@ def audit_unit(
     available_date = iso_date(unit.get("available_date"))
     available_date_raw = text(unit.get("available_date_raw") or unit.get("_available_date_raw"))
     status = text(unit.get("availability_status")).upper().replace(" ", "_")
+    raw_lower = available_date_raw.lower()
     if status in NEGATIVE_STATUSES and availability_prov in {"capture_date_default", "available_now"}:
         add_issue(
             issues,
@@ -667,6 +710,35 @@ def audit_unit(
             field="availability_status,availability_date_provenance",
             observed=f"{status},{availability_prov},{unit.get('available_date')}",
             expected="explicitly negative rows have no manufactured capture date",
+        )
+    if raw_lower and any(
+        token in raw_lower
+        for token in ("unavailable", "not available", "leased", "waitlist", "wait list", "pending")
+    ) and (available_date is not None or status == "AVAILABLE"):
+        add_issue(
+            issues,
+            prop,
+            "critical",
+            "NEGATIVE_RAW_AVAILABILITY_REVERSED",
+            unit=unit,
+            field="available_date_raw,availability_status,available_date",
+            observed=f"{available_date_raw}|{status}|{unit.get('available_date')}",
+            expected="negative source text remains non-available and has no manufactured date",
+        )
+    if re.fullmatch(
+        r"\s*(?:available\s+)?(?:now|today|immediate(?:ly)?)\s*",
+        available_date_raw,
+        flags=re.IGNORECASE,
+    ) and availability_prov != "available_now":
+        add_issue(
+            issues,
+            prop,
+            "high",
+            "AVAILABLE_NOW_PROVENANCE_LOST",
+            unit=unit,
+            field="availability_date_provenance",
+            observed=availability_prov,
+            expected="available_now",
         )
     if availability_prov in {"available_now", "capture_date_default"} and available_date != capture:
         add_issue(
@@ -717,6 +789,19 @@ def audit_unit(
 
     response_hash = text(unit.get("source_response_sha256"))
     asset_hash = text(unit.get("source_asset_sha256"))
+    for field in ("source_response_url", "source_asset_url"):
+        source_url = text(unit.get(field))
+        if source_url and url_has_unredacted_secret(source_url):
+            add_issue(
+                issues,
+                prop,
+                "critical",
+                "SOURCE_URL_SECRET_NOT_REDACTED",
+                unit=unit,
+                field=field,
+                observed=source_url,
+                expected="sanitized URL without credential-bearing query values",
+            )
     for field, digest in (("source_response_sha256", response_hash), ("source_asset_sha256", asset_hash)):
         if digest and not SHA256_RE.fullmatch(digest):
             add_issue(
@@ -940,6 +1025,41 @@ def audit_property(
                 observed=plan.get("is_floor_plan_level"),
                 expected="true",
             )
+    keyed_plans = [
+        plan for plan in plans if text(plan.get("floor_plan_id") or plan.get("floor_plan_name"))
+    ]
+    plan_fingerprints = [
+        json.dumps(
+            {
+                key: plan.get(key)
+                for key in (
+                    "floor_plan_id",
+                    "floor_plan_name",
+                    "beds",
+                    "baths",
+                    "area_low",
+                    "area_high",
+                    "rent_low",
+                    "rent_high",
+                    "availability_status",
+                )
+            },
+            sort_keys=True,
+            default=str,
+        )
+        for plan in keyed_plans
+    ]
+    duplicate_plans = len(plan_fingerprints) - len(set(plan_fingerprints))
+    if duplicate_plans:
+        add_issue(
+            issues,
+            prop,
+            "high",
+            "DUPLICATE_FLOOR_PLAN_ROWS",
+            field="floor_plans[]",
+            observed=duplicate_plans,
+            expected="one row per exact plan fingerprint",
+        )
 
     # Compare only units that still exist and match unambiguously. Inventory
     # movement is not an availability regression.
@@ -1045,6 +1165,13 @@ def main() -> int:
     parser.add_argument(
         "--regression-tests",
         default="984 passed, 2 skipped across 50 finding-mapped modules",
+    )
+    parser.add_argument(
+        "--regression-skips",
+        default=(
+            "test_g5.py has two explicitly skipped Apollo-cache fallback tests; "
+            "the merged G5 adapter exits on NO_URN before that fallback"
+        ),
     )
     args = parser.parse_args()
     capture = date.fromisoformat(args.capture_date)
@@ -1162,6 +1289,54 @@ def main() -> int:
             }
         )
 
+    # Explicit route-coverage targets retain the five N0/dormant registered
+    # adapters whose candidates were selected despite having no prior winner.
+    # Finding adapters are included too, making this the route-level companion
+    # to the prior-output-stratum matrix above.
+    route_groups: dict[str, set[str]] = defaultdict(set)
+    for pid, selection in sample_by_id.items():
+        targets = {
+            text(selection.get("prior_adapter")),
+            *parse_delimited(selection.get("finding_adapters", "")),
+            *parse_delimited(selection.get("route_coverage_adapters", "")),
+        }
+        for target in targets - {"", "UNATTRIBUTED"}:
+            route_groups[target].add(pid)
+    route_rows: list[dict[str, Any]] = []
+    property_rows_by_id = {row["apartment_id"]: row for row in property_rows}
+    for target, pids in sorted(route_groups.items()):
+        rows = [property_rows_by_id[pid] for pid in sorted(pids, key=int)]
+        props = [current[pid] for pid in pids if pid in current]
+        exercised = [prop for prop in props if target_route_exercised(prop, target)]
+        route_rows.append(
+            {
+                "target_adapter": target,
+                "sample_properties": len(pids),
+                "output_records": len(props),
+                "target_route_exercised_properties": len(exercised),
+                "unit_successes": sum(row["current_verdict"] == "SUCCESS" for row in rows),
+                "plan_successes": sum(
+                    row["current_verdict"] == "SUCCESS_PLAN_LEVEL" for row in rows
+                ),
+                "failed_no_data": sum(
+                    row["current_verdict"] == "FAILED_NO_DATA" for row in rows
+                ),
+                "critical_issues": sum(int(row["critical_issues"]) for row in rows),
+                "high_issues": sum(int(row["high_issues"]) for row in rows),
+                "observed_winners": json.dumps(
+                    dict(sorted(Counter(row["current_adapter"] for row in rows).items())),
+                    sort_keys=True,
+                ),
+                "runtime_status": (
+                    "FAIL_OUTPUT_CONTRACT"
+                    if any(int(row["critical_issues"]) or int(row["high_issues"]) for row in rows)
+                    else "EXERCISED"
+                    if exercised
+                    else "NOT_EXERCISED"
+                ),
+            }
+        )
+
     transition_counts = Counter(
         (row["prior_property_type"], row["current_verdict"]) for row in property_rows
     )
@@ -1207,7 +1382,12 @@ def main() -> int:
                 "adapter": target,
                 "title": finding.get("title", ""),
                 "acceptance_contract": finding.get("acceptance_contract", ""),
-                "fixture_test_status": "PASS",
+                "fixture_test_status": (
+                    "PASS_WITH_MODULE_SKIPS"
+                    if "ma_poc/tests/pms/adapters/test_g5.py"
+                    in (finding.get("test_selectors") or [])
+                    else "PASS"
+                ),
                 "fixture_test_selectors": ";".join(finding.get("test_selectors") or []),
                 "sampled_properties": len(pids),
                 "affected_properties": len(affected),
@@ -1246,6 +1426,11 @@ def main() -> int:
     )]
     write_csv(args.output_dir / "data-quality-issues.csv", issue_rows, issue_fields)
     write_csv(args.output_dir / "adapter-result-matrix.csv", adapter_rows, list(adapter_rows[0]))
+    write_csv(
+        args.output_dir / "adapter-route-coverage-matrix.csv",
+        route_rows,
+        list(route_rows[0]),
+    )
     write_csv(args.output_dir / "property-type-transitions.csv", transition_rows, list(transition_rows[0]))
     write_csv(args.output_dir / "finding-validation.csv", finding_rows, list(finding_rows[0]))
 
@@ -1309,6 +1494,10 @@ def main() -> int:
         },
         "coverage": {
             "prior_adapter_strata": len(adapter_rows),
+            "target_adapter_routes": len(route_rows),
+            "target_adapter_routes_exercised": sum(
+                row["runtime_status"] == "EXERCISED" for row in route_rows
+            ),
             "prior_property_type_strata": len({row["prior_property_type"] for row in property_rows}),
             "states": len({row["state"] for row in property_rows}),
             "findings": len(finding_rows),
@@ -1319,6 +1508,7 @@ def main() -> int:
             ),
         },
         "regression_tests": args.regression_tests,
+        "regression_test_skips": args.regression_skips,
     }
     summary_path = args.output_dir / "post-run-summary.json"
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1391,6 +1581,8 @@ def main() -> int:
             "",
             f"Finding-mapped regression suite: **{args.regression_tests}**.",
             "",
+            f"Declared skips: {args.regression_skips}.",
+            "",
             markdown_table(
                 ["Runtime status", "Findings"],
                 sorted(findings_runtime.items()),
@@ -1398,7 +1590,9 @@ def main() -> int:
             "",
             "See `finding-validation.csv` for every finding's acceptance contract, fixture selectors, "
             "sampled properties, observed winners, and runtime status. See `adapter-result-matrix.csv` "
-            "for every prior adapter stratum and `property-ledger.csv` for every property.",
+            "for every prior adapter stratum, `adapter-route-coverage-matrix.csv` for every explicit "
+            "registered/finding route (including prior N0 adapters), and `property-ledger.csv` for "
+            "every property.",
             "",
             "## Reproduction",
             "",

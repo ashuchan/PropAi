@@ -134,3 +134,8 @@ def test_runtime_route_aliases_match_output_adapter_names() -> None:
     assert AUDIT.target_route_exercised(prop, "rentcafe_applicant") is True
     assert AUDIT.target_route_exercised(prop, "rentcafe_layout_tab") is True
     assert AUDIT.target_route_exercised(prop, "avalonbay") is False
+
+
+def test_redacted_source_query_is_safe_but_literal_secret_is_not() -> None:
+    assert AUDIT.url_has_unredacted_secret("https://api.example/units?apiKey=%3Credacted%3E") is False
+    assert AUDIT.url_has_unredacted_secret("https://api.example/units?apiKey=literal-secret") is True

@@ -1,0 +1,19 @@
+{
+  "finding_count": 49,
+  "module_count": 50,
+  "passed": 984,
+  "result": "PASS_WITH_DECLARED_SKIPS",
+  "skipped": 2,
+  "skips": [
+    {
+      "file": "ma_poc/tests/pms/adapters/test_g5.py",
+      "line": 206,
+      "reason": "Apollo cache fallback is explicitly disabled because the merged G5 adapter exits TIER_1_API_G5_NO_URN before consulting the Page Apollo cache."
+    },
+    {
+      "file": "ma_poc/tests/pms/adapters/test_g5.py",
+      "line": 224,
+      "reason": "Same explicitly documented Apollo-fallback drift as the preceding G5 test."
+    }
+  ]
+}
