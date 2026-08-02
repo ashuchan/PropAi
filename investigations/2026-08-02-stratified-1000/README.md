@@ -23,5 +23,21 @@ downloaded immutable GCS evidence, not source.  `manifest-v1/` is committed and
 contains the exact launch CSV, selection ledger, coverage tables, summary, and
 checksums.
 
-The build script is local-only.  Upload/build/launch details and the downloaded
-post-run audit will be appended after the canary finishes.
+The exact build, image digest, input generation, isolated warm-profile seed,
+Cloud Run job, and execution are recorded in `launch-manifest.json`. The job
+uses 100 shards at parallelism 50, Hyperbrowser with proxy enabled, and no LLM,
+Web Unlocker, or FlareSolverr tier.
+
+After completion the GCS run prefix is mirrored **once** into ignored
+`canary-output/`. `audit_stratified_canary.py` then operates entirely offline
+and writes its committed evidence to `post-run-audit/`:
+
+- a 1,000-row property ledger;
+- adapter/result and property-type transition matrices;
+- a severity-ranked issue ledger;
+- a finding-by-finding validation matrix for all 49 fixes; and
+- a concise Markdown conclusion plus machine-readable JSON summary.
+
+The 50 finding-mapped regression modules are also run as a separate gate. This
+keeps fixture-backed semantic proof distinct from a route actually exercised
+by the live sample.
