@@ -504,7 +504,10 @@ async def run_jugnu(
     # configured DataProvider exposes (CSV for filesystem, DB for sql).
     from data_provider.dtos import CatalogFilters
     from data_provider.factory import get_data_provider
-    from data_provider.filesystem import CsvPropertyCatalogSource
+    from data_provider.filesystem import (
+        CsvPropertyCatalogSource,
+        hydrate_property_catalog_rows,
+    )
 
     if csv_path is not None:
         catalog_source = CsvPropertyCatalogSource(csv_path)
@@ -519,6 +522,29 @@ async def run_jugnu(
         shard_count=shard_count,
     )
     catalog_rows = catalog_source.list_active(limit=limit, filters=catalog_filters)
+    if csv_path is not None:
+        canonical_csv = _MA_POC_ROOT / "config" / "properties.csv"
+        try:
+            is_canonical_input = csv_path.resolve() == canonical_csv.resolve()
+        except OSError:
+            is_canonical_input = False
+        if canonical_csv.exists() and not is_canonical_input:
+            requested_ids = [row.canonical_id for row in catalog_rows]
+            canonical_rows = CsvPropertyCatalogSource(canonical_csv).list_active(
+                filters=CatalogFilters(canonical_ids=requested_ids)
+            )
+            original_rows = catalog_rows
+            catalog_rows = hydrate_property_catalog_rows(catalog_rows, canonical_rows)
+            hydrated_count = sum(
+                before.model_dump() != after.model_dump()
+                for before, after in zip(original_rows, catalog_rows, strict=True)
+            )
+            log.info(
+                "Hydrated canonical metadata for %d/%d explicit-cohort rows from %s",
+                hydrated_count,
+                len(catalog_rows),
+                canonical_csv,
+            )
     # Downstream consumers (scheduler.build_tasks, csv_lookup, _format_v1/v2)
     # treat each row as a flat dict with property_id/url + Title-Case CSV
     # aliases. `as_csv_row()` mints exactly that shape from the DTO so
@@ -2079,9 +2105,7 @@ async def _process_property(
         try:
             from ma_poc.reporting.publish_ceiling import assess_publish_ceiling
 
-            _pc_plans, _pc_verified_plan_only = _publish_ceiling_plan_inputs(
-                result
-            )
+            _pc_plans, _pc_verified_plan_only = _publish_ceiling_plan_inputs(result)
             _pc_body = getattr(fetch_result, "body", None)
             _pc_html = (
                 _pc_body.decode("utf-8", "replace") if isinstance(_pc_body, bytes) else (_pc_body or "")
@@ -2371,11 +2395,7 @@ def _provenance_block(
     from ma_poc.core.schema_v2 import _is_floor_plan_level
 
     units = result.get("units") or []
-    plan_summaries = [
-        plan
-        for plan in (result.get("plan_summaries") or [])
-        if isinstance(plan, dict)
-    ]
+    plan_summaries = [plan for plan in (result.get("plan_summaries") or []) if isinstance(plan, dict)]
     by_family: dict[str, int] = {}
     n_plan = n_synth = n_realid = 0
     # Same property-level marker the output formatter uses, so this counter and
@@ -2452,17 +2472,9 @@ def _publish_ceiling_plan_inputs(
     """Return the exact final plan collection and its complete-surface proof."""
     from ma_poc.pms.adapters.base import VERIFIED_PLAN_ONLY_SURFACE_KEY
 
-    plans = [
-        plan
-        for plan in (result.get("plan_summaries") or [])
-        if isinstance(plan, dict)
-    ]
+    plans = [plan for plan in (result.get("plan_summaries") or []) if isinstance(plan, dict)]
     verified = bool(
-        plans
-        and all(
-            str(plan.get(VERIFIED_PLAN_ONLY_SURFACE_KEY) or "").strip()
-            for plan in plans
-        )
+        plans and all(str(plan.get(VERIFIED_PLAN_ONLY_SURFACE_KEY) or "").strip() for plan in plans)
     )
     return plans, verified
 
@@ -2862,9 +2874,7 @@ def _format_v2_floor_plan(plan: dict[str, Any], scrape_ts: datetime, property_id
     # ``available_date_raw`` (jugnu emits first-class ``<field>_raw`` columns,
     # not the underscore-private ones core/ uses); a date without one was
     # manufactured by definition.
-    if out.get("availability_status") != "AVAILABLE" and not out.get(
-        "available_date_raw"
-    ):
+    if out.get("availability_status") != "AVAILABLE" and not out.get("available_date_raw"):
         out["available_date"] = None
         out["availability_date_provenance"] = "missing"
     flags = [part.strip() for part in str(out.get("data_quality_flag") or "").split("|") if part.strip()]

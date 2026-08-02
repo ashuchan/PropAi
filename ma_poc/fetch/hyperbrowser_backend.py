@@ -25,6 +25,8 @@ Design notes (see the integration map, task #46):
     clearance-reuse runs on the GCP worker IP, so HB cookies are inert-to-
     counterproductive across the egress boundary. Emit {} deliberately.
   * **Per-property cost cap** (``HYPERBROWSER_MAX_CALLS_PER_PROPERTY``),
+    with an optional slot reserved for exact/profile routes
+    (``HYPERBROWSER_RESERVED_PRIORITY_CALLS``),
     mirroring the Web-Unlocker cap — the link-hop crawl fires multiple
     fetches/property and HB is billed per session.
 
@@ -92,16 +94,36 @@ def _hb_prop_cap() -> int:
         return 0
 
 
+def _hb_reserved_priority_calls(cap: int) -> int:
+    """Slots unavailable to exploratory calls but usable by priority routes.
+
+    The default is zero, so existing production jobs are unchanged. A canary
+    can reserve one of its already-budgeted sessions without increasing cost.
+    """
+    raw = os.getenv("HYPERBROWSER_RESERVED_PRIORITY_CALLS", "").strip()
+    if not raw or cap <= 0:
+        return 0
+    try:
+        return min(cap, max(0, int(raw)))
+    except ValueError:
+        return 0
+
+
 def _hb_try_reserve_property(
     property_id: str,
     *,
     cap_override: int | None = None,
+    priority: bool = False,
+    reason: str = "unspecified",
 ) -> bool:
     """Reserve one HB session for *property_id*. False when the per-property
     cap is exhausted. Atomic; empty property_id is never capped.
 
     ``cap_override`` lets a stricter call site enforce its own ceiling without
-    weakening the process-wide environment cap for ordinary callers.
+    weakening the process-wide environment cap for ordinary callers. When
+    ``HYPERBROWSER_RESERVED_PRIORITY_CALLS`` is positive, ordinary discovery
+    cannot consume those final slots; a caller must explicitly set
+    ``priority=True``. The total cap never increases.
     """
     configured_cap = _hb_prop_cap()
     if cap_override is None:
@@ -112,11 +134,31 @@ def _hb_try_reserve_property(
         cap = max(0, int(cap_override))
     if not cap or not property_id:
         return True
+    reserved = _hb_reserved_priority_calls(cap)
+    ordinary_cap = max(0, cap - reserved)
     with _HB_PROP_LOCK:
         n = _hb_prop_counts.get(property_id, 0)
-        if n >= cap:
+        if n >= cap or (not priority and n >= ordinary_cap):
+            log.info(
+                "hb.session_reservation_denied property=%s count=%d cap=%d reserved=%d priority=%s reason=%s",
+                property_id,
+                n,
+                cap,
+                reserved,
+                priority,
+                reason,
+            )
             return False
         _hb_prop_counts[property_id] = n + 1
+        log.info(
+            "hb.session_reserved property=%s count=%d cap=%d reserved=%d priority=%s reason=%s",
+            property_id,
+            n + 1,
+            cap,
+            reserved,
+            priority,
+            reason,
+        )
         return True
 
 
@@ -273,8 +315,12 @@ class HyperbrowserProvider:
         *,
         mode: str = "unlock",
         session_factory: Any = None,
+        priority: bool = False,
+        reservation_reason: str = "provider_fetch",
     ) -> None:
         self.mode = mode
+        self.priority = priority
+        self.reservation_reason = reservation_reason
         # Default: a real HB session. Tests inject a fake with open()/close().
         self._session_factory = session_factory or (lambda: _HbSession(mode))
 
@@ -286,7 +332,11 @@ class HyperbrowserProvider:
         # profile may be None (the _try_unlocker_fallback seam passes None).
         start_ms = _now_ms()
         # Per-property cost cap: skip without opening a (paid) session.
-        if not _hb_try_reserve_property(getattr(task, "property_id", "")):
+        if not _hb_try_reserve_property(
+            getattr(task, "property_id", ""),
+            priority=self.priority,
+            reason=self.reservation_reason,
+        ):
             log.info("hb.prop_cap_exhausted property=%s", getattr(task, "property_id", ""))
             return _stamp(_capped_result(task, start_ms))
 
@@ -328,10 +378,7 @@ class HyperbrowserProvider:
                     inventory_url,
                     final_url,
                 )
-                if (
-                    200 <= follow_status < 300
-                    and _has_rentmanager_native_cards(follow_body)
-                ):
+                if 200 <= follow_status < 300 and _has_rentmanager_native_cards(follow_body):
                     body_text = follow_body
                     final_url = inventory_url
 
@@ -652,6 +699,8 @@ async def hb_raw_get(
     *,
     session_factory: Any = None,
     max_calls_per_property: int | None = None,
+    priority: bool = False,
+    reservation_reason: str = "raw_get",
 ) -> tuple[int, str]:
     """Fetch *url* as a RAW response through HB's residential proxy via an
     in-page same-origin fetch (see _INPAGE_FETCH_JS). Returns ``(status, body)``
@@ -678,14 +727,14 @@ async def hb_raw_get(
     if not _hb_try_reserve_property(
         cap_pid,
         cap_override=max_calls_per_property,
+        priority=priority,
+        reason=reservation_reason,
     ):
         log.info("hb.raw_get_prop_cap_exhausted property=%s", property_id)
         return 0, ""
 
     original_parts = urlsplit(url)
-    original_rel = original_parts.path + (
-        ("?" + original_parts.query) if original_parts.query else ""
-    )
+    original_rel = original_parts.path + (("?" + original_parts.query) if original_parts.query else "")
     sess = (session_factory or (lambda: _HbSession(mode="render")))()
     try:
         page = await sess.open()
@@ -698,9 +747,7 @@ async def hb_raw_get(
         # when the page does not expose a valid HTTP(S) URL.
         landing_parts = urlsplit(_safe_url(page, url))
         if landing_parts.scheme in {"http", "https"} and landing_parts.netloc:
-            rel = landing_parts.path + (
-                ("?" + landing_parts.query) if landing_parts.query else ""
-            )
+            rel = landing_parts.path + (("?" + landing_parts.query) if landing_parts.query else "")
         else:
             rel = original_rel
         res = await page.evaluate(_INPAGE_FETCH_JS, rel)
@@ -723,6 +770,8 @@ async def hb_raw_get_then(
     followup_url_from_body: Any,
     *,
     session_factory: Any = None,
+    priority: bool = False,
+    reservation_reason: str = "raw_get_then",
 ) -> tuple[tuple[int, str], tuple[str, int, str] | None]:
     """Fetch *url* and one body-derived same-origin follow-up in one session.
 
@@ -745,7 +794,11 @@ async def hb_raw_get_then(
     cap_pid = str(property_id or "")
     if cap_pid == "?":
         cap_pid = ""
-    if not _hb_try_reserve_property(cap_pid):
+    if not _hb_try_reserve_property(
+        cap_pid,
+        priority=priority,
+        reason=reservation_reason,
+    ):
         log.info("hb.raw_get_then_prop_cap_exhausted property=%s", property_id)
         return (0, ""), None
 

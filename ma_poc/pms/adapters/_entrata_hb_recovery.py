@@ -204,9 +204,7 @@ def _parent_address_match(address: str, visible_tokens: set[str]) -> bool:
     distinctive = [
         token
         for token in tokens
-        if len(token) >= 3
-        and token not in _ADDRESS_STOPWORDS
-        and not token.isdigit()
+        if len(token) >= 3 and token not in _ADDRESS_STOPWORDS and not token.isdigit()
     ]
     return bool(
         street_numbers
@@ -274,9 +272,7 @@ def _property_owned_snippet_target(ctx: Any) -> _EntrataSnippetTarget | None:
         iframe_id = str(iframe.get("id") or "").strip().casefold()
         id_match = _SNIPPET_IFRAME_ID_RE.fullmatch(iframe_id)
         compact_host = re.sub(r"[^a-z0-9]+", "", host)
-        provider_tokens = tuple(
-            token for token in wanted if len(token) >= 4 and token in compact_host
-        )
+        provider_tokens = tuple(token for token in wanted if len(token) >= 4 and token in compact_host)
         if (
             parsed.scheme.casefold() not in {"http", "https"}
             or parsed.username is not None
@@ -289,8 +285,7 @@ def _property_owned_snippet_target(ctx: Any) -> _EntrataSnippetTarget | None:
             or not provider_tokens
             or query.get("snippet_type", [""])[0].casefold() != "website"
             or query.get("is_responsive_snippet", [""])[0] != "1"
-            or query.get("occupancy_type", [""])[0].casefold()
-            not in {"1", "conventional"}
+            or query.get("occupancy_type", [""])[0].casefold() not in {"1", "conventional"}
             or "application_authentication" in parsed.path.casefold()
             or "guest_card" in parsed.path.casefold()
         ):
@@ -303,11 +298,7 @@ def _property_owned_snippet_target(ctx: Any) -> _EntrataSnippetTarget | None:
         if parsed.scheme.casefold() == "http" and raw_src.startswith("//"):
             candidate = parsed._replace(scheme="https").geturl()
         if "host_domain=" not in candidate.casefold():
-            separator = (
-                ""
-                if candidate.endswith(("?", "&"))
-                else ("&" if parsed.query else "?")
-            )
+            separator = "" if candidate.endswith(("?", "&")) else ("&" if parsed.query else "?")
             candidate += separator + f"host_domain={parent_host}"
         targets.append(
             _EntrataSnippetTarget(
@@ -367,10 +358,9 @@ def _snippet_plan_links(
         if match is None:
             continue
         observed_detail = True
-        if (
-            (parsed.hostname or "").casefold().rstrip(".") != target.host
-            or match.group("property_id") != target.property_id
-        ):
+        if (parsed.hostname or "").casefold().rstrip(".") != target.host or match.group(
+            "property_id"
+        ) != target.property_id:
             return [], False
         relative = _same_origin_relative(candidate, index_url)
         plan_name = _entrata_snippet_plan_name(anchor)
@@ -382,10 +372,7 @@ def _snippet_plan_links(
         by_url[candidate] = (relative, plan_name)
     if not observed_detail or not by_url or len(by_url) > _MAX_PLAN_URLS:
         return [], False
-    return [
-        (url, relative, plan_name)
-        for url, (relative, plan_name) in by_url.items()
-    ], True
+    return [(url, relative, plan_name) for url, (relative, plan_name) in by_url.items()], True
 
 
 def strict_conventional_url(
@@ -628,12 +615,8 @@ async def recover_entrata_hb_conventional(
         base_url,
         property_name,
     )
-    snippet_target = (
-        None if conventional_url else _property_owned_snippet_target(ctx)
-    )
-    index_url = conventional_url or (
-        snippet_target.url if snippet_target is not None else ""
-    )
+    snippet_target = None if conventional_url else _property_owned_snippet_target(ctx)
+    index_url = conventional_url or (snippet_target.url if snippet_target is not None else "")
     if not index_url:
         return EntrataHbRecovery()
 
@@ -650,7 +633,11 @@ async def recover_entrata_hb_conventional(
     )
 
     property_id = str(getattr(ctx, "property_id", "") or "")
-    if not _hb_try_reserve_property(property_id):
+    if not _hb_try_reserve_property(
+        property_id,
+        priority=True,
+        reason="property_bound_entrata_route",
+    ):
         return EntrataHbRecovery()
 
     session = (session_factory or (lambda: _HbSession(mode="render")))()
@@ -734,15 +721,11 @@ async def recover_entrata_hb_conventional(
                 attempted=attempted,
                 failure_reason="CROSS_ORIGIN_REDIRECT_REJECTED",
             )
-        if (
-            snippet_target is not None
-            and (
-                (urlsplit(final_url).hostname or "").casefold().rstrip(".")
-                != snippet_target.host
-                or not _snippet_provider_identity_match(
-                    index_html,
-                    snippet_target,
-                )
+        if snippet_target is not None and (
+            (urlsplit(final_url).hostname or "").casefold().rstrip(".") != snippet_target.host
+            or not _snippet_provider_identity_match(
+                index_html,
+                snippet_target,
             )
         ):
             return EntrataHbRecovery(
@@ -865,12 +848,9 @@ async def recover_entrata_hb_conventional(
             ):
                 all_detail_fetches_ok = False
                 continue
-            if (
-                snippet_target is not None
-                and not _snippet_provider_identity_match(
-                    detail_html,
-                    snippet_target,
-                )
+            if snippet_target is not None and not _snippet_provider_identity_match(
+                detail_html,
+                snippet_target,
             ):
                 return EntrataHbRecovery(
                     attempted=attempted,
@@ -889,24 +869,17 @@ async def recover_entrata_hb_conventional(
                 for row in detail_rows:
                     row["source_property_id"] = snippet_target.property_id
                     row["source_property_name"] = property_name
-                    row["source_property_provenance"] = (
-                        "exact_operator_published_entrata_website_snippet"
-                    )
+                    row["source_property_provenance"] = "exact_operator_published_entrata_website_snippet"
                     row["source_portal_url"] = final_url
             parsed_units.extend(detail_rows)
 
         units = _validated_units(parsed_units)
         if snippet_target is not None and units:
             native_ids = [
-                str((row.get("source_ids") or {}).get("entrata_uid") or "")
-                .strip()
-                .casefold()
+                str((row.get("source_ids") or {}).get("entrata_uid") or "").strip().casefold()
                 for row in units
             ]
-            if (
-                any(not value for value in native_ids)
-                or len(native_ids) != len(set(native_ids))
-            ):
+            if any(not value for value in native_ids) or len(native_ids) != len(set(native_ids)):
                 return EntrataHbRecovery(
                     attempted=attempted,
                     plan_rows=plan_rows,

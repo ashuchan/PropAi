@@ -811,9 +811,7 @@ def _try_page_local_static_recovery(
             )
 
             rows = recover_static_residence_table(ctx)
-            static_plans = list(
-                getattr(ctx, "_static_residence_table_plan_summaries", []) or []
-            )
+            static_plans = list(getattr(ctx, "_static_residence_table_plan_summaries", []) or [])
         except Exception:
             rows = []
             static_plans = []
@@ -2292,7 +2290,7 @@ async def scrape(
                     # Extend forward; cap at 300 chars total so the
                     # downstream truncation doesn't lop off the body
                     # we just rescued.
-                    for _nxt in _parts[_idx + 1:_idx + 3]:
+                    for _nxt in _parts[_idx + 1: _idx + 3]:  # fmt: skip
                         _candidate = (_seg + " " + _nxt).strip()
                         if len(_candidate) > 300:
                             break
@@ -3061,7 +3059,15 @@ async def scrape(
             "",
         }
         _PATH_B_MAX_RETRIES = int(_retry_os.environ.get("PATH_B_MAX_RETRIES", "2"))
-        _PATH_B_EFFECTIVE_MAX_RETRIES = 0 if _fast_portal_handoff else _PATH_B_MAX_RETRIES
+        # A discovered SecureCafe handoff is a route hint, not a successful
+        # roster. The previous zero-budget shortcut classified the episode as
+        # ``no_budget`` and suppressed every co-resident adapter candidate.
+        # Retain one cheap same-page retry while preserving the portal hint for
+        # the later bounded link-hop. This caps duplicate work without treating
+        # mere discovery as recovery.
+        _PATH_B_EFFECTIVE_MAX_RETRIES = (
+            min(_PATH_B_MAX_RETRIES, 1) if _fast_portal_handoff else _PATH_B_MAX_RETRIES
+        )
         _ep_retry_enabled = _PATH_B_RETRY_ENABLED
         _ep_max_retries = _PATH_B_EFFECTIVE_MAX_RETRIES
 
@@ -5716,29 +5722,18 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
     candidates = [*existing, *harvested]
 
     def normalized_name(row: dict[str, Any]) -> str:
-        value = (
-            row.get("floor_plan_name")
-            or row.get("floorplan_name")
-            or row.get("name")
-            or ""
-        )
+        value = row.get("floor_plan_name") or row.get("floorplan_name") or row.get("name") or ""
         return re.sub(r"[^a-z0-9]+", "", str(value).casefold())
 
     def is_rs365(row: dict[str, Any]) -> bool:
         tier = str(
-            row.get("extraction_tier")
-            or row.get("extraction_tier_used")
-            or row.get("tier_used")
-            or ""
+            row.get("extraction_tier") or row.get("extraction_tier_used") or row.get("tier_used") or ""
         )
         return "365RESIDENTSERVICES" in tier.upper()
 
     def is_exact_aspensquare_plan(row: dict[str, Any]) -> bool:
         tier = str(
-            row.get("extraction_tier")
-            or row.get("extraction_tier_used")
-            or row.get("tier_used")
-            or ""
+            row.get("extraction_tier") or row.get("extraction_tier_used") or row.get("tier_used") or ""
         ).upper()
         source_ids = row.get("source_ids")
         return bool(
@@ -5749,10 +5744,7 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
 
     def is_exact_edifice_plan(row: dict[str, Any]) -> bool:
         tier = str(
-            row.get("extraction_tier")
-            or row.get("extraction_tier_used")
-            or row.get("tier_used")
-            or ""
+            row.get("extraction_tier") or row.get("extraction_tier_used") or row.get("tier_used") or ""
         ).upper()
         source_ids = row.get("source_ids")
         return bool(
@@ -5763,27 +5755,18 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
 
     def is_exact_marketapts_plan(row: dict[str, Any]) -> bool:
         tier = str(
-            row.get("extraction_tier")
-            or row.get("extraction_tier_used")
-            or row.get("tier_used")
-            or ""
+            row.get("extraction_tier") or row.get("extraction_tier_used") or row.get("tier_used") or ""
         ).upper()
         return tier.startswith("TIER_1_DOM_MARKETAPTS")
 
     def is_exact_rentcafe_lt_plan(row: dict[str, Any]) -> bool:
         tier = str(
-            row.get("extraction_tier")
-            or row.get("extraction_tier_used")
-            or row.get("tier_used")
-            or ""
+            row.get("extraction_tier") or row.get("extraction_tier_used") or row.get("tier_used") or ""
         ).upper()
         return tier.startswith("TIER_1_DOM_RENTCAFE_LT")
 
     result_tier = str(
-        result.get("extraction_tier_used")
-        or result.get("tier_used")
-        or result.get("extraction_tier")
-        or ""
+        result.get("extraction_tier_used") or result.get("tier_used") or result.get("extraction_tier") or ""
     ).upper()
     exact_edifice_plans = [row for row in existing if is_exact_edifice_plan(row)]
     if result_tier == "TIER_1_API_EDIFICECMS" or exact_edifice_plans:
@@ -5818,9 +5801,7 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
     # the winning MarketApts result carries physical units or its own no-unit
     # plan rows, retain only that authoritative plan channel.
     exact_marketapts_plans = [row for row in existing if is_exact_marketapts_plan(row)]
-    if result_tier.startswith("TIER_1_DOM_MARKETAPTS") and (
-        result.get("units") or exact_marketapts_plans
-    ):
+    if result_tier.startswith("TIER_1_DOM_MARKETAPTS") and (result.get("units") or exact_marketapts_plans):
         result["plan_summaries"] = exact_marketapts_plans
         result["_hop_plan_harvest"] = len(harvested)
         result["_hop_plan_harvest_suppressed"] = len(harvested)
@@ -5832,12 +5813,8 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
     # rows. Once the exact adapter has physical units or its own empty-plan
     # rows, the generic harvest is a lower-authority restatement, not additive
     # evidence.
-    exact_rentcafe_lt_plans = [
-        row for row in existing if is_exact_rentcafe_lt_plan(row)
-    ]
-    if result_tier.startswith("TIER_1_DOM_RENTCAFE_LT") and (
-        result.get("units") or exact_rentcafe_lt_plans
-    ):
+    exact_rentcafe_lt_plans = [row for row in existing if is_exact_rentcafe_lt_plan(row)]
+    if result_tier.startswith("TIER_1_DOM_RENTCAFE_LT") and (result.get("units") or exact_rentcafe_lt_plans):
         result["plan_summaries"] = exact_rentcafe_lt_plans
         result["_hop_plan_harvest"] = len(harvested)
         result["_hop_plan_harvest_suppressed"] = len(harvested)
@@ -5848,16 +5825,8 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
     # intentionally does not collapse them. Narrowly suppress the generic
     # restatement only when an exact non-empty normalized plan name is shared;
     # keep all dedicated RS365 offers and leave every other adapter untouched.
-    rs365_names = {
-        normalized_name(row)
-        for row in candidates
-        if is_rs365(row) and normalized_name(row)
-    }
-    candidates = [
-        row
-        for row in candidates
-        if is_rs365(row) or normalized_name(row) not in rs365_names
-    ]
+    rs365_names = {normalized_name(row) for row in candidates if is_rs365(row) and normalized_name(row)}
+    candidates = [row for row in candidates if is_rs365(row) or normalized_name(row) not in rs365_names]
 
     merged: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()

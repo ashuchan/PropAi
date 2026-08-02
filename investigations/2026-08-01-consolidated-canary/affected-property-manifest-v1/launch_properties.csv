@@ -1,0 +1,387 @@
+apartmentid,name,address,city,state,zip,website
+540,Bridgepoint I,1500 Monument Rd,Jacksonville,FL,32225,https://www.hgliving.com/apartments/fl/jacksonville/bridgepoint/#/
+738,Cross Creek,22 Creek Rd,Irvine,CA,92604,https://www.irvinecompanyapartments.com/communities/cross-creek
+1084,Black Hawk,3010 Simcoe Dr,Fort Wayne,IN,46815,https://www.theblackhawkapartments.com/
+1156,Northview Southview Apartment Homes,8111 Reseda Blvd,Reseda,CA,91335,https://www.northview-southview.com/
+1165,Tustin View,2002 & 2010 N Ponderosa St,Santa Ana,CA,92705,https://www.allenproperties.net/tustin-view-santa-ana-ca/
+1740,Camden Fairview,8738 Fairview Rd,Charlotte,NC,28226,https://www.camdenliving.com/apartments/charlotte-nc/camden-fairview?utm_source=gmb&utm_medium=local&utm_campaign=camden-fairview&y_source=1_MTE2Nzc0MTctNzE1LWxvY2F0aW9uLndlYnNpdGU%3D
+1752,Kensington Park,11651 Norbourne Dr,Forest Park,OH,45240,www.kensingtonparkaptsoh.com
+1765,Annaberg,2905 Arrowhead Dr,Augusta,GA,30909,https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US
+1777,Rustic Woods,7901 S Yale Ave,Tulsa,OK,74136,https://www.rusticwoodsapts.com/
+1783,Madison at Largo,601 Rosery Rd NE,Largo,FL,33770,https://gscapts.com/apartments/florida/madison-at-largo/
+2282,City View,25200 Carlos Bee Blvd,Hayward,CA,94542,https://www.essexapartmenthomes.com/california/san-francisco-bay-area-apartments/hayward-apartments/city-view
+2305,Sun Lake Apartments,420 Sun Lake Cir,Lake Mary,FL,32746,www.livesunlake.com
+2405,Foster's Landing,700 Bounty Dr,Foster City,CA,94404,https://www.essexapartmenthomes.com/apartments/foster-city/fosters-landing
+2537,Bothell Ridge,19928 Bothell Everett Hwy,Bothell,WA,98012,https://www.essexapartmenthomes.com/apartments/bothell-ridge
+2587,The Palms at Laguna Niguel,28188 Moulton Pkwy,Laguna Niguel,CA,92677,https://www.essexapartmenthomes.com/california/orange-county-area-apartments/laguna-niguel-apartments/the-palms-laguna-niguel
+2594,The Reserve At Capital Center,3466 Data Dr,Rancho Cordova,CA,95670,https://www.elevatetosequoia.com/apartments/ca/rancho-cordova/reserve-at-capital-center-apartment-homes/
+2598,Shore Park at Riverlake,7952 Pocket Rd,Sacramento,CA,95831,https://www.elevatetosequoia.com/apartments/ca/sacramento/shore-park-at-riverlake/
+2709,Wellington Place at Olde Town,10303 7th Regiment Dr,Manassas,VA,20110,https://www.udr.com/washington-dc-apartments/manassas/wellington-place-at-olde-town/
+2955,2501 Porter Apartments,2501 Porter St NW,Washington,DC,20008,http://www.equityapartments.com/washington-dc/washington-dc-apartments/cleveland-park/2501-porter-apartments.aspx
+2957,Arbor Park of Alexandria,6340 Wingate St,Alexandria,VA,22312,http://arborparkofalexandria.com
+2958,Newport Village I,4757 W Braddock Rd,Alexandria,VA,22311,https://www.udr.com/washington-dc-apartments/alexandria/newport-village
+2982,Cortland on Pike,1850 Columbia Pike,Arlington,VA,22204,https://cortland.com/apartments/cortland-on-pike/
+3181,Cortland Mirror Lake,700 Post Lake Pl,Apopka,FL,32703,https://cortland.com/apartments/cortland-mirror-lake/
+3379,Atwater Cove,425 Merrimac Way,Costa Mesa,CA,92626,https://www.atwatercove.com/
+3535,Aspire Thunderbird,5150 W Eugie Ave,Glendale,AZ,85304,https://www.aspirethunderbird.com/
+3748,Brookside Oaks,1651 Belleville Way,Sunnyvale,CA,94087,https://www.essexapartmenthomes.com/apartments/sunnyvale/brookside-oaks
+3749,Highlands of Marin,1001 Cresta Way,San Rafael,CA,94903,https://www.udr.com/san-francisco-bay-area-apartments/san-rafael/highlands-of-marin/
+3785,Shadowbrook,3852 S 1845 W,West Valley City,UT,84119,http://www.shadowbrookapartments.com/
+3811,Vista Del Sol,7100 Louisiana Blvd NE,Albuquerque,NM,87109,www.vista-del-sol.com
+4079,The View at Waters Edge,6175 Reflections Blvd,Lantana,FL,33462,https://www.aspensquare.com/apartments/florida/lantana/the-view-at-waters-edge?utm_source=google&utm_medium=referral
+4724,MiraBella,40300 Washington St,Bermuda Dunes,CA,92203,www.mirabellalifestyle.com
+4752,Regatta Shores,2335 W Seminole Blvd,Sanford,FL,32771,https://www.udr.com/orlando-apartments/north-sanford/regatta-shores/
+4904,Saybrooke,100 Old MacDonald Rd,Gaithersburg,MD,20877,https://www.saybrookeapartments.com/
+4944,Triangle Place,2800 Bainbridge Dr,Durham,NC,27713,https://www.hgliving.com/apartments/nc/durham/triangle-place/
+5119,Embarc at West Jordan,6885 S Redwood Rd,West Jordan,UT,84084,http://www.embarcatwestjordan.com/
+5974,Promenade at Aventura Apartments,19680 E Country Club Dr,Aventura,FL,33180,https://www.promenadeataventuraapartments.com/
+6194,MAA Rocky Point,3101 N Rocky Point Dr E,Tampa,FL,33607,https://www.maac.com/florida/tampa/maa-rocky-point/
+6281,Wildwood,7610 Cameron Rd,Austin,TX,78752,http://www.wildwoodaustin.com/
+6526,Southwood Acres,342 Southwick Rd,Westfield,MA,1085,https://www.aspensquare.com/apartments/massachusetts/westfield/southwood-acres
+7383,Camden Lakeway,7355 Grant Ranch Blvd,Lakewood,CO,80123,https://www.camdenliving.com/apartments/lakewood-co/camden-lakeway
+7797,Village at Del Mar Heights,13138 Kellam Ct,San Diego,CA,92130,https://www.equityapartments.com/san-diego/del-mar/the-village-at-del-mar-heights-apartments
+8179,Cambridge Woods,14138 Monterey Pines Dr,Tampa,FL,33613,https://www.udr.com/tampa-apartments/university-center/cambridge-woods/contact-us/
+8418,City Gate at Cupertino Apartments,5608 Stevens Creek Blvd,Cupertino,CA,95014,http://www.equityapartments.com/california/san-francisco-bay-apartments/cupertino/archstone-cupertino-apartments.aspx
+9133,Lane at Towne Crossing,4035 Towne Crossing Blvd,Mesquite,TX,75150,https://www.hgliving.com/apartments/tx/mesquite/lane-at-towne-crossing/?utm_knock=g
+9168,The Lake Lofts,2795 N Buckner Blvd,Dallas,TX,75228,https://www.thelakeloftsapts.com/
+11317,Dixon at Stonegate,2501 Oak Hill Cir,Fort Worth,TX,76109,https://www.dixonatstonegate.com/
+11805,Woodland Hills,3541 W Northgate Dr,Irving,TX,75062,http://www.thewoodlandhills411.com/
+12355,THIRTY377,3377 Blackburn St,Dallas,TX,75204,https://www.udr.com/dallas-apartments/uptown-dallas/thirty377/
+12370,Rockbrook Creek I,2200 Uecker Dr,Lewisville,TX,75067,https://www.hgliving.com/apartments/tx/lewisville/rockbrook-creek/
+12377,Metropolitan at Cityplace,2802 N Carroll Ave,Dallas,TX,75204,https://www.metropolitancityplace.com/
+12525,MAA Boulder Ridge,1515 Cannon Pkwy,Roanoke,TX,76262,https://www.maac.com/texas/dallas/maa-boulder-ridge/
+12586,Avondale at Warner Center,22222 Victory Blvd,Woodland Hills,CA,91367,https://www.essexapartmenthomes.com/apartments/woodland-hills/avondale-at-warner-center
+12927,Wyvernwood Garden,2901 E Olympic Blvd,Los Angeles,CA,90023,http://www.wyvernwoodla.com
+12963,The Blake LA,733 N Kings Rd,Los Angeles,CA,90069,https://www.essexapartmenthomes.com/apartments/the-blake-la
+12985,Meadowood,1733 Cochran St,Simi Valley,CA,93065,https://www.essexapartmenthomes.com/california/ventura-county-apartments/simi-valley-apartments/meadowood
+13153,Canyon Creek Apartments,1000 Canyon Village Cir,San Ramon,CA,94583,http://www.equityapartments.com/california/san-francisco-bay-apartments/san-ramon/canyon-creek-apartments.aspx
+13181,Park Hill at Issaquah,22500 SE 56th St,Issaquah,WA,98029,https://www.essexapartmenthomes.com/apartments/park-hill-at-issaquah
+13305,Portola Redlands,1250 N University St,Redlands,CA,92374,https://www.portolaredlands.com/
+13756,Ellis Midtown,3117 N 7th Ave,Phoenix,AZ,85013,www.ellismidtown.com
+14062,Camden Lake Pine,600 Park Summit Blvd,Apex,NC,27523,https://www.camdenliving.com/apartments/apex-nc/camden-lake-pine
+14117,Marquis at Great Hills,10050 Great Hills Trl,Austin,TX,78759,www.mqgreathills.com
+14155,Waterside at Ocotillo,4800 S Alma School Rd,Chandler,AZ,85248,https://www.mark-taylor.com/apartments/az/chandler/waterside-at-ocotillo/
+14336,Mountain View Casitas,1130 E Grovers Ave,Phoenix,AZ,85022,https://www.mountainviewcasitas.com/
+14524,Canton Mill Lofts,550 Riverstone Pkwy,Canton,GA,30114,https://venterraliving.com/apartments/canton-mill-lofts/
+14538,Mira Santi,800 W Queen Creek Rd,Chandler,AZ,85248,https://www.mark-taylor.com/apartments/az/chandler/mira-santi/
+14581,Milano,2500 Woodland Park Dr,Houston,TX,77077,https://www.milanoatwestchase.com/#
+14596,Portola South Mountain,7611 S 36th St,Phoenix,AZ,85042,https://www.portolasouthmountain.com/
+14907,Boca Winds,530 NE 47th St,Boca Raton,FL,33431,https://www.aspensquare.com/apartments/florida/boca-raton/boca-winds?utm_source=google&utm_medium=referral
+14934,Country Manor,59 S Westfield St,Feeding Hills,MA,1030,https://www.aspensquare.com/apartments/massachusetts/feeding-hills/country-manor
+14956,Mill Creek,1823 Stadium Rd,Wharton,TX,77488,https://www.millcreektx.com/
+15049,Verandah at Lakepointe,8300 Farm to Market 1960 Rd E,Humble,TX,77346,https://verandahlake.com/
+15064,Camden Holly Springs,680 W Sam Houston Pkwy S,Houston,TX,77042,https://www.camdenliving.com/apartments/houston-tx/camden-holly-springs
+15332,Camden Ashburn Farm,20886 Isherwood Terrace,Ashburn,VA,20147,https://www.camdenliving.com/apartments/ashburn-va/camden-ashburn-farm?utm_source=gmb&utm_medium=local&utm_campaign=camden-ashburn-farm&y_source=1_MTE2NzczODUtNzE1LWxvY2F0aW9uLndlYnNpdGU%3D
+15361,Hidden Springs,5220 Pearblossom Dr,Riverside,CA,92507,https://www.allenproperties.net/hidden-springs-riverside-ca/floorplans
+15579,Regency Palm Court,914 S Wilton Pl,Los Angeles,CA,90019,https://www.essexapartmenthomes.com/apartments/los-angeles/regency-palm-court
+16078,San Cervantes,400 N Coronado St,Chandler,AZ,85224,https://www.mark-taylor.com/apartments/az/chandler/san-cervantes/
+16101,Park Place Townhomes,1005 S Gilbert St,Hemet,CA,92543,https://www.allenproperties.net/parkplacetownhomes-hemet-ca
+16186,Edgewood Court,649 Prospect St,Chicopee,MA,1020,https://www.aspensquare.com/apartments/massachusetts/chicopee/edgewood-court
+16196,Village Square Apartments,12011 Veirs Mill Rd,Wheaton,MD,20906,http://www.villagesquarewheaton.com/Home/Index/36189
+16198,Rose Luxury Apartments,10853 Rose Ave,Los Angeles,CA,90034,https://www.theroseapts.com/
+16377,Westshore,4601 W Gray St,Tampa,FL,33609,www.westshoretampabay.com/
+16387,The Colony at Fashion Island,5100 Colony Plaza,Newport Beach,CA,92660,https://www.irvinecompanyapartments.com/locations/orange-county/newport-beach/colony-at-fashion-island.html
+16758,Sonoma at Oak Creek,700 Sonoma Aisle,Irvine,CA,92618,https://www.irvinecompanyapartments.com/locations/orange-county/irvine/oak-creek/sonoma.html
+16796,Santa Rosa,500 Cardiff,Irvine,CA,92606,https://www.irvinecompanyapartments.com/locations/orange-county/irvine/westpark/santa-rosa.html
+16953,Serrano Highlands,25421 Alta Loma,Lake Forest,CA,92630,https://www.serranohighlandsapts.com/
+16961,Creek at 2645 Apartments,2645 Stonecreek Dr,Sacramento,CA,95833,https://www.thecreekat2645.com/
+16969,Hidden Hills,30041 Tessier St,Laguna Niguel,CA,92677,https://www.elevatetosequoia.com/apartments/ca/laguna-niguel/hidden-hills-condominium-rentals/
+17102,Woodbridge Willows,344 Knollglen,Irvine,CA,92614,https://www.irvinecompanyapartments.com/locations/orange-county/irvine/woodbridge/woodbridge-willows.html
+17161,Monterey Villas,7000 La Praix St,Highland,CA,92346,https://www.allenproperties.net/monterey-villas-highland-ca/
+17178,Oak Glen,100 Oak Glen,Irvine,CA,92618,https://www.irvinecompanyapartments.com/locations/orange-county/irvine/oak-creek/oak-glen.html
+17320,The Villas of Renaissance,5280 Fiore Terrace,San Diego,CA,92122,https://www.irvinecompanyapartments.com/communities/the-villas-of-renaissance
+17541,Greentree Gardens,2618 Flint Way,San Bernardino,CA,92408,https://www.allenproperties.net/greentree-gardens-san-bernardino-ca/
+17984,Alessio,5700 W Centinela Ave,Los Angeles,CA,90045,https://www.essexapartmenthomes.com/apartments/los-angeles/alessio
+18752,Brookstone Apartments,1401 N Lamb Blvd,Las Vegas,NV,89110,https://www.liveatbrookstoneapartments.com/?utm_source=GMB&utm_medium=organic
+19108,Canopy,923 112th St SW,Everett,WA,98204,https://www.canopyeverett.com/
+19299,Phoenix Orlando,10801 Heather Ridge Cir,Orlando,FL,32817,https://www.livephoenixorlando.com/
+19357,Newport Village Apartments,1827 W Gowan Rd,North Las Vegas,NV,89032,https://newportvillageaptslv.com/?utm_knock=g
+19396,Alcove at Seahurst,14001 Ambaum Blvd SW,Burien,WA,98166,https://www.hgliving.com/apartments/wa/burien/alcove-at-seahurst/
+19538,Stadium Apartments,2999 Woodway Dr SW,Huntsville,AL,35805,http://www.stadiumapartmentshuntsville.com/
+19940,Portola Biltmore,2323 E Flower St,Phoenix,AZ,85016,https://www.portolabiltmore.com/
+19995,BellCentre,308 108th Ave NE,Bellevue,WA,98004,https://www.essexapartmenthomes.com/apartments/bellevue/bellcentre
+20050,Carmel Creek,11724 Carmel Creek Rd,San Diego,CA,92130,https://www.essexapartmenthomes.com/apartments/san-diego/carmel-creek?sc_camp=2648D1300BEC431BB11EB86F02F52DBD&utm_source=googlesearch
+20349,Loma Palisades,2799 Adrian St,San Diego,CA,92110,http://www.lomapalisades.com/
+20977,Cobblestone,15449 N 25th Ave,Phoenix,AZ,85023,https://www.cobblestonephx.com/
+21149,Pinnacle at MacArthur Place,31 E Macarthur Cres,Santa Ana,CA,92707,https://www.essexapartmenthomes.com/apartments/santa-ana/pinnacle-at-macarthur-place
+21169,Montebello at Summit Ridge,5200 Summit Ridge Dr,Reno,NV,89523,https://www.montebelloatsummitridge.com/
+21347,River Oaks,1000 Allison Dr,Vacaville,CA,95687,https://www.elevatetosequoia.com/apartments/ca/vacaville/river-oaks-apartment-homes/
+21381,Summit Park Village,8563 Lake Murray Blvd,San Diego,CA,92119,https://www.essexapartmenthomes.com/apartments/summit-park-village
+23143,Mira Monte,10360 Maya Linda Rd,San Diego,CA,92126,https://www.essexapartmenthomes.com/apartments/mira-monte?sc_camp=2648D1300BEC431BB11EB86F02F52DBD&utm_source=googlesearch
+23306,Villas Willow Glen,850 Meridian Way,San Jose,CA,95126,www.villaswillowglen.com
+23367,Broadway Towers,1601 Broadway St,Concord,CA,94520,https://www.broadwayconcord.com/
+23494,Indian Village,930 Old Goddard Rd,Lincoln Park,MI,48146,https://indianvillageapt.wixsite.com/home/apartments
+23549,Landmark,6303 Indian School Rd NE,Albuquerque,NM,87110,https://www.thelandmark-apartments.com/
+23963,Luna Bear Arcos,1637 E Missouri Ave,Phoenix,AZ,85016,http://www.arcosphx.com/
+24049,River Bluff of Lexington,300 Palmetto Park Blvd,Lexington,SC,29072,https://www.aspensquare.com/apartments/south-carolina/lexington/river-bluff-of-lexington?utm_source=google&utm_medium=referral
+24180,Pinnacle at Otay Ranch,1310 Santa Rita E,Chula Vista,CA,91913,https://www.essexapartmenthomes.com/california/san-diego-area-apartments/chula-vista-apartments/pinnacle-otay-ranch
+24315,Riley Square,3707 Poinciana Dr,Santa Clara,CA,95051,https://www.essexapartmenthomes.com/apartments/santa-clara/riley-square
+24366,Bay Terrace,3204 Casa De Campo Way,San Mateo,CA,94403,http://www.udr.com/san-francisco-bay-area-apartments/san-mateo/bay-terrace/
+24542,Archstone Fremont Center Apartments,39410 Civic Center Dr,Fremont,CA,94538,http://www.equityapartments.com/california/san-francisco-bay-apartments/fremont/archstone-fremont-center-apartments.aspx
+24648,Camden Overlook,4703 Summit Overlook Dr,Raleigh,NC,27612,https://www.camdenliving.com/apartments/raleigh-nc/camden-overlook
+24998,Liberty Park Apartments,1 Matthew Ln,Braintree,MA,2184,https://www.equityapartments.com/south-boston/braintree/liberty-park-apartments
+25781,Mayflower,205 34th St,Virginia Beach,VA,23451,https://www.iliveonthebeach.com/
+26094,Garrison Square,7 Harcourt St,Boston,MA,2116,https://www.udr.com/boston-apartments/back-bay/garrison-square/
+26194,Ventana Palms,7021 W McDowell Rd,Phoenix,AZ,85035,http://www.ventanapalmsapartments.com/
+26730,Camden Brookwood,147 26th St NW,Atlanta,GA,30309,https://www.camdenliving.com/apartments/atlanta-ga/camden-brookwood
+26892,Avalon at Arlington Square,2350 26th Ct S,Arlington,VA,22206,https://new.avaloncommunities.com/virginia/arlington-apartments/avalon-at-arlington-square/?utm_source=gmb&utm_medium=organic&utm_campaign=gmblist
+26901,Bordeaux,1 Ambroise,Newport Beach,CA,92657,https://www.irvinecompanyapartments.com/communities/bordeaux
+26946,Bermuda Terrace,9850 Bermuda Rd,Las Vegas,NV,89183,www.bermudaterraceapts.com
+26967,The Estates at Cougar Mountain,2128 NW Shy Bear Way,Issaquah,WA,98027,http://www.estatesatcougarmountain.com/
+27125,Tudor Place,5801 Peabody St,Hyattsville,MD,20783,https://www.tudorplaceapts.com/
+27161,Huntington Gardens,4901 Heil Ave,Huntington Beach,CA,92649,https://www.allenproperties.net/huntington-gardens-huntington-beach-ca/
+27574,Belle Fontaine Apartments,4077 Glencoe Ave,Marina Del Rey,CA,90292,https://www.equityapartments.com/los-angeles/marina-del-rey/belle-fontaine-apartments?propertyid=4035&s_kwcid=TC|4015|marina%20del%20rey%20apartments||S|e|15154714153
+27577,Park Catalina,690 S Catalina St,Los Angeles,CA,90005,https://www.essexapartmenthomes.com/california/los-angeles-area-apartments/los-angeles-apartments/park-catalina
+27999,Echo Pointe,4300 Echo Ct,La Mesa,CA,91941,https://www.liveatechopointe.com/
+28372,Las Ventanas,3819 Vineyard Ave,Pleasanton,CA,94566,www.lasventanasapt.com
+28386,Greenback Ridge,7566 Greenback Ln,Citrus Heights,CA,95610,www.thegreenbackridge.com
+28391,Hill Country Villas,9032 Dugas Rd,San Antonio,TX,78251,http://www.hillcountryvillasapartments.com/
+28538,The Mark,24650 Amador St,Hayward,CA,94544,https://www.experiencethemark.com/
+28696,Ellinwood,400 Longbrook Way,Pleasant Hill,CA,94523,https://www.ellinwoodapartments.com/
+28728,ArtHaus Central,544 Central Ave,Alameda,CA,94501,https://www.arthauscentral.mov/
+29583,Norcross Crossings,3400 Peachtree Corners Cir,Norcross,GA,30092,https://www.hgliving.com/apartments/ga/peachtree-corners/norcross-crossing/
+30237,Forest View,4545 S Panther Creek Dr,The Woodlands,TX,77381,https://venterraliving.com/apartments/forest-view/
+30657,Pegasus Apartments,612 Flower St,Los Angeles,CA,90017,https://www.equityapartments.com/los-angeles/financial-district/pegasus-apartments
+30723,Mountain Ridge,2605 Verde Dr,Colorado Springs,CO,80910,http://www.mountainridge-apts.com/
+30734,Waterford Village,51 Meadow Ln,Bridgewater,MA,2324,https://www.harborgroupmanagement.com/apartments/MA/Bridgewater/Waterford-Village/
+30751,Commons at Windsor Gardens,624 Walpole St,Norwood,MA,2062,https://www.udr.com/boston-apartments/norwood/the-commons-at-windsor-gardens/
+30997,Camden Fallsgrove,719 Fallsgrove Dr,Rockville,MD,20850,https://www.camdenliving.com/apartments/rockville-md/camden-fallsgrove
+31197,The Village at Toluca Lake I,211 N Valley St,Burbank,CA,91505,https://www.essexapartmenthomes.com/apartments/burbank/the-village-at-toluca-lake
+31564,The 1856 Apartments,1703 S I-35 South Frontage Rd,San Marcos,TX,78666,https://www.the1856apartments.com/
+32336,1210 Mass Apartments,1210 Massachusetts Ave NW,Washington,DC,20005,http://www.equityapartments.com/washington-dc/washington-dc-apartments/northwest-dc/1210-mass-apartments.aspx
+32561,Pacific View,5162 Whitman Way,Carlsbad,CA,92008,https://www.irvinecompanyapartments.com/locations/san-diego/carlsbad/pacific-view.html
+32746,Wildwood off Main,200 Lake Forest Blvd,Kalamazoo,MI,49006,https://www.wildwoodoffmainapts.com/
+32793,The Reserve,1930 Ridge Ave,Evanston,IL,60201,www.reserveatevanston.com
+32995,2400 M Apartments,2400 M St NW,Washington,DC,20037,http://www.equityapartments.com/washington-dc/georgetown/2400-m-apartments
+33267,Brookside Village,28700 34th Ave S,Auburn,WA,98001,https://www.brooksidevillageapts.com/
+33318,Riverstone,7459 Rush River Dr,Sacramento,CA,95831,http://www.riverstoneaptliving.com/
+33327,The Parker,14140 N Broadway Ext,Edmond,OK,73013,https://venterraliving.com/apartments/the-parker/
+33986,South City Station Apartments,101 McLellan Drive,South San Francisco,CA,94080,http://www.equityapartments.com/california/san-francisco-bay-apartments/south-san-francisco/archstone-south-san-francisco-apartments.aspx
+34275,Bella Rose,4900 Canada Valley Rd,Antioch,CA,94531,www.bellaroseapts.com
+34482,Abberly Grove,1160 Auston Grove Dr,Raleigh,NC,27610,www.abberlygrove.com
+34500,Cortland Brier Creek,7920 Oak Estate St,Raleigh,NC,27617,https://cortland.com/apartments/cortland-brier-creek/
+34523,Constellation Ranch,500 W Loop 820 S,Fort Worth,TX,76108,https://www.constellationranchtx.com/
+34548,Marbella,2504 Marron Rd,Carlsbad,CA,92010,https://www.irvinecompanyapartments.com/communities/marbella/
+34785,Pepper Tree,2701 Longmire Dr,College Station,TX,77845,http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55
+34909,Polo Downs,1135 London Cir Ln,Fenton,MO,63026,http://www.polodowns.com/
+35256,Camden Manor Park,4000 Manor Club Dr,Raleigh,NC,27612,https://www.camdenliving.com/apartments/raleigh-nc/camden-manor-park
+35349,The Redland,18979 Redland Rd,San Antonio,TX,78259,www.livetheredland.com
+35540,The Flats At Dupont Circle Apartments,2000 N St NW,Washington,DC,20036,https://www.equityapartments.com/washington-dc/dupont-circle/the-flats-at-dupont-circle-apartments
+35919,Murray Hill Tower,245 E 40th St,New York,NY,10016,http://www.equityapartments.com/new-york/new-york-city-apartments/gramercy-park-murray-hill/archstone-murray-hill-apartments.aspx
+35934,Hawthorn Village,3663 Solano Ave,Napa,CA,94558,http://www.hawthornvillageapts.com
+36173,Wedgewood on the Green,161 Green Moor Way,Henrietta,NY,14467,https://wg.barringtonresidential.com/
+36268,Stoney Creek,570 Stowell Dr,Rochester,NY,14616,http://www.stoneycreekapthomes.com/
+36925,View 14,2303 14th St NW,Washington,DC,20009,http://www.view14.com/
+36964,Avalon Meydenbauer,10410 NE 2nd St,Bellevue,WA,98004,https://www.avaloncommunities.com/washington/bellevue-apartments/avalon-meydenbauer
+36972,The Kennedy Building,907 NE 45th St,Seattle,WA,98105,https://www.udr.com/seattle-apartments/downtown-seattle/the-kennedy-building/.
+37143,Village of Cross Creek,7536 Hillcrest Dr,Florence,KY,41042,www.villageofcrosscreek.com
+37360,Goldstone Place,1200 S 1500 E,Clearfield,UT,84015,http://www.goldstoneplace.com
+37386,AMLI Quadrangle,2717 Howell St,Dallas,TX,75204,https://www.amli.com/apartments/dallas/downtown-dallas-apartments/amli-quadrangle
+37388,Villas At Wylie,600 Woodbridge Pkwy,Wylie,TX,75098,http://www.villasatwylie.com/
+37545,Camden Cedar Hills,4100 W Slaughter Ln,Austin,TX,78749,https://www.camdenliving.com/apartments/austin-tx/camden-cedar-hills
+37577,Siena Villas,9130 Nolan St,Elk Grove,CA,95758,https://www.sienavillaapartment.com/
+37712,The Enclave,507 NE Northgate Way,Seattle,WA,98125,https://www.enclavenorthgate.com/
+37716,Ten20,10710 NE 10th St,Bellevue,WA,98004,https://www.udr.com/seattle-apartments/bellevue/ten20/
+37721,Belcarra,10688 NE 10th St,Bellevue,WA,98004,https://www.essexapartmenthomes.com/apartments/bellevue/belcarra?sc_camp=2648D1300BEC431BB11EB86F02F52DBD&utm_source=googlesearch
+37805,The Gentry's Landing,400 N 4th St,St. Louis,MO,63102,http://www.gentryslanding.com/
+37919,Parc Coliseum Apartments,228 W 71st St,New York,NY,10023,http://www.equityapartments.com/New-York/New-York-City-apartments/Upper-West-Side/Parc-Coliseum-apartments.aspx
+37920,Parc Cameron,41 W 86th St,New York,NY,10024,http://www.equityapartments.com/new-york/new-york-city-apartments/upper-west-side/parc-cameron-apartments.aspx
+37972,Eagle Rock Apartments at West Hartford,1248 Farmington Ave,West Hartford,CT,6107,https://www.eaglerockproperties.com/apartments/ct/west-hartford/eagle-rock-apartments-of-west-hartford/
+37983,Eagle Rock Apartments at Towson,5 Stonewain Ct,Towson,MD,21204,https://www.eaglerockproperties.com/apartments/md/towson/eagle-rock-apartments-at-towson/
+38378,Park Northside,1601 Roane St,Richmond,VA,23222,https://www.parknorthsiderva.com/
+38525,Marquis Sonoran Preserve,29675 N North Valley Pkwy,Phoenix,AZ,85085,https://www.mqsonoranpreserve.com/
+38541,Camden Brushy Creek,1101 Brushy Creek Rd,Cedar Park,TX,78613,https://www.camdenliving.com/apartments/cedar-park-tx/camden-brushy-creek#overview
+38733,Versailles Koreatown Apartments,918 S Oxford Ave,Los Angeles,CA,90006,http://www.equityapartments.com/bbrochure.aspx?PropertyId=2359&utm_source=google&utm_medium=cpc&utm_campaign=losangelesproperties_versailleskoreatown&s_kwcid=TC%7c4015%7cversailles+koreatown+apartments%7c%7cS%7cp%7c9013274593
+39346,Bella Mirage,3800 N El Mirage Rd,Avondale,AZ,85392,https://www.bellamirageapts.com/
+39387,High Rock 5300,5300 Los Altos Pkwy,Sparks,NV,89436,www.highrock5300.com
+39573,Prime at Gardenside,2044 Georgian Way,Lexington,KY,40504,https://www.liveprimegardenside.com/
+40193,AMLI South Shore,1620 E Riverside Dr,Austin,TX,78741,https://www.amli.com/apartments/austin/downtown-austin-apartments/amli-south-shore
+40566,The Courts at Huntington Station I,5950 Grand Pavilion Way,Alexandria,VA,22303,http://www.udr.com/washington-dc-apartments/alexandria/the-courts-at-huntington-station/
+40710,Chloe on Union,1408 E Union St,Seattle,WA,98122,https://www.equityapartments.com/seattle/pike-pine/chloe-apartments
+40989,Savoye,3850 Vitruvian Way,Addison,TX,75001,http://www.savoyeaddison.com/
+41973,Rosewood Park,4500 Mira Loma Dr,Reno,NV,89502,http://www.rosewoodparkreno.com/
+43097,Big Creek Apartments and Townhomes,11540 Apache Dr,Parma Heights,OH,44130,https://www.goldbergcompanies.com/big-creek-apartments-parma-heights-oh/?utm_source=GMB&utm_medium=Website
+44765,Aero Place Apartments,3885 Lakehurst Drive,Colorado Springs,CO,80916,https://www.aeroplaceliving.com/
+46179,East Hampton,2901 N Governeour St,Wichita,KS,67226,https://www.hayloftapartmenthomes.com/east-hampton-estates
+46561,Preserve at Creekside,1299 Antelope Creek Dr,Roseville,CA,95678,http://www.thepreserveatcreeksideapts.com/
+46986,Mountain Ridge Manor,820 Monroe Blvd,Ogden,UT,84404,http://www.mountainridgemanor.com
+47710,Adley at 72nd,1214 Applewood Dr,Papillion,NE,68046,https://www.aspensquare.com/apartments/nebraska/papillion/adley-72nd
+47909,Westerville Park Apartment Homes,4565 Northland Square Dr E,Columbus,OH,43231,https://www.capcityapartments.com/westerville-park
+48177,The Metropolitan,2612 Whitehall Terrace,Louisville,KY,40220,https://venterraliving.com/apartments/the-metropolitan/
+48514,The Avenue,300 Chapel Ridge Dr,Cabot,AR,72023,https://www.aspensquare.com/apartments/arkansas/cabot/the-avenue
+48769,Spring Gate,1500 Springate Dr,Panama City,FL,32404,https://www.hgliving.com/apartments/fl/panama-city/spring-gate/#/
+49248,Sandpiper,1496 Spring Ln,Holladay,UT,84117,https://www.sandpiperapartmentssaltlakecity.com/
+50746,Crawford Square,510 Protectory Pl,Pittsburgh,PA,15219,http://www.crawfordsquareapts.com
+51921,Deer Run,9957 Darrow Park Dr,Twinsburg,OH,44087,https://www.liveatdeerrunapts.com/
+52140,MAA Wade Park,5443 Wade Park Blvd,Raleigh,NC,27607,https://www.maac.com/north-carolina/raleigh-cary/maa-wade-park/
+52348,The Vue,110 Somerset St,New Brunswick,NJ,8901,http://thevuenj.com/
+52967,Seville at Mace Ranch,4501 Alhambra Dr,Davis,CA,95618,http://www.liveattheseville.com/
+54550,MAA West Village,4600 W Village Pl,Smyrna,GA,30080,https://www.maac.com/georgia/atlanta/maa-west-village/
+54553,AMLI Evanston,737 Chicago Ave,Evanston,IL,60202,https://www.amli.com/apartments/chicago/near-north-suburbs-apartments/amli-evanston
+54743,Twin Oaks,3800 14th St NW,Washington,DC,20011,https://www.twinoaksdc.com/
+54769,Emerson Park Apartment Homes,1701 E Don Carlos Ave,Tempe,AZ,85281,https://www.emersonparkapartmenthomes.com/
+55194,Village,3661 River Rd N,Keizer,OR,97303,https://www.thevillagekeizer.com/
+55709,Vista Pointe Apartments,2981 Ridge Ave,Macon,GA,31204,https://ridgepointeblueridgeapts.com/en/
+56151,Brandon Place,6700 W Memorial Rd,Oklahoma City,OK,73142,www.brandonplaceapthome.com
+56166,Village at Crown Woods,9201 Riverside Pkwy,Tulsa,OK,74137,https://www.crownwoodsvillagelc.com/
+56750,SB1K,1000 S Broadway,Denver,CO,80209,https://www.liveatsb1k.com/
+56903,The Landmark,550 Washington St,Braintree,MA,2184,https://www.fxmessina.com/the-landmark?rq=The%20Landmark
+57195,Tribeca,720 W 3rd Ave,Columbus,OH,43212,https://tribecacolumbus.com/
+57918,Chandler,6767 W Windmill Ln,Las Vegas,NV,89139,http://www.chandlerapthomes.com/
+58156,District at Seven Springs,300 Seven Springs Way,Brentwood,TN,37027,http://www.districtsevensprings.com/
+58341,Heritage Park,1818 Evergreen Park Dr SW,Olympia,WA,98502,http://heritageparkolympia.com/
+58969,Cirrus,2030 8th Ave,Seattle,WA,98121,https://www.cirrusseattle.com/
+60386,The Paramount at South Market,611 O'Keefe Ave,New Orleans,LA,70113,https://www.paramountnola.com/
+60750,The Meyden,10333 Main St,Bellevue,WA,98004,http://www.themeydenbellevue.com/
+60939,Greenarch,10 N Greenwood Ave,Tulsa,OK,74120,http://www.greenarchtulsa.com/
+61548,AMLI Dadeland,8250 SW 72nd Ct,Miami,FL,33143,https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-dadeland
+61950,250 High,250 S High St,Columbus,OH,43215,https://250high.com/
+61951,Ellis at Germantown,1600 Rosa L Parks Blvd,Nashville,TN,37208,https://www.ellisgermantown.com/
+62178,Bungalows,9755 Silver Sky Pkwy,Reno,NV,89506,https://thebungalowsatskyvista.com/
+62512,Camden Chandler,2777 S Arizona Ave,Chandler,AZ,85286,https://www.camdenliving.com/apartments/chandler-az/camden-chandler
+62778,AMLI Dry Creek,7471 S Clinton St,Englewood,CO,80112,https://www.amli.com/apartments/denver/englewood-centennial-apartments/amli-dry-creek
+62782,Cortland Alameda Station,415 S Cherokee St,Denver,CO,80223,https://cortland.com/apartments/cortland-alameda-station/
+63462,Telfair Lofts,7500 Branford Pl,Sugar Land,TX,77479,https://apartmentssugarlandtexas.com/
+63770,1000 Kiely,1000 Kiely Blvd,Santa Clara,CA,95051,https://www.essexapartmenthomes.com/apartments/1000-kiely?sc_camp=2648D1300BEC431BB11EB86F02F52DBD&utm_source=googlesearch
+63771,Apex,1102 S Abel St,Milpitas,CA,95035,https://www.essexapartmenthomes.com/apartments/milpitas/apex?sc_camp=2648D1300BEC431BB11EB86F02F52DBD&utm_source=googlesearch
+63933,Vercanta Riverfront,4949 S Landing Dr,Portland,OR,97239,http://www.oxbow49.com/
+64390,Broadway Palace,1026 S Broadway,Los Angeles,CA,90015,http://www.broadwaypalaceapartments.com
+64618,70 Pine,70 Pine St,New York,NY,10005,http://www.70pine.com/
+65134,Garnet Creek,5002 Jewel St,Rocklin,CA,95677,http://www.garnetcreekapts.com/
+66940,AMLI Riverfront Green,1750 Little Raven St,Denver,CO,80202,https://www.amli.com/apartments/denver/lodo-apartments/amli-riverfront-green
+66998,345 Harrison,345 Harrison Ave,Boston,MA,2118,https://www.udr.com/boston-apartments/south-end/345-harrison/
+67150,Harbor Vista at Crawford Street,800 Crawford St,Portsmouth,VA,23704,https://www.liveharborvista.com/
+67516,The Eastland,1035 W Eastland Ave,Nashville,TN,37206,https://www.theeastlandnashville.com/
+67524,Riverworks,45 N Main St,Phoenixville,PA,19460,https://www.hgliving.com/apartments/pa/phoenixville/riverworks
+68148,AMLI Midtown 29,180 NE 29th St,Miami,FL,33137,https://www.amli.com/apartments/southeast-florida/miami-apartments/amli-midtown-29
+68313,The Maxwell,7777 Adelaide St,Frisco,TX,75034,https://www.themaxwellfrisco.com/
+68505,30Sixty Apartments,3060 W Olympic Blvd,Los Angeles,CA,90006,https://www.30sixtyapts.com/
+68991,The Reserve At Water Tower Village,7937 W 54th Ave,Arvada,CO,80002,https://www.thereserveatwatertowervillage.com/
+69203,The Marq,4781 Alicia Dr,Virginia Beach,VA,23462,https://www.livemarqvb.com/
+69323,Fusion 355,355 Eldorado Blvd,Broomfield,CO,80021,https://www.fusion355.com/
+69928,The Azlee,3480 S 300 E,Salt Lake City,UT,84115,https://www.theazleeapartments.com/
+70255,Coventry Square,20 Charles St,Westwood,NJ,7675,https://coventrysquareapartments.com/
+71345,Westgate Village Townhouses,680 Pinckney Ct,Comstock Park,MI,49321,https://www.westgate-village-townhouses.com/
+71558,The Bishop,1115 Springwood Connector,Sandy Springs,GA,30328,https://www.equityapartments.com/atlanta/sandy-springs/the-bishop-apartments
+71651,Waterfront at the Marina,375 Harbour Cove Dr,Sparks,NV,89434,http://www.waterfrontmarinaliving.com/
+72192,Autumn Oaks,1400 Humphrey Dr,Suisun City,CA,94585,https://www.liveatautumnoaks.com/
+72374,Alderwood Park,277 Junction Ave,Livermore,CA,94551,https://www.alderwoodparkaptliving.com/
+72593,Slade at Channelside,1190 E Washington St,Tampa,FL,33602,https://www.udr.com/tampa-apartments/tampa/the-slade-at-channelside/
+73916,Riverbank Apartments,4433 Continental Way,Stockton,CA,95207,https://www.riverbankapartments.com/
+74193,Summerhill Terrace,15267 Hesperian Blvd,San Leandro,CA,94578,https://www.summerhillterraceaptliving.com/
+75722,Birch Pond,5 Birch Pond Dr,Shallotte,NC,28470,http://www.birchpondapts.com/
+77713,Pure Redmond Apartments,17634 NE Union Hill Rd,Redmond,WA,98052,https://www.essexapartmenthomes.com/apartments/pure-redmond
+78373,Fenway Apartments,7112 Fenway Dr,Westminster,CA,92683,https://www.allenproperties.net/fenway-apartments-westminster-ca/
+78381,Rose Park Commons,1634-1635 W Eldridge Ave,Roseville,MN,55113,https://krcapartments.com/property-detail/?propid=148&propname=1634EA%20Rose%20Park
+78724,Camden North End,6800 E Mayo Blvd,Phoenix,AZ,85054,https://www.camdenliving.com/apartments/phoenix-az/camden-north-end?utm_source=gmb&utm_medium=local&utm_campaign=camden-north-end&y_source=1_MTE2Nzc1MjAtNzE1LWxvY2F0aW9uLndlYnNpdGU%3D
+94295,Silver,333 Sunol St,San Jose,CA,95126,https://www.essexapartmenthomes.com/apartments/san-jose/silver
+95149,HQ @ 1532 Harrison,1532 Harrison St,San Francisco,CA,94103,https://www.udr.com/san-francisco-bay-area-apartments/west-soma/hq-apartments/
+118445,Mara Pacific Beach Apartments,4275 Mission Bay Dr.,San Diego,CA,92109,https://www.equityapartments.com/san-diego/pacific-beach/mara-pacific-beach-apartments
+118965,16 Bennett,16 Bennett St,Jersey City,NJ,7304,https://www.16bennett.com
+119144,Windsor Burnet,10301 Burnet Rd,Austin,TX,78758,https://www.windsorburnet.com/
+217343,Eagle Harbor II,220 Marsh Landing,Carrollton,VA,23314,https://www.liveeagleharbor.com/
+217605,Bennett Pointe,930 S Blvd,Edmond,OK,73034,https://www.livebennettpointe.com/
+217956,Cedar Falls Apartments,385 NW Lost Springs Terrace,Portland,OR,97229,https://www.liveatcedarfalls.com/
+218378,The Terraces Apartments,1330 Bush St,San Francisco,CA,94109,http://www.equityapartments.com/california/san-francisco-bay-apartments/lower-nob-hill/the-terraces-apartments.aspx
+218586,Cedar Ridge,4945 Mack Rd,Sacramento,CA,95823,https://cedarridgeapts.rentaladdress.com/
+218985,MAA Trinity II,1140 Trinity Pine Ln,Raleigh,NC,27607,https://www.maac.com/north-carolina/raleigh-cary/maa-trinity/
+220345,Vestawood Apartments,1716 Vestawood Ct,Vestavia Hills,AL,35216,https://www.vestawood.com/
+220976,The Summit at Rivery Park I,1400 Rivery Blvd,Georgetown,TX,78628,http://riveryparkapts.com/
+221098,Ayla Stonebriar,3030 Ohio Dr,Frisco,TX,75035,https://www.equityapartments.com/dallas/frisco/ayla-stonebriar-apartments##neighborhood-tile
+221319,Royal Park,501 HWY 54 Bypass,Carrboro,NC,27510,https://gscapts.com/apartments/north-carolina/royal-park/
+222652,Turtle Dove I,3516 Matilda St,Dallas,TX,75206,https://liveatturtledove.com/
+224538,The Toluca Lofts,4605 Cahuenga Blvd,Toluca Lake,CA,91602,http://www.tolucalofts.com/index.aspx
+224788,Progress Terrace,12230 SW Horizon Blvd,Beaverton,OR,97007,https://www.liveatprogressterrace.com/
+225934,KD Place,1601 E Katie Ave,Las Vegas,NV,89119,https://www.kdplaceapartmentslv.com/
+226350,1250 Lakeside,1250 Lakeside Dr,Sunnyvale,CA,94085,https://www.essexapartmenthomes.com/apartments/sunnyvale/1250-lakeside
+227366,Stazione:25,2715 25th Ave S,Seattle,WA,98144,https://www.stazione25.com/
+227989,Camden Riverwalk,3800 Grapevine Mills Pkwy,Grapevine,TX,76051,https://www.camdenliving.com/apartments/grapevine-tx/camden-riverwalk
+228359,Milo,4109 E 10th Ave,Denver,CO,80220,https://www.equityapartments.com/denver/congress-park/milo-apartments
+228582,1274 at Towson,1274 E Joppa Rd,Towson,MD,21286,https://www.udr.com/baltimore-apartments/towson/1274-at-towson/
+229295,Camden Farmers Market,2210 Canton St,Dallas,TX,75201,https://www.camdenliving.com/apartments/dallas-tx/camden-farmers-market
+229748,Chestnut Street,143 Chestnut St,Santa Cruz,CA,95060,https://www.essexapartmenthomes.com/apartments/chestnut-street
+230081,Vitruvian West II,3737 Vitruvian Way,Addison,TX,75001,www.vitruvianwest.com
+230542,Santa Clara Square,3320 Montgomery Dr,Santa Clara,CA,95054,https://www.irvinecompanyapartments.com/locations/northern-california/santa-clara/santa-clara-square.html
+230770,Lake Haven,732 Bluff St,Carol Stream,IL,60188,http://www.lakehavenluxury.com/
+231107,Crescent Village - Verona,401 River Oaks Pkwy,San Jose,CA,95134,www.irvinecompanyapartments.com/communities/crescent-village
+232480,Vintage at 425 Broadway,1455 4th St,Santa Monica,CA,90401,https://www.equityapartments.com/los-angeles/santa-monica/vintage-at-425-broadway-apartments
+232538,Woodman Apartment Homes,8811 Woodman Ave,Arleta,CA,91331,https://www.woodmanapartments.com/
+232992,The Paddock Club at Providence,685 Providence Main St NW,Huntsville,AL,35806,https://www.maac.com/alabama/huntsville/the-paddock-club-at-providence/
+234581,Georgetown Crossing,100 Georgetown Rd,Mechanicsburg,PA,17050,https://www.triplecrowncorp.com/company/locations/georgetown-crossing/
+234916,Camden Vanderbilt,7171 Buffalo Speedway,Houston,TX,77025,https://www.camdenliving.com/apartments/houston-tx/camden-vanderbilt?utm_source=gmb&utm_medium=local&utm_campaign=camden-vanderbilt&y_source=1_MTE2Nzc0ODMtNzE1LWxvY2F0aW9uLndlYnNpdGU%3D
+234936,Amber Ridge Apartments,2312 55th St S,Fargo,ND,58104,https://www.prg.propertyresourcesgroup.com/amber-ridge-apartments
+235871,Elmtree Park Apartments,11023 Elmtree Park Dr,Indianapolis,IN,46229,https://www.hgliving.com/apartments/in/indianapolis/elmtree-park/#/
+237704,AMLI on Aldrich,2401 Aldrich St,Austin,TX,78723,https://www.amli.com/apartments/austin/mueller-apartments/amli-on-aldrich
+238944,Eagle Rock Apartments At Woodbury,92 Fairhaven Blvd,Woodbury,NY,11797,https://www.eaglerockmanagement.com/apartments/new-york/woodbury/eagle-rock-11797
+239094,Zander Place,1300 Main St,Cross Plains,WI,53528,http://www.zanderplace.com/
+239318,Legacy Fort Mill,700 Gates Mills Dr,Fort Mill,SC,29708,http://www.legacyfortmill.com/
+239952,AMLI Toscana Place,5971 Toscana Dr,Davie,FL,33314,https://www.amli.com/apartments/southeast-florida/fort-lauderdale-apartments/amli-toscana-place
+240595,Stockbridge Trails,319 E Hill Pkwy,Madison,WI,53718,https://www.stockbridgetrailsapartments.com/
+240745,The Allure at Jefferson I,4660 Monroe Way,Fredericksburg,VA,22407,https://www.liveallureva.com/
+241432,Cricket Flats,65 Cricket Ave,Ardmore,PA,19003,http://cricketflats.com/
+241643,Jade at North Hills,N72W12727 Good Hope Rd,Menomonee Falls,WI,53051,https://www.movetojade.com/
+242191,AMLI West Loop,205 S Peoria St,Chicago,IL,60607,https://www.amli.com/apartments/chicago/west-loop-apartments/amli-west-loop
+242344,Franklin Flats,3208 W 7th St,Greeley,CO,80634,www.franklinflatsapts.com
+243936,Centennial Gardens,7841 N Garden Manor Dr,Memphis,TN,38125,http://www.centennialgardensapts.com
+245501,Luna Upper Westside Apartments,2265 Marietta Blvd NW,Atlanta,GA,30318,https://www.equityapartments.com/atlanta/upper-westside/luna-upper-westside-apartments#/
+246152,Oxford at Lake View,3300 S Garrison Rd,Corinth,TX,76210,http://www.oxfordlakeview.com/
+246304,Vista Creek Apartments,22432 Center St,Castro Valley,CA,94546,https://www.vistacreekaptliving.com/
+250124,One Clinton Park,55 Clinton Pl,New Rochelle,NY,10801,https://oneclintonpark.com/
+250342,Station House,16550 NE 79th St,Redmond,WA,98052,https://www.stationhouseredmond.com/
+253383,Pullman Lofts,755 Wilson St,Santa Rosa,CA,95401,https://www.pullmansantarosa.com/
+253388,Quattro,385 S 400 E,Salt Lake City,UT,84111,https://www.livequattro.com/
+253774,27Seventy Lower Heights,2770 Summer St,Houston,TX,77007,https://www.27seventylowerheights.com/
+254167,Harbisons Dairy,2041 Coral St,Philadelphia,PA,19125,https://www.harbisonsdairy.com/
+254556,Park Place,305 W Jack Finney Blvd,Greenville,TX,75402,https://www.parkplacegreenville.com/
+255134,Cortland Royal Palm Beach,11200 Nicole Dr,Royal Palm Beach,FL,33414,https://cortland.com/apartments/the-villas-at-tuttle-royale/
+255578,Circa Fitzsimons,11700 E 26th Ave,Denver,CO,80238,https://www.equityapartments.com/denver/central-park/circa-fitzsimons-apartments
+255737,Vanguard,225 S 6th St,Boise,ID,83702,https://www.vanguardboise.com/
+256972,Pottery Creek,2000 SE Sedgwick Rd,Port Orchard,WA,98366,http://www.potterycreek.com/
+257328,Seasons at Mount Pleasant,4301 Yates Dr,Mt Pleasant,WI,53403,https://www.seasonsmtpleasant.com/
+257779,38 North,1020 Kawana Springs Rd,Santa Rosa,CA,95404,https://www.rent38north.com/?utm_source=apartmentseo&utm_medium=gmb&utm_campaign=organicmaplisting
+258135,Aven Ridge,1141 Pleasant Hill Rd,Leander,TX,78641,https://www.avenridgeleandertx.com/
+258143,Alleia Long Meadow Farms,5600 Berkeley Knl Cir,Richmond,TX,77407,https://www.alleialongmeadow.com/#hero
+259386,Fairmount,585 Newark Ave,Elizabeth,NJ,7208,https://www.fairmount-towers.com/
+260340,Linden At The Rim,15022 Vance Jackson Rd,San Antonio,TX,78249,https://www.hgliving.com/apartments/tx/san-antonio/linden-at-the-rim
+261530,Waterline Square,400 W 61st St,New York,NY,10069,https://www.waterlinesquare.com/
+261580,1515 Park Place,1515 Park Pl,Brooklyn,NY,11213,https://www.1515parkplace.com/
+261648,The Larson,3706 Larson Ln W,University Place,WA,98466,https://www.larsonapts.com/
+261770,AMLI Broadway Park,357 S Bannock St,Denver,CO,80223,https://www.amli.com/apartments/denver/broadway-park-apartments/amli-broadway-park
+262518,Bloom,13120 NE 85th St,Kirkland,WA,98033,https://www.bloomkirkland.com/
+262540,AvalonBay Montville,85 Old Bloomfield Ave,Pine Brook,NJ,7058,https://www.avaloncommunities.com/new-jersey/montville-apartments/avalon-montville/
+262964,The Bellagio,1384 Empire Blvd,Rochester,NY,14609,https://www.bellagio1384.com/
+263158,Promenade at Irvine Spectrum,1100 Perlita,Irvine,CA,92618,https://www.irvinecompanyapartments.com/locations/orange-county/irvine/spectrum/promenade-at-spectrum.html
+263732,Hoyt Tower,50-54 Sussex Ave,Newark,NJ,7103,https://www.hoyttowernewark.com/
+264397,Linden Ranch,4300 Ranchero Dr,Sachse,TX,75048,https://www.hgliving.com/apartments/tx/sachse/linden-ranch/?utm_source=GBP&utm_medium=organic
+265281,The Louise,4151 Viridian Village Dr,Arlington,TX,76005,https://www.equityapartments.com/dallas/arlington/the-louise-apartments##unit-availability-tile
+265383,Monterey Garden,150 W 3rd Ave,San Mateo,CA,94402,https://www.themontereygarden.com/
+266348,Solasta,7606 Klotz Ranch Ct,Sacramento,CA,95831,https://www.livesolasta.com/
+268592,Jasper House,1825 E Boston St,Philadelphia,PA,19125,https://live.jasperhousephl.com/
+269136,Coventry Townhomes,2323 S 800 W,Woods Cross,UT,84087,https://www.liveatcoventry.com/?_yTrackUser=MTI0NDc2MzY0OSMxMjE3MjEzNDA2-%2foPyM8O4Dko%3d&_yTrackVisit=MjIwNjgxNzA3NSMxNTk0MTk2MTgz-rdkjryyrv%2fE%3d&_yTrackReqDT=35491920210707
+269985,Resia Tributary,1851 Market St,Douglasville,GA,30135,https://www.resiatributary.com/
+271195,Indy Flats,1304 N Delaware St,Indianapolis,IN,46202,https://www.indyflatsapts.com/
+271721,The Millennium on Monroe,2002 N Monroe St,Spokane,WA,99205,https://www.millenniumnw.com/
+274384,Bryn House,2490 N Druid Hills Rd,Atlanta,GA,30329,https://brynhouseatl.com/
+274909,The Sinclair II,414 SW Hayworth Dr,Port Orchard,WA,98367,https://www.thesinclair.com/
+276351,The Parkline,4250 Oregon St,San Diego,CA,92104,https://www.parkline.live/
+276734,5Line,2005 Empire St,Charlotte,NC,28217,https://liveatfiveline.com/
+278113,Ascend NonaWest I,4000 Nona West Blvd,Orlando,FL,32824,https://ascendnonawest.com/?utm_source=gbp&utm_medium=organic&utm_campaign=website_clicks
+278167,Aspen Vista at Anchor Pointe,548 Aurora Vw Dr,Reno,NV,89506,https://www.aspenvistaliving.com/
+279103,Shade,10340 S Decatur Blvd,Las Vegas,NV,89141,https://shadeapartments.com/
+279758,Tisdale at Lakeline Station,13621 Lyndhurst St,Austin,TX,78717,https://www.irtliving.com/Apartments-In/Austin-TX/Tisdale-at-Lakeline-Station
+280355,Town Center Apartments,4653 S Amherst Hwy,Madison Heights,VA,24572,https://www.mhtowncenter.com/
+281149,Irondale at Wharton,47 Kossuth St,Wharton,NJ,7885,http://irondaleatwharton.com/
+281751,The Franklin Marlboro,2 Jayden Rd,Marlboro,NJ,7746,https://www.thefranklinmarlboro.com/
+281928,Mosby Citrus Ridge,130 Orlando Breeze Cir,Davenport,FL,33897,https://www.mosbycitrusridge.com/?utm_source=GBP&utm_medium=organic&utm_knock=g
+282696,Allen Ranch Estates,1893 SW Hungry Hill Dr,Grants Pass,OR,97527,https://www.ishranchestates.com/allen-ranch
+284598,Sunrise Station,11260 Point E Dr,Rancho Cordova,CA,95742,https://www.liveatsunrisestation.com/
+286725,Kinsley Yards,2801 Grewal Pkwy,Modesto,CA,95356,https://www.kinsleyyardapts.com/
+288502,Marlowe Tomoka Village,100 Windflower Ln,Daytona Beach,FL,32117,https://marlowetomokavillage.com/
+288891,The Parker,5944 Hwy 92,Acworth,GA,30102,https://theparkerga.com/
+290807,Meri Palm Bay,1880 Mogra Cir NE,Palm Bay,FL,32905,https://www.meripalmbay.com/
+291150,Carlson Place,7954 Jacks Way,Horace,ND,58047,https://www.prg.propertyresourcesgroup.com/carlson-place-apartments
+291337,Vasari at Ventana,4800 Citrus Ave,Fontana,CA,92336,https://livingatvasari.com/
+293332,Taverna at the Forum,3240 Champion Ring Rd,Fort Myers,FL,33905,https://livetavernaftmyers.com/
+294552,Red Hawk Laurel Grey,2031 NE Holliday Ave,Bend,OR,97701,https://www.redhawklaurelgrey.com/
+295254,Broadstone Overlands,5000 Collina Ter,Clermont,FL,34711,https://broadstoneoverlands.com/
+296916,Vivo Living Port Royal,1660 Ribaut Rd,Port Royal,SC,29935,https://www.vivolivingportroyal.com/

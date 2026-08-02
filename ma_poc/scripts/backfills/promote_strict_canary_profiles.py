@@ -325,9 +325,7 @@ def write_snapshot(
     # ``--expected-snapshot-manifest`` points at the dry-run file, while the
     # write result receives its own audit record.
     manifest_name = (
-        "promotion_manifest_execute.json"
-        if manifest.get("mode") == "execute"
-        else "promotion_manifest.json"
+        "promotion_manifest_execute.json" if manifest.get("mode") == "execute" else "promotion_manifest.json"
     )
     output = snapshot_dir / manifest_name
     output.write_text(
@@ -394,8 +392,14 @@ def promote_one(
     source: FrozenProfile,
     *,
     existed_before: bool,
+    expected_target_generation: int | None = None,
 ) -> dict[str, Any]:
-    """Create or generation-merge one profile and hash-verify the result."""
+    """Create or generation-merge one profile and hash-verify the result.
+
+    ``expected_target_generation`` pins a reviewed overlap snapshot. The
+    ordinary strict-canary promoter leaves it unset for backward-compatible
+    behavior; identity-admitted promotion always supplies it.
+    """
     from google.api_core.exceptions import NotFound, PreconditionFailed
 
     pid = source.property_id
@@ -412,6 +416,15 @@ def promote_one(
         else:
             blob.reload()
             generation_before = int(blob.generation or 0)
+            if expected_target_generation is not None and generation_before != expected_target_generation:
+                return {
+                    "property_id": pid,
+                    "status": "generation_conflict_or_missing",
+                    "error": "TargetGenerationChangedSinceReview",
+                    "expected_generation": expected_target_generation,
+                    "actual_generation": generation_before,
+                    "source_sha256": source.sha256,
+                }
             target_raw = blob.download_as_bytes(if_generation_match=generation_before)
             target = ScrapeProfile.model_validate_json(target_raw)
             incoming = ScrapeProfile.model_validate_json(source.raw)

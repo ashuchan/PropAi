@@ -1,0 +1,26 @@
+{
+  "build_or_deploy_performed": false,
+  "environment": {
+    "COMPLIANCE_MODE": "1",
+    "ENABLE_UNLOCKER_TIER": "false",
+    "FETCH_BACKEND": "hyperbrowser",
+    "HYPERBROWSER_MAX_CALLS_PER_PROPERTY": "3",
+    "HYPERBROWSER_RESERVED_PRIORITY_CALLS": "1"
+  },
+  "job_started": false,
+  "launch_authorized": false,
+  "manifest_version": "affected-property-manifest-v1",
+  "profile_gate": "strict_profile_materializer_v3_identity_ADMIT_only",
+  "property_count": 386,
+  "property_input": "launch_properties.csv",
+  "required_outputs": [
+    "raw_source_count",
+    "parser_count",
+    "formatted_count",
+    "final_admitted_count",
+    "canonical_id_uniqueness",
+    "property_identity_verdict",
+    "availability_date_provenance",
+    "unit_source_provenance"
+  ]
+}

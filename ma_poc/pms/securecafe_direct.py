@@ -77,7 +77,12 @@ async def try_rentcafe_direct(
     pid = getattr(task, "property_id", "?")
     from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
 
-    status, body = await hb_raw_get(url, pid)
+    status, body = await hb_raw_get(
+        url,
+        pid,
+        priority=True,
+        reservation_reason="warm_profile_securecafe_route",
+    )
     if status != 200 or not body:
         log.debug("rentcafe_direct %s: hb_raw_get non-200/empty (%s) — fall through", pid, status)
         return None

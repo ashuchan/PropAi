@@ -1,0 +1,748 @@
+{
+  "all_findings_represented": true,
+  "finding_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49
+  ],
+  "findings": [
+    {
+      "acceptance_contract": "Inquiry-only plans remain plan-level UNKNOWN and never become available units.",
+      "adapter": "rentcafe_applicant",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 18,
+      "finding_id": 1,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentcafe_applicant_recovery.py"
+      ],
+      "title": "RentCafe Applicant API manufactures availability on inquiry-only plans"
+    },
+    {
+      "acceptance_contract": "Every native Avalon apartment ID survives even when visible unit labels repeat.",
+      "adapter": "avalonbay",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 106,
+      "finding_id": 2,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_avalonbay_html.py"
+      ],
+      "title": "AvalonBay discards the unique native apartment ID"
+    },
+    {
+      "acceptance_contract": "Building/address and native apartment identity disambiguate repeated visible numbers.",
+      "adapter": "entrata",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 176,
+      "finding_id": 3,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_entrata_pp_building_identity.py"
+      ],
+      "title": "Entrata unit cards discard the building/address disambiguator"
+    },
+    {
+      "acceptance_contract": "Current UDR identity remains collision-free.",
+      "adapter": "udr",
+      "affected_property_count": 0,
+      "control_property_count": 3,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "cleared_control",
+      "evidence_line": 245,
+      "finding_id": 4,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_udr_jsonld.py"
+      ],
+      "title": "UDR July collision candidate is cleared on the current branch"
+    },
+    {
+      "acceptance_contract": "Current Knock UUID identity remains collision-free.",
+      "adapter": "knock",
+      "affected_property_count": 0,
+      "control_property_count": 4,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "cleared_control",
+      "evidence_line": 268,
+      "finding_id": 5,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_knock.py"
+      ],
+      "title": "Knock July collision candidate is cleared on the current branch"
+    },
+    {
+      "acceptance_contract": "Wisconsin grid addresses and native listing IDs keep all physical apartments distinct.",
+      "adapter": "appfolio",
+      "affected_property_count": 1,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 293,
+      "finding_id": 6,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_appfolio_wisconsin_grid_identity.py"
+      ],
+      "title": "AppFolio rejects Wisconsin grid addresses as identity"
+    },
+    {
+      "acceptance_contract": "Native unit code is canonical; the short public label remains display metadata.",
+      "adapter": "venterra",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 352,
+      "finding_id": 7,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_venterra.py"
+      ],
+      "title": "Venterra keeps the unique unit code only as provenance"
+    },
+    {
+      "acceptance_contract": "Native apartment and building identity survive both modern and legacy Cortland cards.",
+      "adapter": "cortland",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 391,
+      "finding_id": 8,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_cortland_cards.py"
+      ],
+      "title": "Cortland drops both building and native apartment identity"
+    },
+    {
+      "acceptance_contract": "Base rent remains separate from fee-inclusive total monthly rent.",
+      "adapter": "cortland",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 444,
+      "finding_id": 9,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_cortland_cards.py"
+      ],
+      "title": "Cortland emits fee-inclusive price as base rent"
+    },
+    {
+      "acceptance_contract": "Native apartment identity wins over repeated floor-plan type labels.",
+      "adapter": "g5",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 471,
+      "finding_id": 10,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_g5.py"
+      ],
+      "title": "G5 substitutes the floor-plan type for apartment identity"
+    },
+    {
+      "acceptance_contract": "Every explicit Harbor future date survives the production formatter.",
+      "adapter": "harbor_group",
+      "affected_property_count": 1,
+      "control_property_count": 2,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 526,
+      "finding_id": 11,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_harbor_group.py",
+        "ma_poc/tests/scripts/test_availability_date_contract.py"
+      ],
+      "title": "Harbor Group future dates are lost at the Jugnu boundary"
+    },
+    {
+      "acceptance_contract": "Only the configured Mark-Taylor property roster may be admitted.",
+      "adapter": "onesite_workflow",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 583,
+      "finding_id": 12,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_mark_taylor.py"
+      ],
+      "title": "OneSite adopts a sibling Mark-Taylor property's apartments"
+    },
+    {
+      "acceptance_contract": "Native SecureCafe UnitID is canonical when published.",
+      "adapter": "securecafe",
+      "affected_property_count": 4,
+      "control_property_count": 1,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 647,
+      "finding_id": 13,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentcafe_rc2.py"
+      ],
+      "title": "SecureCafe legacy rows discard native `UnitID`"
+    },
+    {
+      "acceptance_contract": "Building/native identity is applied before deduplication.",
+      "adapter": "generic_spherexx",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 703,
+      "finding_id": 14,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_spherexx.py"
+      ],
+      "title": "Generic API fallback deduplicates apartments before using building identity"
+    },
+    {
+      "acceptance_contract": "Explicitly unavailable rows without a date never receive the capture date.",
+      "adapter": "shared_formatter",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 757,
+      "finding_id": 15,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_api_parser_available_flag.py"
+      ],
+      "title": "The formatter assigns today's date to explicitly unavailable apartments"
+    },
+    {
+      "acceptance_contract": "Join UDR dates by native apartment ID first; preserve all source dates and existing canonical IDs.",
+      "adapter": "udr",
+      "affected_property_count": 20,
+      "control_property_count": 0,
+      "coverage_mode": "complete_20_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 814,
+      "finding_id": 16,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_udr_jsonld.py",
+        "ma_poc/tests/scripts/test_availability_date_contract.py"
+      ],
+      "title": "UDR building-safe identity disconnects every source availability date"
+    },
+    {
+      "acceptance_contract": "Repair zero dimensions only when explicit non-studio plan tokens prove the value.",
+      "adapter": "g5",
+      "affected_property_count": 1,
+      "control_property_count": 2,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 882,
+      "finding_id": 17,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_g5.py"
+      ],
+      "title": "One G5 property publishes zero dimensions that contradict explicit plan codes"
+    },
+    {
+      "acceptance_contract": "Do not invent future dates absent from the current public source.",
+      "adapter": "securecafe",
+      "affected_property_count": 0,
+      "control_property_count": 5,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "cleared_control",
+      "evidence_line": 925,
+      "finding_id": 18,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentcafe_unit_roster.py"
+      ],
+      "title": "SecureCafe RP future-date candidate is not confirmed from the current source"
+    },
+    {
+      "acceptance_contract": "Equivalent URL spellings are crawled once and merge by immutable apartment identity.",
+      "adapter": "jonah_ssr",
+      "affected_property_count": 1,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 964,
+      "finding_id": 19,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_jonah_ssr_recovery.py"
+      ],
+      "title": "Lake Haven re-crawls one successful Jonah roster under two URL spellings"
+    },
+    {
+      "acceptance_contract": "Retain native detail ID and street-qualified identity for every Rose Park row.",
+      "adapter": "rentmanager_iloveleasing",
+      "affected_property_count": 1,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1011,
+      "finding_id": 20,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_iloveleasing_table.py"
+      ],
+      "title": "Rose Park discards both native identity and street address"
+    },
+    {
+      "acceptance_contract": "Retain Apply UnitId and building; repeated short apartment labels remain distinct.",
+      "adapter": "rentvision",
+      "affected_property_count": 1,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1048,
+      "finding_id": 21,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentvision_building_identity.py"
+      ],
+      "title": "Birch Pond drops an explicit building and two native unit IDs"
+    },
+    {
+      "acceptance_contract": "Join full roster and availability surfaces by immutable identity, never mutable rent.",
+      "adapter": "resman",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1084,
+      "finding_id": 22,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_resman.py"
+      ],
+      "title": "ResMan full-roster and availability sources are joined on mutable rent"
+    },
+    {
+      "acceptance_contract": "Direct SightMap source-to-final identity and value mapping remains exact.",
+      "adapter": "sightmap",
+      "affected_property_count": 0,
+      "control_property_count": 3,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "cleared_control",
+      "evidence_line": 1133,
+      "finding_id": 23,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_sightmap_direct_probe.py"
+      ],
+      "title": "SightMap's direct roster route clears three source-to-final controls"
+    },
+    {
+      "acceptance_contract": "Stable native PMS identity is canonical for numbered apartments.",
+      "adapter": "apts247",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1172,
+      "finding_id": 24,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_apts247.py"
+      ],
+      "title": "Apts247 discards a stable native PMS identity on numbered apartments"
+    },
+    {
+      "acceptance_contract": "Native property, plan, and unit IDs survive final formatting.",
+      "adapter": "funnel_spaces",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1219,
+      "finding_id": 25,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_funnel_spaces_identity.py"
+      ],
+      "title": "Funnel Spaces discards its native unit, plan, and property IDs"
+    },
+    {
+      "acceptance_contract": "Native IDs and explicit dates on public GetUnits routes remain exact.",
+      "adapter": "realpage_getunits",
+      "affected_property_count": 0,
+      "control_property_count": 6,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "cleared_control",
+      "evidence_line": 1283,
+      "finding_id": 26,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_realpage_onlineleasing_getunits.py"
+      ],
+      "title": "RealPage public GetUnits routes preserve native IDs and explicit dates"
+    },
+    {
+      "acceptance_contract": "Waitlist sentinels are excluded and native unit IDs are retained.",
+      "adapter": "repli360",
+      "affected_property_count": 6,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1345,
+      "finding_id": 27,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_repli360.py"
+      ],
+      "title": "Repli360 turns waitlist sentinels into apartments and drops native IDs"
+    },
+    {
+      "acceptance_contract": "MAAC native identity survives without changing exact values or dates.",
+      "adapter": "maac",
+      "affected_property_count": 6,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1422,
+      "finding_id": 28,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_maac_html.py"
+      ],
+      "title": "MAAC preserves inventory values and dates but discards native identity"
+    },
+    {
+      "acceptance_contract": "SSR and resource routes preserve the same property-bound native identity.",
+      "adapter": "encore_jonah",
+      "affected_property_count": 6,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1495,
+      "finding_id": 29,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_encoreskyline_units.py"
+      ],
+      "title": "Encore/Jonah resource identity is clean, but the SSR route drops it"
+    },
+    {
+      "acceptance_contract": "Community-qualified native unit identity prevents cross-community collisions.",
+      "adapter": "irvine",
+      "affected_property_count": 13,
+      "control_property_count": 0,
+      "coverage_mode": "complete_13_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1590,
+      "finding_id": 30,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_irvine_identity.py"
+      ],
+      "title": "Irvine values are clean, but `unitID` is not a community-unique key"
+    },
+    {
+      "acceptance_contract": "Only target-property AMLI units are admitted and exact unit fields survive.",
+      "adapter": "amli",
+      "affected_property_count": 11,
+      "control_property_count": 0,
+      "coverage_mode": "complete_11_property_audit_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1682,
+      "finding_id": 31,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_amli_property_binding.py"
+      ],
+      "title": "AMLI admits submarket siblings and drops exact target-unit fields"
+    },
+    {
+      "acceptance_contract": "Native On-Site ID, baths, exact proven plan, dates, and property binding survive.",
+      "adapter": "onsite_apply",
+      "affected_property_count": 59,
+      "control_property_count": 2,
+      "coverage_mode": "deterministic_july_success_superset_plus_current_no_link_controls",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1784,
+      "finding_id": 32,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_onsite_apply.py"
+      ],
+      "title": "On-Site kept rows and dates but lost baths, plans, and canonical ID"
+    },
+    {
+      "acceptance_contract": "Property-scoped buildingId:unitId is canonical and all source values remain exact.",
+      "adapter": "equity",
+      "affected_property_count": 25,
+      "control_property_count": 1,
+      "coverage_mode": "complete_26_property_current_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1872,
+      "finding_id": 33,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_equity.py"
+      ],
+      "title": "Equity values were clean, but identity was lossy"
+    },
+    {
+      "acceptance_contract": "Native unit/floor-plan IDs and property request binding survive; empty exits are observable.",
+      "adapter": "essex",
+      "affected_property_count": 27,
+      "control_property_count": 0,
+      "coverage_mode": "complete_27_property_current_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 1952,
+      "finding_id": 34,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_essex.py"
+      ],
+      "title": "Essex preserves mapped values but loses native identity and fails opaquely"
+    },
+    {
+      "acceptance_contract": "Trusted structured 282-sq-ft studio area survives without weakening general clamps.",
+      "adapter": "fortresstech",
+      "affected_property_count": 1,
+      "control_property_count": 9,
+      "coverage_mode": "complete_10_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2063,
+      "finding_id": 35,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_fortresstech.py"
+      ],
+      "title": "FortressTech is stable, but a trusted 282-sq-ft plan is falsely clamped"
+    },
+    {
+      "acceptance_contract": "Exact plan/floor/term and coherent Best Value tuple survive; visible Now overrides stale epochs.",
+      "adapter": "residentservices365",
+      "affected_property_count": 10,
+      "control_property_count": 0,
+      "coverage_mode": "complete_10_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2161,
+      "finding_id": 36,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_residentservices365.py"
+      ],
+      "title": "ResidentServices365 drops visible unit fields and multiplies one plan catalogue"
+    },
+    {
+      "acceptance_contract": "Inquiry-only plan cards retain exact values but no fabricated availability date.",
+      "adapter": "rentaladdress",
+      "affected_property_count": 1,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2286,
+      "finding_id": 37,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentaladdress.py"
+      ],
+      "title": "RentalAddress plans are exact, but inquiry-only cards receive a fake date"
+    },
+    {
+      "acceptance_contract": "Stable UUID plus public label/building/human plan survive and future offerings stay available.",
+      "adapter": "aspensquare",
+      "affected_property_count": 8,
+      "control_property_count": 0,
+      "coverage_mode": "complete_8_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2366,
+      "finding_id": 38,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_aspensquare.py"
+      ],
+      "title": "AspenSquare's Knock fallback loses public identity and reverses availability"
+    },
+    {
+      "acceptance_contract": "Future on-notice rows remain available and only property-bound plan catalogues merge.",
+      "adapter": "edificecms",
+      "affected_property_count": 5,
+      "control_property_count": 0,
+      "coverage_mode": "complete_5_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2521,
+      "finding_id": 39,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_edificecms.py"
+      ],
+      "title": "EdificeCMS keeps exact values but reverses future status and mixes sibling plans"
+    },
+    {
+      "acceptance_contract": "Authoritative MarketApts plan channel suppresses degraded generic rows; deposits never become rent.",
+      "adapter": "marketapts",
+      "affected_property_count": 2,
+      "control_property_count": 27,
+      "coverage_mode": "complete_29_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2662,
+      "finding_id": 40,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_marketapts.py"
+      ],
+      "title": "MarketApts units are exact, but the shared plan merge turns deposits into rent"
+    },
+    {
+      "acceptance_contract": "Preserve both rent-range endpoints and prefer an exactly property-bound MRI route.",
+      "adapter": "mri_prospectconnect",
+      "affected_property_count": 2,
+      "control_property_count": 7,
+      "coverage_mode": "complete_9_property_attributed_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2753,
+      "finding_id": 41,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_mri_prospectconnect.py"
+      ],
+      "title": "MRI preserves native rows and dates but collapses rent ranges; its Knock fallback is lossy"
+    },
+    {
+      "acceptance_contract": "Union exact plan drills by native apartment identity and let exact plan semantics win.",
+      "adapter": "rentcafe_layout_tab",
+      "affected_property_count": 8,
+      "control_property_count": 4,
+      "coverage_mode": "complete_12_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 2856,
+      "finding_id": 42,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_rentcafe_layout_tab.py"
+      ],
+      "title": "RentCafe layout-tab's whole-roster shortcut is neither whole nor semantically safe"
+    },
+    {
+      "acceptance_contract": "Recover authored Wix plans and only explicitly linked, identity-bound physical rosters.",
+      "adapter": "wix_floor_plans",
+      "affected_property_count": 2,
+      "control_property_count": 1,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3009,
+      "finding_id": 43,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_wix_floor_plans.py"
+      ],
+      "title": "Wix's rigid card grammar misses both visible plans and a linked unit roster"
+    },
+    {
+      "acceptance_contract": "Exact catalogue/plan drills produce every community-qualified unit; suggestion cross-products are forbidden.",
+      "adapter": "camden",
+      "affected_property_count": 16,
+      "control_property_count": 0,
+      "coverage_mode": "complete_16_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3123,
+      "finding_id": 44,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_camden.py"
+      ],
+      "title": "Camden reports a suggestion sample as unit inventory; its older expansion fabricates rows"
+    },
+    {
+      "acceptance_contract": "Recover authored property-bound rosters and reject provider placeholders.",
+      "adapter": "squarespace_nopms",
+      "affected_property_count": 4,
+      "control_property_count": 2,
+      "coverage_mode": "complete_6_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3263,
+      "finding_id": 45,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_squarespace_authored_routes.py"
+      ],
+      "title": "Squarespace's fixed-route recovery misses two authored rosters and admits a SightMap placeholder"
+    },
+    {
+      "acceptance_contract": "Current towncommunity shapes remain complete; visible Now provenance and exact plan cards survive.",
+      "adapter": "thinkreside",
+      "affected_property_count": 2,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3409,
+      "finding_id": 46,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_thinkreside.py"
+      ],
+      "title": "ThinkReside misses its current towncommunity card shape and erases `Now` provenance"
+    },
+    {
+      "acceptance_contract": "Provider routes stay identity-bound; recoverable plan/unit routes emit exact rows without waitlist or placeholder records.",
+      "adapter": "wix_nopms",
+      "affected_property_count": 15,
+      "control_property_count": 3,
+      "coverage_mode": "complete_18_property_cohort",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3536,
+      "finding_id": 47,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_wix_iframe_walker.py"
+      ],
+      "title": "`wix_nopms` mixes clean provider routes with lossy plan parsing and four recoverable misses"
+    },
+    {
+      "acceptance_contract": "Provider plan IDs, floor ordinals, literal Today provenance, future dates, and response lineage survive.",
+      "adapter": "yotta",
+      "affected_property_count": 3,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3728,
+      "finding_id": 48,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_yotta.py"
+      ],
+      "title": "Yotta preserves its apartment roster and future dates but loses plan, floor, and `Today` semantics"
+    },
+    {
+      "acceptance_contract": "Each exact non-registry route stays property-bound and preserves physical rows, future dates, and authored plans.",
+      "adapter": "non_registry",
+      "affected_property_count": 4,
+      "control_property_count": 0,
+      "coverage_mode": "explicit_audit_scope",
+      "disposition": "confirmed_remediated",
+      "evidence_line": 3823,
+      "finding_id": 49,
+      "test_selectors": [
+        "ma_poc/tests/pms/adapters/test_betternoi_public.py",
+        "ma_poc/tests/pms/adapters/test_nesthub_public.py",
+        "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+        "ma_poc/tests/pms/adapters/test_static_residence_table.py"
+      ],
+      "title": "Non-registry recoveries preserve physical rows, but ShowMojo loses a future date and the static table drops five plans"
+    }
+  ],
+  "manifest_version": "affected-property-manifest-v1"
+}

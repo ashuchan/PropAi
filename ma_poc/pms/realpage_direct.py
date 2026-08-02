@@ -104,7 +104,12 @@ async def try_realpage_direct(
     pid = getattr(task, "property_id", "?")
     from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
 
-    status, html = await hb_raw_get(page_url, pid)
+    status, html = await hb_raw_get(
+        page_url,
+        pid,
+        priority=True,
+        reservation_reason="warm_profile_realpage_route",
+    )
     if status != 200 or not html:
         log.debug("realpage_direct %s: property page fetch non-200/empty (%s) — fall through", pid, status)
         return None

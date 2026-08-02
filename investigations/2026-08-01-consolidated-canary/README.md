@@ -6,6 +6,11 @@ are integrated on `codex/consolidated-canary-2026-08-01`, while this directory
 holds the admissions, negative controls, replay programs, hashes, and run
 provenance needed to audit or resume the campaign.
 
+The Aug 1 full-run reconciliation, strict replay-route counts, guarded profile
+promotions, recovery hardening, and deterministic no-launch manifest are
+recorded in
+[`RECOVERY_REPLAY_HARDENING_2026-08-02.md`](RECOVERY_REPLAY_HARDENING_2026-08-02.md).
+
 ## Frozen state
 
 | Stream | Strict state before consolidated canary | Provenance |

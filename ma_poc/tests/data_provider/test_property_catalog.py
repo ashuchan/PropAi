@@ -17,6 +17,7 @@ from data_provider.dtos import CatalogFilters, PropertyToScrape
 from data_provider.filesystem import (
     CsvPropertyCatalogSource,
     FileSystemDataProvider,
+    hydrate_property_catalog_rows,
 )
 from data_provider.postgres import PostgresDataProvider
 from data_provider.sqlite import SqliteDataProvider
@@ -150,9 +151,7 @@ def provider(request, tmp_path) -> DataProvider:
         p.close()
 
 
-providers = pytest.mark.parametrize(
-    "provider", ["filesystem", "sqlite", "postgres"], indirect=True
-)
+providers = pytest.mark.parametrize("provider", ["filesystem", "sqlite", "postgres"], indirect=True)
 
 
 # ── Contract tests (parametrised over every provider) ───────────────────────
@@ -169,9 +168,7 @@ def test_list_active_returns_all_rows(provider: DataProvider) -> None:
 
 @providers
 def test_count_matches_list_length(provider: DataProvider) -> None:
-    assert provider.property_catalog.count_active() == len(
-        provider.property_catalog.list_active()
-    )
+    assert provider.property_catalog.count_active() == len(provider.property_catalog.list_active())
 
 
 @providers
@@ -279,9 +276,7 @@ def test_csv_and_sql_sources_yield_identical_order(tmp_path: Path) -> None:
             ("P002", "Oak Tower", "https://oak.example.com"),
             ("P004", "Cedar Park", "https://cedar.example.com"),
         ]:
-            sql_provider.property_state.upsert(
-                cid, {"proj_name": name, "website": url}, "2026-05-08"
-            )
+            sql_provider.property_state.upsert(cid, {"proj_name": name, "website": url}, "2026-05-08")
         sql_ids = [r.canonical_id for r in sql_provider.property_catalog.list_active()]
     finally:
         sql_provider.close()
@@ -320,6 +315,65 @@ def test_csv_source_synthesises_id_when_missing(tmp_path: Path) -> None:
     source = CsvPropertyCatalogSource(csv_path)
     rows = source.list_active()
     assert [r.canonical_id for r in rows] == ["row_0", "row_1"]
+
+
+def test_focused_cohort_rows_are_hydrated_from_canonical_catalog(tmp_path: Path) -> None:
+    cohort_path = tmp_path / "cohort.csv"
+    cohort_path.write_text(
+        "property_id,website\n22986,https://current.example.com/\n",
+        encoding="utf-8",
+    )
+    canonical_path = tmp_path / "canonical.csv"
+    canonical_path.write_text(
+        "apartmentid,name,address,city,state,zip,website\n"
+        "22986,Tuscany Hills,715 Ash Ln,San Marcos,CA,92069,http://legacy.example.com/\n",
+        encoding="utf-8",
+    )
+    cohort = CsvPropertyCatalogSource(cohort_path).list_active()
+    canonical = CsvPropertyCatalogSource(canonical_path).list_active()
+
+    [hydrated] = hydrate_property_catalog_rows(cohort, canonical)
+    flat = hydrated.as_csv_row()
+
+    assert hydrated.canonical_id == "22986"
+    assert hydrated.proj_name == "Tuscany Hills"
+    assert hydrated.address == "715 Ash Ln"
+    assert hydrated.city == "San Marcos"
+    assert hydrated.state == "CA"
+    assert hydrated.zip_code == "92069"
+    assert hydrated.apartment_id == 22986
+    # Explicit cohort URL remains authoritative while missing identity aliases
+    # are supplied from the canonical row.
+    assert hydrated.website == "https://current.example.com/"
+    assert flat["Property Name"] == "Tuscany Hills"
+    assert flat["Address"] == "715 Ash Ln"
+
+
+def test_catalog_hydration_never_overwrites_explicit_cohort_identity() -> None:
+    cohort = PropertyToScrape(
+        canonical_id="7",
+        url="https://cohort.example.com",
+        proj_name="Cohort Name",
+        address="7 Current St",
+        raw={"name": "Cohort Name", "address": "7 Current St"},
+    )
+    canonical = PropertyToScrape(
+        canonical_id="7",
+        url="https://canonical.example.com",
+        proj_name="Canonical Name",
+        address="7 Old St",
+        city="Austin",
+        raw={"name": "Canonical Name", "address": "7 Old St", "city": "Austin"},
+    )
+
+    [hydrated] = hydrate_property_catalog_rows([cohort], [canonical])
+
+    assert hydrated.url == "https://cohort.example.com"
+    assert hydrated.proj_name == "Cohort Name"
+    assert hydrated.address == "7 Current St"
+    assert hydrated.city == "Austin"
+    assert hydrated.raw["name"] == "Cohort Name"
+    assert hydrated.raw["address"] == "7 Current St"
 
 
 def test_as_csv_row_populates_both_v2_and_titlecase_aliases(tmp_path: Path) -> None:

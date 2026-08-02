@@ -21,6 +21,7 @@ from ma_poc.fetch import hyperbrowser_backend as hb
 from ma_poc.fetch.contracts import FetchOutcome
 from ma_poc.fetch.hyperbrowser_backend import (
     HyperbrowserProvider,
+    _hb_try_reserve_property,
     _published_rentmanager_inventory_url,
     hb_raw_get,
     hyperbrowser_property_call_count,
@@ -182,13 +183,16 @@ def test_rentmanager_inventory_hop_requires_exact_same_origin_publication() -> N
     <a href="https://gmc.twa.rentmanager.com/">Resident Portal</a>
     <a href="/unit-availability/">View Live Apartment Availability</a>
     """
-    assert _published_rentmanager_inventory_url(
-        root,
-        "https://legacy.example/",
-    ) == "https://legacy.example/unit-availability/"
     assert (
         _published_rentmanager_inventory_url(
-            root.replace('/unit-availability/', 'https://sibling.example/unit-availability/'),
+            root,
+            "https://legacy.example/",
+        )
+        == "https://legacy.example/unit-availability/"
+    )
+    assert (
+        _published_rentmanager_inventory_url(
+            root.replace("/unit-availability/", "https://sibling.example/unit-availability/"),
             "https://legacy.example/",
         )
         == ""
@@ -235,9 +239,9 @@ async def test_provider_reuses_session_for_published_rentmanager_inventory(
         url="https://legacy.example/",
     )
     session = _FakeSession(page)
-    result = await HyperbrowserProvider(
-        session_factory=lambda: session
-    ).fetch(_task(url="https://legacy.example/", pid="legacy-rm"), None)
+    result = await HyperbrowserProvider(session_factory=lambda: session).fetch(
+        _task(url="https://legacy.example/", pid="legacy-rm"), None
+    )
 
     assert result.outcome == FetchOutcome.OK
     assert result.final_url == "https://legacy.example/unit-availability/"
@@ -333,6 +337,29 @@ async def test_per_property_cost_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r3.outcome == FetchOutcome.BOT_BLOCKED
     assert r3.block_signature == "hb_property_cap"
     assert r3.attempts == 0
+
+
+def test_priority_slot_is_reserved_without_increasing_total_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HYPERBROWSER_MAX_CALLS_PER_PROPERTY", "3")
+    monkeypatch.setenv("HYPERBROWSER_RESERVED_PRIORITY_CALLS", "1")
+    reset_hyperbrowser_property_counts()
+
+    assert _hb_try_reserve_property("priority-cap", reason="discovery-1")
+    assert _hb_try_reserve_property("priority-cap", reason="discovery-2")
+    assert not _hb_try_reserve_property("priority-cap", reason="discovery-3")
+    assert _hb_try_reserve_property(
+        "priority-cap",
+        priority=True,
+        reason="exact-profile-route",
+    )
+    assert not _hb_try_reserve_property(
+        "priority-cap",
+        priority=True,
+        reason="over-total-cap",
+    )
+    assert hyperbrowser_property_call_count("priority-cap") == 3
 
 
 @pytest.mark.asyncio

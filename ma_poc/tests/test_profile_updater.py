@@ -5,10 +5,12 @@ from __future__ import annotations
 import pytest
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile
+from pms.source_provenance import sanitise_source_url
 from services.profile_store import ProfileStore
 from services.profile_updater import (
     _base_tier_num,
     _compute_quality_signals,
+    _identity_admitted_unit_source_urls,
     _row_zip,
     update_profile_after_extraction,
 )
@@ -108,20 +110,185 @@ def test_navigation_hints_recorded_from_crawled_urls(store: ProfileStore) -> Non
     assert updated.navigation.availability_page_path == "/floor-plans"
 
 
+def _unit_source(
+    url: str,
+    *,
+    identity_status: str = "MATCH",
+    status: int = 200,
+    unit_count: int = 4,
+) -> dict:
+    return {
+        "provider": "test",
+        "response_kind": "unit_roster",
+        "source_url": url,
+        "response_status": status,
+        "response_sha256": "a" * 64,
+        "unit_count": unit_count,
+        "identity": {"status": identity_status},
+    }
+
+
+def test_exact_matched_unit_source_turns_bootstrap_success_into_warm_route(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-001")
+    p.navigation.entry_url = "https://property.example/"
+    store.save(p)
+    source_url = "https://portal.example/api/units?property=7"
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_unit_source_provenance": [_unit_source(source_url, unit_count=1)],
+    }
+
+    updated = update_profile_after_extraction(p, result, 1, store)
+
+    assert updated.navigation.winning_page_url == source_url
+    assert updated.navigation.availability_page_path == "/api/units"
+    assert updated.navigation.availability_links == [source_url]
+
+
+def test_unknown_or_unhashed_unit_source_never_becomes_warm_state(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-002")
+    store.save(p)
+    unknown = _unit_source("https://wrong.example/api/units", identity_status="UNKNOWN")
+    unhashed = _unit_source("https://property.example/api/units")
+    unhashed["response_sha256"] = ""
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_unit_source_provenance": [unknown, unhashed],
+    }
+
+    updated = update_profile_after_extraction(p, result, 1, store)
+
+    assert _identity_admitted_unit_source_urls(result) == []
+    assert updated.navigation.winning_page_url is None
+    assert updated.navigation.availability_links == []
+
+
+def test_redacted_provenance_recovers_only_exact_in_memory_replay_url(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-redacted")
+    store.save(p)
+    raw_url = "https://portal.example/api/units?api_key=public-123&property=7"
+    safe_url = sanitise_source_url(raw_url)
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_winning_page_url": raw_url,
+        "_raw_api_responses": [{"url": raw_url, "body": {"units": [{"rent": 1200}]}}],
+        "_unit_source_provenance": [_unit_source(safe_url, unit_count=1)],
+    }
+
+    updated = update_profile_after_extraction(p, result, 1, store)
+
+    assert "%3Credacted%3E" in safe_url
+    assert _identity_admitted_unit_source_urls(result) == [raw_url]
+    assert updated.navigation.winning_page_url == raw_url
+    assert updated.navigation.availability_links == [raw_url]
+
+
+def test_redacted_provenance_without_exact_raw_route_stays_diagnostic_only(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-redacted-missing")
+    store.save(p)
+    safe_url = sanitise_source_url("https://portal.example/api/units?token=secret&property=7")
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_unit_source_provenance": [_unit_source(safe_url, unit_count=1)],
+    }
+
+    updated = update_profile_after_extraction(p, result, 1, store)
+
+    assert _identity_admitted_unit_source_urls(result) == []
+    assert updated.navigation.winning_page_url is None
+    assert updated.navigation.availability_links == []
+
+
+def test_unknown_provenance_blocks_winning_and_raw_api_profile_routes(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-unknown")
+    store.save(p)
+    url = "https://wrong.example/api/units"
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": [{"unit_number": "101", "market_rent_low": 1200}],
+        "_winning_page_url": url,
+        "_raw_api_responses": [{"url": url, "body": {"units": [{"rent": 1200}]}}],
+        "_unit_source_provenance": [_unit_source(url, identity_status="UNKNOWN", unit_count=1)],
+    }
+
+    updated = update_profile_after_extraction(p, result, 1, store)
+
+    assert updated.navigation.winning_page_url is None
+    assert updated.navigation.availability_links == []
+    assert updated.api_hints.known_endpoints == []
+
+
+def test_multiple_matched_unit_sources_are_retained_without_inventing_one_winner(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-003")
+    store.save(p)
+    urls = [
+        "https://property.example/floorplans/a1/units",
+        "https://property.example/floorplans/b1/units",
+    ]
+    result = {
+        "extraction_tier_used": "TIER_MERGED_CROSS_PAGE",
+        "units": [
+            {"unit_number": "101", "market_rent_low": 1200},
+            {"unit_number": "201", "market_rent_low": 1400},
+        ],
+        "_unit_source_provenance": [_unit_source(url, unit_count=1) for url in urls],
+    }
+
+    updated = update_profile_after_extraction(p, result, 2, store)
+
+    assert updated.navigation.winning_page_url is None
+    assert updated.navigation.availability_links == urls
+
+
+def test_matched_provenance_does_not_override_roster_contamination(
+    store: ProfileStore,
+) -> None:
+    p = ScrapeProfile(canonical_id="source-route-004")
+    store.save(p)
+    source_url = "https://portfolio.example/api/units"
+    result = {
+        "extraction_tier_used": "TIER_1_API_VENDOR",
+        "units": _roster_rows("85283", 8),
+        "_property_zip": "85013",
+        "_unit_source_provenance": [_unit_source(source_url, unit_count=8)],
+    }
+
+    updated = update_profile_after_extraction(p, result, 8, store)
+
+    assert updated.navigation.winning_page_url is None
+    assert updated.navigation.availability_links == []
+
+
 # ── 2026-07-19: suffixed-tier persistence fix (writer tier-string mismatch) ──
 
 
 @pytest.mark.parametrize(
     "tier,expected",
     [
-        ("TIER_1_API", 1),                       # bare — exact map
-        ("TIER_1_API_ENTRATA", 1),               # suffixed API
+        ("TIER_1_API", 1),  # bare — exact map
+        ("TIER_1_API_ENTRATA", 1),  # suffixed API
         ("TIER_1_KNOCK_API", 1),
         ("TIER_1_API_RENTCAFE_SECURECAFE", 1),
         ("TIER_1_DOM_CAMDEN", 1),
-        ("TIER_3_DOM", 3),                       # bare
+        ("TIER_3_DOM", 3),  # bare
         ("TIER_1_DOM_ENTRATA_PP_SSR", 1),
-        ("TIER_MERGED_CROSS_PAGE", None),        # no TIER_<n> leading token
+        ("TIER_MERGED_CROSS_PAGE", None),  # no TIER_<n> leading token
         ("generic:no_body_short_circuit", None),
         ("", None),
         (None, None),
@@ -145,9 +312,7 @@ def test_suffixed_api_success_persists_preferred_and_endpoints(store: ProfileSto
     up = update_profile_after_extraction(p, result, 44, store)
     assert up.confidence.preferred_tier == 1
     assert up.confidence.last_success_tier == 1
-    assert [e.url_pattern for e in up.api_hints.known_endpoints] == [
-        "https://x.securecafe.com/api/units"
-    ]
+    assert [e.url_pattern for e in up.api_hints.known_endpoints] == ["https://x.securecafe.com/api/units"]
 
 
 def test_suffixed_dom_success_persists_preferred_tier(store: ProfileStore) -> None:

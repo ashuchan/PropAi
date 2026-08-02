@@ -119,6 +119,8 @@ async def test_compliance_late_captcha_uses_one_clean_bounded_rescue(
     assert rescue.await_args.kwargs == {
         "allow_probe_proxy": False,
         "hb_max_calls_per_property": 1,
+        "hb_priority": True,
+        "hb_reservation_reason": "blocked_requested_route",
     }
 
 
@@ -143,6 +145,8 @@ async def test_compliance_empty_202_render_uses_same_clean_bounded_rescue(
     assert rescue.await_args.kwargs == {
         "allow_probe_proxy": False,
         "hb_max_calls_per_property": 1,
+        "hb_priority": True,
+        "hb_reservation_reason": "blocked_requested_route",
     }
 
 
@@ -218,7 +222,7 @@ async def test_late_captcha_rescue_failure_remains_bot_blocked(
 async def test_clean_helper_stops_after_direct_then_one_hyperbrowser_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[str, object]] = []
+    calls: list[tuple[str, object, object]] = []
 
     class _ProbeResponse:
         status_code = 202
@@ -226,7 +230,7 @@ async def test_clean_helper_stops_after_direct_then_one_hyperbrowser_call(
         url = "https://operator.example/.well-known/sgcaptcha/"
 
     def _probe_get(url: str, **kwargs: object) -> _ProbeResponse:
-        calls.append(("direct", kwargs.get("proxies")))
+        calls.append(("direct", kwargs.get("proxies"), None))
         return _ProbeResponse()
 
     async def _hb_raw_get(
@@ -234,7 +238,13 @@ async def test_clean_helper_stops_after_direct_then_one_hyperbrowser_call(
         property_id: str,
         **kwargs: object,
     ) -> tuple[int, str]:
-        calls.append(("hb", kwargs.get("max_calls_per_property")))
+        calls.append(
+            (
+                "hb",
+                kwargs.get("max_calls_per_property"),
+                (kwargs.get("priority"), kwargs.get("reservation_reason")),
+            )
+        )
         return 200, "<html>" + ("exact inventory " * 100) + "</html>"
 
     monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _probe_get)
@@ -250,7 +260,12 @@ async def test_clean_helper_stops_after_direct_then_one_hyperbrowser_call(
         0,
         allow_probe_proxy=False,
         hb_max_calls_per_property=1,
+        hb_priority=True,
+        hb_reservation_reason="blocked_requested_route",
     )
 
     assert result is not None and result.outcome == FetchOutcome.OK
-    assert calls == [("direct", {}), ("hb", 1)]
+    assert calls == [
+        ("direct", {}, None),
+        ("hb", 1, (True, "blocked_requested_route")),
+    ]

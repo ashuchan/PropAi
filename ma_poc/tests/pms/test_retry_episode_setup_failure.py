@@ -115,9 +115,7 @@ _HTML_TWO_CANDIDATES = (
 _HTML_NO_CANDIDATE = "<html><body>hello</body></html>"
 
 #: Real per-apartment identity + rent + area: the trigger stays None.
-_UNIT_LEVEL = [
-    {"unit_number": "101", "beds": 1, "baths": 1, "sqft": 750, "asking_rent": 1500}
-]
+_UNIT_LEVEL = [{"unit_number": "101", "beds": 1, "baths": 1, "sqft": 750, "asking_rent": 1500}]
 #: Floor-plan rows: dims + rent + area, but no per-apartment anchor.
 _PLAN_LEVEL = [
     {"floor_plan": "A1", "beds": 1, "baths": 1, "sqft": 750, "asking_rent": 1500},
@@ -226,9 +224,7 @@ async def _drive(
         # The real registry never returns None — unknown PMSs resolve to
         # ``generic`` — so an unlisted candidate yields an adapter that
         # extracts nothing rather than a KeyError.
-        return _stub_adapter(
-            pms, table.get(pms, AdapterResult(units=[], tier_used="TIER_3_DOM"))
-        )
+        return _stub_adapter(pms, table.get(pms, AdapterResult(units=[], tier_used="TIER_3_DOM")))
 
     from ma_poc.pms import detector as _detector_mod
 
@@ -236,11 +232,7 @@ async def _drive(
     cand_patch = patch.object(
         _detector_mod,
         "detect_pms_candidates",
-        side_effect=(
-            candidates_side_effect
-            if candidates_side_effect is not None
-            else real_candidates
-        ),
+        side_effect=(candidates_side_effect if candidates_side_effect is not None else real_candidates),
     )
 
     with (
@@ -273,9 +265,7 @@ async def _drive(
         ),
         cand_patch,
     ):
-        return await scrape(
-            "https://example.com/", page=_make_page(html), property_id="P-real-001"
-        )
+        return await scrape("https://example.com/", page=_make_page(html), property_id="P-real-001")
 
 
 @pytest.fixture(autouse=True)
@@ -362,18 +352,15 @@ async def test_zero_budget_emits_no_budget_not_lost_max_retries(
 
 
 @pytest.mark.asyncio
-async def test_strict_portal_handoff_redirects_retry_budget(
+async def test_strict_portal_handoff_retains_one_adapter_retry(
     captured: _CapturedEvents,
 ) -> None:
-    """A canonical SecureCafe route reaches link-hop without adapter retries."""
+    """A portal hint survives while one co-resident adapter is still tried."""
     from ma_poc.pms.adapters._pms_portal_hop import (
         _record_rentcafe_portal_hint,
     )
 
-    canonical = (
-        "https://tenant.securecafe.com/onlineleasing/community/"
-        "availableunits.aspx"
-    )
+    canonical = "https://tenant.securecafe.com/onlineleasing/community/availableunits.aspx"
 
     async def _discover_portal(
         _page: object,
@@ -394,11 +381,11 @@ async def test_strict_portal_handoff_redirects_retry_budget(
     )
 
     episode = captured.episode()
-    assert episode["outcome"] == "no_budget"
+    assert episode["outcome"] == "lost_max_retries"
     assert episode["trigger_reason"] == "empty_exit"
-    assert episode["attempts"] == 0
-    assert episode["candidates_offered"] == -1
-    assert episode["max_retries"] == 0
+    assert episode["attempts"] == 1
+    assert episode["candidates_offered"] >= 1
+    assert episode["max_retries"] == 1
     fast_recovery.assert_awaited_once()
     assert result["_embedded_portal_hints"] == [(canonical, "securecafe")]
     assert "fast_securecafe_render_handoff" in result["_fallback_chain"]
@@ -440,10 +427,7 @@ async def test_fast_body_unit_win_preempts_adapter_retry(
     assert result["units"]
     assert result["units"][0]["unit_number"] == "701"
     assert result["extraction_tier_used"] == "TIER_1_API_FAST_TEST"
-    assert (
-        "fast_universal_recovery:knock_dni_config"
-        in result["_fallback_chain"]
-    )
+    assert "fast_universal_recovery:knock_dni_config" in result["_fallback_chain"]
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -553,11 +537,7 @@ async def test_won_promotes_the_retry_result(captured: _CapturedEvents) -> None:
         baseline_units=[],
         baseline_tier="TIER_1_API_G5_EMPTY",
         html=_HTML_TWO_CANDIDATES,
-        retry_table={
-            "knock": AdapterResult(
-                units=_UNIT_LEVEL, tier_used="TIER_1_API_KNOCK", errors=[]
-            )
-        },
+        retry_table={"knock": AdapterResult(units=_UNIT_LEVEL, tier_used="TIER_1_API_KNOCK", errors=[])},
     )
 
     d = captured.episode()
@@ -761,9 +741,7 @@ async def test_lost_dead_end_when_the_trigger_stops_firing_without_a_win(
         baseline_units=[],
         baseline_tier="TIER_1_API_G5_EMPTY",
         html=_HTML_TWO_CANDIDATES,
-        retry_table={
-            "knock": AdapterResult(units=[], tier_used="TIER_3_DOM", errors=[])
-        },
+        retry_table={"knock": AdapterResult(units=[], tier_used="TIER_3_DOM", errors=[])},
     )
 
     d = captured.episode()
@@ -897,33 +875,33 @@ async def test_every_declared_outcome_is_reachable_from_production(
     dud = AdapterResult(units=_NAME_ONLY, tier_used="TIER_3_DOM", errors=[])
     empty = AdapterResult(units=[], tier_used="TIER_3_DOM", errors=[])
     good = AdapterResult(units=_UNIT_LEVEL, tier_used="TIER_1_API_KNOCK", errors=[])
-    empty_exit = {"baseline_units": [], "baseline_tier": "TIER_1_API_G5_EMPTY",
-                  "html": _HTML_TWO_CANDIDATES}
+    empty_exit = {"baseline_units": [], "baseline_tier": "TIER_1_API_G5_EMPTY", "html": _HTML_TWO_CANDIDATES}
 
     # (expected outcome, env overrides, _drive kwargs, does scrape() raise?)
     scenarios: list[tuple[str, dict[str, str], dict[str, Any], bool]] = [
-        ("not_triggered", {},
-         {"baseline_units": _UNIT_LEVEL, "baseline_tier": "T"}, False),
+        ("not_triggered", {}, {"baseline_units": _UNIT_LEVEL, "baseline_tier": "T"}, False),
         ("no_budget", {"PATH_B_MAX_RETRIES": "0"}, empty_exit, False),
-        ("no_candidate", {},
-         {"baseline_units": _PLAN_LEVEL, "baseline_tier": "T"}, False),
+        ("no_candidate", {}, {"baseline_units": _PLAN_LEVEL, "baseline_tier": "T"}, False),
         ("telemetry_only", {"PATH_B_RETRY_ENABLED": "0"}, empty_exit, False),
         ("won", {}, {**empty_exit, "retry_table": {"knock": good}}, False),
-        ("lost_max_retries", {},
-         {**empty_exit, "retry_table": {"knock": dud, "rentcafe": dud}}, False),
-        ("lost_candidates_exhausted", {"PATH_B_MAX_RETRIES": "3"},
-         {**empty_exit, "retry_table": {"knock": dud, "rentcafe": dud}}, False),
-        ("lost_adapter_error", {},
-         {**empty_exit, "retry_table": {"knock": RuntimeError("boom")}}, False),
+        ("lost_max_retries", {}, {**empty_exit, "retry_table": {"knock": dud, "rentcafe": dud}}, False),
+        (
+            "lost_candidates_exhausted",
+            {"PATH_B_MAX_RETRIES": "3"},
+            {**empty_exit, "retry_table": {"knock": dud, "rentcafe": dud}},
+            False,
+        ),
+        ("lost_adapter_error", {}, {**empty_exit, "retry_table": {"knock": RuntimeError("boom")}}, False),
         ("lost_dead_end", {}, {**empty_exit, "retry_table": {"knock": empty}}, False),
-        ("aborted_error", {},
-         {**empty_exit, "candidates_side_effect": RuntimeError("boom")}, False),
-        ("aborted_cancelled", {},
-         {**empty_exit, "retry_table": {"knock": asyncio.CancelledError()}}, True),
-        ("trigger_error", {},
-         {"baseline_units": _MALFORMED, "baseline_tier": "T"}, False),
-        ("setup_error", {"PATH_B_MAX_RETRIES": "two"},
-         {"baseline_units": _UNIT_LEVEL, "baseline_tier": "T"}, False),
+        ("aborted_error", {}, {**empty_exit, "candidates_side_effect": RuntimeError("boom")}, False),
+        ("aborted_cancelled", {}, {**empty_exit, "retry_table": {"knock": asyncio.CancelledError()}}, True),
+        ("trigger_error", {}, {"baseline_units": _MALFORMED, "baseline_tier": "T"}, False),
+        (
+            "setup_error",
+            {"PATH_B_MAX_RETRIES": "two"},
+            {"baseline_units": _UNIT_LEVEL, "baseline_tier": "T"},
+            False,
+        ),
     ]
 
     seen: dict[str, str] = {}
@@ -941,8 +919,7 @@ async def test_every_declared_outcome_is_reachable_from_production(
 
     wrong = {k: v for k, v in seen.items() if k != v}
     assert not wrong, (
-        f"production assigned the wrong terminal outcome for these scenarios "
-        f"(expected -> got): {wrong}"
+        f"production assigned the wrong terminal outcome for these scenarios (expected -> got): {wrong}"
     )
     assert set(seen.values()) == set(RETRY_EPISODE_OUTCOMES), (
         f"declared but never produced by production: "
@@ -1034,9 +1011,7 @@ _PARITY_SCENARIOS = [
 ]
 
 
-@pytest.mark.parametrize(
-    ("label", "units", "tier", "html", "table", "enabled"), _PARITY_SCENARIOS
-)
+@pytest.mark.parametrize(("label", "units", "tier", "html", "table", "enabled"), _PARITY_SCENARIOS)
 @pytest.mark.asyncio
 async def test_mirror_matches_production_payload(
     label: str,
@@ -1065,8 +1040,7 @@ async def test_mirror_matches_production_payload(
         baseline_tier=tier,
         html=html,
         retry_table={
-            pms: AdapterResult(units=list(u), tier_used=t, errors=[])
-            for pms, (t, u) in table.items()
+            pms: AdapterResult(units=list(u), tier_used=t, errors=[]) for pms, (t, u) in table.items()
         },
     )
     produced = prod_cap.episode()
@@ -1097,11 +1071,6 @@ async def test_mirror_matches_production_payload(
     mirrored = mirror_cap.episode()
 
     diffs = {
-        f: (produced.get(f), mirrored.get(f))
-        for f in _PARITY_FIELDS
-        if produced.get(f) != mirrored.get(f)
+        f: (produced.get(f), mirrored.get(f)) for f in _PARITY_FIELDS if produced.get(f) != mirrored.get(f)
     }
-    assert not diffs, (
-        f"[{label}] production and the test mirror have DRIFTED "
-        f"(production, mirror): {diffs}"
-    )
+    assert not diffs, f"[{label}] production and the test mirror have DRIFTED (production, mirror): {diffs}"

@@ -1,0 +1,10 @@
+{
+  "README.md": "8490d7793f4a87e5a87380871681c5637a811bfc8b0c8ffe5208dc91ca76eaf2",
+  "affected_properties.csv": "a25e5cf9b6ec198a0235476ec4571a70a0ebd26c36fad8958a4728f500b5d796",
+  "affected_properties.jsonl": "70f8f6edc0d88f3069df4fb003cd5006758edfc430bc406c28b3400c4be26052",
+  "finding_coverage.json": "7804961d49df4ffa792f8e0b14803ac82dfd932eb87ed4311cd22566fae8ce65",
+  "future_launch_contract.json": "3522ede6dab0fff66169a487ea8f35423011884874ad9357b6e506bd2a6e7072",
+  "launch_index.csv": "d348c87fd9f5a9143e1c4f7349a8bc045ec1c6bf85bcf5b00e4bcf5b191e0dd9",
+  "launch_properties.csv": "4a6c32d8595831b11699b274cf6921abf66ecbce075638df9a1171776155b2fe",
+  "manifest_summary.json": "d31d8944cff013189f145a8f5693ee4d5a60db7b6e4d41643520b029e7f0d5e4"
+}
