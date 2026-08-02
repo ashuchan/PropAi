@@ -1,0 +1,119 @@
+{
+  "affected_manifest_sha256": "d348c87fd9f5a9143e1c4f7349a8bc045ec1c6bf85bcf5b00e4bcf5b191e0dd9",
+  "explicit_route_candidate_property_count": 11,
+  "launch_performed": false,
+  "mandatory_finding_property_count": 386,
+  "manifest_version": "stratified-1000-adapter-type-v1",
+  "observed_adapter_count": 48,
+  "observed_adapter_type_stratum_count": 105,
+  "population_by_property_type": {
+    "DEAD_URL": 50,
+    "FAILED_NO_DATA": 224,
+    "FAILED_UNREACHABLE": 94,
+    "SUCCESS": 4238,
+    "SUCCESS_NO_DATA_PUBLISHED": 19,
+    "SUCCESS_PLAN_LEVEL": 357
+  },
+  "population_size": 4982,
+  "property_type_definition": "prior strict canary verdict/output class; source catalog has no asset-type field",
+  "registered_adapter_count": 47,
+  "registered_adapters_missing_coverage": [],
+  "represented_observed_adapter_count": 48,
+  "represented_observed_adapter_type_stratum_count": 105,
+  "represented_state_bucket_count": 50,
+  "route_coverage_candidates": {
+    "equity_apartments": [
+      "2955",
+      "7797",
+      "8418"
+    ],
+    "imt_spaces": [
+      "41185"
+    ],
+    "reinhold": [
+      "36175"
+    ],
+    "rentcafe_unit_roster": [
+      "4904",
+      "5974",
+      "60750"
+    ],
+    "touchtour": [
+      "24928",
+      "26151",
+      "27595"
+    ]
+  },
+  "sample_by_adapter": {
+    "UNATTRIBUTED": 25,
+    "amli": 11,
+    "appfolio": 34,
+    "apts247": 22,
+    "aspensquare": 8,
+    "avalonbay": 7,
+    "betternoi_public": 1,
+    "camden": 16,
+    "cortland": 7,
+    "edificecms": 5,
+    "encoreskyline_template": 15,
+    "entrata": 59,
+    "equity": 23,
+    "essex": 27,
+    "fortresstech": 10,
+    "funnel": 16,
+    "g5": 14,
+    "generic": 49,
+    "generic_plan_text": 30,
+    "imt_spaces": 1,
+    "irvine": 13,
+    "knock": 68,
+    "maac": 9,
+    "marketapts": 29,
+    "mri_prospectconnect": 4,
+    "nesthub_public": 1,
+    "onesite": 23,
+    "onsite_apply": 42,
+    "realpage_cws": 7,
+    "realpage_oll": 22,
+    "rentaladdress": 1,
+    "rentcafe": 251,
+    "rentcafe_layout_tab": 12,
+    "rentmanager": 8,
+    "rentvision": 7,
+    "repli360": 14,
+    "residentservices365": 9,
+    "resman": 15,
+    "showmojo_public": 1,
+    "sightmap": 42,
+    "spherexx": 6,
+    "squarespace_nopms": 6,
+    "static_residence_table": 1,
+    "thinkreside": 2,
+    "venterra": 3,
+    "wix_floor_plans": 3,
+    "wix_nopms": 18,
+    "yotta": 3
+  },
+  "sample_by_property_type": {
+    "DEAD_URL": 10,
+    "FAILED_NO_DATA": 45,
+    "FAILED_UNREACHABLE": 19,
+    "SUCCESS": 851,
+    "SUCCESS_NO_DATA_PUBLISHED": 4,
+    "SUCCESS_PLAN_LEVEL": 71
+  },
+  "sample_size": 1000,
+  "seed": "stratified-1000-adapter-type-2026-08-02-v1",
+  "source_benchmark_properties_digest": "84023a73b8f6054da3d6ee903b2d8bb9b5146a33eefa62c1a5f0ee9bc23a8c40",
+  "source_benchmark_uri": "gs://jugnu-canary/runs/2026-08-01-consolidated-strict-fa1afb7/",
+  "source_catalog_sha256": "4f0a12e0e3fa04993e31fe277db052f7893307c87ed7d11cb1afbc6cd04675de",
+  "state_bucket_count": 50,
+  "target_by_property_type": {
+    "DEAD_URL": 10,
+    "FAILED_NO_DATA": 45,
+    "FAILED_UNREACHABLE": 19,
+    "SUCCESS": 851,
+    "SUCCESS_NO_DATA_PUBLISHED": 4,
+    "SUCCESS_PLAN_LEVEL": 71
+  }
+}
