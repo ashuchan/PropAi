@@ -243,6 +243,7 @@ def parse_rentcafe_lt_applyga(
                 available_units="1",
                 source_api_url=drill_url,
                 extraction_tier="TIER_1_DOM_RENTCAFE_LT",
+                floor_plan_name_provenance="rentcafe.layout-tab.plan-label",
             )
         )
     return out

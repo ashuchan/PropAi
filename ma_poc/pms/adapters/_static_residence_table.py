@@ -11,14 +11,17 @@ It is intentionally page-local: no fetch, browser, proxy, or LLM call occurs.
 
 from __future__ import annotations
 
+import hashlib
 import re
+from collections.abc import Callable
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 from bs4 import BeautifulSoup, Tag
 
 from ma_poc.pms.adapters._parsing import bed_label_from, make_unit_dict
 from ma_poc.pms.adapters.base import AdapterContext
+from ma_poc.pms.source_provenance import response_sha256, sanitise_source_url
 
 _EXPECTED_HEADERS = ("residence", "bed bath", "price", "floorplan")
 _BED_BATH_RE = re.compile(
@@ -40,6 +43,27 @@ _ADDRESS_ALIASES = {
     "place": "pl",
     "road": "rd",
     "street": "st",
+}
+
+# 1515 Park Place's availability table publishes image links rather than text
+# sqft. Each image was downloaded from the same property host and visually
+# verified on 2026-08-02; the immutable byte hash makes the recovery fail
+# closed if the operator replaces or reuses an asset. Unit 102's table link
+# incorrectly points to ``105.jpg`` (404), while the same-directory
+# ``102.jpg`` is live and carries the verified 950 SF label.
+_VERIFIED_ASSET_AREAS_BY_SHA256: dict[str, tuple[str, int]] = {
+    "dc8b80736a7529fa2717b5c4690b322b550fc28d3c80e913a76e13892a2d8d9f": (
+        "101",
+        1271,
+    ),
+    "0c14b689f4dbc30771d5473bcdcb8c381c9085c90c6416253f2a52c6bf45cf6b": (
+        "102",
+        950,
+    ),
+    "77ea43af412153941a39223bbf48b730dd3dfa9c7cf145d5a82871c187a4555b": (
+        "103",
+        1124,
+    ),
 }
 
 
@@ -271,6 +295,19 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
         )
         unit.update(
             {
+                "source_asset_candidate_urls": [
+                    urljoin(page_url, str(anchor.get("href") or ""))
+                    for anchor in cells[3].select("a[href]")
+                    if str(anchor.get("href") or "").strip()
+                    and urlparse(
+                        urljoin(page_url, str(anchor.get("href") or ""))
+                    ).hostname
+                    == urlparse(page_url).hostname
+                ],
+                "source_response_sha256": response_sha256(html),
+                "source_response_url": sanitise_source_url(page_url),
+                "source_record_locator": f"residence_table:{residence}",
+                "identity_quality": "provider_explicit_physical_unit",
                 "availability_date_provenance": (
                     "current_availability_roster_no_explicit_date"
                 ),
@@ -344,4 +381,163 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
     return units
 
 
-__all__ = ["recover_static_residence_table"]
+def _asset_candidates(unit: dict[str, Any]) -> list[str]:
+    """Return bounded same-directory asset candidates for one residence."""
+
+    residence = str(unit.get("unit_number") or "").strip()
+    candidates: list[str] = []
+    for raw in unit.get("source_asset_candidate_urls") or []:
+        url = str(raw or "").strip()
+        if not url:
+            continue
+        try:
+            parsed = urlparse(url)
+        except (TypeError, ValueError):
+            continue
+        path = parsed.path or ""
+        if "." in path.rsplit("/", 1)[-1] and residence.isdigit():
+            name = path.rsplit("/", 1)[-1]
+            stem, extension = name.rsplit(".", 1)
+            if stem.isdigit() and stem != residence:
+                corrected_path = f"{path.rsplit('/', 1)[0]}/{residence}.{extension}"
+                candidates.append(
+                    urlunparse(
+                        (
+                            parsed.scheme,
+                            parsed.netloc,
+                            corrected_path,
+                            parsed.params,
+                            parsed.query,
+                            "",
+                        )
+                    )
+                )
+        candidates.append(url)
+    return list(dict.fromkeys(candidates))[:2]
+
+
+def enrich_static_residence_asset_areas(
+    ctx: AdapterContext,
+    units: list[dict[str, Any]],
+    *,
+    fetch: Callable[..., Any],
+    max_fetches: int = 6,
+) -> dict[str, Any]:
+    """Attach sqft only when a same-host asset matches a verified SHA-256.
+
+    Args:
+        ctx: Property-scoped adapter context whose table identity already
+            passed :func:`recover_static_residence_table`.
+        units: Physical residence rows emitted by that parser.
+        fetch: Requests-compatible direct HTTP callable.
+        max_fetches: Hard property-level network bound.
+
+    Returns:
+        Compact attempts/admissions diagnostic. Raw winning bytes are attached
+        to the context for the runner's content-addressed source archive.
+    """
+
+    page_host = (urlparse(_page_url(ctx)).hostname or "").casefold()
+    diagnostic: dict[str, Any] = {
+        "attempted": False,
+        "fetch_count": 0,
+        "matched_units": 0,
+        "attempts": [],
+    }
+    asset_responses: list[dict[str, Any]] = []
+    if not units or not page_host:
+        return diagnostic
+    diagnostic["attempted"] = True
+    for unit in units:
+        if diagnostic["fetch_count"] >= max_fetches:
+            break
+        residence = str(unit.get("unit_number") or "").strip()
+        for url in _asset_candidates(unit):
+            if diagnostic["fetch_count"] >= max_fetches:
+                break
+            if (urlparse(url).hostname or "").casefold() != page_host:
+                continue
+            diagnostic["fetch_count"] += 1
+            try:
+                response = fetch(url, timeout=12, unlocker=False)
+            except Exception as exc:
+                diagnostic["attempts"].append(
+                    {
+                        "url": sanitise_source_url(url),
+                        "status": 0,
+                        "error": type(exc).__name__,
+                    }
+                )
+                continue
+            status = int(getattr(response, "status_code", 0) or 0)
+            content = getattr(response, "content", b"")
+            if isinstance(content, bytearray):
+                content = bytes(content)
+            elif isinstance(content, str):
+                content = content.encode("utf-8")
+            elif not isinstance(content, bytes):
+                content = str(content or "").encode("utf-8")
+            body_hash = hashlib.sha256(content).hexdigest() if content else ""
+            diagnostic["attempts"].append(
+                {
+                    "url": sanitise_source_url(url),
+                    "status": status,
+                    "response_sha256": body_hash or None,
+                    "body_bytes": len(content),
+                }
+            )
+            verified = _VERIFIED_ASSET_AREAS_BY_SHA256.get(body_hash)
+            if status != 200 or verified is None or verified[0] != residence:
+                continue
+            area = verified[1]
+            unit.update(
+                {
+                    "sqft": str(area),
+                    "area_low": area,
+                    "area_high": area,
+                    "area_range": str(area),
+                    "area_range_raw": str(area),
+                    "area_provenance": "verified_source_asset_sha256",
+                    "area_source_url": sanitise_source_url(url),
+                    "source_asset_url": sanitise_source_url(url),
+                    "source_asset_sha256": body_hash,
+                    "source_response_url": sanitise_source_url(url),
+                    "source_response_sha256": body_hash,
+                    "source_parent_record_locator": unit.get("source_record_locator"),
+                    "source_record_locator": f"asset_sha256:{body_hash}",
+                }
+            )
+            asset_responses.append(
+                {
+                    "url": url,
+                    "status": status,
+                    "body": content,
+                    "content_type": str(
+                        (getattr(response, "headers", {}) or {}).get(
+                            "content-type",
+                            "image/jpeg",
+                        )
+                    ),
+                    "response_kind": "verified_floor_plan_asset",
+                    "identity": {
+                        "status": "MATCH",
+                        "configured_property_id": str(ctx.property_id or ""),
+                        "unit_number": residence,
+                        "verification": "sha256_allowlist_and_same_host",
+                    },
+                }
+            )
+            diagnostic["matched_units"] += 1
+            break
+    try:
+        ctx._static_residence_asset_responses = asset_responses  # type: ignore[attr-defined]
+        ctx._static_residence_asset_diagnostic = diagnostic  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    return diagnostic
+
+
+__all__ = [
+    "enrich_static_residence_asset_areas",
+    "recover_static_residence_table",
+]

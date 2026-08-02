@@ -22,6 +22,7 @@ from ma_poc.pms.adapters._html_extract import (
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.generic import GenericAdapter
 from ma_poc.pms.detector import DetectedPMS
+from ma_poc.pms.source_provenance import response_sha256
 
 
 def _card(
@@ -144,6 +145,53 @@ def test_parser_rejects_wrong_host_and_missing_numeric_listing_id() -> None:
             _INDEX_HTML, "https://example.com/Resident/public/rentals"
         )
         == []
+    )
+
+
+def test_scoped_parser_recovers_only_explicit_description_unit_numbers() -> None:
+    """Le Mirage's labelled apartment numbers become physical identities."""
+
+    def scoped_card(listing_id: str, description: str) -> str:
+        return f"""
+        <a class="featured-listing" href="/Resident/public/rentals/{listing_id}"
+           data-bedrooms="2" data-bathrooms="2" data-rent="1500"
+           data-square-feet="900" data-location="Las Vegas, NV | 89120">
+          <p class="featured-listing__description">{description}</p>
+        </a>
+        """
+
+    html = f"""
+    <html><body><header><img alt="Le Mirage Apartments"></header>
+      {scoped_card("113015", "Apartment #5102 is ready for move-in.")}
+      {scoped_card("76796", "Unit #1207 with mountain views.")}
+      {scoped_card("304127", "#2205 - renovated two bedroom")}
+      {scoped_card("99999", "Call 702-555-5100 for leasing details")}
+    </body></html>
+    """
+
+    units = extract_managebuilding_rentals_index(
+        html,
+        _COMPLETE_INDEX_URL,
+        property_name="Le Mirage Apartments",
+        city="Las Vegas",
+        state="NV",
+        zip_code="89120",
+    )
+    by_listing = {
+        row["source_ids"]["managebuilding_listing_id"]: row for row in units
+    }
+
+    assert by_listing["113015"]["unit_number"] == "5102"
+    assert by_listing["76796"]["unit_number"] == "1207"
+    assert by_listing["304127"]["unit_number"] == "2205"
+    assert by_listing["99999"]["unit_number"] == ""
+    assert by_listing["113015"]["identity_quality"] == (
+        "provider_explicit_physical_unit"
+    )
+    assert by_listing["99999"]["identity_quality"] == "volatile_listing_only"
+    assert by_listing["113015"]["source_response_sha256"] == response_sha256(html)
+    assert by_listing["113015"]["source_record_locator"] == (
+        "featured-listing:113015"
     )
     missing_id_html = f"<div>{_card('', href='/Resident/public/rentals/')}</div>"
     assert (

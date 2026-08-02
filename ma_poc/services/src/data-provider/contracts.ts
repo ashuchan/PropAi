@@ -81,9 +81,47 @@ export interface UnitStateRecord {
   beds?: number | null;
   baths?: number | null;
   area?: number | null;
+  areaSqft?: number | null;
+  areaIsPublished?: boolean | null;
+  areaLow?: number | null;
+  areaHigh?: number | null;
+  areaRange?: string | null;
+  areaRangeRaw?: string | null;
+  areaValueType?: string | null;
+  areaProvenance?: string | null;
+  areaSourceUrl?: string | null;
+  rentRange?: string | null;
+  rentRangeRaw?: string | null;
+  rentIsRange?: boolean | null;
+  rentProvenance?: string | null;
   dateCaptured?: string | null;
   leaseTerm?: number | null;
   moveInDate?: string | null;
+  sourceUnitId?: string | null;
+  canonicalUnitId?: string | null;
+  unitName?: string | null;
+  floor?: string | null;
+  building?: string | null;
+  buildingId?: string | null;
+  buildingIdSource?: string | null;
+  floorPlanNameProvenance?: string | null;
+  availableDateRaw?: string | null;
+  availabilityDateProvenance?: string | null;
+  extractionTier?: string | null;
+  sourceIds?: Record<string, unknown> | null;
+  sourceResponseSha256?: string | null;
+  sourceResponseUrl?: string | null;
+  sourceRecordLocator?: string | null;
+  sourceParentRecordLocator?: string | null;
+  sourceAssetUrl?: string | null;
+  sourceAssetSha256?: string | null;
+  identityQuality?: string | null;
+  unitIdAliases?: string[];
+  unitIdAliasSources?: Record<string, unknown>[];
+  unitHistoryKey?: string | null;
+  unitHistoryKeyBasis?: string | null;
+  unitHistoryKeyQuality?: string | null;
+  unitHistoryKeyVersion?: string | null;
   // Shared
   availableDate?: string | null;
   concessions?: unknown;
@@ -96,6 +134,7 @@ export interface UnitStateRecord {
   disappearedSince?: string | null;
   lastAbsentDate?: string | null;
   changedFields?: string[];
+  dataSha256?: string | null;
   extra?: Record<string, unknown>;
 }
 

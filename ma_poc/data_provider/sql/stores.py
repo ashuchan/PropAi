@@ -137,13 +137,52 @@ _UNIT_COLS = {
     "baths",
     "floor_plan_name",
     "floor_plan_id",
+    "floor_plan_name_provenance",
+    "source_unit_id",
+    "canonical_unit_id",
+    "unit_name",
+    "floor",
+    "building",
+    "building_id",
+    "building_id_source",
     "area",
+    "area_sqft",
+    "area_is_published",
+    "area_low",
+    "area_high",
+    "area_range",
+    "area_range_raw",
+    "area_value_type",
+    "area_provenance",
+    "area_source_url",
     "rent_low",
     "rent_high",
+    "rent_range",
+    "rent_range_raw",
+    "rent_is_range",
+    "rent_provenance",
     "date_captured",
     "available_date",
+    "available_date_raw",
+    "availability_date_provenance",
+    "availability_status",
     "lease_term",
     "move_in_date",
+    "extraction_tier",
+    "source_ids",
+    "source_response_sha256",
+    "source_response_url",
+    "source_record_locator",
+    "source_parent_record_locator",
+    "source_asset_url",
+    "source_asset_sha256",
+    "identity_quality",
+    "unit_id_aliases",
+    "unit_id_alias_sources",
+    "unit_history_key",
+    "unit_history_key_basis",
+    "unit_history_key_quality",
+    "unit_history_key_version",
     # State-tracking
     "first_seen_date",
     "last_seen_at",
@@ -268,13 +307,52 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
         "baths": row.baths,
         "floor_plan_name": row.floor_plan_name,
         "floor_plan_id": row.floor_plan_id,
+        "floor_plan_name_provenance": row.floor_plan_name_provenance,
+        "source_unit_id": row.source_unit_id,
+        "canonical_unit_id": row.canonical_unit_id,
+        "unit_name": row.unit_name,
+        "floor": row.floor,
+        "building": row.building,
+        "building_id": row.building_id,
+        "building_id_source": row.building_id_source,
         "area": row.area,
+        "area_sqft": row.area_sqft,
+        "area_is_published": row.area_is_published,
+        "area_low": row.area_low,
+        "area_high": row.area_high,
+        "area_range": row.area_range,
+        "area_range_raw": row.area_range_raw,
+        "area_value_type": row.area_value_type,
+        "area_provenance": row.area_provenance,
+        "area_source_url": row.area_source_url,
         "rent_low": row.rent_low,
         "rent_high": row.rent_high,
+        "rent_range": row.rent_range,
+        "rent_range_raw": row.rent_range_raw,
+        "rent_is_range": row.rent_is_range,
+        "rent_provenance": row.rent_provenance,
         "date_captured": row.date_captured,
         "available_date": row.available_date,
+        "available_date_raw": row.available_date_raw,
+        "availability_date_provenance": row.availability_date_provenance,
+        "availability_status": row.availability_status,
         "lease_term": row.lease_term,
         "move_in_date": row.move_in_date,
+        "extraction_tier": row.extraction_tier,
+        "source_ids": row.source_ids,
+        "source_response_sha256": row.source_response_sha256,
+        "source_response_url": row.source_response_url,
+        "source_record_locator": row.source_record_locator,
+        "source_parent_record_locator": row.source_parent_record_locator,
+        "source_asset_url": row.source_asset_url,
+        "source_asset_sha256": row.source_asset_sha256,
+        "identity_quality": row.identity_quality,
+        "unit_id_aliases": row.unit_id_aliases or [],
+        "unit_id_alias_sources": row.unit_id_alias_sources or [],
+        "unit_history_key": row.unit_history_key,
+        "unit_history_key_basis": row.unit_history_key_basis,
+        "unit_history_key_quality": row.unit_history_key_quality,
+        "unit_history_key_version": row.unit_history_key_version,
         # State-tracking
         "first_seen_date": row.first_seen_date,
         "last_seen_at": row.last_seen_at,
@@ -284,6 +362,7 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
         "concessions": row.concessions,
         "amenities": row.amenities,
         "changed_fields": row.changed_fields or [],
+        "data_sha256": row.data_sha256,
     }
     if row.extra:
         base.update(row.extra)
@@ -304,6 +383,7 @@ def _seen_at_iso(run_date: str) -> str:
     sys.path during alembic migrations).
     """
     from ma_poc.core.identity import seen_at_iso
+
     return seen_at_iso(run_date)
 
 
@@ -426,9 +506,7 @@ class SqlPropertyCatalogSource(IPropertyCatalogSource):
         return stmt
 
     @staticmethod
-    def _apply_post_filters(
-        rows: list[PropertyRow], filters: CatalogFilters | None
-    ) -> list[PropertyRow]:
+    def _apply_post_filters(rows: list[PropertyRow], filters: CatalogFilters | None) -> list[PropertyRow]:
         if filters is None or not filters.property_types:
             return rows
         wanted = {t.upper() for t in filters.property_types}
@@ -511,13 +589,52 @@ class SqlUnitStateStore(IUnitStateStore):
         "baths": ("baths", "bathrooms", "_bathrooms"),
         "floor_plan_name": ("floor_plan_name", "_floor_plan"),
         "floor_plan_id": ("floor_plan_id",),
+        "floor_plan_name_provenance": ("floor_plan_name_provenance",),
+        "source_unit_id": ("source_unit_id",),
+        "canonical_unit_id": ("canonical_unit_id", "unit_id"),
+        "unit_name": ("unit_name",),
+        "floor": ("floor", "_floor"),
+        "building": ("building", "_building", "building_name"),
+        "building_id": ("building_id",),
+        "building_id_source": ("building_id_source",),
         "area": ("area", "sqft", "_sqft"),
+        "area_sqft": ("area_sqft",),
+        "area_is_published": ("area_is_published",),
+        "area_low": ("area_low",),
+        "area_high": ("area_high",),
+        "area_range": ("area_range",),
+        "area_range_raw": ("area_range_raw",),
+        "area_value_type": ("area_value_type",),
+        "area_provenance": ("area_provenance",),
+        "area_source_url": ("area_source_url",),
         "rent_low": ("rent_low", "market_rent_low"),
         "rent_high": ("rent_high", "market_rent_high"),
+        "rent_range": ("rent_range",),
+        "rent_range_raw": ("rent_range_raw", "_rent_range_raw"),
+        "rent_is_range": ("rent_is_range",),
+        "rent_provenance": ("rent_provenance",),
         "date_captured": ("date_captured",),
         "available_date": ("available_date",),
+        "available_date_raw": ("available_date_raw", "_available_date_raw"),
+        "availability_date_provenance": ("availability_date_provenance",),
+        "availability_status": ("availability_status", "_availability_status"),
         "lease_term": ("lease_term", "_lease_term"),
         "move_in_date": ("move_in_date", "_move_in_date"),
+        "extraction_tier": ("extraction_tier", "_extraction_tier"),
+        "source_ids": ("source_ids",),
+        "source_response_sha256": ("source_response_sha256",),
+        "source_response_url": ("source_response_url",),
+        "source_record_locator": ("source_record_locator",),
+        "source_parent_record_locator": ("source_parent_record_locator",),
+        "source_asset_url": ("source_asset_url",),
+        "source_asset_sha256": ("source_asset_sha256",),
+        "identity_quality": ("identity_quality",),
+        "unit_id_aliases": ("unit_id_aliases",),
+        "unit_id_alias_sources": ("unit_id_alias_sources",),
+        "unit_history_key": ("unit_history_key",),
+        "unit_history_key_basis": ("unit_history_key_basis",),
+        "unit_history_key_quality": ("unit_history_key_quality",),
+        "unit_history_key_version": ("unit_history_key_version",),
         "concessions": ("concessions",),
         "amenities": ("amenities",),
     }
@@ -582,7 +699,12 @@ class SqlUnitStateStore(IUnitStateStore):
                     uid = derived
                 current_ids.add(uid)
 
+                # Begin with the complete incoming unit so additive output
+                # fields are retained in ``extra`` instead of being silently
+                # discarded by this fixed-column state boundary. First-class
+                # columns below are then normalised from their alias chains.
                 snap: dict[str, Any] = {
+                    **u,
                     "canonical_id": canonical_id,
                     "unit_id": uid,
                     # Date portion = run_date so day-level "was this unit
@@ -594,6 +716,9 @@ class SqlUnitStateStore(IUnitStateStore):
                 }
                 for col, sources in self._SNAPSHOT_SOURCES.items():
                     snap[col] = self._read_first(u, sources)
+                # A legacy caller may omit canonical_unit_id even though the
+                # state layer just resolved/fabricated ``uid`` above.
+                snap["canonical_unit_id"] = snap.get("canonical_unit_id") or uid
 
                 prior = prior_by_id.get(uid)
                 if prior is None:
@@ -643,26 +768,9 @@ class SqlUnitStateStore(IUnitStateStore):
                 # as "seen on day X" for day-level queries — same contract
                 # as a fresh upsert.
                 r.last_seen_at = seen_at
-                out.append(
-                    {
-                        "unit_id": r.unit_id,
-                        # V2 data fields
-                        "beds": r.beds,
-                        "baths": r.baths,
-                        "floor_plan_name": r.floor_plan_name,
-                        "floor_plan_id": r.floor_plan_id,
-                        "area": r.area,
-                        "rent_low": r.rent_low,
-                        "rent_high": r.rent_high,
-                        "date_captured": r.date_captured,
-                        "available_date": r.available_date,
-                        "lease_term": r.lease_term,
-                        "move_in_date": r.move_in_date,
-                        "concessions": r.concessions,
-                        # State-tracking
-                        "carryforward_days": r.carryforward_days,
-                    }
-                )
+                carried = _hydrate_unit(r).model_dump()
+                carried["carryforward_days"] = r.carryforward_days
+                out.append(carried)
             return out
 
 
@@ -707,7 +815,7 @@ class SqlRunStore(IRunStore):
                         PropertySnapshotRow.canonical_id.in_(my_cids),
                     )
                 )
-            for ordinal, (cid, payload) in enumerate(zip(cids, properties)):
+            for ordinal, (cid, payload) in enumerate(zip(cids, properties, strict=True)):
                 s.add(
                     PropertySnapshotRow(
                         run_date=run_date,
@@ -1028,9 +1136,7 @@ class SqlProfileStore(IProfileStore):
             )
             return list(rows)
 
-    def iter_profiles_by_cluster_key(
-        self, cluster_key: str, limit: int = 100
-    ) -> list[ScrapeProfile]:
+    def iter_profiles_by_cluster_key(self, cluster_key: str, limit: int = 100) -> list[ScrapeProfile]:
         """Return profiles sharing ``cluster_key`` (arch-hardening #1 warm-start).
 
         ``cluster_key`` lives inside the JSON ``payload`` column, so this filters

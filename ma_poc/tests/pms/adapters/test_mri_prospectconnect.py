@@ -178,6 +178,7 @@ def test_parse_mri_search_units_preserves_native_row_and_dimensions() -> None:
     assert units[0]["building"] == "A01"
     assert units[0]["provider_native_unit_id"] == "A01:42-B"
     assert units[0]["source_ids"] == {"mri_unit_id": "A01:42-B"}
+    assert units[0]["_floor_plan_name_provenance"] == "mri.pc-card-title"
     assert units[0]["source_property_id"] == "CCA"
     assert units[0]["sqft"] == "750"
     assert units[0]["market_rent_low"] == 1099

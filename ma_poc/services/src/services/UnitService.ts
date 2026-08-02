@@ -23,16 +23,57 @@ interface RawV1Unit {
 
 interface RawV2Unit {
   unit_id: string | null;
+  source_unit_id?: string | null;
+  canonical_unit_id?: string | null;
+  unit_history_key?: string | null;
+  unit_history_key_basis?: string | null;
+  unit_history_key_quality?: string | null;
+  unit_history_key_version?: string | null;
   beds: number;
   baths: number;
   floor_plan_name: string | null;
+  floor_plan_id?: string | null;
+  floor_plan_name_provenance?: string | null;
+  unit_name?: string | null;
+  floor?: string | null;
+  building?: string | null;
+  building_id?: string | null;
+  building_id_source?: string | null;
   area: number;
+  area_sqft?: number | null;
+  area_is_published?: boolean | null;
+  area_low?: number | null;
+  area_high?: number | null;
+  area_range?: string | null;
+  area_range_raw?: string | null;
+  area_value_type?: string | null;
+  area_provenance?: string | null;
+  area_source_url?: string | null;
   rent_low: number | null;
   rent_high: number | null;
+  rent_range?: string | null;
+  rent_range_raw?: string | null;
+  rent_is_range?: boolean | null;
+  rent_provenance?: string | null;
   date_captured: string;
   available_date: string | null;
+  available_date_raw?: string | null;
+  _available_date_raw?: string | null;
+  availability_date_provenance?: string | null;
+  availability_status?: string | null;
   lease_term: number | null;
   move_in_date: string | null;
+  extraction_tier?: string | null;
+  source_ids?: Record<string, unknown> | null;
+  source_response_sha256?: string | null;
+  source_response_url?: string | null;
+  source_record_locator?: string | null;
+  source_parent_record_locator?: string | null;
+  source_asset_url?: string | null;
+  source_asset_sha256?: string | null;
+  identity_quality?: string | null;
+  unit_id_aliases?: string[];
+  unit_id_alias_sources?: Record<string, unknown>[];
 }
 
 export class UnitService implements IUnitService {
@@ -112,9 +153,24 @@ export class UnitService implements IUnitService {
       const lo = u.rent_low ?? 0;
       const hi = u.rent_high ?? 0;
       const askingRent = lo > 0 && hi > 0 ? (lo + hi) / 2 : lo > 0 ? lo : hi;
-      const sqft = u.area > 0 ? u.area : null;
+      const sqft = u.area_sqft ?? (u.area > 0 ? u.area : null);
+      const publishedStatus = u.availability_status?.toUpperCase();
+      const availabilityStatus =
+        publishedStatus === 'AVAILABLE' ||
+        publishedStatus === 'UNAVAILABLE' ||
+        publishedStatus === 'UNKNOWN'
+          ? publishedStatus
+          : u.available_date
+            ? ('AVAILABLE' as const)
+            : ('UNKNOWN' as const);
       return {
         unitId: u.unit_id || '',
+        sourceUnitId: u.source_unit_id ?? null,
+        canonicalUnitId: u.canonical_unit_id ?? u.unit_id ?? null,
+        unitHistoryKey: u.unit_history_key ?? null,
+        unitHistoryKeyBasis: u.unit_history_key_basis ?? null,
+        unitHistoryKeyQuality: u.unit_history_key_quality ?? null,
+        unitHistoryKeyVersion: u.unit_history_key_version ?? null,
         propertyId,
         floorPlanType: u.floor_plan_name || null,
         marketRentLow: lo,
@@ -122,8 +178,10 @@ export class UnitService implements IUnitService {
         askingRent: Math.round(askingRent),
         effectiveRent: null,
         sqft,
-        availabilityStatus: u.available_date ? ('AVAILABLE' as const) : ('UNKNOWN' as const),
+        availabilityStatus,
         availableDate: u.available_date || null,
+        availableDateRaw: u.available_date_raw ?? u._available_date_raw ?? null,
+        availabilityDateProvenance: u.availability_date_provenance ?? null,
         leaseLink: '',
         concessions: null,
         amenities: null,
@@ -133,7 +191,38 @@ export class UnitService implements IUnitService {
         beds: u.beds,
         baths: u.baths,
         area: u.area,
+        areaSqft: u.area_sqft ?? null,
+        areaIsPublished: u.area_is_published ?? null,
+        areaLow: u.area_low ?? null,
+        areaHigh: u.area_high ?? null,
+        areaRange: u.area_range ?? null,
+        areaRangeRaw: u.area_range_raw ?? null,
+        areaValueType: u.area_value_type ?? null,
+        areaProvenance: u.area_provenance ?? null,
+        areaSourceUrl: u.area_source_url ?? null,
+        rentRange: u.rent_range ?? null,
+        rentRangeRaw: u.rent_range_raw ?? null,
+        rentIsRange: u.rent_is_range ?? null,
+        rentProvenance: u.rent_provenance ?? null,
         floorPlanName: u.floor_plan_name,
+        floorPlanId: u.floor_plan_id ?? null,
+        floorPlanNameProvenance: u.floor_plan_name_provenance ?? null,
+        unitName: u.unit_name ?? null,
+        floor: u.floor ?? null,
+        building: u.building ?? null,
+        buildingId: u.building_id ?? null,
+        buildingIdSource: u.building_id_source ?? null,
+        extractionTier: u.extraction_tier ?? null,
+        sourceIds: u.source_ids ?? null,
+        sourceResponseSha256: u.source_response_sha256 ?? null,
+        sourceResponseUrl: u.source_response_url ?? null,
+        sourceRecordLocator: u.source_record_locator ?? null,
+        sourceParentRecordLocator: u.source_parent_record_locator ?? null,
+        sourceAssetUrl: u.source_asset_url ?? null,
+        sourceAssetSha256: u.source_asset_sha256 ?? null,
+        identityQuality: u.identity_quality ?? null,
+        unitIdAliases: u.unit_id_aliases ?? [],
+        unitIdAliasSources: u.unit_id_alias_sources ?? [],
         leaseTerm: u.lease_term,
         moveInDate: u.move_in_date,
         dateCaptured: u.date_captured,

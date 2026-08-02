@@ -109,6 +109,31 @@ _JUNK_PLAN_PATTERNS = (
     re.compile(r"^\d\s+bed\s+\d(?:\.5)?\s+bath$", re.I),
 )
 
+
+# Closed list: only adapter code that reads an explicit provider-side label may
+# opt out of the generic plan-name scrub. Keeping this central prevents the
+# production Jugnu formatter and the library V2 formatter from drifting.
+TRUSTED_FLOOR_PLAN_NAME_PROVENANCE = frozenset(
+    {
+        "betternoi.floor_plan.name",
+        "onsite.floorplans[].name",
+        "camden.floorPlan.name",
+        "mri.pc-card-title",
+        "rentcafe.layout-tab.plan-label",
+        "marketapts.plan.name",
+    }
+)
+
+
+def has_trusted_floor_plan_name_provenance(unit: Any) -> bool:
+    """Whether *unit* carries one exact, allow-listed provider name origin."""
+
+    return bool(
+        isinstance(unit, dict)
+        and unit.get("_floor_plan_name_provenance")
+        in TRUSTED_FLOOR_PLAN_NAME_PROVENANCE
+    )
+
 # Unit number tokens that are obviously navigation text or stop-words, not
 # real unit identifiers. Observed DOM-scan false positives: "Left", "s",
 # "Right", "new". All-lowercase single-word matches only — real unit IDs
@@ -418,6 +443,37 @@ def parse_area(text: str | None, *, amenity_guard: bool = True) -> int | None:
     if not candidates:
         return None
     return min(candidates)[2]
+
+
+_PUBLISHED_AREA_RANGE_RE = re.compile(
+    r"(?P<low>(?:\d{1,2},\d{3}|\d{3,5}))"
+    r"(?:\s*(?:-|–|—|to)\s*(?P<high>(?:\d{1,2},\d{3}|\d{3,5})))?"
+    r"\s*(?:sq\.?\s*ft\.?|square\s+feet|sqft|sf)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_published_area_pair(value: Any) -> tuple[int | None, int | None]:
+    """Return published sqft endpoints while preserving a real range.
+
+    Unlike :func:`parse_area`, this helper is for an already-scoped plan-area
+    field/caption and therefore returns both endpoints. It never substitutes a
+    midpoint and refuses unlabelled prose numbers.
+    """
+
+    match = _PUBLISHED_AREA_RANGE_RE.search(str(value or ""))
+    if match is None:
+        return None, None
+    try:
+        low = int(match.group("low").replace(",", ""))
+        high = int(
+            (match.group("high") or match.group("low")).replace(",", "")
+        )
+    except (TypeError, ValueError):
+        return None, None
+    if not 100 <= low <= 20_000 or not 100 <= high <= 20_000:
+        return None, None
+    return min(low, high), max(low, high)
 
 
 # Patterns for inferring bed/bath count from a floor-plan / unit name.
@@ -874,7 +930,11 @@ def has_field_label_contamination(val: Any) -> bool:
     return bool(val) and bool(_FIELD_LABEL_CONTAM_RE.search(str(val)))
 
 
-def clean_floor_plan_name(name: Any) -> str | None:
+def clean_floor_plan_name(
+    name: Any,
+    *,
+    allow_numeric_provider_code: bool = False,
+) -> str | None:
     """Hygiene for ``floor_plan_name`` (2026-07-31 data-audit defects #4/#5).
 
     #4 — strip a trailing lease/concession percentage that a plain
@@ -896,7 +956,13 @@ def clean_floor_plan_name(name: Any) -> str | None:
     s = _PLAN_NAME_TRAILING_PCT_RE.sub("", s).strip()
     if not s:
         return None
-    if re.fullmatch(r"[\d.,\s]+", s):  # bare number → not a plan name
+    if re.fullmatch(r"[\d.,\s]+", s) and not allow_numeric_provider_code:
+        # A bare number is normally leaked sqft/internal metadata. A small
+        # number of bounded, identity-gated provider surfaces publish numeric
+        # plan CODES as their actual display name (Camden examples in the
+        # 2026-08-02 affected-386 canary: ``2.1``, ``2.2``, ``9``). Those
+        # adapters must opt in with explicit name provenance; generic paths
+        # keep the conservative scrub.
         return None
     if has_field_label_contamination(s):  # #3-tail: "APT SQFT: 689 SF" → None
         return None
@@ -1231,6 +1297,7 @@ def make_unit_dict(
     source_api_url: str = "",
     extraction_tier: str = "",
     source_ids: dict[str, Any] | None = None,
+    floor_plan_name_provenance: str = "",
     data_gaps: list[str] | None = None,
     data_quality_flag: str = "",
 ) -> dict[str, Any]:
@@ -1432,6 +1499,11 @@ def make_unit_dict(
         "move_in_date": move_in_date,
         "source_api_url": source_api_url,
         "extraction_tier": extraction_tier,
+        # Exact adapter-side origin of the displayed plan label. The output
+        # formatter uses a closed allow-list of these values to distinguish a
+        # real provider label such as ``1 Bed 1 Bath`` / ``2.1`` from the same
+        # text synthesized by a generic fallback.
+        "_floor_plan_name_provenance": floor_plan_name_provenance or None,
         # 2026-05-19: stable PMS-native identifiers (model_id, building_id,
         # floor_id, listing_id, etc.) for cross-run daily merge. Until now
         # the fixed kwarg set dropped them at the adapter boundary, so only

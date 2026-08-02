@@ -53,6 +53,7 @@ from ma_poc.pms.signal_engine.floor_plan_signals import (
 from ma_poc.pms.signal_engine.floor_plan_signals import (
     has_floor_plan_signals as _has_fp_signals,
 )
+from ma_poc.pms.source_provenance import response_sha256, sanitise_source_url
 
 # Mirrors scripts/entrata.py::_EMBEDDED_JS_GLOBALS so both pipelines search
 # the same set of SSR framework globals.
@@ -1615,18 +1616,19 @@ def extract_managebuilding_rentals_index(
         return []
 
     def _scoped_unit_number(anchor: Any) -> str:
+        """Return only an explicitly labelled physical apartment identity."""
+
         title_node = anchor.select_one(".featured-listing__title")
         title = title_node.get_text(" ", strip=True) if title_node else ""
-        if not title:
-            return ""
-        title_parts = [part.strip() for part in re.split(r"\s+-\s+", title)]
-        # Multifamily titles use ``street address - apartment - qualifier``.
-        # Keep every suffix component ("1105 - ADA" -> "1105-ADA").
-        if len(title_parts) >= 2 and any(ch.isdigit() for ch in title_parts[1]):
-            return "-".join(part for part in title_parts[1:] if part)
+        if title:
+            title_parts = [part.strip() for part in re.split(r"\s+-\s+", title)]
+            # Multifamily titles use ``street address - apartment - qualifier``.
+            # Keep every suffix component ("1105 - ADA" -> "1105-ADA").
+            if len(title_parts) >= 2 and any(ch.isdigit() for ch in title_parts[1]):
+                return "-".join(part for part in title_parts[1:] if part)
         # Scattered-site homes use the street address itself as the permanent
         # physical identity, the same model as the registered Rently lane.
-        if re.search(
+        if title and re.search(
             r"^\s*\d+[A-Za-z0-9-]*\s+.*\b(?:avenue|ave|boulevard|blvd|court|ct|"
             r"drive|dr|highway|hwy|lane|ln|parkway|pkwy|place|pl|road|rd|"
             r"street|st|terrace|ter|trail|trl|way)\.?\s*$",
@@ -1634,6 +1636,31 @@ def extract_managebuilding_rentals_index(
             re.IGNORECASE,
         ):
             return title
+
+        description_node = anchor.select_one(".featured-listing__description")
+        description = (
+            description_node.get_text(" ", strip=True)
+            if description_node is not None
+            else ""
+        )
+        # Live Le Mirage evidence (2026-08-02) uses two explicit forms:
+        # ``Apartment #5102`` and a description beginning ``#2205 -``.
+        # The leading/label gates prevent rent, address and prose numbers from
+        # becoming identities. Keep the token short and require a digit.
+        patterns = (
+            re.compile(
+                r"\b(?:apartment|apt|unit)\s*#\s*([A-Z0-9][A-Z0-9-]{0,15})\b",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"^\s*#\s*([A-Z0-9][A-Z0-9-]{0,15})(?=\s*(?:[-–—,:]|$))",
+                re.IGNORECASE,
+            ),
+        )
+        for pattern in patterns:
+            match = pattern.search(description)
+            if match is not None and any(ch.isdigit() for ch in match.group(1)):
+                return match.group(1)
         return ""
 
     units: list[dict[str, Any]] = []
@@ -1695,6 +1722,7 @@ def extract_managebuilding_rentals_index(
         except Exception:
             availability_date = ""
 
+        physical_unit_number = _scoped_unit_number(anchor) if scoped else ""
         units.append(
             {
                 "floor_plan_name": "",
@@ -1702,7 +1730,7 @@ def extract_managebuilding_rentals_index(
                 "bedrooms": bedrooms,
                 "bathrooms": bathrooms,
                 "sqft": str(sqft_value),
-                "unit_number": _scoped_unit_number(anchor) if scoped else "",
+                "unit_number": physical_unit_number,
                 "floor": "",
                 "building": "",
                 "rent_range": (
@@ -1722,6 +1750,14 @@ def extract_managebuilding_rentals_index(
                 "source_ids": {"managebuilding_listing_id": listing_id},
                 "source_api_url": detail_url,
                 "_source_url": source_url,
+                "source_response_sha256": response_sha256(html),
+                "source_response_url": sanitise_source_url(source_url),
+                "source_record_locator": f"featured-listing:{listing_id}",
+                "identity_quality": (
+                    "provider_explicit_physical_unit"
+                    if physical_unit_number
+                    else "volatile_listing_only"
+                ),
                 "source": "html_managebuilding_index",
                 "extraction_tier": "TIER_1_DOM_MANAGEBUILDING",
             }

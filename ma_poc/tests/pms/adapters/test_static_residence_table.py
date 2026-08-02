@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+from ma_poc.pms.adapters import _static_residence_table as residence_module
 from ma_poc.pms.adapters._static_residence_table import (
+    enrich_static_residence_asset_areas,
     recover_static_residence_table,
 )
 from ma_poc.pms.adapters.base import AdapterContext
@@ -190,6 +193,74 @@ def test_non_availability_path_cannot_activate_table_parser() -> None:
     context = _ctx(_table(_row("101", "4 Bed/2Bath", "$4,500")))
     context.fetch_result.final_url = "https://www.1515parkplace.example/residences.html"
     assert recover_static_residence_table(context) == []
+
+
+def test_verified_asset_hashes_restore_three_exact_areas(
+    monkeypatch,
+) -> None:
+    """Three visually verified images patch only their matching residence."""
+
+    context = _ctx(
+        _table(
+            _row("101", "4 Bed/2Bath", "$4,500", "/images/4bed/101.jpg"),
+            # The live table's 102 link says 105.jpg; candidate correction is
+            # allowed only within the same directory and still must hash-match.
+            _row("102", "2 Bed/2Bath", "$3,000", "/images/2bed/105.jpg"),
+            _row("103", "4 Bed/2Bath", "$4,300", "/images/4bed/103.jpg"),
+        )
+    )
+    rows = recover_static_residence_table(context)
+    payloads = {
+        "101.jpg": b"verified-image-101",
+        "102.jpg": b"verified-image-102",
+        "103.jpg": b"verified-image-103",
+    }
+    monkeypatch.setattr(
+        residence_module,
+        "_VERIFIED_ASSET_AREAS_BY_SHA256",
+        {
+            hashlib.sha256(body).hexdigest(): (unit, area)
+            for unit, area, body in (
+                ("101", 1271, payloads["101.jpg"]),
+                ("102", 950, payloads["102.jpg"]),
+                ("103", 1124, payloads["103.jpg"]),
+            )
+        },
+    )
+    calls: list[str] = []
+
+    class Response:
+        status_code = 200
+        headers = {"content-type": "image/jpeg"}
+
+        def __init__(self, body: bytes) -> None:
+            self.content = body
+
+    def fetch(url: str, **_kwargs) -> Response:
+        calls.append(url)
+        filename = url.rsplit("/", 1)[-1]
+        body = payloads.get(filename)
+        if body is None:
+            response = Response(b"not-found")
+            response.status_code = 404
+            return response
+        return Response(body)
+
+    diagnostic = enrich_static_residence_asset_areas(
+        context,
+        rows,
+        fetch=fetch,
+    )
+
+    assert diagnostic["matched_units"] == 3
+    assert {row["unit_number"]: row["sqft"] for row in rows} == {
+        "101": "1271",
+        "102": "950",
+        "103": "1124",
+    }
+    assert calls[1].endswith("/images/2bed/102.jpg")
+    assert all(row["area_provenance"] == "verified_source_asset_sha256" for row in rows)
+    assert len(context._static_residence_asset_responses) == 3
 
 
 async def test_generic_adapter_preserves_static_native_rows_before_flattening() -> None:

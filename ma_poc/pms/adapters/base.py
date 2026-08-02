@@ -74,6 +74,12 @@ class AdapterResult:
     tier_used: str = ""
     winning_url: str | None = None
     api_responses: list[dict[str, Any]] = field(default_factory=list)
+    # Additional source bodies that contributed fields but are not JSON/XHR
+    # API captures.  The runner archives these content-addressed and removes
+    # the body from the public property document; unit rows retain only the
+    # SHA-256, sanitised URL and record locator needed to retrieve the source.
+    html_responses: list[dict[str, Any]] = field(default_factory=list)
+    asset_responses: list[dict[str, Any]] = field(default_factory=list)
     blocked_endpoints: list[tuple[str, str]] = field(default_factory=list)
     llm_field_mappings: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)

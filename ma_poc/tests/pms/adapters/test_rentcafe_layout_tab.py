@@ -197,6 +197,7 @@ def test_applyga_preserves_visible_unit_date() -> None:
     assert len(rows) == 1
     # Human-visible source date wins over a conflicting action parameter.
     assert rows[0]["availability_date"] == "9/25/2026"
+    assert rows[0]["_floor_plan_name_provenance"] == "rentcafe.layout-tab.plan-label"
 
 
 def test_applyga_accepts_bathroom_from_exact_drill_context() -> None:

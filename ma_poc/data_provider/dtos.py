@@ -105,14 +105,55 @@ class UnitIndexEntry(BaseModel):
     baths: float | None = None
     floor_plan_name: str | None = None
     floor_plan_id: str | None = None
+    floor_plan_name_provenance: str | None = None
+    source_unit_id: str | None = None
+    canonical_unit_id: str | None = None
+    unit_name: str | None = None
+    floor: str | None = None
+    building: str | None = None
+    building_id: str | None = None
+    building_id_source: str | None = None
     area: int | None = None
+    area_sqft: int | None = None
+    area_is_published: bool | None = None
+    area_low: int | None = None
+    area_high: int | None = None
+    area_range: str | None = None
+    area_range_raw: str | None = None
+    area_value_type: str | None = None
+    area_provenance: str | None = None
+    area_source_url: str | None = None
     rent_low: float | int | None = None
     rent_high: float | int | None = None
+    rent_range: str | None = None
+    rent_range_raw: str | None = None
+    rent_is_range: bool | None = None
+    rent_provenance: str | None = None
     date_captured: str | None = None
     available_date: str | None = None
+    available_date_raw: str | None = None
+    availability_date_provenance: str | None = None
+    availability_status: str | None = None
     lease_term: int | None = None
     move_in_date: str | None = None
+    extraction_tier: str | None = None
+    source_ids: dict[str, Any] | None = None
+    source_response_sha256: str | None = None
+    source_response_url: str | None = None
+    source_record_locator: str | None = None
+    source_parent_record_locator: str | None = None
+    source_asset_url: str | None = None
+    source_asset_sha256: str | None = None
+    identity_quality: str | None = None
+    unit_id_aliases: list[str] = Field(default_factory=list)
+    unit_id_alias_sources: list[dict[str, Any]] = Field(default_factory=list)
+    unit_history_key: str | None = None
+    unit_history_key_basis: str | None = None
+    unit_history_key_quality: str | None = None
+    unit_history_key_version: str | None = None
     concessions: Any = None
+    amenities: Any = None
+    data_sha256: str | None = None
 
     # State-tracking
     first_seen_date: str | None = None

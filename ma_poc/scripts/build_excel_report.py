@@ -43,13 +43,28 @@ _TITLE_FONT = Font(bold=True, size=13)
 _SUBTITLE_FONT = Font(bold=True, size=11, color="1F3864")
 
 _FILL_FIELDS = (
-    "unit_id", "beds", "baths", "area", "rent_low", "available_date",
-    "availability_status", "floor_plan_name", "floor", "building",
-    "concession_text", "source_ids",
+    "unit_id",
+    "beds",
+    "baths",
+    "area",
+    "rent_low",
+    "available_date",
+    "availability_status",
+    "floor_plan_name",
+    "floor",
+    "building",
+    "source_unit_id",
+    "canonical_unit_id",
+    "building_id",
+    "unit_history_key",
+    "availability_date_provenance",
+    "concession_text",
+    "source_ids",
 )
 
 
 # ── field extraction (defensive across v1/v2 + provenance-present-or-absent) ──
+
 
 def _first(d: dict[str, Any], *keys: str) -> Any:
     for k in keys:
@@ -61,11 +76,7 @@ def _first(d: dict[str, Any], *keys: str) -> Any:
 
 def _prop_id(p: dict[str, Any]) -> str:
     meta = p.get("_meta") or {}
-    return str(
-        _first(p, "apartment_id", "Property ID", "Unique ID")
-        or meta.get("canonical_id")
-        or ""
-    )
+    return str(_first(p, "apartment_id", "Property ID", "Unique ID") or meta.get("canonical_id") or "")
 
 
 def _prop_name(p: dict[str, Any]) -> str:
@@ -92,7 +103,9 @@ def _property_row(p: dict[str, Any]) -> dict[str, Any]:
         "confidence": prov.get("confidence"),
         "adapter": prov.get("adapter") or "",
         "detected_pms": prov.get("detected_pms") or "",
-        "winning_tier": prov.get("winning_tier") or (ex.get("tier_used") if isinstance(ex, dict) else "") or "",
+        "winning_tier": prov.get("winning_tier")
+        or (ex.get("tier_used") if isinstance(ex, dict) else "")
+        or "",
         "fetch_outcome": fetch.get("outcome") or "",
         "render_mode": fetch.get("render_mode") or "",
         "proxied": fetch.get("proxied"),
@@ -118,30 +131,65 @@ def _concession_text(c: Any) -> str:
 
 def _unit_row(p: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     sids = u.get("source_ids") or {}
+    area_sqft = u.get("area_sqft")
+    if "area_sqft" not in u:
+        legacy_area = _first(u, "area", "sqft")
+        area_sqft = None if legacy_area == -1 else legacy_area
     return {
         "property_id": _prop_id(p),
         "property_name": _prop_name(p),
         "unit_id": u.get("unit_id") or "",
+        "source_unit_id": u.get("source_unit_id") or "",
+        "canonical_unit_id": u.get("canonical_unit_id") or u.get("unit_id") or "",
+        "unit_history_key": u.get("unit_history_key") or "",
+        "unit_history_key_quality": u.get("unit_history_key_quality") or "",
+        "unit_history_key_version": u.get("unit_history_key_version") or "",
         "is_floor_plan_level": u.get("is_floor_plan_level"),
         "extraction_tier": u.get("extraction_tier") or "",
         "beds": u.get("beds"),
         "baths": u.get("baths"),
-        "area_sqft": u.get("area") or u.get("sqft"),
+        "area_sqft": area_sqft,
+        "area_is_published": u.get("area_is_published"),
+        "area_low": u.get("area_low"),
+        "area_high": u.get("area_high"),
+        "area_range": u.get("area_range") or "",
+        "area_range_raw": u.get("area_range_raw") or "",
+        "area_value_type": u.get("area_value_type") or "",
+        "area_provenance": u.get("area_provenance") or "",
+        "area_source_url": u.get("area_source_url") or "",
         "rent_low": u.get("rent_low") or u.get("market_rent_low"),
         "rent_high": u.get("rent_high") or u.get("market_rent_high"),
+        "rent_range": u.get("rent_range") or "",
+        "rent_range_raw": u.get("rent_range_raw") or u.get("_rent_range_raw") or "",
+        "rent_is_range": u.get("rent_is_range"),
+        "rent_provenance": u.get("rent_provenance") or "",
         "availability_status": u.get("availability_status") or "",
         "available_date": u.get("available_date") or "",
+        "available_date_raw": u.get("available_date_raw") or u.get("_available_date_raw") or "",
+        "availability_date_provenance": u.get("availability_date_provenance") or "",
         "floor_plan_name": u.get("floor_plan_name") or "",
+        "floor_plan_name_provenance": u.get("floor_plan_name_provenance") or "",
+        "floor_plan_id": u.get("floor_plan_id") or "",
         "floor": u.get("floor"),
         "building": u.get("building") or "",
+        "building_id": u.get("building_id") or "",
+        "building_id_source": u.get("building_id_source") or "",
         "lease_term": u.get("lease_term") or "",
         "move_in_date": u.get("move_in_date") or "",
         "concession": u.get("concession_text_clean") or u.get("concession_text") or "",
         "source_ids": json.dumps(sids) if sids else "",
+        "identity_quality": u.get("identity_quality") or "",
+        "unit_id_aliases": json.dumps(u.get("unit_id_aliases") or []),
+        "source_response_sha256": u.get("source_response_sha256") or "",
+        "source_response_url": u.get("source_response_url") or "",
+        "source_record_locator": u.get("source_record_locator") or "",
+        "source_asset_url": u.get("source_asset_url") or "",
+        "source_asset_sha256": u.get("source_asset_sha256") or "",
     }
 
 
 # ── sheet writers ────────────────────────────────────────────────────────────
+
 
 def _write_table(ws: Worksheet, headers: list[str], rows: list[dict[str, Any]], start_row: int = 1) -> None:
     for c, h in enumerate(headers, start=1):
@@ -228,7 +276,7 @@ def _recompute_report(properties: list[dict[str, Any]]) -> dict[str, Any]:
     n_units = 0
     for p in properties:
         verdicts[str((p.get("_meta") or {}).get("verdict") or "UNKNOWN")] += 1
-        for u in (p.get("units") or []):
+        for u in p.get("units") or []:
             n_units += 1
             tiers[str(u.get("extraction_tier") or "NONE")] += 1
             for k in _FILL_FIELDS:
@@ -259,17 +307,80 @@ def _recompute_report(properties: list[dict[str, Any]]) -> dict[str, Any]:
 # ── workbook assembly ────────────────────────────────────────────────────────
 
 _PROP_HEADERS = [
-    "property_id", "name", "city", "state", "zip", "website", "verdict",
-    "verdict_reason", "units", "confidence", "adapter", "detected_pms",
-    "winning_tier", "fetch_outcome", "render_mode", "proxied", "page_load_ms",
-    "real_id_units", "synthetic_id_units", "plan_level_units", "is_lease_up",
-    "llm_cost_usd", "concession_banner",
+    "property_id",
+    "name",
+    "city",
+    "state",
+    "zip",
+    "website",
+    "verdict",
+    "verdict_reason",
+    "units",
+    "confidence",
+    "adapter",
+    "detected_pms",
+    "winning_tier",
+    "fetch_outcome",
+    "render_mode",
+    "proxied",
+    "page_load_ms",
+    "real_id_units",
+    "synthetic_id_units",
+    "plan_level_units",
+    "is_lease_up",
+    "llm_cost_usd",
+    "concession_banner",
 ]
 _UNIT_HEADERS = [
-    "property_id", "property_name", "unit_id", "is_floor_plan_level",
-    "extraction_tier", "beds", "baths", "area_sqft", "rent_low", "rent_high",
-    "availability_status", "available_date", "floor_plan_name", "floor",
-    "building", "lease_term", "move_in_date", "concession", "source_ids",
+    "property_id",
+    "property_name",
+    "unit_id",
+    "source_unit_id",
+    "canonical_unit_id",
+    "unit_history_key",
+    "unit_history_key_quality",
+    "unit_history_key_version",
+    "is_floor_plan_level",
+    "extraction_tier",
+    "beds",
+    "baths",
+    "area_sqft",
+    "area_is_published",
+    "area_low",
+    "area_high",
+    "area_range",
+    "area_range_raw",
+    "area_value_type",
+    "area_provenance",
+    "area_source_url",
+    "rent_low",
+    "rent_high",
+    "rent_range",
+    "rent_range_raw",
+    "rent_is_range",
+    "rent_provenance",
+    "availability_status",
+    "available_date",
+    "available_date_raw",
+    "availability_date_provenance",
+    "floor_plan_name",
+    "floor_plan_name_provenance",
+    "floor_plan_id",
+    "floor",
+    "building",
+    "building_id",
+    "building_id_source",
+    "lease_term",
+    "move_in_date",
+    "concession",
+    "source_ids",
+    "identity_quality",
+    "unit_id_aliases",
+    "source_response_sha256",
+    "source_response_url",
+    "source_record_locator",
+    "source_asset_url",
+    "source_asset_sha256",
 ]
 
 

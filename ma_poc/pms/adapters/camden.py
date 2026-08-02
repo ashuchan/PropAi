@@ -404,6 +404,7 @@ def _parse_detail(
             move_in_date=move_in,
             source_api_url=page.final_url,
             extraction_tier=CAMDEN_DETAIL_TIER,
+            floor_plan_name_provenance="camden.floorPlan.name",
             source_ids={
                 "camden_community_unit_id": composite_unit_id,
                 "camden_realpage_community_id": community_id,

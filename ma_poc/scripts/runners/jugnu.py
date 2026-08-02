@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -71,6 +72,279 @@ log = logging.getLogger("jugnu_runner")
 _API_SAMPLE_CAP_PER_ADAPTER = 15
 _API_SAMPLE_COUNTS: dict[str, int] = {}
 _API_SAMPLE_TIER_MARKERS = ("ENTRATA", "ONESITE", "RENTCAFE", "KNOCK")
+
+
+def _redact_raw_api_diagnostic(value: Any) -> Any:
+    """Recursively redact credential fields while preserving payload shape."""
+
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized = _re.sub(r"[^a-z0-9]", "", str(key).casefold())
+            if normalized in {
+                "authorization",
+                "accesstoken",
+                "apikey",
+                "clientsecret",
+                "password",
+                "refreshtoken",
+                "secret",
+                "signature",
+            }:
+                out[str(key)] = "<redacted>"
+            else:
+                out[str(key)] = _redact_raw_api_diagnostic(item)
+        return out
+    if isinstance(value, (list, tuple)):
+        return [_redact_raw_api_diagnostic(item) for item in value]
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    if isinstance(value, str):
+        # Adapter responses may retain serialized JSON rather than decoded
+        # objects. Parse only object/array shapes so credential keys receive
+        # the same recursive redaction without changing ordinary HTML/text.
+        stripped = value.strip()
+        if stripped.startswith(("{", "[")):
+            try:
+                decoded = json.loads(stripped)
+                if isinstance(decoded, (dict, list)):
+                    return _redact_raw_api_diagnostic(decoded)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pass
+    return value
+
+
+def _archive_raw_api_responses(
+    result: dict[str, Any],
+    run_dir: Path | None,
+    property_id: str,
+    tier: str,
+) -> dict[str, Any] | None:
+    """Persist full, compressed adapter responses once per property.
+
+    The archive is deliberately separate from ``properties.json`` so one API
+    body is not duplicated onto every unit. URLs and credential-like body
+    fields are redacted, but the remaining response is not sampled/truncated.
+    ``shard_entry`` already uploads every run-dir file, so the artifact follows
+    the property to GCS automatically.
+    """
+
+    raw = [item for item in (result.get("_raw_api_responses") or []) if isinstance(item, dict)]
+    if run_dir is None or not raw:
+        return None
+
+    import gzip
+
+    from ma_poc.pms.source_provenance import (
+        response_sha256,
+        sanitise_source_url,
+    )
+
+    records: list[dict[str, Any]] = []
+    for response in raw:
+        body = _redact_raw_api_diagnostic(response.get("body"))
+        records.append(
+            {
+                "url": sanitise_source_url(str(response.get("url") or "")),
+                "status": response.get("status"),
+                "content_type": response.get("content_type"),
+                "response_kind": response.get("response_kind"),
+                "via": response.get("via"),
+                "identity": _redact_raw_api_diagnostic(response.get("identity")),
+                "response_sha256": response_sha256(response.get("body")),
+                "body": body,
+            }
+        )
+
+    payload = {
+        "property_id": str(property_id),
+        "tier": tier or None,
+        "response_count": len(records),
+        "responses": records,
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+    archive_dir = run_dir / "raw_api"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = archive_dir / f"{property_id}.json.gz"
+    tmp_path = archive_path.with_suffix(archive_path.suffix + ".tmp")
+    with gzip.open(tmp_path, "wb") as handle:
+        handle.write(encoded)
+    os.replace(tmp_path, archive_path)
+    return {
+        "path": str(archive_path.relative_to(run_dir)),
+        "response_count": len(records),
+        "compressed_bytes": archive_path.stat().st_size,
+        "payload_sha256": hashlib.sha256(encoded).hexdigest(),
+        "redaction": "credential_fields_and_url_query_secrets",
+    }
+
+
+def _gzip_write_immutable(path: Path, payload: bytes) -> None:
+    """Atomically create one compressed content-addressed artifact once."""
+
+    if path.exists():
+        return
+    import gzip
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
+    with gzip.open(tmp_path, "wb") as handle:
+        handle.write(payload)
+    try:
+        # ``replace`` is atomic. Content-addressing guarantees an existing
+        # destination is byte-equivalent, so a racing writer is harmless.
+        if not path.exists():
+            os.replace(tmp_path, path)
+        else:
+            tmp_path.unlink(missing_ok=True)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def _archive_raw_source_responses(
+    result: dict[str, Any],
+    run_dir: Path | None,
+    property_id: str,
+    tier: str,
+) -> dict[str, Any] | None:
+    """Archive every field-producing API, HTML and binary source by hash.
+
+    This is the diagnostic contract for future offline debugging: public unit
+    rows carry ``source_response_sha256``/``source_record_locator`` and this
+    manifest maps that hash to one immutable compressed body. API objects are
+    credential-redacted; HTML/assets are public first-party responses. A
+    separate extraction snapshot stores both pre-format and final unit rows so
+    formatter defects can be diagnosed without another live probe.
+    """
+
+    if run_dir is None:
+        return None
+    from ma_poc.pms.source_provenance import response_sha256, sanitise_source_url
+
+    safe_property = _re.sub(r"[^A-Za-z0-9_.-]+", "_", str(property_id or "unknown"))
+    source_sets = (
+        ("api", result.get("_raw_api_responses") or []),
+        ("html", result.get("_raw_html_responses") or []),
+        ("asset", result.get("_raw_asset_responses") or []),
+    )
+    records: list[dict[str, Any]] = []
+    for kind, responses in source_sets:
+        for index, response in enumerate(responses):
+            if not isinstance(response, dict) or response.get("body") is None:
+                continue
+            original = response.get("body")
+            source_hash = response_sha256(original)
+            if kind == "asset":
+                if isinstance(original, bytes):
+                    payload = original
+                elif isinstance(original, bytearray):
+                    payload = bytes(original)
+                elif isinstance(original, str):
+                    payload = original.encode("utf-8", errors="replace")
+                else:
+                    payload = json.dumps(
+                        original,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    ).encode("utf-8")
+                encoding = "binary"
+                extension = "bin.gz"
+                redaction = "none_public_asset"
+            else:
+                safe_body = _redact_raw_api_diagnostic(original)
+                if isinstance(safe_body, bytes):
+                    payload = safe_body
+                    encoding = "bytes"
+                    extension = "body.gz"
+                elif isinstance(safe_body, str):
+                    payload = safe_body.encode("utf-8", errors="replace")
+                    encoding = "utf-8"
+                    extension = "html.gz" if kind == "html" else "txt.gz"
+                else:
+                    payload = json.dumps(
+                        safe_body,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    ).encode("utf-8")
+                    encoding = "json"
+                    extension = "json.gz"
+                redaction = "credential_fields" if kind == "api" else "credential_fields_if_json"
+            relative = Path("raw_sources") / kind / safe_property / f"{source_hash}.{extension}"
+            _gzip_write_immutable(run_dir / relative, payload)
+            records.append(
+                {
+                    "kind": kind,
+                    "index": index,
+                    "source_url": sanitise_source_url(str(response.get("url") or "")),
+                    "status": response.get("status"),
+                    "content_type": response.get("content_type"),
+                    "response_kind": response.get("response_kind"),
+                    "via": response.get("via"),
+                    "identity": _redact_raw_api_diagnostic(response.get("identity")),
+                    "source_response_sha256": source_hash,
+                    "archive_payload_sha256": hashlib.sha256(payload).hexdigest(),
+                    "archive_body_path": str(relative),
+                    "body_bytes": len(payload),
+                    "body_encoding": encoding,
+                    "redaction": redaction,
+                }
+            )
+
+    snapshot = {
+        "property_id": str(property_id),
+        "tier": tier or None,
+        "units_pre_format": _redact_raw_api_diagnostic(result.get("units") or []),
+        "floor_plans_pre_format": _redact_raw_api_diagnostic(result.get("plan_summaries") or []),
+        "formatted_property": _redact_raw_api_diagnostic(result.get("_v2_formatted")),
+        "unit_source_provenance": _redact_raw_api_diagnostic(result.get("_unit_source_provenance") or []),
+        "area_enrichment_diagnostic": _redact_raw_api_diagnostic(result.get("_area_enrichment_diagnostic")),
+        "verdict": _redact_raw_api_diagnostic((result.get("_meta") or {}).get("verdict")),
+    }
+    snapshot_payload = json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    ).encode("utf-8")
+    snapshot_hash = hashlib.sha256(snapshot_payload).hexdigest()
+    snapshot_relative = Path("diagnostics") / safe_property / f"{snapshot_hash}.extraction.json.gz"
+    _gzip_write_immutable(run_dir / snapshot_relative, snapshot_payload)
+
+    manifest = {
+        "property_id": str(property_id),
+        "tier": tier or None,
+        "source_count": len(records),
+        "source_kind_counts": {
+            kind: sum(record["kind"] == kind for record in records) for kind in ("api", "html", "asset")
+        },
+        "responses": records,
+        "extraction_snapshot": {
+            "path": str(snapshot_relative),
+            "payload_sha256": snapshot_hash,
+            "compressed_bytes": (run_dir / snapshot_relative).stat().st_size,
+        },
+    }
+    manifest_payload = json.dumps(
+        manifest,
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    ).encode("utf-8")
+    manifest_hash = hashlib.sha256(manifest_payload).hexdigest()
+    manifest_relative = Path("raw_sources") / "manifests" / safe_property / f"{manifest_hash}.json.gz"
+    _gzip_write_immutable(run_dir / manifest_relative, manifest_payload)
+    return {
+        "manifest_path": str(manifest_relative),
+        "manifest_sha256": manifest_hash,
+        "source_count": len(records),
+        "source_kind_counts": manifest["source_kind_counts"],
+        "extraction_snapshot": manifest["extraction_snapshot"],
+    }
 
 
 # 2026-05-19 JSON-on-GCS profile persistence (interim, no database).
@@ -2089,6 +2363,16 @@ async def _process_property(
     # per-property data-quality mix) onto _meta.provenance. Additive +
     # never-fail, same contract as the _meta.publish_ceiling stamp below.
     try:
+        # A cold/bootstrap property may have ``profile is None`` and therefore
+        # skip the profile-loop formatter above. Materialize V2 here before
+        # computing stage counts so diagnostics always describe the rows that
+        # will actually ship, not the pre-format candidate list.
+        if schema_version == "v2" and not isinstance(result.get("_v2_formatted"), dict):
+            result["_v2_formatted"] = _format_output(
+                result,
+                csv_row or {},
+                schema_version,
+            )
         meta["provenance"] = _provenance_block(result, csv_row or {}, fetch_result, outcome_val)
     except Exception:  # provenance must never sink a property record
         pass
@@ -2343,6 +2627,43 @@ async def _process_property(
         except Exception as _exc:
             log.debug("api_sample capture failed for %s: %s", task.property_id, _exc)
 
+    # Full deduplicated diagnostic capture. Unlike the legacy adapter-capped
+    # ``api_samples`` block above, this writes every adapter-retained response
+    # for this property and compresses it under raw_api/. Never affects verdict.
+    try:
+        _raw_api_archive = _archive_raw_api_responses(
+            result,
+            run_dir,
+            task.property_id,
+            _tier_used,
+        )
+        if _raw_api_archive:
+            result["_raw_api_archive"] = _raw_api_archive
+            _prov = (result.get("_meta") or {}).get("provenance")
+            if isinstance(_prov, dict):
+                _prov["raw_api_archive"] = _raw_api_archive
+    except Exception as _exc:
+        log.warning("raw API archive failed for %s: %s", task.property_id, _exc)
+
+    # Unified offline replay bundle: every API/HTML/asset body is written once
+    # under its SHA-256 and a full pre-format/final extraction snapshot links
+    # parser output to source records. This is deliberately after formatting
+    # so it can diagnose both extractor and formatter defects.
+    try:
+        _raw_source_archive = _archive_raw_source_responses(
+            result,
+            run_dir,
+            task.property_id,
+            _tier_used,
+        )
+        if _raw_source_archive:
+            result["_raw_source_archive"] = _raw_source_archive
+            _prov = (result.get("_meta") or {}).get("provenance")
+            if isinstance(_prov, dict):
+                _prov["raw_source_archive"] = _raw_source_archive
+    except Exception as _exc:
+        log.warning("raw source archive failed for %s: %s", task.property_id, _exc)
+
     return result
 
 
@@ -2385,6 +2706,24 @@ def _is_lease_up(csv_row: dict[str, Any]) -> bool:
     return False
 
 
+def _is_catalogue_plan_marker(unit: Any) -> bool:
+    """True for explicit non-apartment catalogue rows kept beside units.
+
+    SightMap emits sold-out/unreleased floor plans as
+    ``SIGHTMAP_PLAN_PRESENCE`` rows. They are useful plan evidence but are not
+    physical apartments and therefore belong in ``floor_plans[]`` at the V2
+    boundary. Keep this exact-token gate narrow; ordinary unit rows are never
+    moved based on shape alone.
+    """
+
+    if not isinstance(unit, dict):
+        return False
+    return any(
+        token.strip().upper() == "SIGHTMAP_PLAN_PRESENCE"
+        for token in str(unit.get("data_quality_flag") or "").split("|")
+    )
+
+
 def _provenance_block(
     result: dict[str, Any],
     csv_row: dict[str, Any],
@@ -2414,10 +2753,15 @@ def _provenance_block(
         # all 505 SightMap properties in the 2026-07-25 5k canary while 4,024
         # plan rows were in fact shipping. Delegate to the canonical predicate,
         # which reads the flag as well as the tier suffix.
+        is_catalogue_marker = _is_catalogue_plan_marker(u)
         if _is_floor_plan_level(u, property_plan_level=prop_plan_level) or tier.upper().endswith(
             "_PLAN_LEVEL"
         ):
             n_plan += 1
+        if is_catalogue_marker:
+            # The row is counted above as plan evidence, but never as a
+            # physical/synthetic apartment identity.
+            continue
         uid = str(u.get("unit_id") or u.get("unit_number") or "")
         if uid.startswith(("inferred_", "unkeyable_")):
             n_synth += 1
@@ -2429,8 +2773,56 @@ def _provenance_block(
     n_plan += len(plan_summaries)
     det = result.get("_detected_pms") or {}
     rm = getattr(fetch_result, "render_mode", None)
+    unit_sources = [item for item in (result.get("_unit_source_provenance") or []) if isinstance(item, dict)]
+    identity_statuses = [
+        str((item.get("identity") or {}).get("status") or "UNKNOWN").upper()
+        for item in unit_sources
+        if isinstance(item.get("identity"), dict)
+    ]
+    if any(status == "MISMATCH" for status in identity_statuses):
+        aggregate_identity = "MISMATCH"
+    elif identity_statuses and all(status == "MATCH" for status in identity_statuses):
+        aggregate_identity = "MATCH"
+    elif any(status == "MATCH" for status in identity_statuses):
+        aggregate_identity = "PARTIAL_MATCH"
+    elif identity_statuses:
+        aggregate_identity = "UNKNOWN"
+    else:
+        aggregate_identity = "NOT_RECORDED"
+
+    formatted = result.get("_v2_formatted")
+    formatted_units = (
+        [row for row in (formatted.get("units") or []) if isinstance(row, dict)]
+        if isinstance(formatted, dict)
+        else [row for row in units if isinstance(row, dict) and not _is_catalogue_plan_marker(row)]
+    )
+    formatted_plans = (
+        [row for row in (formatted.get("floor_plans") or []) if isinstance(row, dict)]
+        if isinstance(formatted, dict)
+        else [*plan_summaries, *[row for row in units if _is_catalogue_plan_marker(row)]]
+    )
+    canonical_ids = [
+        str(row.get("unit_id")).strip()
+        for row in formatted_units
+        if row.get("unit_id") not in (None, "", "null")
+    ]
+    duplicate_ids = len(canonical_ids) - len(set(canonical_ids))
+    availability_provenance: dict[str, int] = {}
+    rent_provenance: dict[str, int] = {}
+    for row in formatted_units:
+        label = str(row.get("availability_date_provenance") or "missing")
+        availability_provenance[label] = availability_provenance.get(label, 0) + 1
+        rent_label = str(row.get("rent_provenance") or "missing")
+        rent_provenance[rent_label] = rent_provenance.get(rent_label, 0) + 1
+
+    raw_apis = [item for item in (result.get("_raw_api_responses") or []) if isinstance(item, dict)]
+    raw_html = [item for item in (result.get("_raw_html_responses") or []) if isinstance(item, dict)]
+    raw_assets = [item for item in (result.get("_raw_asset_responses") or []) if isinstance(item, dict)]
+    raw_source_count = len(raw_apis) + len(raw_html) + len(raw_assets)
+    if raw_source_count == 0 and getattr(fetch_result, "body", None):
+        raw_source_count = 1
     return {
-        "unit_count": len(units),
+        "unit_count": len(formatted_units),
         "confidence": result.get("confidence"),
         "adapter": result.get("_adapter_used") or None,
         "detected_pms": det.get("pms") if isinstance(det, dict) else None,
@@ -2440,7 +2832,44 @@ def _provenance_block(
         # Exact unit-producing response(s): sanitised URL + body hash +
         # property-identity verdict. This is intentionally separate from the
         # broad intercepted-response count above.
-        "unit_source": list(result.get("_unit_source_provenance") or [])[:20],
+        "unit_source": unit_sources,
+        # Explicit aliases required by the affected-property replay contract.
+        # Counts are stage-local and never inferred from expected inventory.
+        "raw_source_count": raw_source_count,
+        "raw_source_count_basis": (
+            "adapter_api_html_asset_responses"
+            if raw_apis or raw_html or raw_assets
+            else "primary_fetch_body"
+            if raw_source_count
+            else "no_captured_source"
+        ),
+        "raw_source_kind_counts": {
+            "api": len(raw_apis),
+            "html": len(raw_html),
+            "asset": len(raw_assets),
+        },
+        "parser_count": len(units) + len(plan_summaries),
+        "formatted_count": len(formatted_units) + len(formatted_plans),
+        "final_admitted_count": len(formatted_units),
+        "canonical_id_uniqueness": {
+            "id_count": len(canonical_ids),
+            "unique_id_count": len(set(canonical_ids)),
+            "duplicate_count": duplicate_ids,
+            "passed": duplicate_ids == 0 and len(canonical_ids) == len(formatted_units),
+        },
+        "property_identity_verdict": {
+            "status": aggregate_identity,
+            "source_count": len(unit_sources),
+            "status_counts": {
+                status: identity_statuses.count(status) for status in sorted(set(identity_statuses))
+            },
+        },
+        "availability_date_provenance": availability_provenance,
+        "rent_range_units": sum(row.get("rent_is_range") is True for row in formatted_units),
+        "rent_provenance": rent_provenance,
+        "unit_source_provenance": unit_sources,
+        "raw_api_archive": result.get("_raw_api_archive"),
+        "raw_source_archive": result.get("_raw_source_archive"),
         "is_lease_up": _is_lease_up(csv_row),
         "fetch": {
             "outcome": outcome_val,
@@ -2453,8 +2882,23 @@ def _provenance_block(
             # signature, HTTP status and body size so the SAME question is
             # answerable offline from properties.json next time.
             "error_signature": getattr(fetch_result, "error_signature", None),
-            "status_code": getattr(fetch_result, "status_code", None),
+            "status_code": getattr(
+                fetch_result,
+                "status",
+                getattr(fetch_result, "status_code", None),
+            ),
             "body_bytes": len(getattr(fetch_result, "body", None) or ""),
+            "response_sha256": getattr(fetch_result, "response_sha256", None),
+            "raw_html_archive_path": getattr(
+                fetch_result,
+                "raw_html_archive_path",
+                None,
+            ),
+            "raw_html_archive_sha256": getattr(
+                fetch_result,
+                "raw_html_archive_sha256",
+                None,
+            ),
         },
         "data_quality": {
             "by_tier_family": by_family,
@@ -2462,6 +2906,7 @@ def _provenance_block(
             "synthetic_id_units": n_synth,
             "plan_level_units": n_plan,
             "plan_summary_count": len(plan_summaries),
+            "catalogue_plan_marker_count": sum(1 for unit in units if _is_catalogue_plan_marker(unit)),
         },
     }
 
@@ -2651,8 +3096,13 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     # docs/2026_05_11_regressions_fix_design.md.
     meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
-    units = result.get("units", [])
-    plan_summaries = result.get("plan_summaries", [])
+    all_rows = result.get("units", [])
+    units = [u for u in all_rows if not _is_catalogue_plan_marker(u)]
+    catalogue_plan_markers = [u for u in all_rows if _is_catalogue_plan_marker(u)]
+    plan_summaries = [
+        *(result.get("plan_summaries", []) or []),
+        *catalogue_plan_markers,
+    ]
     scrape_ts = datetime.now(UTC)
 
     def _csv(key: str) -> Any:
@@ -2745,6 +3195,12 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
                 for u in units
             ]
         )
+    from ma_poc.core.schema_v2 import finalize_output_unit_identities
+
+    finalize_output_unit_identities(
+        _v2_units,
+        _v2_property_id_for_unit(meta, apartment_id),
+    )
 
     prop: dict[str, Any] = {
         "apartment_id": apartment_id,
@@ -3171,6 +3627,9 @@ def _emit_v2_units_for_property(units: list[dict[str, Any]]) -> list[dict[str, A
     _apply_p0_fp_name_canonicalization(units)
     _apply_p2_building_disambiguation(units)
     _apply_p2b_floor_plan_id_disambiguation(units)
+    from ma_poc.core.schema_v2 import collapse_numeric_unit_id_aliases
+
+    collapse_numeric_unit_id_aliases(units)
     _apply_p1_exact_dedup(units)
     # P3 runs LAST — only fires on inferred_* IDs that survive P1
     # because their fingerprints differ on area / rent / building.
@@ -3253,7 +3712,10 @@ def _format_v2_unit(
         _row_has_availability_date,
         area_sanity_provenance,
         classify_area_absence,
+        output_area_range,
+        output_rent_range,
         resolve_plan_row_availability,
+        resolve_published_rent_bounds,
         withdraw_unsupported_available,
     )
 
@@ -3297,13 +3759,19 @@ def _format_v2_unit(
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
     fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
+    from ma_poc.pms.adapters._parsing import has_trusted_floor_plan_name_provenance
+
+    _explicit_provider_plan = has_trusted_floor_plan_name_provenance(unit)
     # Name hygiene (2026-07-31 data-audit #4/#5) — lock-step with schema_v2:
     # strip a trailing concession % ("A1 80%" -> "A1") and null a bare-number
     # name (leaked sqft / code). Runs before the junk / fpn==uid checks below.
     try:
         from ma_poc.pms.adapters._parsing import clean_floor_plan_name
 
-        fp_name = clean_floor_plan_name(fp_name)
+        fp_name = clean_floor_plan_name(
+            fp_name,
+            allow_numeric_provider_code=_explicit_provider_plan,
+        )
     except Exception:
         pass
     sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
@@ -3322,14 +3790,10 @@ def _format_v2_unit(
             is_junk_unit_number,
         )
 
-        # BetterNOI and On-Site both publish an explicit provider-side plan
-        # name. Real names on those bounded sources include generic-looking
-        # labels such as ``1 Bed 1 Bath``; their exact provenance separates
-        # them from the same text synthesized by generic fallback paths.
-        _explicit_provider_plan = unit.get("_floor_plan_name_provenance") in {
-            "betternoi.floor_plan.name",
-            "onsite.floorplans[].name",
-        }
+        # Bounded providers publish explicit plan labels that can legitimately
+        # look generic (``1 Bed 1 Bath``) or numeric (Camden ``2.1``). Exact,
+        # allow-listed provenance separates those from synthesized fallback
+        # text; unknown/forged provenance remains scrubbed.
         if is_junk_floor_plan(fp_name) and not _explicit_provider_plan:
             fp_name = None
         if is_junk_unit_number(uid):
@@ -3370,18 +3834,7 @@ def _format_v2_unit(
         except Exception:
             pass
 
-    # rent: numeric first, parse rent_range string if needed.
-    rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
-    rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
-    if rent_lo_raw is None and rent_hi_raw is None:
-        rent_range = unit.get("rent_range")
-        if rent_range:
-            try:
-                from ma_poc.pms.adapters._parsing import parse_rent_range
-
-                rent_lo_raw, rent_hi_raw = parse_rent_range(str(rent_range))
-            except Exception:
-                pass
+    rent_lo_raw, rent_hi_raw, _rent_range_raw, _rent_provenance = resolve_published_rent_bounds(unit)
 
     norm_beds = _normalize_beds(beds_raw)
     norm_baths = _normalize_baths(baths_raw)
@@ -3578,10 +4031,33 @@ def _format_v2_unit(
         scrape_ts,
     )
 
+    from ma_poc.core.schema_v2 import source_building_identity
+
+    _building_id, _building_id_source = source_building_identity(unit)
+    _area_low, _area_high, _area_range, _area_value_type = output_area_range(
+        unit,
+        area_out,
+    )
+    _rent_range, _rent_is_range = output_rent_range(
+        _rent_lo_fmt,
+        _rent_hi_fmt,
+    )
+    _raw_src.update(
+        {
+            "floor_plan_name_provenance": unit.get("_floor_plan_name_provenance"),
+            "source_unit_id": _raw_src["unit_id"],
+            "building_id": _building_id,
+            "area_sqft": _raw_src["area"],
+        }
+    )
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name or None,
+        "floor_plan_name_provenance": (
+            unit.get("_floor_plan_name_provenance") if _explicit_provider_plan else None
+        ),
         "floor_plan_description": (
             str(unit.get("floor_plan_description")).strip() or None
             if unit.get("floor_plan_description") not in (None, "", "null")
@@ -3589,6 +4065,19 @@ def _format_v2_unit(
         ),
         "floor_plan_id": floor_plan_id,
         "area": area_out,
+        "area_low": _area_low,
+        "area_high": _area_high,
+        "area_range": _area_range,
+        "area_range_raw": (
+            unit.get("area_range_raw") or unit.get("area_range") or unit.get("sqft_range") or None
+        ),
+        "area_value_type": _area_value_type,
+        "area_provenance": unit.get("area_provenance") or None,
+        "area_source_url": unit.get("area_source_url") or None,
+        # Keep ``area`` backward-compatible while giving new consumers a
+        # nullable sqft column instead of the legacy -1 absence sentinel.
+        "area_sqft": (_area_low if _area_low is not None and _area_low == _area_high else None),
+        "area_is_published": _area_low is not None and _area_high is not None,
         "area_absence": area_absence,
         "area_absence_evidence": area_absence_evidence,
         "area_pre_sanity_value": area_pre_sanity_value,
@@ -3596,6 +4085,9 @@ def _format_v2_unit(
         "area_sanity_reason": area_sanity_reason,
         "area_sanity_source": area_sanity_source,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        "source_unit_id": (
+            str(_raw_src["unit_id"]).strip() if _raw_src["unit_id"] not in (None, "", "null") else None
+        ),
         # As-displayed operator label. Kept in lock-step with
         # core/schema_v2.py — this fork is the one production actually runs,
         # and it is where task #36's is_floor_plan_level flag was lost for
@@ -3625,12 +4117,18 @@ def _format_v2_unit(
         "is_floor_plan_level": _plan_level,
         "rent_low": _rent_lo_fmt,
         "rent_high": _rent_hi_fmt,
+        "rent_range": _rent_range,
+        "rent_range_raw": (str(_rent_range_raw).strip() if _rent_range_raw not in (None, "") else None),
+        "rent_is_range": _rent_is_range,
+        "rent_provenance": _rent_provenance,
         "floor": _format_floor(_raw_src["floor"]),
         "building": (
             None
             if not _raw_src["building"] or str(_raw_src["building"]).strip() == ""
             else str(_raw_src["building"]).strip()
         ),
+        "building_id": _building_id,
+        "building_id_source": _building_id_source,
         "available_units": (
             int(_m.group(0))
             if (_m := _re.search(r"\d+", str(_raw_src["available_units"] or "")))
@@ -3681,6 +4179,17 @@ def _format_v2_unit(
         # assign_fallback_unit_id(), making real CWS/Apts247/etc. anchors
         # unreachable and fabricating inferred IDs instead.
         "source_ids": (dict(unit.get("source_ids")) if isinstance(unit.get("source_ids"), dict) else {}),
+        "source_response_sha256": unit.get("source_response_sha256") or None,
+        "source_response_url": unit.get("source_response_url") or None,
+        "source_record_locator": unit.get("source_record_locator") or None,
+        "source_asset_url": unit.get("source_asset_url") or None,
+        "source_asset_sha256": unit.get("source_asset_sha256") or None,
+        "identity_quality": unit.get("identity_quality") or None,
+        "unit_id_aliases": (
+            list(unit.get("unit_id_aliases"))
+            if isinstance(unit.get("unit_id_aliases"), (list, tuple))
+            else []
+        ),
         # Row-level lineage and data-quality gaps are required to distinguish
         # an API plan summary from a real unit after output formatting.
         "extraction_tier": (unit.get("extraction_tier") or unit.get("_extraction_tier") or None),
@@ -3708,7 +4217,13 @@ def _format_v2_unit(
     # column; consumers that don't know these keys simply ignore them.
     for _k in list(out.keys()):
         _v = _raw_src.get(_k)
-        out[f"{_k}_raw"] = None if _v is None or str(_v).strip() == "" else str(_v).strip()
+        # Explicit raw fields (for example ``rent_range_raw`` and
+        # ``area_range_raw``) carry richer source text than the generic alias
+        # snapshot. Never overwrite them while generating companions.
+        out.setdefault(
+            f"{_k}_raw",
+            None if _v is None or str(_v).strip() == "" else str(_v).strip(),
+        )
 
     return out
 
@@ -4891,11 +5406,16 @@ def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) 
         from ma_poc.core.schema_v2 import (
             apply_plan_unavailability_tag,
             enforce_zero_inventory_contract,
+            finalize_output_unit_identities,
         )
 
         for _prop in properties or ():
             if isinstance(_prop, dict):
                 enforce_zero_inventory_contract(_prop.get("units"))
+                finalize_output_unit_identities(
+                    _prop.get("units") or [],
+                    str(((_prop.get("_meta") or {}).get("canonical_id")) or _prop.get("apartment_id") or ""),
+                )
                 # 2026-07-30 — stamp the plan-level unavailability reason
                 # (waitlist / no-availability / contact-for-availability)
                 # detected from the page body during processing onto the

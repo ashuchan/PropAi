@@ -153,6 +153,79 @@ def test_unit_state_carry_forward(provider: DataProvider) -> None:
     assert carried[0]["carryforward_days"] == 1
 
 
+@providers
+def test_unit_output_identity_and_lineage_roundtrip(provider: DataProvider) -> None:
+    """Audited output companions survive state, read, and carry-forward."""
+
+    history_key = "unitsha_" + "a" * 64
+    unit = {
+        "unit_id": "B1::101",
+        "source_unit_id": "101",
+        "canonical_unit_id": "B1::101",
+        "unit_name": "Apartment 101",
+        "floor_plan_name": "The Aster",
+        "floor_plan_id": "fp_1",
+        "floor_plan_name_provenance": "camden.floorPlan.name",
+        "floor": "1",
+        "building": "Building One",
+        "building_id": "B1",
+        "building_id_source": "source_ids.camden_building_id",
+        "area": 745,
+        "area_sqft": 745,
+        "area_is_published": True,
+        "rent_low": 1900,
+        "rent_high": 1950,
+        "rent_range": "$1,900 - $1,950",
+        "rent_range_raw": "$1,900 - $1,950",
+        "rent_is_range": True,
+        "rent_provenance": "numeric_fields_confirmed_by_published_range",
+        "available_date": "2026-09-01",
+        "_available_date_raw": "9/1/2026",
+        "availability_date_provenance": "explicit_future",
+        "availability_status": "AVAILABLE",
+        "extraction_tier": "TIER_1_API_CAMDEN",
+        "source_ids": {"camden_unit_id": "native-101", "camden_building_id": "B1"},
+        "unit_history_key": history_key,
+        "unit_history_key_basis": "property:P-TRACE|building:B1|floor_plan:fp_1|unit:101",
+        "unit_history_key_quality": "building_and_floor_plan_scoped_source_id",
+        "unit_history_key_version": "v1",
+        # Proves the documented SQL ``extra`` catch-all is no longer bypassed.
+        "diagnostic_note": {"response_kind": "availability"},
+    }
+    with provider.transaction():
+        provider.unit_state.upsert_units("P-TRACE", [unit], "2026-08-02")
+
+    got = provider.unit_state.get_units("P-TRACE")["B1::101"]
+    assert got.source_unit_id == "101"
+    assert got.canonical_unit_id == "B1::101"
+    assert got.building_id == "B1"
+    assert got.building_id_source == "source_ids.camden_building_id"
+    assert got.area_sqft == 745
+    assert got.area_is_published is True
+    assert got.rent_range == "$1,900 - $1,950"
+    assert got.rent_range_raw == "$1,900 - $1,950"
+    assert got.rent_is_range is True
+    assert got.rent_provenance == "numeric_fields_confirmed_by_published_range"
+    assert got.available_date == "2026-09-01"
+    assert got.available_date_raw == "9/1/2026"
+    assert got.availability_date_provenance == "explicit_future"
+    assert got.source_ids == {"camden_unit_id": "native-101", "camden_building_id": "B1"}
+    assert got.unit_history_key == history_key
+    assert got.unit_history_key_version == "v1"
+    assert got.diagnostic_note == {"response_kind": "availability"}
+
+    with provider.transaction():
+        carried = provider.unit_state.carry_forward_units("P-TRACE", "2026-08-03")
+    assert len(carried) == 1
+    assert carried[0]["source_unit_id"] == "101"
+    assert carried[0]["building_id"] == "B1"
+    assert carried[0]["available_date_raw"] == "9/1/2026"
+    assert carried[0]["availability_date_provenance"] == "explicit_future"
+    assert carried[0]["rent_provenance"] == ("numeric_fields_confirmed_by_published_range")
+    assert carried[0]["unit_history_key"] == history_key
+    assert carried[0]["diagnostic_note"] == {"response_kind": "availability"}
+
+
 # ── runs (properties / report / issues / ledger) ─────────────────────────────
 
 

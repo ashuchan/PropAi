@@ -58,6 +58,7 @@ from ma_poc.pms.signal_engine.defaults import (
 )
 from ma_poc.pms.signal_engine.defaults import LLM_HINT_SCORE as _LLM_HINT_SCORE
 from ma_poc.pms.signal_engine.defaults import PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE
+from ma_poc.pms.source_provenance import response_sha256
 
 if TYPE_CHECKING:
     pass  # Playwright Page type used only in type annotations
@@ -103,6 +104,8 @@ _UNREACHABLE_PATTERNS: tuple[str, ...] = (
 # place main before sub.
 _MERGE_LIST_KEYS: tuple[str, ...] = (
     "_raw_api_responses",
+    "_raw_html_responses",
+    "_raw_asset_responses",
     "_unit_source_provenance",
     "_llm_interactions",
     "_llm_field_mappings",
@@ -4345,6 +4348,32 @@ async def scrape(
         result.pop("_verdict_quality", None)
         result.pop("_plan_level_reason", None)
 
+    # A small audited cohort publishes exact unit area on a property-authored
+    # floor-plan/availability surface while its primary PMS API omits area.
+    # The enrichment is fail-closed: >=3 exact labels or a complete unique
+    # roster bijection are required, plan ranges remain ranges, and the raw
+    # winning HTML is retained for content-addressed diagnostics.  Run the
+    # bounded synchronous probes off the event loop so one slow host cannot
+    # stall unrelated properties in the shard.
+    try:
+        from ma_poc.pms.area_enrichment import enrich_missing_unit_areas
+
+        _area_diagnostic = await asyncio.to_thread(
+            enrich_missing_unit_areas,
+            ctx,
+            adapter_result,
+        )
+        if _area_diagnostic.get("attempted"):
+            result["_area_enrichment_diagnostic"] = _area_diagnostic
+    except Exception as exc:
+        result["_area_enrichment_diagnostic"] = {
+            "attempted": True,
+            "error": type(exc).__name__,
+        }
+        adapter_result.errors.append(
+            f"published-area-enrichment-error: {type(exc).__name__}"
+        )
+
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
     # ``plan_summaries`` are deliberately separate: Jugnu emits them under
@@ -4367,7 +4396,35 @@ async def scrape(
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
+    result["_raw_html_responses"] = list(adapter_result.html_responses)
+    result["_raw_asset_responses"] = list(adapter_result.asset_responses)
     result["_unit_source_provenance"] = list(adapter_result.unit_source_provenance)
+    _primary_body = getattr(fetch_result, "body", None) if fetch_result is not None else None
+    if _primary_body:
+        _primary_headers = getattr(fetch_result, "headers", {}) or {}
+        _primary_record = {
+            "url": (
+                getattr(fetch_result, "final_url", None)
+                or getattr(fetch_result, "url", None)
+                or base_url
+            ),
+            "status": getattr(fetch_result, "status", None),
+            "body": _primary_body,
+            "content_type": _primary_headers.get("content-type"),
+            "response_kind": "primary_fetch_body",
+            "via": str(getattr(fetch_result, "render_mode", "") or ""),
+            "identity": {
+                "status": "CONFIGURED_URL",
+                "configured_property_id": str(getattr(ctx, "property_id", "") or ""),
+            },
+        }
+        _primary_hash = response_sha256(_primary_body)
+        if not any(
+            response_sha256(item.get("body")) == _primary_hash
+            for item in result["_raw_html_responses"]
+            if isinstance(item, dict) and item.get("body") is not None
+        ):
+            result["_raw_html_responses"].insert(0, _primary_record)
 
     # Learn a marketing-page DOM parser from this run's gold units + rendered
     # HTML ($0, no LLM) → serialized parser stashed for profile_updater to
@@ -7940,6 +7997,8 @@ async def scrape_jugnu(
                                 "api_calls_intercepted",
                                 "_winning_page_url",
                                 "_raw_api_responses",
+                                "_raw_html_responses",
+                                "_raw_asset_responses",
                                 "_unit_source_provenance",
                                 "_adapter_used",
                                 "_fallback_chain",
@@ -7960,6 +8019,8 @@ async def scrape_jugnu(
                             "api_calls_intercepted",
                             "_winning_page_url",
                             "_raw_api_responses",
+                            "_raw_html_responses",
+                            "_raw_asset_responses",
                             "_unit_source_provenance",
                             "_adapter_used",
                             "_fallback_chain",
@@ -7982,6 +8043,8 @@ async def scrape_jugnu(
                         "api_calls_intercepted",
                         "_winning_page_url",
                         "_raw_api_responses",
+                        "_raw_html_responses",
+                        "_raw_asset_responses",
                         "_unit_source_provenance",
                         "_adapter_used",
                         "_fallback_chain",

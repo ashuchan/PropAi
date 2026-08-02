@@ -240,6 +240,7 @@ async def test_adapter_walks_exact_detail_and_preserves_unit_values(
     assert second["unit_id"] == "camden_1092761_44"
     assert first["source_ids"]["camden_community_unit_id"] == "1092761:104"
     assert first["floor_plan_name"] == "1.1E"
+    assert first["_floor_plan_name_provenance"] == "camden.floorPlan.name"
     assert first["market_rent_low"] == first["market_rent_high"] == 2189
     assert second["market_rent_low"] == second["market_rent_high"] == 2229
     assert first["available_date"] == first["move_in_date"] == "2026-08-03"

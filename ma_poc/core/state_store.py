@@ -28,7 +28,6 @@ from typing import Any
 
 from ma_poc.core.identity import (
     assign_fallback_unit_id,
-    compute_fallback_unit_id,
     compute_unit_data_sha256,
     seen_at_iso,
     synthesize_unkeyable_id,
@@ -175,7 +174,10 @@ class StateStore:
         prior = dict(self.unit_index.get(canonical_id, {}))
         current_ids: set[str] = set()
         diff: dict[str, Any] = {
-            "new": [], "updated": [], "unchanged": [], "disappeared": [],
+            "new": [],
+            "updated": [],
+            "unchanged": [],
+            "disappeared": [],
             "skipped_no_identity": 0,
             "synthetic_key_used": 0,
             "input_count": len(today_units),
@@ -206,25 +208,48 @@ class StateStore:
 
             # Persist the full unit snapshot (not just rent/availability) so
             # a carry-forward on the next run produces a complete record.
+            # Start from the complete incoming record so new output fields do
+            # not disappear merely because this legacy state file predates
+            # them. Canonical V1 aliases below overwrite their raw variants.
             snapshot = {
+                **u,
                 "unit_id": uid,
                 "market_rent_low": u.get("market_rent_low"),
                 "market_rent_high": u.get("market_rent_high"),
                 "available_date": u.get("available_date"),
+                "available_date_raw": _first_not_none(u, "available_date_raw", "_available_date_raw"),
+                "availability_date_provenance": u.get("availability_date_provenance"),
                 "concessions": u.get("concessions"),
                 # Extended fields — read both canonical and _-prefixed names.
                 "bedrooms": _first_not_none(u, "bedrooms", "_bedrooms"),
                 "bathrooms": _first_not_none(u, "bathrooms", "_bathrooms"),
                 "sqft": _safe_sqft(_first_not_none(u, "sqft", "_sqft", "area")),
                 "floor_plan_name": _first_not_none(u, "floor_plan_name", "_floor_plan"),
+                "floor_plan_name_provenance": u.get("floor_plan_name_provenance"),
+                "source_unit_id": u.get("source_unit_id"),
+                "canonical_unit_id": (_first_not_none(u, "canonical_unit_id", "unit_id") or uid),
                 "unit_number": _first_not_none(u, "unit_number", "_unit_number"),
+                "unit_name": u.get("unit_name"),
                 "bed_label": u.get("bed_label"),
                 "floor": u.get("floor"),
                 "building": u.get("building"),
+                "building_id": u.get("building_id"),
+                "building_id_source": u.get("building_id_source"),
+                "area_sqft": u.get("area_sqft"),
+                "area_is_published": u.get("area_is_published"),
                 "rent_range": u.get("rent_range"),
+                "rent_range_raw": _first_not_none(u, "rent_range_raw", "_rent_range_raw"),
+                "rent_is_range": u.get("rent_is_range"),
+                "rent_provenance": u.get("rent_provenance"),
                 "lease_term": _first_not_none(u, "lease_term", "_lease_term"),
                 "move_in_date": _first_not_none(u, "move_in_date", "_move_in_date"),
                 "availability_status": u.get("availability_status"),
+                "extraction_tier": _first_not_none(u, "extraction_tier", "_extraction_tier"),
+                "source_ids": u.get("source_ids"),
+                "unit_history_key": u.get("unit_history_key"),
+                "unit_history_key_basis": u.get("unit_history_key_basis"),
+                "unit_history_key_quality": u.get("unit_history_key_quality"),
+                "unit_history_key_version": u.get("unit_history_key_version"),
                 "last_seen_date": run_date,
                 # Date portion of the timestamp is anchored to ``run_date``
                 # via the shared :func:`seen_at_iso` helper so day-level
@@ -293,29 +318,29 @@ class StateStore:
             # beds/baths/area/floor_plan_name instead of silently defaulting.
             # Kept optional (.get) so older state files without extended
             # fields still carry forward at least rent/availability.
-            out.append(
-                {
-                    "unit_id": uid,
-                    "unit_number": rec.get("unit_number") or uid,
-                    "market_rent_low": rec.get("market_rent_low"),
-                    "market_rent_high": rec.get("market_rent_high"),
-                    "available_date": rec.get("available_date"),
-                    "lease_link": None,
-                    "concessions": rec.get("concessions"),
-                    "amenities": None,
-                    # Extended carry-forward fields (Phase 1):
-                    "bedrooms": rec.get("bedrooms"),
-                    "bathrooms": rec.get("bathrooms"),
-                    "sqft": rec.get("sqft"),
-                    "floor_plan_name": rec.get("floor_plan_name"),
-                    "bed_label": rec.get("bed_label"),
-                    "floor": rec.get("floor"),
-                    "building": rec.get("building"),
-                    "rent_range": rec.get("rent_range"),
-                    "lease_term": rec.get("lease_term"),
-                    "move_in_date": rec.get("move_in_date"),
-                    "availability_status": rec.get("availability_status"),
-                    "carryforward_days": cfd,
-                }
-            )
+            carried = {
+                **rec,
+                "unit_id": uid,
+                "unit_number": rec.get("unit_number") or uid,
+                "market_rent_low": rec.get("market_rent_low"),
+                "market_rent_high": rec.get("market_rent_high"),
+                "available_date": rec.get("available_date"),
+                "lease_link": None,
+                "concessions": rec.get("concessions"),
+                "amenities": rec.get("amenities"),
+                # Extended carry-forward fields (Phase 1):
+                "bedrooms": rec.get("bedrooms"),
+                "bathrooms": rec.get("bathrooms"),
+                "sqft": rec.get("sqft"),
+                "floor_plan_name": rec.get("floor_plan_name"),
+                "bed_label": rec.get("bed_label"),
+                "floor": rec.get("floor"),
+                "building": rec.get("building"),
+                "rent_range": rec.get("rent_range"),
+                "lease_term": rec.get("lease_term"),
+                "move_in_date": rec.get("move_in_date"),
+                "availability_status": rec.get("availability_status"),
+                "carryforward_days": cfd,
+            }
+            out.append(carried)
         return out

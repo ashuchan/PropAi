@@ -43,10 +43,45 @@ def _prop_with_provenance() -> dict[str, Any]:
         },
         "_extract_result": {"tier_used": "TIER_1_DOM_ENTRATA_PP_JD_FP", "llm_cost_usd": 0.0},
         "units": [
-            {"unit_id": "3100", "beds": 0, "baths": 1, "area": 464, "rent_low": 2400,
-             "availability_status": "AVAILABLE", "extraction_tier": "TIER_1_DOM_ENTRATA_PP_JD_FP",
-             "is_floor_plan_level": False, "source_ids": {"entrata_uid": "abc"}},
-            {"unit_id": "inferred_x", "beds": 1, "extraction_tier": "TIER_4_LLM_DOM"},
+            {
+                "unit_id": "B1::3100",
+                "source_unit_id": "3100",
+                "canonical_unit_id": "B1::3100",
+                "unit_history_key": "unitsha_abc",
+                "unit_history_key_quality": "building_scoped_source_id",
+                "unit_history_key_version": "v1",
+                "beds": 0,
+                "baths": 1,
+                "area": 464,
+                "area_sqft": 464,
+                "area_is_published": True,
+                "rent_low": 2400,
+                "rent_high": 2600,
+                "rent_range": "$2,400 - $2,600",
+                "rent_range_raw": "$2,400 - $2,600",
+                "rent_is_range": True,
+                "rent_provenance": "numeric_fields_confirmed_by_published_range",
+                "availability_status": "AVAILABLE",
+                "extraction_tier": "TIER_1_DOM_ENTRATA_PP_JD_FP",
+                "available_date": "2026-09-01",
+                "available_date_raw": "9/1/2026",
+                "availability_date_provenance": "explicit_future",
+                "floor_plan_name": "Studio A",
+                "floor_plan_id": "fp_1",
+                "building": "Building One",
+                "building_id": "B1",
+                "building_id_source": "source_ids.entrata_building_id",
+                "is_floor_plan_level": False,
+                "source_ids": {"entrata_uid": "abc"},
+            },
+            {
+                "unit_id": "inferred_x",
+                "beds": 1,
+                "area": -1,
+                "area_sqft": None,
+                "area_is_published": False,
+                "extraction_tier": "TIER_4_LLM_DOM",
+            },
         ],
     }
 
@@ -99,9 +134,20 @@ def test_units_sheet_flattens_with_tier():
     wb = build_workbook([_prop_with_provenance()], report=None)
     ws = wb["Units"]
     assert ws.max_row == 3  # header + 2 units
-    assert _cell(ws, _UNIT_HEADERS, "unit_id", 2) == "3100"
+    assert _cell(ws, _UNIT_HEADERS, "unit_id", 2) == "B1::3100"
+    assert _cell(ws, _UNIT_HEADERS, "source_unit_id", 2) == "3100"
+    assert _cell(ws, _UNIT_HEADERS, "canonical_unit_id", 2) == "B1::3100"
+    assert _cell(ws, _UNIT_HEADERS, "unit_history_key", 2) == "unitsha_abc"
+    assert _cell(ws, _UNIT_HEADERS, "building_id", 2) == "B1"
+    assert _cell(ws, _UNIT_HEADERS, "available_date_raw", 2) == "9/1/2026"
+    assert _cell(ws, _UNIT_HEADERS, "availability_date_provenance", 2) == "explicit_future"
+    assert _cell(ws, _UNIT_HEADERS, "area_sqft", 2) == 464
+    assert _cell(ws, _UNIT_HEADERS, "area_sqft", 3) is None
     assert _cell(ws, _UNIT_HEADERS, "extraction_tier", 2) == "TIER_1_DOM_ENTRATA_PP_JD_FP"
     assert _cell(ws, _UNIT_HEADERS, "rent_low", 2) == 2400
+    assert _cell(ws, _UNIT_HEADERS, "rent_high", 2) == 2600
+    assert _cell(ws, _UNIT_HEADERS, "rent_range", 2) == "$2,400 - $2,600"
+    assert _cell(ws, _UNIT_HEADERS, "rent_provenance", 2) == ("numeric_fields_confirmed_by_published_range")
     assert _cell(ws, _UNIT_HEADERS, "source_ids", 2) == '{"entrata_uid": "abc"}'
     assert _cell(ws, _UNIT_HEADERS, "extraction_tier", 3) == "TIER_4_LLM_DOM"
 
@@ -136,4 +182,4 @@ def test_empty_input_does_not_crash():
     assert wb.sheetnames == ["Summary", "Properties", "Units"]
     ws = wb["Units"]
     assert ws.cell(row=1, column=1).value == "property_id"  # header present
-    assert ws.cell(row=2, column=1).value is None           # no data rows
+    assert ws.cell(row=2, column=1).value is None  # no data rows

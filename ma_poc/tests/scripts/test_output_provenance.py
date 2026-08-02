@@ -105,6 +105,9 @@ def test_provenance_block_fields_and_quality():
         "status_code": None,
         "error_signature": None,
         "body_bytes": 0,
+        "response_sha256": None,
+        "raw_html_archive_path": None,
+        "raw_html_archive_sha256": None,
     }
     dq = prov["data_quality"]
     assert dq["real_id_units"] == 2          # N115 + plan1 (plan1 has a real id)

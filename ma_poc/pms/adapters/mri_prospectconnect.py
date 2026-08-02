@@ -289,6 +289,7 @@ def parse_mri_search_units(
             lease_term=str(button.get("data-term") or "").strip(),
             source_api_url=source_url,
             extraction_tier=_TIER,
+            floor_plan_name_provenance="mri.pc-card-title",
             source_ids={"mri_unit_id": native_unit_id},
         )
         unit["source_property_id"] = community

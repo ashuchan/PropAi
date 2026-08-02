@@ -615,9 +615,23 @@ class Fetcher:
             if proxy:
                 self._proxy_pool.mark_success(proxy)
 
-            # Persist raw HTML for replay
-            if last_result.render_mode == RenderMode.RENDER and last_result.body:
-                _persist_raw_html(task.property_id, last_result.body)
+            # Persist every successful primary HTML body for offline replay,
+            # not only browser renders. Many affected properties resolve via
+            # GET/curl and would otherwise have final rows but no source body.
+            content_type = str(last_result.headers.get("content-type") or "").lower()
+            if last_result.body and (
+                last_result.render_mode == RenderMode.RENDER
+                or "html" in content_type
+                or not content_type
+            ):
+                archive = _persist_raw_html(task.property_id, last_result.body)
+                if archive:
+                    last_result = dataclasses.replace(
+                        last_result,
+                        response_sha256=archive["response_sha256"],
+                        raw_html_archive_path=archive["path"],
+                        raw_html_archive_sha256=archive["response_sha256"],
+                    )
 
         return last_result
 
@@ -1959,22 +1973,80 @@ def _short_hash(value: str | None) -> str | None:
     return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()[:10]
 
 
-def _persist_raw_html(property_id: str, body: bytes) -> None:
-    """Write raw HTML to disk for replay. Fails silently.
+def _persist_raw_html(property_id: str, body: bytes) -> dict[str, Any] | None:
+    """Write legacy + immutable content-addressed HTML for replay.
 
     Args:
         property_id: The property's canonical ID.
         body: Raw HTML bytes.
+    Returns:
+        Relative immutable path, source SHA-256 and size, or ``None`` when
+        persistence fails. Repeated identical bodies reuse the same artifact.
     """
     try:
+        import hashlib
+        import json
+
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         data_dir = Path(os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
         out_dir = data_dir / "raw_html" / date_str
         out_dir.mkdir(parents=True, exist_ok=True)
+        compressed = gzip.compress(body)
+        body_hash = hashlib.sha256(body).hexdigest()
+
+        # Backward-compatible latest pointer used by existing replay tools.
         out_path = out_dir / f"{property_id}.html.gz"
-        out_path.write_bytes(gzip.compress(body))
+        latest_tmp = out_path.with_suffix(out_path.suffix + f".{os.getpid()}.tmp")
+        latest_tmp.write_bytes(compressed)
+        os.replace(latest_tmp, out_path)
+
+        safe_property = "".join(
+            ch if ch.isalnum() or ch in "_.-" else "_"
+            for ch in str(property_id or "unknown")
+        )
+        immutable_dir = out_dir / safe_property
+        immutable_dir.mkdir(parents=True, exist_ok=True)
+        immutable_path = immutable_dir / f"{body_hash}.html.gz"
+        if not immutable_path.exists():
+            immutable_tmp = immutable_path.with_suffix(
+                immutable_path.suffix + f".{os.getpid()}.tmp"
+            )
+            immutable_tmp.write_bytes(compressed)
+            if not immutable_path.exists():
+                os.replace(immutable_tmp, immutable_path)
+            else:
+                immutable_tmp.unlink(missing_ok=True)
+        metadata_path = immutable_dir / f"{body_hash}.metadata.json"
+        if not metadata_path.exists():
+            metadata_tmp = metadata_path.with_suffix(
+                metadata_path.suffix + f".{os.getpid()}.tmp"
+            )
+            metadata_tmp.write_text(
+                json.dumps(
+                    {
+                        "property_id": str(property_id),
+                        "response_sha256": body_hash,
+                        "body_bytes": len(body),
+                        "compressed_bytes": len(compressed),
+                        "captured_date": date_str,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            if not metadata_path.exists():
+                os.replace(metadata_tmp, metadata_path)
+            else:
+                metadata_tmp.unlink(missing_ok=True)
+        return {
+            "path": str(immutable_path.relative_to(data_dir)),
+            "response_sha256": body_hash,
+            "body_bytes": len(body),
+            "compressed_bytes": len(compressed),
+        }
     except Exception as exc:
         log.debug("Failed to persist raw HTML for %s: %s", property_id, exc)
+        return None
 
 
 # Module-level singleton factory
