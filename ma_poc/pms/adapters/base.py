@@ -71,6 +71,9 @@ class AdapterResult:
     llm_field_mappings: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     confidence: float = 0.0
+    # Exact response(s) that produced the admitted units.  Bodies are never
+    # persisted here: only a hash, sanitised URL, count and identity verdict.
+    unit_source_provenance: list[dict[str, Any]] = field(default_factory=list)
 
 
 @runtime_checkable

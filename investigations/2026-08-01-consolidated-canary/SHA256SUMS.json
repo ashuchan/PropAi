@@ -1,21 +1,121 @@
 {
-  "file_count": 529,
+  "file_count": 558,
   "files": {
     ".gitignore": {
-      "bytes": 376,
-      "sha256": "ce746e9717b38a43ed61575a17d024022e488c965b93e9e95282f8b1ab39251f"
+      "bytes": 756,
+      "sha256": "e504365dc20c8a3129a65fdef2a1e8d59208b7515d3c773b68bf787826cbf607"
+    },
+    "PROPERTY_IDENTITY_AND_JULY_PROFILE_VETTING.md": {
+      "bytes": 6347,
+      "sha256": "c6e17de69d4e8074b9a3edd850c0e9d24bf0dc71a015ace95bfcc1102d9eabdf"
     },
     "README.md": {
-      "bytes": 5242,
-      "sha256": "d9ea0fff7bcf06ff854b56f58dd49c6a1af45ba33b71bb7043cff3dfde1ef2f5"
+      "bytes": 6604,
+      "sha256": "e7c25d083645a916cb7ad1eb5660da8a9de20965ac1388e7ecfa3ef7eb96288f"
+    },
+    "STRICT_WARM_PROFILE_CANDIDATE_V2.md": {
+      "bytes": 6390,
+      "sha256": "20d9178b92d76fef9f8a19948d6048fb874efd194cb703cc6af6784344666968"
+    },
+    "STRICT_WARM_PROFILE_IDENTITY_AUDIT.md": {
+      "bytes": 8782,
+      "sha256": "4e02829df4fdaadafd22ce6ab7f7cd72cc7c6ee9d1a50a8d440abe7ca1a12f39"
     },
     "WORKER_STATE.json": {
       "bytes": 3156,
       "sha256": "8b5df415424eeef572d6908557c3e30403176cf418751c080fd7508d6294b4a0"
     },
     "build_archive_manifest.py": {
-      "bytes": 1249,
-      "sha256": "4744d958bd12a44534a790fb82e7751f9a42cbe5776c16749db4bcdc285a5b17"
+      "bytes": 1619,
+      "sha256": "0e180bc19237ba855deb00629330da030e5316735ee77313ce92ce2dbaced1a4"
+    },
+    "gcp-evidence-audit-v1/archive-evidence-ledger.jsonl": {
+      "bytes": 7842176,
+      "sha256": "8dfbece0fd0d0e309b686c573ca3de9e6680b460295797b2277143e2b4ef3b3b"
+    },
+    "gcp-evidence-audit-v1/summary.json": {
+      "bytes": 3053,
+      "sha256": "4c7f3b6dc35d62391749aa17b7b7b750f37596d1698357dc4c8c050acabf2492"
+    },
+    "july-vetted-profile-snapshot-v1/promotion_manifest.json": {
+      "bytes": 897582,
+      "sha256": "4d08a3cbe2655b12b7d102aadccd323141976eb9a6132345943f37b465658063"
+    },
+    "july-vetted-profile-snapshot-v1/promotion_manifest_execute.json": {
+      "bytes": 1888336,
+      "sha256": "b746d9e0092cd85ef0892683a82478f04af80e60d9018035794751e5c4a0bbde"
+    },
+    "live-winner-audit-v1/live-winner-ledger.jsonl": {
+      "bytes": 1875822,
+      "sha256": "7bf2036f44e9cef0927146ba5ea60670a7835c1c6b14ee0f452245f419a200ff"
+    },
+    "live-winner-audit-v1/summary.json": {
+      "bytes": 764,
+      "sha256": "6b08164fabcbfd75738c0f1d940bdcb0cf7c0bb21bfe93bfe39292d0cbc7d11e"
+    },
+    "live-winner-audit-v2-appfolio/live-winner-ledger.jsonl": {
+      "bytes": 179953,
+      "sha256": "1da033448715f008346680ea2e6a0fd8f3618af95af6ad6e75364c33dca5a3aa"
+    },
+    "live-winner-audit-v2-appfolio/summary.json": {
+      "bytes": 539,
+      "sha256": "dde269d22c86b3a7fc138b58f66bc72f4d74cf6cd09684736c48c4b632133928"
+    },
+    "live-winner-audit-v2-krc/live-winner-ledger.jsonl": {
+      "bytes": 6545,
+      "sha256": "1285f08b72f5041f4e572280cacd3badfd5c413bf48e1f65053076b007e7324d"
+    },
+    "live-winner-audit-v2-krc/summary.json": {
+      "bytes": 527,
+      "sha256": "cad658bd6523e4fc974b5509526b4a52eeaf307b7ee56e6b41ddc9a694f39e28"
+    },
+    "live-winner-samples/appfolio/live-winner-ledger.jsonl": {
+      "bytes": 2218,
+      "sha256": "74d959fa20f388d41c15fc8da07262708e3db32f9deff8a2cf4441d0614b0828"
+    },
+    "live-winner-samples/appfolio/summary.json": {
+      "bytes": 504,
+      "sha256": "9d97f97816d6b5f094d190762cf1d61350e796a12900168d2c3c06f76dfdc439"
+    },
+    "live-winner-samples/inventory_g5marketingcloud_com/live-winner-ledger.jsonl": {
+      "bytes": 1827,
+      "sha256": "cca2207d0881b20e55e45078480fd1f1951fdf0141172f94dbd4c0786f220e1b"
+    },
+    "live-winner-samples/inventory_g5marketingcloud_com/summary.json": {
+      "bytes": 531,
+      "sha256": "fa3d1362f711fe2b2c918b132abfd51797427a2e8dc9637cf89582f08bcc1410"
+    },
+    "live-winner-samples/realpage/live-winner-ledger.jsonl": {
+      "bytes": 1904,
+      "sha256": "9780597dbacf9624b8ef98578b5412f48f316639546ff149067fc8b7da94da48"
+    },
+    "live-winner-samples/realpage/summary.json": {
+      "bytes": 527,
+      "sha256": "98fdb499351bebd8ac62ec161afc7523ba9f73bbda2d7089a6b6d2bd9d4744c9"
+    },
+    "live-winner-samples/rentcafe/live-winner-ledger.jsonl": {
+      "bytes": 2364,
+      "sha256": "3d3f8bdcb1c0a1e0da936e0c5f0419e72831bd126db8ad24da4f38e334eefd19"
+    },
+    "live-winner-samples/rentcafe/summary.json": {
+      "bytes": 502,
+      "sha256": "76061137f410d0430f234159188365dd9fc6af68599cd134e8d1bd7d0fa4dcca"
+    },
+    "live-winner-samples/resman/live-winner-ledger.jsonl": {
+      "bytes": 2170,
+      "sha256": "62fffbbcfc86ef6365539ef9969202b9819b4d92ac1939b9b136fcd60eb54cfb"
+    },
+    "live-winner-samples/resman/summary.json": {
+      "bytes": 502,
+      "sha256": "f88ac8a6c1742174aa8b8996871fd39bb40a1c7583185da660778abe7adcf4e6"
+    },
+    "live-winner-samples/www_on_site_com/live-winner-ledger.jsonl": {
+      "bytes": 1596,
+      "sha256": "a91abd7a9a1c2b6d71c4cffdc2aa769d932944a784a4a289bd6b7c50fba4057b"
+    },
+    "live-winner-samples/www_on_site_com/summary.json": {
+      "bytes": 532,
+      "sha256": "9a2317306592557b4150f32a874e89e7eb185d5d71f18c59664cce0bbd9539cc"
     },
     "profile-snapshot/.gitignore": {
       "bytes": 176,
@@ -32,6 +132,22 @@
     "shared_profile_coverage_audit.json": {
       "bytes": 1520,
       "sha256": "b340ccb8f319260eb1060e9500ceafad5b41f85d1f9001eaf1c561efa5d944f9"
+    },
+    "strict-warm-profile-candidate-v2/strict-profile-ledger.jsonl": {
+      "bytes": 1987165,
+      "sha256": "d15d8ad39072caf28fcc613faa5ec3054d640f032fcab0c50c46ba3ccebafe2d"
+    },
+    "strict-warm-profile-candidate-v2/summary.json": {
+      "bytes": 793,
+      "sha256": "dc10f77bf22386a28b132b69d01fbbbaa75bf8196c9f2f9df8782fb61939982c"
+    },
+    "warm-profile-identity-audit-v1/route-ledger.jsonl": {
+      "bytes": 1239829,
+      "sha256": "757331deb9538790d3a19cfb3276ee4505d93efdd1b85053b9218c1810272c6b"
+    },
+    "warm-profile-identity-audit-v1/summary.json": {
+      "bytes": 37180,
+      "sha256": "92c263e64465c9287be9d85d8c21ab2ad8be9aa83c623d13f3321e9e4eafbcaa"
     },
     "worker-archive/failed-no-data/acorn_56182_current_rentvision/evidence_acorn_56182_full_scrape_jugnu_3x.json": {
       "bytes": 24652,
@@ -2118,6 +2234,6 @@
       "sha256": "0889197f4a65bf335ce3665252f17cf2a8394091aa13ccbcbda7d625a476cd83"
     }
   },
-  "generated_at_utc": "2026-08-01T21:35:18.660922+00:00",
+  "generated_at_utc": "2026-08-02T00:46:19.863181+00:00",
   "schema_version": "propai_worker_archive_hashes_v1"
 }

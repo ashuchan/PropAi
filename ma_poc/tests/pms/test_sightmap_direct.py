@@ -19,18 +19,21 @@ from ma_poc.pms.sightmap_direct import sightmap_api_url, try_sightmap_direct
 _URL = "https://sightmap.com/app/api/v1/8epmg884p6d/sightmaps/41123"
 
 
-def _payload(price):
+def _payload(price, asset_name=None):
+    data = {
+        "floor_plans": [
+            {"id": "fp1", "name": "A1", "bedrooms": 1, "bathrooms": 1, "area": 700}
+        ],
+        "units": [
+            {"unit_number": "101", "floor_plan_id": "fp1", "price": price},
+            {"unit_number": "102", "floor_plan_id": "fp1", "price": price},
+        ],
+    }
+    if asset_name:
+        data["asset"] = {"name": asset_name}
     return json.dumps(
         {
-            "data": {
-                "floor_plans": [
-                    {"id": "fp1", "name": "A1", "bedrooms": 1, "bathrooms": 1, "area": 700}
-                ],
-                "units": [
-                    {"unit_number": "101", "floor_plan_id": "fp1", "price": price},
-                    {"unit_number": "102", "floor_plan_id": "fp1", "price": price},
-                ],
-            }
+            "data": data
         }
     )
 
@@ -129,3 +132,45 @@ async def test_non_200_falls_through(monkeypatch) -> None:
 async def test_unparseable_falls_through(monkeypatch) -> None:
     _patch(monkeypatch, raw=(200, "<html>not json</html>"))
     assert await try_sightmap_direct(_Task(), _Profile(), None) is None
+
+
+@pytest.mark.asyncio
+async def test_property_identity_mismatch_rejects_stale_warm_route(monkeypatch) -> None:
+    _patch(monkeypatch, raw=(200, _payload(1500, "NOVI Rise")))
+    row = {
+        "name": "Novi Flats",
+        "address": "25 Barbrick Ave SW",
+        "website": "https://noviflats.com/",
+    }
+    assert await try_sightmap_direct(_Task(), _Profile(), row) is None
+
+
+@pytest.mark.asyncio
+async def test_property_identity_match_records_unit_source(monkeypatch) -> None:
+    _patch(monkeypatch, raw=(200, _payload(1500, "Novi Flats")))
+    row = {"name": "Novi Flats", "address": "25 Barbrick Ave SW"}
+    output = await try_sightmap_direct(_Task(), _Profile(), row)
+    assert output is not None
+    source = output["result"]["_unit_source_provenance"][0]
+    assert source["identity"]["status"] == "MATCH"
+    assert source["unit_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_confirmed_novi_route_is_quarantined_before_fetch(monkeypatch) -> None:
+    calls = 0
+
+    async def _should_not_fetch(*_a, **_kw):
+        nonlocal calls
+        calls += 1
+        return 200, _payload(1500, "NOVI Rise")
+
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_SIGHTMAP_DIRECT_GET", True)
+    monkeypatch.setattr("ma_poc.fetch.hyperbrowser_backend.hb_raw_get", _should_not_fetch)
+    task = _Task()
+    task.property_id = "264077"
+    bad_profile = _Profile(
+        url="https://sightmap.com/app/api/v1/yjp2415rvxl/sightmaps/104541"
+    )
+    assert await try_sightmap_direct(task, bad_profile, {"name": "Novi Flats"}) is None
+    assert calls == 0

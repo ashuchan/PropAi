@@ -109,6 +109,11 @@ async def try_sightmap_direct(
         return None
 
     pid = getattr(task, "property_id", "?")
+    from ma_poc.services.profile_route_quarantine import route_is_quarantined
+
+    if route_is_quarantined(pid, url):
+        log.warning("sightmap_direct %s: confirmed contaminated route quarantined", pid)
+        return None
     from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
 
     status, body = await hb_raw_get(url, pid)
@@ -120,7 +125,30 @@ async def try_sightmap_direct(
     try:
         from ma_poc.pms.adapters.sightmap import parse_sightmap_payload
 
-        units, dropped = parse_sightmap_payload(json.loads(body), url)
+        payload = json.loads(body)
+        from ma_poc.pms.property_identity import (
+            MATCH,
+            configured_identity_from_csv,
+            evaluate_observed_from_csv,
+            identity_is_configured,
+            sightmap_observed_identity,
+        )
+
+        observed_identity = sightmap_observed_identity(payload)
+        identity = evaluate_observed_from_csv(csv_row, observed_identity)
+        # A warm direct replay is detached from the marketing page that first
+        # discovered it.  When CSV identity is available it therefore needs
+        # positive vendor metadata, not merely a parseable roster.
+        if identity_is_configured(configured_identity_from_csv(csv_row)) and identity.status != MATCH:
+            log.warning(
+                "sightmap_direct %s: property identity %s (%s) — route rejected",
+                pid,
+                identity.status,
+                ",".join(identity.evidence),
+            )
+            return None
+
+        units, dropped = parse_sightmap_payload(payload, url)
     except Exception as exc:
         log.debug("sightmap_direct %s: parse failed (%s) — fall through", pid, exc)
         return None
@@ -154,6 +182,17 @@ async def try_sightmap_direct(
     result["_property_id"] = pid
     result["_adapter_used"] = "sightmap"
     result["api_calls_intercepted"] = [url]
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    result["_unit_source_provenance"] = [
+        build_unit_source_provenance(
+            provider="sightmap",
+            source_url=url,
+            body=payload,
+            unit_count=len(units),
+            identity=identity,
+        )
+    ]
     result["_extract_result"] = ExtractResult(
         property_id=str(pid),
         records=units,

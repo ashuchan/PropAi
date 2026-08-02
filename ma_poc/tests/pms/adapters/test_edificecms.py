@@ -29,6 +29,7 @@ from ma_poc.pms.adapters.edificecms import (
     _avail_status,
     _rent_to_int,
     find_edificecms_property_id,
+    find_edificecms_property_ids,
     parse_edificecms_plan_summary,
     parse_edificecms_units,
 )
@@ -70,6 +71,17 @@ def test_property_id_fallback_to_resman_apply_link() -> None:
         '?a=2071&p=b63cc3f8-3edf-4ec9-be58-8bf4a77455bf&moveInDate=4/30/2026">Apply</a>'
     )
     assert find_edificecms_property_id(html) == COBBLESTONE_UUID
+
+
+def test_property_ids_decode_html_entities_and_preserve_candidate_order() -> None:
+    first = "318beef3-c0ee-4d07-a9c7-a9624bb13238"
+    second = "e7494880-99cb-4613-9de6-06812af8bbdd"
+    html = (
+        f'<script>const x={{property_id:"{first}"}}</script>'
+        '<a href="https://lpp.myresman.com/Portal/Applicants/Availability'
+        f'?a=2071&amp;p={second}&amp;moveInDate=8/1/2026">Apply</a>'
+    )
+    assert find_edificecms_property_ids(html) == [first, second]
 
 
 def test_property_id_returns_none_when_absent() -> None:
@@ -306,3 +318,36 @@ def test_adapter_extract_misroute_falls_through() -> None:
         result = asyncio.run(adapter.extract(page=None, ctx=ctx))  # type: ignore[arg-type]
     assert result.tier_used.endswith("_NO_FINGERPRINT")
     assert fired is False, "API call fired despite missing fingerprint"
+
+
+def test_adapter_verifies_each_uuid_and_selects_matching_phase() -> None:
+    wrong = "318beef3-c0ee-4d07-a9c7-a9624bb13238"
+    correct = "e7494880-99cb-4613-9de6-06812af8bbdd"
+    html = (
+        '<script>var BUILDER_LIVE="https://beta.edificecms.com/builder/";'
+        f'const a={{property_id:"{wrong}"}};'
+        f'const b={{property_id:"{correct}"}};</script>'
+    )
+    ctx = _make_ctx(html)
+    ctx.property_name = "Turtle Dove I"
+    ctx.address = "3516 Matilda St"
+    calls: list[str] = []
+
+    async def mock_fetch_json(url: str, params: dict[str, str]) -> dict[str, Any]:
+        candidate = params.get("property_id", "")
+        if "floorplans" in url:
+            calls.append(candidate)
+            response = dict(FLOORPLANS_API)
+            response["property"] = "Turtle Dove 2" if candidate == wrong else "Turtle Dove 1"
+            return response
+        return {"status": True, "units": {params.get("u", ""): []}}
+
+    with patch("ma_poc.pms.adapters.edificecms._fetch_json", side_effect=mock_fetch_json):
+        result = asyncio.run(EdificeCmsAdapter().extract(page=None, ctx=ctx))  # type: ignore[arg-type]
+
+    assert calls[:2] == [wrong, correct]
+    assert result.tier_used == "TIER_1_API_EDIFICECMS"
+    assert correct in (result.winning_url or "")
+    assert any("PROPERTY_IDENTITY_REJECTED" in error for error in result.errors)
+    assert result.unit_source_provenance
+    assert result.unit_source_provenance[0]["identity"]["status"] == "MATCH"

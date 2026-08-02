@@ -1,6 +1,12 @@
 # Raw profiles can contain public vendor query credentials. Their object
 # generations and hashes are committed in the promotion manifests instead.
 profile-snapshot/profiles/*.json
+# The versioned July candidate retains the same raw-profile security policy;
+# generation/hash details live in its committed manifests.
+july-vetted-profile-snapshot-v1/profiles/*.json
+# Locally sanitized v2 candidate profiles retain validated public widget URLs;
+# the strict ledger and hashes are committed, raw payloads are not.
+strict-warm-profile-candidate-v2/profiles/*.json
 
 # A tiny interrupted uv environment was copied with the worker evidence. It is
 # not part of the replay archive and is intentionally excluded.

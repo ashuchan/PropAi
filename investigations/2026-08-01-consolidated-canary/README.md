@@ -22,6 +22,29 @@ The plan worker's last single materialized ledger contains 330 rows. It predates
 presented as a fully reconciled ledger or canary outcome. The consolidated
 full canary is the authoritative reconciliation step.
 
+## Post-freeze property-identity hardening
+
+After this worker snapshot was frozen, the confirmed wrong-property routes
+were closed with a shared vendor-metadata identity gate, property-scoped route
+quarantine, sibling-community filtering, Edifice multi-UUID verification, and
+actual unit-response provenance. A create-only July candidate profile prefix
+was also materialized without switching production or starting the full paid
+canary. See
+[`PROPERTY_IDENTITY_AND_JULY_PROFILE_VETTING.md`](PROPERTY_IDENTITY_AND_JULY_PROFILE_VETTING.md)
+for the exact 3,449-object write, hashes, controls, and limitations.
+
+A read-only retrospective identity audit is complete. Its first,
+highest-signal wave checked all 877 profiles whose SightMap, Knock, or Edifice
+route publishes property metadata. The archive-plus-current-response pass then
+materialized a local positive-only candidate of **2,566/3,449 (74.40%)**,
+quarantined 51, and withheld 832 for review. Unit-row agreement and RP data are
+not admission evidence; only independent source property identity can admit a
+route. The shared profile store was not changed. See
+[`STRICT_WARM_PROFILE_IDENTITY_AUDIT.md`](STRICT_WARM_PROFILE_IDENTITY_AUDIT.md)
+for the first wave and
+[`STRICT_WARM_PROFILE_CANDIDATE_V2.md`](STRICT_WARM_PROFILE_CANDIDATE_V2.md)
+for the final local candidate, exact route ledger, and counts.
+
 ## What is preserved
 
 - `worker-archive/failed-no-data/` contains the ledger builder, all worker

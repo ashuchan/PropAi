@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -102,6 +103,16 @@ async def try_knock_direct(
         return None
 
     pid = getattr(task, "property_id", "?")
+    from ma_poc.services.profile_route_quarantine import route_is_quarantined
+
+    if route_is_quarantined(pid, endpoint):
+        log.warning("knock_direct %s: confirmed contaminated route quarantined", pid)
+        return None
+    endpoint_match = re.search(r"/v1/property/(\d+)/units(?:[/?#]|$)", endpoint)
+    if not endpoint_match:
+        log.warning("knock_direct %s: malformed units endpoint — route rejected", pid)
+        return None
+    metadata_url = endpoint[: endpoint_match.start()] + f"/v1/property/{endpoint_match.group(1)}"
     try:
         from ma_poc.pms.adapters._probe import probe_get
 
@@ -112,6 +123,9 @@ async def try_knock_direct(
         # a full ~10-45s render, so a transient soft-403 forces the render this
         # fast path exists to skip. A bounded compliance-safe plain re-GET
         # (unlocker stays False under COMPLIANCE_MODE) recovers it far cheaper.
+        meta_r = await asyncio.to_thread(
+            probe_get, metadata_url, unlocker=False, retries=2, timeout=20
+        )
         r = await asyncio.to_thread(
             probe_get, endpoint, unlocker=False, retries=2, timeout=20
         )
@@ -119,6 +133,8 @@ async def try_knock_direct(
         log.debug("knock_direct GET raised for %s: %s", pid, exc)
         return None
 
+    meta_status = int(getattr(meta_r, "status_code", 0) or 0)
+    meta_body = getattr(meta_r, "text", "") or ""
     status = int(getattr(r, "status_code", 0) or 0)
     body = getattr(r, "text", "") or ""
     if status != 200 or not body:
@@ -129,6 +145,25 @@ async def try_knock_direct(
     # with an empty/renamed shape yields [] and falls through to the render
     # (which re-learns), so a drifted endpoint never silently degrades quality.
     try:
+        metadata_payload = json.loads(meta_body) if meta_status == 200 and meta_body else {}
+        from ma_poc.pms.property_identity import (
+            MATCH,
+            configured_identity_from_csv,
+            evaluate_observed_from_csv,
+            identity_is_configured,
+            knock_observed_identity,
+        )
+
+        observed_identity = knock_observed_identity(metadata_payload)
+        identity = evaluate_observed_from_csv(csv_row, observed_identity)
+        if identity_is_configured(configured_identity_from_csv(csv_row)) and identity.status != MATCH:
+            log.warning(
+                "knock_direct %s: property identity %s (%s) — route rejected",
+                pid,
+                identity.status,
+                ",".join(identity.evidence),
+            )
+            return None
         payload = json.loads(body)
         from ma_poc.pms.adapters.knock import parse_knock_units
 
@@ -156,6 +191,17 @@ async def try_knock_direct(
     result["_property_id"] = pid
     result["_adapter_used"] = "knock"
     result["api_calls_intercepted"] = [endpoint]
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    result["_unit_source_provenance"] = [
+        build_unit_source_provenance(
+            provider="knock",
+            source_url=endpoint,
+            body=payload,
+            unit_count=len(units),
+            identity=identity,
+        )
+    ]
     result["_extract_result"] = ExtractResult(
         property_id=str(pid),
         records=units,
@@ -178,6 +224,13 @@ async def try_knock_direct(
         attempts=1,
         elapsed_ms=int(getattr(r, "elapsed_ms", 0) or 0),
         network_log=[
+            {
+                "url": metadata_url,
+                "status": meta_status,
+                "content_type": "application/json",
+                "body": meta_body,
+                "captcha_detected": False,
+            },
             {
                 "url": endpoint,
                 "status": 200,

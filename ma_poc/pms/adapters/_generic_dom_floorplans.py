@@ -244,7 +244,7 @@ def _property_slug(prop_path: str) -> str:
     """
     for seg in reversed([s for s in prop_path.split("/") if s]):
         stem = re.sub(r"\.(?:html?|aspx?|php|jsp)$", "", seg, flags=re.IGNORECASE)
-        if stem and stem not in _GENERIC_PATH_TAIL and len(stem) >= 4:
+        if stem and stem not in _GENERIC_PATH_TAIL and len(stem) >= 3:
             return stem
     return ""
 
@@ -350,7 +350,12 @@ def classify_href_scope(property_url: str, href: str, doc_url: str = "") -> str:
     # modelled as separate CMS posts (``/summerset`` →
     # ``/property/summerset-at-international-crossings-2-2``).
     slug = _property_slug(prop_path)
-    if slug and slug in target_path:
+    # A landing URL such as ``/contact-us`` has no property identity.  Treat
+    # an unrelated same-host target as unknown rather than manufacturing a
+    # sibling-community verdict from a generic page tail.
+    if not slug:
+        return _SCOPE_NEUTRAL
+    if slug in target_path:
         return _SCOPE_NEUTRAL
 
     # A bare off-subtree page: on a management-company site this is a
@@ -403,14 +408,18 @@ def filter_cards_by_scope(
     if not cards or not (property_url or "").strip():
         return cards
     kept: list[dict[str, Any]] = []
+    kept_in_scope: list[dict[str, Any]] = []
     off_scope = 0
     for c in cards:
         if not isinstance(c, dict):
             continue
-        if card_scope_verdict(c, property_url, doc_url) == _SCOPE_OUT:
+        verdict = card_scope_verdict(c, property_url, doc_url)
+        if verdict == _SCOPE_OUT:
             off_scope += 1
             continue
         kept.append(c)
+        if verdict == _SCOPE_IN:
+            kept_in_scope.append(c)
     if not off_scope:
         return kept
     total = off_scope + len(kept)
@@ -426,7 +435,10 @@ def filter_cards_by_scope(
             property_url,
             doc_url,
         )
-        return []
+        # One positively in-scope plan card is stronger evidence than the
+        # original raw-card count rule; a lone NEUTRAL directory summary is
+        # still rejected.
+        return kept_in_scope
     log.info(
         "generic-dom scope guard dropped %d/%d off-scope cards property_url=%s",
         off_scope,

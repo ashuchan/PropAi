@@ -139,6 +139,23 @@ def test_store_with_backing_delegates_get_to_iprofilestore(tmp_path: Path) -> No
     assert fake.get_calls == ["P-1"]
 
 
+def test_store_quarantines_confirmed_bad_route_on_read(tmp_path: Path) -> None:
+    from models.scrape_profile import ProfileMaturity, ScrapeProfile
+
+    bad = "https://sightmap.com/app/api/v1/yjp2415rvxl/sightmaps/104541"
+    profile = ScrapeProfile(canonical_id="264077")
+    profile.navigation.winning_page_url = bad
+    profile.confidence.maturity = ProfileMaturity.HOT
+    fake = _FakeIProfileStore()
+    fake.put(profile)
+
+    store = _SimpleProfileStore(tmp_path / "profiles", backing=fake)
+    loaded = store.get_profile("264077")
+
+    assert loaded.navigation.winning_page_url is None
+    assert loaded.confidence.maturity == ProfileMaturity.COLD
+
+
 def test_store_with_backing_delegates_save_to_put(tmp_path: Path) -> None:
     """``profile_updater`` calls ``store.save(profile)``. With a
     data-provider backing we must translate that to ``.put`` so writes

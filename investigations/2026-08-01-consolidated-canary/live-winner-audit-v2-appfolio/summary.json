@@ -1,0 +1,26 @@
+{
+  "audit_version": "live-warm-profile-winners-v2",
+  "completion": {
+    "complete": true,
+    "completed_routes": 205,
+    "expected_routes": 205
+  },
+  "generated_at": "2026-08-02T00:38:17.136905+00:00",
+  "inventory_skips": {
+    "already_match": 781,
+    "already_mismatch": 38,
+    "lower_priority_candidate": 320,
+    "no_unresolved_winner_route": 920
+  },
+  "provider_group_counts": {
+    "appfolio": 205
+  },
+  "scope": {
+    "profiles": 205,
+    "routes": 205
+  },
+  "status_counts": {
+    "MATCH": 125,
+    "UNKNOWN": 80
+  }
+}

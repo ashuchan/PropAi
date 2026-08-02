@@ -1,0 +1,36 @@
+{
+  "audit_version": "live-warm-profile-winners-v1",
+  "completion": {
+    "complete": true,
+    "completed_routes": 2529,
+    "expected_routes": 2529
+  },
+  "generated_at": "2026-08-02T00:34:07.364043+00:00",
+  "inventory_skips": {
+    "already_match": 781,
+    "already_mismatch": 38,
+    "lower_priority_candidate": 320,
+    "no_unresolved_winner_route": 920
+  },
+  "provider_group_counts": {
+    "appfolio": 205,
+    "entrata": 6,
+    "g5_inventory": 99,
+    "knock": 1,
+    "onsite": 64,
+    "property_or_operator_site": 1119,
+    "realpage": 71,
+    "rentcafe": 924,
+    "resman": 40
+  },
+  "scope": {
+    "profiles": 2529,
+    "routes": 2529
+  },
+  "status_counts": {
+    "FETCH_FAILED": 362,
+    "MATCH": 1624,
+    "MISMATCH": 10,
+    "UNKNOWN": 533
+  }
+}

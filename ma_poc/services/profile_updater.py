@@ -844,6 +844,16 @@ def update_profile_after_extraction(
     store: ProfileStore,
 ) -> ScrapeProfile:
     """Update profile based on what worked during this scrape."""
+    from ma_poc.services.profile_route_quarantine import (
+        quarantine_reason,
+        route_is_quarantined,
+        sanitise_profile_routes,
+    )
+
+    # Stop a legacy poisoned profile before any of its routes can be refreshed
+    # into another warm generation. Existing stores remain untouched until the
+    # normal successful write boundary below.
+    profile, _quarantined_on_read = sanitise_profile_routes(profile)
     tier = scrape_result.get("extraction_tier_used")
 
     # Data-quality signals, computed ONCE up front (2026-07-28). They were
@@ -948,7 +958,12 @@ def update_profile_after_extraction(
     # Captured BEFORE the write: the invalidation below must judge the URL
     # this run INHERITED from disk, not one this same call just wrote.
     _stored_wpu = profile.navigation.winning_page_url
-    if winning_url and units_extracted > 0 and not _is_infra_api_url(winning_url):
+    if (
+        winning_url
+        and units_extracted > 0
+        and not _is_infra_api_url(winning_url)
+        and not route_is_quarantined(profile.canonical_id, winning_url)
+    ):
         if contamination:
             log.warning(
                 "refusing to persist winning_page_url for %s (%s): %s",
@@ -962,6 +977,13 @@ def update_profile_after_extraction(
             path = urllib.parse.urlparse(winning_url).path
             if path and path != "/":
                 profile.navigation.availability_page_path = path
+    elif winning_url and route_is_quarantined(profile.canonical_id, winning_url):
+        log.warning(
+            "refusing to persist quarantined route for %s (%s): %s",
+            profile.canonical_id,
+            quarantine_reason(profile.canonical_id, winning_url),
+            winning_url,
+        )
 
     # ── Invalidate a winning_page_url that must not be replayed ────────
     # (a) zero units — the scraper tried profile:winning_page_url as a hop
@@ -1026,6 +1048,13 @@ def update_profile_after_extraction(
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")
+            if route_is_quarantined(profile.canonical_id, url):
+                log.warning(
+                    "refusing to persist quarantined API route for %s: %s",
+                    profile.canonical_id,
+                    url,
+                )
+                continue
             if _response_looks_like_units(api.get("body")):
                 # Track widget endpoints separately (they need special handling)
                 if "/apartments/module/widgets/" in url.lower():
@@ -1450,6 +1479,9 @@ def update_profile_after_extraction(
     except Exception as exc:
         log.warning("failed to persist rentcafe_property_id: %s", exc)
 
+    # Catch every secondary persistence channel (LLM mappings, field patches,
+    # navigation hints) at one final boundary as defence in depth.
+    profile, _quarantined_before_save = sanitise_profile_routes(profile)
     profile.updated_at = datetime.utcnow()
     profile.version += 1
     store.save(profile)

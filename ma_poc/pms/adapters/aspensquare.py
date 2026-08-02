@@ -314,7 +314,9 @@ class AspenSquareAdapter:
             return None
         try:
             from ma_poc.pms.adapters.knock import (
+                _current_knock_responses,
                 _fetch_knock_units_by_domain,
+                _validate_and_record_knock_identity,
                 find_knock_community_hash,
             )
         except ImportError:
@@ -334,6 +336,9 @@ class AspenSquareAdapter:
             return None
         if not pid or not units:
             return None
+        if _validate_and_record_knock_identity(ctx, result) is None:
+            return None
+        result.api_responses.extend(_current_knock_responses())
         from ma_poc.extraction.post_process import post_process
 
         pp = post_process(units, property_id=getattr(ctx, "property_id", None))

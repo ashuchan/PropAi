@@ -1,0 +1,1563 @@
+{
+  "audit_version": "warm-profile-identity-audit-v1",
+  "completion": {
+    "complete": true,
+    "completed_routes": 1345,
+    "expected_routes": 1345
+  },
+  "generated_at": "2026-08-01T23:45:30.359200+00:00",
+  "mismatches": [
+    {
+      "configured": {
+        "address": "109 Pine Knoll Dr",
+        "city": "Ridgeland",
+        "name": "Pinebrook",
+        "state": "MS",
+        "zip": "39157"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict"
+      ],
+      "observed": {
+        "address": "107 PINE KNOLL DR",
+        "city": "RIDGELAND",
+        "name": "Northbrook and Pinebrook",
+        "state": "MS",
+        "zip": "39157"
+      },
+      "property_id": "1352",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2025824"
+    },
+    {
+      "configured": {
+        "address": "100 Hickory Highlands Dr",
+        "city": "Antioch",
+        "name": "Hickory Highlands",
+        "state": "TN",
+        "zip": "37013"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The Landry",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "2196",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:116163"
+    },
+    {
+      "configured": {
+        "address": "4175 Ivanhoe Dr",
+        "city": "Monroeville",
+        "name": "Walnut Crossings",
+        "state": "PA",
+        "zip": "15146"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Walnut Crossing",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "5971",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:117701"
+    },
+    {
+      "configured": {
+        "address": "14101 Walters Rd",
+        "city": "Houston",
+        "name": "Abbey at Champions",
+        "state": "TX",
+        "zip": "77014"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "101 S. East Coast St",
+        "city": "Lake Worth",
+        "name": "The Bohemian",
+        "state": "FL",
+        "zip": "33460"
+      },
+      "property_id": "6356",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2014325"
+    },
+    {
+      "configured": {
+        "address": "12100 Metric Blvd",
+        "city": "Austin",
+        "name": "Twelve 100 Apartments",
+        "state": "TX",
+        "zip": "78758"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Twelve100",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "7770",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:89216"
+    },
+    {
+      "configured": {
+        "address": "2108 Tryon Rd",
+        "city": "Longview",
+        "name": "Towne Oaks North",
+        "state": "TX",
+        "zip": "75601"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "2501 NORTH EASTMAN ROAD",
+        "city": "Longview",
+        "name": "The Q's at Towne Oaks",
+        "state": "TX",
+        "zip": "75605"
+      },
+      "property_id": "12573",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:ec4d1da284893311"
+    },
+    {
+      "configured": {
+        "address": "2108 Tryon Rd",
+        "city": "Longview",
+        "name": "Towne Oaks North",
+        "state": "TX",
+        "zip": "75601"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "2501 NORTH EASTMAN ROAD",
+        "city": "Longview",
+        "name": "The Q's at Towne Oaks",
+        "state": "TX",
+        "zip": "75605"
+      },
+      "property_id": "12573",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2013868"
+    },
+    {
+      "configured": {
+        "address": "2900 Pearland Pkwy",
+        "city": "Pearland",
+        "name": "San Destin at Pearland",
+        "state": "TX",
+        "zip": "77581"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Sandestin at Pearland",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "14337",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:27789"
+    },
+    {
+      "configured": {
+        "address": "3750 Peachtree Industrial Blvd",
+        "city": "Duluth",
+        "name": "Montrose Berkeley Lake",
+        "state": "GA",
+        "zip": "30096"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Montrose Berkley Lake",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "20654",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:23003"
+    },
+    {
+      "configured": {
+        "address": "4727 200th St SW",
+        "city": "Lynnwood",
+        "name": "Collins Junction",
+        "state": "WA",
+        "zip": "98036"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "111 Atlantic Avenue",
+        "city": "Boston",
+        "name": "Mercantile Wharf",
+        "state": "MA",
+        "zip": "02110"
+      },
+      "property_id": "21370",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:0a1dc350a61da11f"
+    },
+    {
+      "configured": {
+        "address": "4727 200th St SW",
+        "city": "Lynnwood",
+        "name": "Collins Junction",
+        "state": "WA",
+        "zip": "98036"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "111 Atlantic Avenue",
+        "city": "Boston",
+        "name": "Mercantile Wharf",
+        "state": "MA",
+        "zip": "02110"
+      },
+      "property_id": "21370",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2029124"
+    },
+    {
+      "configured": {
+        "address": "5419 W Tropicana Ave",
+        "city": "Las Vegas",
+        "name": "Renaissance Villas",
+        "state": "NV",
+        "zip": "89103"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "4500 Truxel Road",
+        "city": "Sacramento",
+        "name": "Granite Point",
+        "state": "CA",
+        "zip": "95834"
+      },
+      "property_id": "23170",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:11ec3b4bccf28b95"
+    },
+    {
+      "configured": {
+        "address": "5419 W Tropicana Ave",
+        "city": "Las Vegas",
+        "name": "Renaissance Villas",
+        "state": "NV",
+        "zip": "89103"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "4500 Truxel Road",
+        "city": "Sacramento",
+        "name": "Granite Point",
+        "state": "CA",
+        "zip": "95834"
+      },
+      "property_id": "23170",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2013942"
+    },
+    {
+      "configured": {
+        "address": "1301 Crossing Pl",
+        "city": "Austin",
+        "name": "Village at East Riverside",
+        "state": "TX",
+        "zip": "78741"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "TBD",
+        "city": "Jacksonville",
+        "name": "Addison Landing",
+        "state": "FL",
+        "zip": "32210"
+      },
+      "property_id": "23791",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:ebea424aef11f060"
+    },
+    {
+      "configured": {
+        "address": "1600 Cooks Ln",
+        "city": "Fort Worth",
+        "name": "Windsong",
+        "state": "TX",
+        "zip": "76120"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Windsong of Fort Worth",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "30197",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:107638"
+    },
+    {
+      "configured": {
+        "address": "100 Landsdowne St",
+        "city": "Cambridge",
+        "name": "100",
+        "state": "MA",
+        "zip": "2139"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "100 Landsdowne",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "33353",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:13957"
+    },
+    {
+      "configured": {
+        "address": "111 Atlantic Ave",
+        "city": "Boston",
+        "name": "Mercantile Wharf Building",
+        "state": "MA",
+        "zip": "2110"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "4727 200th St SW",
+        "city": "Lynnwood",
+        "name": "Collins Junction Apartments",
+        "state": "WA",
+        "zip": "98036"
+      },
+      "property_id": "33539",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:af2b1d0111ea805d"
+    },
+    {
+      "configured": {
+        "address": "4500 Truxel Rd",
+        "city": "Sacramento",
+        "name": "Granite Point",
+        "state": "CA",
+        "zip": "95834"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "5419 W Tropicana Ave",
+        "city": "Las Vegas",
+        "name": "Renaissance Villas",
+        "state": "NV",
+        "zip": "89103"
+      },
+      "property_id": "35846",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:d1ef492653a11f11"
+    },
+    {
+      "configured": {
+        "address": "400-402 Foulk Rd",
+        "city": "Wilmington",
+        "name": "Brandywine Hundred",
+        "state": "DE",
+        "zip": "19803"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Brandywine",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "39281",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:28589"
+    },
+    {
+      "configured": {
+        "address": "2201 W Orem Dr",
+        "city": "Houston",
+        "name": "Trails at City Park",
+        "state": "TX",
+        "zip": "77047"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "8402 N Waterford Ave",
+        "city": "Tampa",
+        "name": "Belara Lakes",
+        "state": "FL",
+        "zip": "33604"
+      },
+      "property_id": "40171",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:03b911ee50be1354"
+    },
+    {
+      "configured": {
+        "address": "2600 E Cary St",
+        "city": "Richmond",
+        "name": "Lucky Strike Lofts at Tobacco Row",
+        "state": "VA",
+        "zip": "23223"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict"
+      ],
+      "observed": {
+        "address": "2 S 25th St.",
+        "city": "Richmond",
+        "name": "River Lofts at Tobacco Row",
+        "state": "VA",
+        "zip": "23223"
+      },
+      "property_id": "40789",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2027360"
+    },
+    {
+      "configured": {
+        "address": "6900 Lenox Village Dr",
+        "city": "Nashville",
+        "name": "Lenox Village Town Center",
+        "state": "TN",
+        "zip": "37211"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Lenox Village [Campus]",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "41308",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:84146"
+    },
+    {
+      "configured": {
+        "address": "9455 103rd St",
+        "city": "Jacksonville",
+        "name": "Addison Landing",
+        "state": "FL",
+        "zip": "32210"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "1301 Crossing Pl",
+        "city": "Austin",
+        "name": "Village at East Riverside",
+        "state": "TX",
+        "zip": "78741"
+      },
+      "property_id": "42510",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:40335811ec0f1dd8"
+    },
+    {
+      "configured": {
+        "address": "9455 103rd St",
+        "city": "Jacksonville",
+        "name": "Addison Landing",
+        "state": "FL",
+        "zip": "32210"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "1301 Crossing Pl",
+        "city": "Austin",
+        "name": "Village at East Riverside",
+        "state": "TX",
+        "zip": "78741"
+      },
+      "property_id": "42510",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2012875"
+    },
+    {
+      "configured": {
+        "address": "400420 Ford Rd",
+        "city": "St. Louis Park",
+        "name": "Shelard Village",
+        "state": "MN",
+        "zip": "55426"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Sumter Green",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "49598",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:87461"
+    },
+    {
+      "configured": {
+        "address": "3920 Ivy Summit Ct",
+        "city": "Cumming",
+        "name": "Summit Crossing North",
+        "state": "GA",
+        "zip": "30041"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Summit Crossing I & II",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "57777",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:102583"
+    },
+    {
+      "configured": {
+        "address": "165 Cambridgepark Dr",
+        "city": "Cambridge",
+        "name": "Fuse",
+        "state": "MA",
+        "zip": "2140"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Fuse Cambridge",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "62380",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:6511"
+    },
+    {
+      "configured": {
+        "address": "7714 Kennedy Hill Dr",
+        "city": "San Antonio",
+        "name": "The Kennedy at Brooks City Base",
+        "state": "TX",
+        "zip": "78235"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The Kennedy",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "67566",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:72690"
+    },
+    {
+      "configured": {
+        "address": "333 S Glebe Rd",
+        "city": "Arlington",
+        "name": "Dominion",
+        "state": "VA",
+        "zip": "22204"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Bell Dominion",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "69123",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:1841"
+    },
+    {
+      "configured": {
+        "address": "455 W 200 N",
+        "city": "Salt Lake City",
+        "name": "Hardware Village East",
+        "state": "UT",
+        "zip": "84103"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Hardware District",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "77045",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:1363"
+    },
+    {
+      "configured": {
+        "address": "624 N Glebe Rd",
+        "city": "Arlington",
+        "name": "UrbA I",
+        "state": "VA",
+        "zip": "22203"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Urba Apartments",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "91537",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:44624"
+    },
+    {
+      "configured": {
+        "address": "201 Wimberly St",
+        "city": "Fort Worth",
+        "name": "Park 7",
+        "state": "TX",
+        "zip": "76107"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "120 Towne Street",
+        "city": "Stamford",
+        "name": "Vault Apartments",
+        "state": "CT",
+        "zip": "06902"
+      },
+      "property_id": "218296",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2014544"
+    },
+    {
+      "configured": {
+        "address": "300 Fly Creek Ave",
+        "city": "Fairhope",
+        "name": "The Retreat at Fairhope Village",
+        "state": "AL",
+        "zip": "36532"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "4650 Nelson Road",
+        "city": "Lake Charles",
+        "name": "Evergreen at River Oaks",
+        "state": "LA",
+        "zip": "70605"
+      },
+      "property_id": "218987",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:11ea265f07da6ace"
+    },
+    {
+      "configured": {
+        "address": "300 Fly Creek Ave",
+        "city": "Fairhope",
+        "name": "The Retreat at Fairhope Village",
+        "state": "AL",
+        "zip": "36532"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "4650 Nelson Road",
+        "city": "Lake Charles",
+        "name": "Evergreen at River Oaks",
+        "state": "LA",
+        "zip": "70605"
+      },
+      "property_id": "218987",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2008223"
+    },
+    {
+      "configured": {
+        "address": "6401 Escena Blvd",
+        "city": "Irving",
+        "name": "AMLI at Escena",
+        "state": "TX",
+        "zip": "75039"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Amara Las Colinas",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "220156",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:18820"
+    },
+    {
+      "configured": {
+        "address": "2402 N Ben Wilson St",
+        "city": "Victoria",
+        "name": "The Pointe at Victoria",
+        "state": "TX",
+        "zip": "77901"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "3601 East McDowell Road",
+        "city": "Phoenix",
+        "name": "The Urban",
+        "state": "AZ",
+        "zip": "85008"
+      },
+      "property_id": "222578",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:eb7311ee4ff2571c"
+    },
+    {
+      "configured": {
+        "address": "2402 N Ben Wilson St",
+        "city": "Victoria",
+        "name": "The Pointe at Victoria",
+        "state": "TX",
+        "zip": "77901"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "3601 East McDowell Road",
+        "city": "Phoenix",
+        "name": "The Urban",
+        "state": "AZ",
+        "zip": "85008"
+      },
+      "property_id": "222578",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2023786"
+    },
+    {
+      "configured": {
+        "address": "14147 Darwin Dr",
+        "city": "Moreno Valley",
+        "name": "Prose Rancho Belago",
+        "state": "CA",
+        "zip": "92555"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Broadstone Rancho Belago",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "228863",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:78219"
+    },
+    {
+      "configured": {
+        "address": "2400 E Cary St",
+        "city": "Richmond",
+        "name": "Cameron Kinney",
+        "state": "VA",
+        "zip": "23223"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The River Lofts at Tobacco Row",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "231586",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:93664"
+    },
+    {
+      "configured": {
+        "address": "4615 Forest Dr",
+        "city": "Columbia",
+        "name": "Cardinal",
+        "state": "SC",
+        "zip": "29206"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The Cardinal at Cardinal Crossing",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "238690",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:2756"
+    },
+    {
+      "configured": {
+        "address": "4650 Nelson Rd",
+        "city": "Lake Charles",
+        "name": "Evergreen at River Oaks II",
+        "state": "LA",
+        "zip": "70605"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "300 Fly Creek Avenue",
+        "city": "Fairhope",
+        "name": "The Retreat at Fairhope Village",
+        "state": "AL",
+        "zip": "36523"
+      },
+      "property_id": "240743",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:a4fcc206511ea56b"
+    },
+    {
+      "configured": {
+        "address": "17715 Overlook Loop",
+        "city": "San Antonio",
+        "name": "TruNorth at Bulverde II & III",
+        "state": "TX",
+        "zip": "78259"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "TruNorth",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "246996",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:102461"
+    },
+    {
+      "configured": {
+        "address": "301 American Way N",
+        "city": "Carmel",
+        "name": "The Kent",
+        "state": "IN",
+        "zip": "46032"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Kent at Carmel City Center",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "253571",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:116058"
+    },
+    {
+      "configured": {
+        "address": "360 Acoma St",
+        "city": "Denver",
+        "name": "Jayne",
+        "state": "CO",
+        "zip": "80223"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Green Leaf Jayne",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "253777",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:64640"
+    },
+    {
+      "configured": {
+        "address": "5055 S Fort Apache Rd",
+        "city": "Las Vegas",
+        "name": "Ely at Fort Apache",
+        "state": "NV",
+        "zip": "89148"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The Gramercy",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "253797",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:21218"
+    },
+    {
+      "configured": {
+        "address": "5801 Lakehurst Dr",
+        "city": "Orlando",
+        "name": "Triton Cay I",
+        "state": "FL",
+        "zip": "32819"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Triton Cay \u2013 Orlando",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "256493",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:19018"
+    },
+    {
+      "configured": {
+        "address": "1621 S Dixie Hwy",
+        "city": "Pompano Beach",
+        "name": "Aviara East Pompano",
+        "state": "FL",
+        "zip": "33060"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Aviara Pompano Beach",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "258550",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:41128"
+    },
+    {
+      "configured": {
+        "address": "620 Foster St",
+        "city": "Durham",
+        "name": "GeerHouse I",
+        "state": "NC",
+        "zip": "27701"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "GeerHouse",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "262792",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:62417"
+    },
+    {
+      "configured": {
+        "address": "2791 Hopper Way",
+        "city": "Columbus",
+        "name": "Southbank at Quarry Trails",
+        "state": "OH",
+        "zip": "43228"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "South Bank at Quarry Trails",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "263860",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:103375"
+    },
+    {
+      "configured": {
+        "address": "7731 Menchaca Rd",
+        "city": "Austin",
+        "name": "Perch at Dawson's Ramble",
+        "state": "TX",
+        "zip": "78745"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Perch Apartments",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "267554",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:99601"
+    },
+    {
+      "configured": {
+        "address": "450 N Apache Rd",
+        "city": "Buckeye",
+        "name": "Lanai I",
+        "state": "AZ",
+        "zip": "85326"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Lanai",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "273989",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:108422"
+    },
+    {
+      "configured": {
+        "address": "3707 Grand Ave",
+        "city": "Des Moines",
+        "name": "The James",
+        "state": "IA",
+        "zip": "50312"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict"
+      ],
+      "observed": {
+        "address": "3717 Grand Ave",
+        "city": "Des Moines",
+        "name": "The James on Grand",
+        "state": "IA",
+        "zip": "50312"
+      },
+      "property_id": "276368",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:f711eecd03c674d4"
+    },
+    {
+      "configured": {
+        "address": "3707 Grand Ave",
+        "city": "Des Moines",
+        "name": "The James",
+        "state": "IA",
+        "zip": "50312"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict"
+      ],
+      "observed": {
+        "address": "3717 Grand Ave",
+        "city": "Des Moines",
+        "name": "The James on Grand",
+        "state": "IA",
+        "zip": "50312"
+      },
+      "property_id": "276368",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2023236"
+    },
+    {
+      "configured": {
+        "address": "4000 Nona West Blvd",
+        "city": "Orlando",
+        "name": "Ascend NonaWest I",
+        "state": "FL",
+        "zip": "32824"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Ascend Nona West",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "278113",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:94185"
+    },
+    {
+      "configured": {
+        "address": "29403 Cayman Canyon Way",
+        "city": "Katy",
+        "name": "Tamarron",
+        "state": "TX",
+        "zip": "77494"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Covey Homes Tamarron",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "278955",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:40372"
+    },
+    {
+      "configured": {
+        "address": "618 E Sycamore St",
+        "city": "Denton",
+        "name": "Railyard I",
+        "state": "TX",
+        "zip": "76204"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Railyard Modern Living",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "281837",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:95283"
+    },
+    {
+      "configured": {
+        "address": "1150 Hunter Trl",
+        "city": "Acworth",
+        "name": "Residences on Hunter Trail III",
+        "state": "GA",
+        "zip": "30102"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Covey Homes Hunter Trail",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "283741",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:61154"
+    },
+    {
+      "configured": {
+        "address": "350 N Reid Pl",
+        "city": "Sioux Falls",
+        "name": "The Clark Lofts",
+        "state": "SD",
+        "zip": "57103"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "The Clark",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "285247",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:37330"
+    },
+    {
+      "configured": {
+        "address": "130 Shipyard Way",
+        "city": "St Augustine",
+        "name": "The Southerly at Shipyards",
+        "state": "FL",
+        "zip": "32084"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "Southerly at the Shipyard",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "286698",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:80790"
+    },
+    {
+      "configured": {
+        "address": "1215 Evolve Way",
+        "city": "Greenville",
+        "name": "Evolve at the Pines",
+        "state": "NC",
+        "zip": "27858"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "1120 Autumn Field Dr.",
+        "city": "Huntersville",
+        "name": "Evolve Huntersville Apartment Homes",
+        "state": "NC",
+        "zip": "28078"
+      },
+      "property_id": "292538",
+      "provider": "knock",
+      "route_kind": "community",
+      "route_locator": "community:413dc323fda11ef1"
+    },
+    {
+      "configured": {
+        "address": "1215 Evolve Way",
+        "city": "Greenville",
+        "name": "Evolve at the Pines",
+        "state": "NC",
+        "zip": "27858"
+      },
+      "evidence": [
+        "name_conflict",
+        "house_number_conflict",
+        "zip_conflict"
+      ],
+      "observed": {
+        "address": "1120 Autumn Field Dr.",
+        "city": "Huntersville",
+        "name": "Evolve Huntersville Apartment Homes",
+        "state": "NC",
+        "zip": "28078"
+      },
+      "property_id": "292538",
+      "provider": "knock",
+      "route_kind": "numeric_property",
+      "route_locator": "property:2025291"
+    },
+    {
+      "configured": {
+        "address": "101 Cay Plaza",
+        "city": "Savannah",
+        "name": "EmmaJames at Savannah Harbor",
+        "state": "GA",
+        "zip": "31421"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "EmmaJames",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "296500",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:111444"
+    },
+    {
+      "configured": {
+        "address": "8683 Holly Grove Ct",
+        "city": "Riverview",
+        "name": "L\u201a\u00c4\u00f4Attitude27 Riverview",
+        "state": "FL",
+        "zip": "33578"
+      },
+      "evidence": [
+        "name_conflict",
+        "address_missing"
+      ],
+      "observed": {
+        "address": "",
+        "city": "",
+        "name": "L'Attitude 27 Riverview",
+        "state": "",
+        "zip": ""
+      },
+      "property_id": "299791",
+      "provider": "sightmap",
+      "route_kind": "asset",
+      "route_locator": "asset:64682"
+    }
+  ],
+  "profile_status_counts": {
+    "MATCH": 817,
+    "MISMATCH": 55,
+    "UNRESOLVED": 5
+  },
+  "route_status_counts": {
+    "FETCH_FAILED": 5,
+    "MATCH": 1277,
+    "MISMATCH": 63
+  },
+  "scope": {
+    "profiles": 877,
+    "route_counts_by_provider": {
+      "edifice": 5,
+      "knock": 947,
+      "sightmap": 393
+    },
+    "routes": 1345
+  }
+}

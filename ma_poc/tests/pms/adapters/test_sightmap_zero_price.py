@@ -704,7 +704,9 @@ async def test_direct_path_drops_dated_no_rent_to_operator_rent_not_published(
     surviving dated-no-rent rows."""
     from ma_poc.pms.adapters import sightmap as _sm
 
-    async def _stub_direct_probe(ctx: Any) -> list[dict[str, Any]]:
+    async def _stub_direct_probe(
+        ctx: Any, result: Any | None = None
+    ) -> list[dict[str, Any]]:
         return [
             make_unit_dict(
                 unit_number=f"01-{2100 + i}",
@@ -746,7 +748,9 @@ async def test_direct_path_keeps_priced_subset_when_mixed(
     DIRECT cohort."""
     from ma_poc.pms.adapters import sightmap as _sm
 
-    async def _stub_direct_probe(ctx: Any) -> list[dict[str, Any]]:
+    async def _stub_direct_probe(
+        ctx: Any, result: Any | None = None
+    ) -> list[dict[str, Any]]:
         return [
             make_unit_dict(
                 unit_number="P1", sqft="800",

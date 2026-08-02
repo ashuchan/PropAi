@@ -18,7 +18,14 @@ def main() -> None:
         if not path.is_file() or path == OUTPUT:
             continue
         relative = path.relative_to(ROOT)
-        if relative.parts[:2] == ("profile-snapshot", "profiles"):
+        # Raw warm profiles may contain public widget credentials.  Every
+        # snapshot/candidate carries object or payload hashes in its own
+        # committed manifest/ledger, so never enumerate the payloads here.
+        if relative.parts[:2] in {
+            ("profile-snapshot", "profiles"),
+            ("july-vetted-profile-snapshot-v1", "profiles"),
+            ("strict-warm-profile-candidate-v2", "profiles"),
+        }:
             continue
         if any("_venv_accidental_" in part for part in relative.parts):
             continue

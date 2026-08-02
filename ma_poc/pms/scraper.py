@@ -102,6 +102,7 @@ _UNREACHABLE_PATTERNS: tuple[str, ...] = (
 # place main before sub.
 _MERGE_LIST_KEYS: tuple[str, ...] = (
     "_raw_api_responses",
+    "_unit_source_provenance",
     "_llm_interactions",
     "_llm_field_mappings",
     "_tier_attempts",
@@ -4065,6 +4066,9 @@ async def scrape(
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
+    result["_unit_source_provenance"] = list(
+        adapter_result.unit_source_provenance
+    )
 
     # Learn a marketing-page DOM parser from this run's gold units + rendered
     # HTML ($0, no LLM) → serialized parser stashed for profile_updater to
@@ -7491,6 +7495,7 @@ async def scrape_jugnu(
                                 "api_calls_intercepted",
                                 "_winning_page_url",
                                 "_raw_api_responses",
+                                "_unit_source_provenance",
                                 "_adapter_used",
                                 "_fallback_chain",
                                 "_tier_attempts",
@@ -7510,6 +7515,7 @@ async def scrape_jugnu(
                             "api_calls_intercepted",
                             "_winning_page_url",
                             "_raw_api_responses",
+                            "_unit_source_provenance",
                             "_adapter_used",
                             "_fallback_chain",
                             "_tier_attempts",
@@ -7531,6 +7537,7 @@ async def scrape_jugnu(
                         "api_calls_intercepted",
                         "_winning_page_url",
                         "_raw_api_responses",
+                        "_unit_source_provenance",
                         "_adapter_used",
                         "_fallback_chain",
                         "_tier_attempts",

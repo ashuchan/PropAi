@@ -80,6 +80,7 @@ apply link.
 """
 from __future__ import annotations
 
+import html as html_lib
 import json
 import logging
 import re
@@ -122,6 +123,27 @@ _RESMAN_APPLY_UUID_RE = re.compile(
 _DATE_MMDDYYYY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$")
 
 
+def find_edificecms_property_ids(html: str) -> list[str]:
+    """Recover every plausible Edifice UUID in deterministic priority order.
+
+    HTML entity decoding is required for apply links such as
+    ``...?a=2071&amp;p=<UUID>``.  Explicit ajax ``property_id`` values come
+    first, followed by ResMan apply-link values.  A generic UUID scan is used
+    only when neither canonical surface is present.
+    """
+
+    if not html:
+        return []
+    decoded = html_lib.unescape(html).replace("\\/", "/")
+    candidates: list[str] = []
+    for pattern in (_PROPERTY_ID_RE, _RESMAN_APPLY_UUID_RE):
+        for match in pattern.finditer(decoded):
+            value = match.group(1).lower()
+            if value not in candidates:
+                candidates.append(value)
+    return candidates
+
+
 def find_edificecms_property_id(html: str) -> str | None:
     """Recover the Edifice CMS property UUID embedded in *html*.
 
@@ -138,15 +160,8 @@ def find_edificecms_property_id(html: str) -> str | None:
     Returns ``None`` only when both sources are absent — a strong signal
     that the page is NOT an Edifice CMS property after all.
     """
-    if not html:
-        return None
-    m = _PROPERTY_ID_RE.search(html)
-    if m:
-        return m.group(1).lower()
-    m = _RESMAN_APPLY_UUID_RE.search(html)
-    if m:
-        return m.group(1).lower()
-    return None
+    candidates = find_edificecms_property_ids(html)
+    return candidates[0] if candidates else None
 
 
 def _rent_to_int(val: Any) -> int | None:
@@ -480,26 +495,56 @@ class EdificeCmsAdapter:
             )
             return result
 
-        # 3. Recover the property UUID.
-        property_uuid = find_edificecms_property_id(html)
-        if not property_uuid:
+        # 3. Recover every candidate UUID. Co-resident recommendation/apply
+        # widgets can expose sibling UUIDs, so no candidate is trusted until
+        # its floorplans response identifies the configured property.
+        property_uuids = find_edificecms_property_ids(html)
+        if not property_uuids:
             result.tier_used = f"{_TIER}_NO_PROPERTY_ID"
             result.errors.append(
                 "EDIFICECMS: property_id UUID not discoverable in HTML"
             )
             return result
 
-        # 4. Fetch the floorplans catalog.
+        # 4. Fetch and identity-check candidate floorplan catalogs.
         fp_url = _FLOORPLANS_API
-        fp_resp = await _fetch_json(
-            fp_url,
-            {"action": "get_floorplans", "property_id": property_uuid},
-        )
-        if not fp_resp or not fp_resp.get("status"):
-            result.tier_used = f"{_TIER}_FLOORPLANS_FAIL"
-            result.errors.append(
-                f"EDIFICECMS: floorplans API failed for property_id={property_uuid}"
+        property_uuid = ""
+        fp_resp: dict[str, Any] | None = None
+        identity = None
+        configured_identity = bool(getattr(ctx, "property_name", "") or getattr(ctx, "address", ""))
+        from ma_poc.pms.property_identity import MATCH, evaluate_from_context
+
+        for candidate_uuid in property_uuids:
+            candidate_resp = await _fetch_json(
+                fp_url,
+                {"action": "get_floorplans", "property_id": candidate_uuid},
             )
+            if not candidate_resp or not candidate_resp.get("status"):
+                result.errors.append(
+                    f"EDIFICECMS: floorplans API failed for property_id={candidate_uuid}"
+                )
+                continue
+            candidate_identity = evaluate_from_context(
+                ctx, observed_name=candidate_resp.get("property") or ""
+            )
+            if configured_identity and candidate_identity.status != MATCH:
+                result.errors.append(
+                    "EDIFICECMS_PROPERTY_IDENTITY_REJECTED: "
+                    f"property_id={candidate_uuid} status={candidate_identity.status} "
+                    f"observed={candidate_identity.observed_name!r} "
+                    f"evidence={','.join(candidate_identity.evidence)}"
+                )
+                continue
+            property_uuid = candidate_uuid
+            fp_resp = candidate_resp
+            identity = candidate_identity
+            break
+
+        if not fp_resp:
+            if any("PROPERTY_IDENTITY_REJECTED" in error for error in result.errors):
+                result.tier_used = f"{_TIER}_PROPERTY_IDENTITY_REJECTED"
+            else:
+                result.tier_used = f"{_TIER}_FLOORPLANS_FAIL"
             return result
         plans = fp_resp.get("data")
         if not isinstance(plans, list) or not plans:
@@ -512,6 +557,9 @@ class EdificeCmsAdapter:
         # 5. For each plan with availability, hit the units endpoint and
         #    splice unit-level rows. For empties, emit a plan-level row.
         raw_units: list[dict[str, Any]] = []
+        from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+        unit_response_count = 0
         fp_source_url = (
             f"{fp_url}?action=get_floorplans&property_id={property_uuid}"
         )
@@ -543,6 +591,16 @@ class EdificeCmsAdapter:
                     )
                     raw_units.extend(
                         parse_edificecms_units(plan, units_for_plan, unit_source_url)
+                    )
+                    unit_response_count += len(units_for_plan)
+                    result.unit_source_provenance.append(
+                        build_unit_source_provenance(
+                            provider="edificecms",
+                            source_url=unit_source_url,
+                            body=units_resp,
+                            unit_count=len(units_for_plan),
+                            identity=identity,
+                        )
                     )
                     continue
                 # Fell through — plan claimed availability but the units
@@ -583,6 +641,21 @@ class EdificeCmsAdapter:
                 "via": "edificecms_probe",
             }
         )
+        # Catalog provenance is needed whenever plan summaries survive; if no
+        # per-plan unit response produced rows, it is the sole source.
+        if result.plan_summaries or unit_response_count == 0:
+            result.unit_source_provenance.append(
+                build_unit_source_provenance(
+                    provider="edificecms",
+                    source_url=fp_source_url,
+                    body=fp_resp,
+                    unit_count=len(result.plan_summaries)
+                    if result.plan_summaries
+                    else len(result.units),
+                    identity=identity,
+                    response_kind="floorplan_catalog",
+                )
+            )
         return result
 
     @staticmethod

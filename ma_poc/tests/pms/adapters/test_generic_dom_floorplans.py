@@ -635,6 +635,26 @@ def test_scope_link_naming_this_property_survives() -> None:
     )
 
 
+def test_scope_generic_property_url_has_no_sibling_identity_signal() -> None:
+    assert (
+        classify_href_scope(
+            "https://example.com/contact-us",
+            "/communities/some-property",
+        )
+        == "NEUTRAL"
+    )
+
+
+def test_three_character_property_slug_is_recognised() -> None:
+    assert (
+        classify_href_scope(
+            "https://example.com/ivy/",
+            "/properties/ivy/floorplans/a1",
+        )
+        == "NEUTRAL"
+    )
+
+
 # ── query-string-identified properties ───────────────────────────────
 # pmsi.biz / rookwoodproperties.com / apartmentsniagara.com identify the
 # property purely by query param, so path comparison alone cannot help.
@@ -675,10 +695,12 @@ def test_cards_without_anchors_are_never_rejected() -> None:
     assert len(kept) == len(_GOOD_CARDS)
 
 
-def test_scope_guard_rejects_set_when_fewer_than_two_survive() -> None:
-    """Re-applies the module's ≥2-admitted-cards invariant after filtering.
-    One surviving card is the property's own 'starting at' summary row
-    inside a sibling directory — plan-level noise, not a plan grid."""
+def test_scope_guard_keeps_single_positively_in_scope_survivor() -> None:
+    """A same-property anchor is stronger than the raw ≥2-card heuristic.
+
+    The two sibling recommendation cards are removed while the one card that
+    explicitly links back to the configured property remains attributable.
+    """
     cards = [
         {"name": "Riverwalk on the Falls", "text": "Riverwalk 1 Bed 1 Bath 800 sq ft $1,200",
          "hrefs": [_RIVERWALK]},
@@ -687,7 +709,7 @@ def test_scope_guard_rejects_set_when_fewer_than_two_survive() -> None:
         {"name": "The Orchard", "text": "The Orchard 1 Bed 1 Bath 900 sq ft $1,300",
          "hrefs": ["/apartments/wi/waukesha/the-orchard"]},
     ]
-    assert filter_cards_by_scope(cards, _RIVERWALK, _WIMMER_DIRECTORY) == []
+    assert filter_cards_by_scope(cards, _RIVERWALK, _WIMMER_DIRECTORY) == cards[:1]
 
 
 def test_scope_guard_keeps_majority_when_minority_off_scope() -> None:

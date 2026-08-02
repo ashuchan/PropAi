@@ -62,10 +62,12 @@ class _Resp:
         self.text = text
 
 
-def _patch_probe(monkeypatch, resp=None, raises=None) -> None:
+def _patch_probe(monkeypatch, resp=None, raises=None, metadata=None) -> None:
     def _pg(url, *, unlocker=True, **kw):
         if raises:
             raise raises
+        if metadata is not None and not url.rstrip("/").endswith("/units"):
+            return metadata
         return resp
 
     monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _pg)
@@ -156,3 +158,83 @@ async def test_probe_raises_falls_through(monkeypatch) -> None:
     monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_KNOCK_DIRECT_GET", True)
     _patch_probe(monkeypatch, raises=RuntimeError("network died"))
     assert await try_knock_direct(_Task(), _Profile(), None) is None
+
+
+@pytest.mark.asyncio
+async def test_property_identity_mismatch_rejects_stale_knock_endpoint(monkeypatch) -> None:
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_KNOCK_DIRECT_GET", True)
+    metadata = _Resp(
+        200,
+        json.dumps(
+            {
+                "property": {
+                    "data": {
+                        "location": {
+                            "name": "The Onyx",
+                            "address": "5150 Duke Ellington Way",
+                            "city": "Las Vegas",
+                            "state": "NV",
+                            "zip": "89119",
+                        }
+                    }
+                }
+            }
+        ),
+    )
+    _patch_probe(monkeypatch, _Resp(200, _UNITS_JSON), metadata=metadata)
+    row = {
+        "name": "Turtle Dove I",
+        "address": "3516 Matilda St",
+        "city": "Dallas",
+        "state": "TX",
+    }
+    assert await try_knock_direct(_Task(), _Profile(), row) is None
+
+
+@pytest.mark.asyncio
+async def test_property_identity_address_match_accepts_knock_endpoint(monkeypatch) -> None:
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_KNOCK_DIRECT_GET", True)
+    metadata = _Resp(
+        200,
+        json.dumps(
+            {
+                "property": {
+                    "data": {
+                        "location": {
+                            "name": "(RDG) Ridgewood Court",
+                            "address": "3616 Hogans Run Rd",
+                        }
+                    }
+                }
+            }
+        ),
+    )
+    _patch_probe(monkeypatch, _Resp(200, _UNITS_JSON), metadata=metadata)
+    row = {"name": "Ridgewood Apartments", "address": "3616 Hogans Run Road"}
+    output = await try_knock_direct(_Task(), _Profile(), row)
+    assert output is not None
+    assert output["result"]["_unit_source_provenance"][0]["identity"]["status"] == "MATCH"
+
+
+@pytest.mark.asyncio
+async def test_confirmed_turtle_route_is_quarantined_before_fetch(monkeypatch) -> None:
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_KNOCK_DIRECT_GET", True)
+    calls = 0
+
+    def _should_not_fetch(*_a, **_kw):
+        nonlocal calls
+        calls += 1
+        return _Resp(200, _UNITS_JSON)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _should_not_fetch)
+    task = _Task()
+    task.property_id = "222652"
+    profile = _Profile(
+        eps=[
+            _Ep(
+                "https://doorway-api.knockrentals.com/v1/property/2016765/units"
+            )
+        ]
+    )
+    assert await try_knock_direct(task, profile, {"name": "Turtle Dove I"}) is None
+    assert calls == 0

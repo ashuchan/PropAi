@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import html as html_lib
 import re
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
@@ -44,6 +45,28 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 # ``result.api_responses.append(...)``. Single-call lifetime — fine for
 # async because each fetch resets at the top.
 LAST_FETCH_RAW_RESPONSES: list[dict[str, Any]] = []
+_TASK_FETCH_RAW_RESPONSES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
+    "knock_fetch_raw_responses", default=None
+)
+
+
+def _reset_knock_responses() -> list[dict[str, Any]]:
+    """Create a task-local capture buffer (adapter calls run concurrently)."""
+
+    global LAST_FETCH_RAW_RESPONSES
+    responses: list[dict[str, Any]] = []
+    LAST_FETCH_RAW_RESPONSES = responses  # compatibility for external diagnostics
+    _TASK_FETCH_RAW_RESPONSES.set(responses)
+    return responses
+
+
+def _current_knock_responses() -> list[dict[str, Any]]:
+    responses = _TASK_FETCH_RAW_RESPONSES.get()
+    return responses if responses is not None else LAST_FETCH_RAW_RESPONSES
+
+
+def _capture_knock_response(response: dict[str, Any]) -> None:
+    _current_knock_responses().append(response)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -112,6 +135,56 @@ _ONESITE_PUBLISHED_PORTAL_RE = re.compile(
 )
 
 _RENT_INT_RE = re.compile(r"(\d[\d,]*)")
+
+
+def _validate_and_record_knock_identity(
+    ctx: AdapterContext, result: AdapterResult
+) -> Any | None:
+    """Require Knock metadata to bind the roster to the configured property."""
+
+    from ma_poc.pms.property_identity import (
+        MATCH,
+        evaluate_observed_from_context,
+        knock_observed_identity,
+    )
+
+    observed: dict[str, str] = {"name": "", "address": "", "city": "", "state": "", "zip": ""}
+    for response in _current_knock_responses():
+        candidate = knock_observed_identity(response.get("body"))
+        if candidate.get("name") or candidate.get("address"):
+            observed = candidate
+            break
+    identity = evaluate_observed_from_context(ctx, observed)
+    configured = bool(getattr(ctx, "property_name", "") or getattr(ctx, "address", ""))
+    if configured and identity.status != MATCH:
+        result.errors.append(
+            "KNOCK_PROPERTY_IDENTITY_REJECTED: "
+            f"status={identity.status} evidence={','.join(identity.evidence)} "
+            f"observed={identity.observed_name or identity.observed_address!r}"
+        )
+        return None
+
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    for response in _current_knock_responses():
+        if response.get("via") != "knock_units":
+            continue
+        body = response.get("body")
+        count = 0
+        if isinstance(body, dict):
+            units_data = body.get("units_data")
+            units_list = units_data.get("units") if isinstance(units_data, dict) else None
+            count = len(units_list) if isinstance(units_list, list) else 0
+        result.unit_source_provenance.append(
+            build_unit_source_provenance(
+                provider="knock",
+                source_url=str(response.get("url") or ""),
+                body=body,
+                unit_count=count,
+                identity=identity,
+            )
+        )
+    return identity
 
 
 def _to_int(v: Any) -> int | None:
@@ -383,6 +456,9 @@ class KnockAdapter:
                 result.errors.append(f"knock-api-error: {exc}")
                 units = []
             if units:
+                if _validate_and_record_knock_identity(ctx, result) is None:
+                    units = []
+            if units:
                 result.units = units
                 result.winning_url = (
                     f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
@@ -392,7 +468,7 @@ class KnockAdapter:
                 # Step 9b can pull leasingSpecial / leasingSpecialIsActive
                 # out of the community-API body. Without this, concession
                 # capture silently misses for every Knock site.
-                for _raw in LAST_FETCH_RAW_RESPONSES:
+                for _raw in _current_knock_responses():
                     result.api_responses.append(_raw)
                 return result
             result.errors.append("knock-adapter: Doorway API returned no units for community_id")
@@ -412,6 +488,9 @@ class KnockAdapter:
                 )
                 pid, units = None, []
             if pid and units:
+                if _validate_and_record_knock_identity(ctx, result) is None:
+                    units = []
+            if pid and units:
                 result.units = units
                 result.winning_url = (
                     f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
@@ -419,7 +498,7 @@ class KnockAdapter:
                 result.tier_used = "TIER_1_KNOCK_API_BY_DOMAIN"
                 result.confidence = min(0.9, 0.6 + 0.02 * len(units))
                 # Surface raw API responses (see Path 1 comment for rationale)
-                for _raw in LAST_FETCH_RAW_RESPONSES:
+                for _raw in _current_knock_responses():
                     result.api_responses.append(_raw)
                 return result
             if pid is None:
@@ -562,8 +641,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
 
     # Reset capture buffer for this call (single-threaded inside an
     # async fetch; only the current adapter consumes it).
-    global LAST_FETCH_RAW_RESPONSES
-    LAST_FETCH_RAW_RESPONSES = []
+    _reset_knock_responses()
 
     headers = {
         "User-Agent": (
@@ -577,14 +655,35 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
     base = "https://doorway-api.knockrentals.com/v1/property"
     if kind == "numeric_property":
         # Community API was already short-circuited to a numeric id by the
-        # caller; hit /units directly.
+        # caller. Bind it through the public metadata endpoint before /units.
+        metadata_url = f"{base}/{comm_id}"
         units_url = f"{base}/{comm_id}/units"
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            mr = await _knock_get(c, metadata_url, headers)
+            if mr.status_code == 200:
+                try:
+                    metadata_body = mr.json()
+                except Exception:
+                    metadata_body = None
+                if isinstance(metadata_body, dict):
+                    _capture_knock_response({
+                        "url": metadata_url,
+                        "status": 200,
+                        "body": metadata_body,
+                        "via": "knock_property_metadata",
+                    })
             r = await _knock_get(c, units_url, headers)
             if r.status_code != 200:
                 return []
             try:
-                return parse_knock_units(r.json(), source_api_url=units_url)
+                units_body = r.json()
+                _capture_knock_response({
+                    "url": units_url,
+                    "status": 200,
+                    "body": units_body,
+                    "via": "knock_units",
+                })
+                return parse_knock_units(units_body, source_api_url=units_url)
             except Exception:
                 return []
 
@@ -603,7 +702,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         # surface it for the scraper's concession scan. This is where
         # ``property.data.leasing.terms.leasingSpecial`` lives —
         # confirmed on livebrez.com / hamburgfarmslex.com HARs.
-        LAST_FETCH_RAW_RESPONSES.append({
+        _capture_knock_response({
             "url": community_url,
             "status": 200,
             "body": community_body,
@@ -618,7 +717,7 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
             return []
         try:
             units_body = r2.json()
-            LAST_FETCH_RAW_RESPONSES.append({
+            _capture_knock_response({
                 "url": units_url,
                 "status": 200,
                 "body": units_body,
@@ -754,6 +853,8 @@ async def _fetch_knock_units_by_domain(
 
     import httpx
 
+    _reset_knock_responses()
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -765,12 +866,33 @@ async def _fetch_knock_units_by_domain(
     }
 
     async def _fetch_units(c: httpx.AsyncClient, pid_str: str) -> list[dict[str, Any]]:
+        metadata_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}"
+        mr = await _knock_get(c, metadata_url, headers)
+        if mr.status_code == 200:
+            try:
+                metadata_body = mr.json()
+            except Exception:
+                metadata_body = None
+            if isinstance(metadata_body, dict):
+                _capture_knock_response({
+                    "url": metadata_url,
+                    "status": 200,
+                    "body": metadata_body,
+                    "via": "knock_property_metadata",
+                })
         units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
         ur = await _knock_get(c, units_url, headers)
         if ur.status_code != 200:
             return []
         try:
-            return parse_knock_units(ur.json(), source_api_url=units_url)
+            units_body = ur.json()
+            _capture_knock_response({
+                "url": units_url,
+                "status": 200,
+                "body": units_body,
+                "via": "knock_units",
+            })
+            return parse_knock_units(units_body, source_api_url=units_url)
         except Exception:
             return []
 
@@ -789,6 +911,12 @@ async def _fetch_knock_units_by_domain(
                         boot_body = br.json()
                     except Exception:
                         boot_body = {}
+                    _capture_knock_response({
+                        "url": boot_url,
+                        "status": 200,
+                        "body": boot_body,
+                        "via": "knock_community",
+                    })
                     pid = (boot_body.get("property") or {}).get("id")
                     if pid:
                         pid_str = str(pid)
@@ -806,6 +934,12 @@ async def _fetch_knock_units_by_domain(
                 profile_body = pr.json()
             except Exception:
                 return None, []
+            _capture_knock_response({
+                "url": profile_url,
+                "status": 200,
+                "body": profile_body,
+                "via": "knock_profile",
+            })
             pid = (profile_body.get("profile") or {}).get("property")
             if not pid:
                 return None, []

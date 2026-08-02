@@ -2439,6 +2439,10 @@ def _provenance_block(
         "winning_tier": result.get("extraction_tier_used"),
         "tiers_attempted": list(result.get("_fallback_chain") or []),
         "api_calls_intercepted": len(result.get("api_calls_intercepted") or []),
+        # Exact unit-producing response(s): sanitised URL + body hash +
+        # property-identity verdict. This is intentionally separate from the
+        # broad intercepted-response count above.
+        "unit_source": list(result.get("_unit_source_provenance") or [])[:20],
         "is_lease_up": _is_lease_up(csv_row),
         "fetch": {
             "outcome": outcome_val,
@@ -4955,8 +4959,13 @@ class _SimpleProfileStore:
         try:
             if self._uses_data_provider:
                 # IProfileStore.get is the canonical read API.
-                return self._backing.get(property_id)
-            return self._backing.load(property_id)
+                profile = self._backing.get(property_id)
+            else:
+                profile = self._backing.load(property_id)
+            from ma_poc.services.profile_route_quarantine import sanitise_profile_routes
+
+            profile, _removed = sanitise_profile_routes(profile, property_id)
+            return profile
         except Exception as exc:
             log.warning(
                 "profile load failed for %s via %s: %s — falling back to FS",
@@ -4966,7 +4975,11 @@ class _SimpleProfileStore:
             )
             if self._uses_data_provider:
                 try:
-                    return self._fs_backing.load(property_id)
+                    profile = self._fs_backing.load(property_id)
+                    from ma_poc.services.profile_route_quarantine import sanitise_profile_routes
+
+                    profile, _removed = sanitise_profile_routes(profile, property_id)
+                    return profile
                 except Exception:
                     return None
             return None
