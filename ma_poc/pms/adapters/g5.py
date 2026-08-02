@@ -25,6 +25,7 @@ Key findings (2026-05-13)
   ``availabilityDate`` populated — a strict improvement over the current
   generic Tier 1 pipeline which loses the date.
 """
+
 from __future__ import annotations
 
 import re
@@ -256,6 +257,72 @@ def _g5_specials_to_str(val: Any) -> str:
     return ""
 
 
+_G5_DIMENSION_PAIR_RE = re.compile(r"(?<!\d)([1-9]\d?)\s*[xX]\s*([1-9]\d?(?:\.\d+)?)(?!\d)")
+_G5_BED_RE = re.compile(r"(?<!\d)([1-9]\d?)\s*bed(?:room)?s?\b", re.IGNORECASE)
+_G5_BATH_RE = re.compile(r"(?<!\d)([1-9]\d?(?:\.\d+)?)\s*bath(?:room)?s?\b", re.IGNORECASE)
+
+
+def _is_numeric_zero(value: Any) -> bool:
+    try:
+        return float(value) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _g5_explicit_dimensions(*labels: Any) -> tuple[int | None, float | None, str]:
+    """Infer only explicit non-studio dimensions from G5 names/codes."""
+
+    texts = [str(label).strip() for label in labels if str(label or "").strip()]
+    for text in texts:
+        pair = _G5_DIMENSION_PAIR_RE.search(text)
+        if pair:
+            return int(pair.group(1)), float(pair.group(2)), text
+
+    beds: int | None = None
+    baths: float | None = None
+    evidence = ""
+    for text in texts:
+        # Zero-bedroom is normally a valid studio. Never override it from a
+        # studio/S-code heuristic; only explicit positive words or NxM win.
+        if "studio" in text.casefold():
+            continue
+        bed_match = _G5_BED_RE.search(text)
+        bath_match = _G5_BATH_RE.search(text)
+        if beds is None and bed_match:
+            beds = int(bed_match.group(1))
+            evidence = evidence or text
+        if baths is None and bath_match:
+            baths = float(bath_match.group(1))
+            evidence = evidence or text
+    return beds, baths, evidence
+
+
+def _repair_g5_dimension_contradiction(
+    beds: Any,
+    baths: Any,
+    *,
+    apartment_code: Any,
+    floor_plan_name: Any,
+) -> tuple[Any, Any, str]:
+    """Repair source zeroes only when an explicit positive token disagrees."""
+
+    explicit_beds, explicit_baths, evidence = _g5_explicit_dimensions(
+        apartment_code,
+        floor_plan_name,
+    )
+    repaired: list[str] = []
+    if _is_numeric_zero(beds) and explicit_beds is not None and explicit_beds > 0:
+        beds = explicit_beds
+        repaired.append(f"beds:0->{explicit_beds}")
+    if _is_numeric_zero(baths) and explicit_baths is not None and explicit_baths > 0:
+        baths = explicit_baths
+        repaired.append(f"baths:0->{explicit_baths:g}")
+    correction = ";".join(repaired)
+    if correction and evidence:
+        correction = f"{correction};evidence={evidence}"
+    return beds, baths, correction
+
+
 def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Convert G5's ``apartmentComplex.apartments`` list into unit dicts."""
     ac = (payload.get("data") or {}).get("apartmentComplex") or {}
@@ -277,13 +344,26 @@ def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
         fp = a.get("floorplan") or {}
         beds = fp.get("beds")
         baths = fp.get("baths")
+        beds, baths, dimension_correction = _repair_g5_dimension_contradiction(
+            beds,
+            baths,
+            apartment_code=a.get("name"),
+            floor_plan_name=fp.get("name"),
+        )
         sqft = _sqft_to_int(fp.get("sqft")) or _sqft_to_int(a.get("sqftDisplay"))
-        unit_number = a.get("name") or a.get("displayName") or ""
+        native_id = a.get("id")
+        public_label = a.get("displayName") or ""
+        plan_name = fp.get("name") or a.get("name") or ""
         avail = a.get("availabilityDate") or ""
         out.append(
             {
-                "unit_number": str(unit_number),
-                "floor_plan_name": str(fp.get("name") or ""),
+                # G5 ``name`` is a repeated apartment/plan type on the
+                # affected portfolio. Native ``id`` is the physical anchor;
+                # ``displayName`` is what the operator shows to prospects.
+                "unit_id": str(native_id) if native_id not in (None, "") else "",
+                "unit_number": str(public_label or native_id or ""),
+                "unit_name": str(public_label) if public_label else None,
+                "floor_plan_name": str(plan_name),
                 "bedrooms": str(beds) if beds is not None else "",
                 "bathrooms": str(baths) if baths is not None else "",
                 "sqft": str(sqft) if sqft else "",
@@ -294,6 +374,17 @@ def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "availability_date": str(avail)[:30],
                 "building": str(a.get("building") or ""),
                 "concession": _fp_spec.get(fp.get("id"), ""),
+                "source_ids": {
+                    key: str(value)
+                    for key, value in {
+                        "g5_apartment_id": native_id,
+                        "g5_floor_plan_id": fp.get("id"),
+                        "g5_property_id": ac.get("id"),
+                    }.items()
+                    if value not in (None, "")
+                },
+                "data_quality_flag": ("G5_EXPLICIT_DIMENSION_CORRECTION" if dimension_correction else None),
+                "dimension_correction_provenance": dimension_correction or None,
                 "extraction_tier": _TIER_BASE,
             }
         )
@@ -341,9 +432,7 @@ class G5Adapter:
         candidates = find_g5_urn_candidates(html) if html else []
         if not candidates:
             result.tier_used = _TIER_NO_URN
-            result.errors.append(
-                "g5-adapter: no g5-cl-... URN in rendered HTML"
-            )
+            result.errors.append("g5-adapter: no g5-cl-... URN in rendered HTML")
             return result
 
         base_url = str(getattr(ctx, "base_url", "") or "")
@@ -355,9 +444,7 @@ class G5Adapter:
             try:
                 payload = await _fetch_g5_units(cand_urn, base_url=base_url)
             except Exception as exc:
-                last_error = (
-                    f"{type(exc).__name__}: {str(exc)[:80]}"
-                )
+                last_error = f"{type(exc).__name__}: {str(exc)[:80]}"
                 continue
             if not payload:
                 last_error = "empty response"
@@ -404,12 +491,31 @@ class G5Adapter:
         # can pull floorplanSpecials / hasFloorplanSpecials out of the
         # payload. Without this, the adapter consumes the payload locally
         # and discards it — concession capture misses for every G5 site.
-        result.api_responses.append({
-            "url": f"{_G5_ENDPOINT}?urn={winning_urn}",
-            "status": 200,
-            "body": winning_payload,
-            "via": "g5_graphql_direct",
-        })
+        result.api_responses.append(
+            {
+                "url": f"{_G5_ENDPOINT}?urn={winning_urn}",
+                "status": 200,
+                "body": winning_payload,
+                "via": "g5_graphql_direct",
+            }
+        )
+        from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+        complex_payload = (winning_payload.get("data") or {}).get("apartmentComplex") or {}
+        result.unit_source_provenance.append(
+            build_unit_source_provenance(
+                provider="g5",
+                source_url=f"{_G5_ENDPOINT}?urn={winning_urn}",
+                body=winning_payload,
+                unit_count=len(units),
+                identity={
+                    "property_id": str(getattr(ctx, "property_id", "") or ""),
+                    "g5_urn": winning_urn,
+                    "g5_property_id": str(complex_payload.get("id") or ""),
+                    "g5_property_name": str(complex_payload.get("name") or ""),
+                },
+            )
+        )
         return result
 
     def static_fingerprints(self) -> list[str]:
@@ -486,6 +592,7 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     if base_url:
         try:
             from urllib.parse import urlparse
+
             p = urlparse(base_url)
             if p.scheme and p.netloc:
                 origin = f"{p.scheme}://{p.netloc}"
@@ -511,11 +618,11 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     # curl_cffi import deferred so the adapter loads even when curl_cffi
     # is absent (test envs); fall back to httpx in that case.
     try:
-        from curl_cffi import requests as _cr
-
         # curl_cffi is synchronous — wrap in asyncio.to_thread so the
         # adapter's outer ``async`` flow doesn't block the event loop.
         import asyncio as _asyncio
+
+        from curl_cffi import requests as _cr
 
         def _do_post() -> tuple[int, str]:
             r = _cr.post(
@@ -532,6 +639,7 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
             return None
         try:
             import json as _json
+
             return _json.loads(text)
         except Exception:
             return None
@@ -540,9 +648,7 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
         # minimal envs without curl_cffi).
         import httpx
 
-        async with httpx.AsyncClient(
-            timeout=15.0, follow_redirects=True
-        ) as c:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
             r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
             if r.status_code != 200:
                 return None
@@ -612,9 +718,7 @@ def _to_int(v: object) -> int | None:
         return None
 
 
-def parse_g5_apollo_floorplans(
-    fps: list[dict[str, object]], url: str
-) -> list[dict[str, str]]:
+def parse_g5_apollo_floorplans(fps: list[dict[str, object]], url: str) -> list[dict[str, str]]:
     """Plan-level rows from Apollo ``Floorplan`` objects (rates numeric)."""
     units: list[dict[str, str]] = []
     for fp in fps:
@@ -651,9 +755,7 @@ def parse_g5_apollo_floorplans(
     return units
 
 
-def parse_g5_apollo_units(
-    rows: list[dict[str, object]], url: str
-) -> list[dict[str, str]]:
+def parse_g5_apollo_units(rows: list[dict[str, object]], url: str) -> list[dict[str, str]]:
     """Unit-level rows from Apollo Apartment↔Prices↔Floorplan join."""
     units: list[dict[str, str]] = []
     for r in rows:

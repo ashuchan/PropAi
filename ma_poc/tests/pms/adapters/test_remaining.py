@@ -97,6 +97,8 @@ async def test_avalonbay_extract_happy_path() -> None:
     assert isinstance(result, AdapterResult)
     assert len(result.units) == 2
     assert "AVALONBAY" in result.units[0]["extraction_tier"]
+    assert result.unit_source_provenance
+    assert result.unit_source_provenance[0]["provider"] == "avalonbay"
 
 
 @pytest.mark.asyncio

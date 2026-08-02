@@ -17,8 +17,9 @@ Deer Run cohort, canary 1ef1060 post-phase16-v2):
 * End-to-end ``ThinkResideAdapter.extract`` on live HTML + mocked
   per-plan fetches emits ≥10 admitted unit rows from Indy Flats.
 * Bedroom 0 (Studio) preserved as ``"0"`` not coerced to ``""``.
-* Date normalisation: ``"Now"`` → today; ``"06/23/2026"`` → ``"2026-
-  06-23"``; ``"YYYY-MM-DD"`` → passthrough; junk → ``""``.
+* Date boundary: raw ``"Now"`` survives to the formatter, which resolves it
+  against the capture date with ``available_now`` provenance; explicit dates
+  remain exact.
 * Rent parsing: ``"$830.0000"`` → 830; ``"$1,250.00"`` → 1250;
   ``"Call for pricing"`` → ``None``.
 """
@@ -34,6 +35,7 @@ from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.adapters.thinkreside import (
     ThinkResideAdapter,
+    _fetch_text,
     _norm_avail_date,
     _strip_dollars,
     parse_thinkreside_plan_index,
@@ -49,16 +51,18 @@ INDY_HOME = (FIXTURES / "indyflats_home.html").read_text(encoding="utf-8")
 OR_HOME = (FIXTURES / "orchardridge_home_ascent.html").read_text(encoding="utf-8")
 OR_ONE_BD_DETAIL = (FIXTURES / "orchardridge_one_bedroom_detail.html").read_text(encoding="utf-8")
 DEER_HOME = (FIXTURES / "deerrun_home_townth.html").read_text(encoding="utf-8")
+DEER_FLOORPLANS = (FIXTURES / "deerrun_floorplans_towncommunity.html").read_text(
+    encoding="utf-8"
+)
 
 
 # ─── unit helpers ────────────────────────────────────────────────────
 
 
 def test_norm_avail_date_handles_now_iso_and_mmddyyyy() -> None:
-    """data-date="Now" → today; MM/DD/YYYY → ISO; ISO passthrough."""
-    today = datetime.now(tz=UTC).date().isoformat()
-    assert _norm_avail_date("Now") == today
-    assert _norm_avail_date("  now  ") == today  # whitespace + case
+    """Raw Now survives; explicit dates normalize without value loss."""
+    assert _norm_avail_date("Now") == "Now"
+    assert _norm_avail_date("  now  ") == "now"  # source case, whitespace trimmed
     assert _norm_avail_date("06/23/2026") == "2026-06-23"
     assert _norm_avail_date("6/3/2026") == "2026-06-03"  # single-digit pad
     assert _norm_avail_date("2026-06-23") == "2026-06-23"
@@ -131,6 +135,69 @@ def test_pattern_b_div_plan_cards_parsed_from_orchardridge_home() -> None:
     )
 
 
+# ─── plan-index parsing (Pattern C: <li class="floorplan">) ─────────
+
+
+def test_pattern_c_towncommunity_cards_preserve_exact_deer_run_catalogue() -> None:
+    """Current Deer Run source is exactly four ordered catalogue plans."""
+    plans = parse_thinkreside_plan_index(
+        DEER_FLOORPLANS, "https://www.liveatdeerrunapts.com"
+    )
+
+    assert [p["name"] for p in plans] == [
+        "2 Bdrm 1.5 Bath -Ranch or Split Ranch Style",
+        "One Bedroom - Ranch Style",
+        "Two Bedroom 1.5 Bath - Garden Style",
+        "Two Bedroom 2 Bath - Ranch or Garden Style",
+    ]
+    assert [(p["beds"], p["baths"]) for p in plans] == [
+        ("2", "1.5"),
+        ("1", "1"),
+        ("2", "1.5"),
+        ("2", "2"),
+    ]
+    assert [p["sqft"] for p in plans] == ["1050", "728", "1150", "1,050 - 1,150"]
+    assert (plans[-1]["sqft_low"], plans[-1]["sqft_high"]) == (1050, 1150)
+    assert [(p["rent_low"], p["rent_high"]) for p in plans] == [
+        (1430, 1430),
+        (1225, 1225),
+        (1420, 1430),
+        (1450, 1450),
+    ]
+    assert [p["detail_url"].rsplit("/", 1)[-1] for p in plans] == [
+        "2-bdrm-15-bath-ranch-or-split-ranch-style",
+        "one-bedroom-ranch-style",
+        "two-bedroom-15-bath-garden-style",
+        "two-bedroom-2-bath-ranch-or-garden-style",
+    ]
+
+
+def test_pattern_c_rejects_cross_property_and_ambiguous_detail_links() -> None:
+    """A card is admitted only with one same-property detail route."""
+    cross_host = DEER_FLOORPLANS.replace(
+        'href="/floorplans/one-bedroom-ranch-style"',
+        'href="https://sibling.example/floorplans/one-bedroom-ranch-style"',
+        1,
+    )
+    plans = parse_thinkreside_plan_index(
+        cross_host, "https://www.liveatdeerrunapts.com"
+    )
+    assert len(plans) == 3
+    assert "One Bedroom - Ranch Style" not in {p["name"] for p in plans}
+
+    ambiguous = DEER_FLOORPLANS.replace(
+        '<a href="/floorplans/one-bedroom-ranch-style">View</a>',
+        '<a href="/floorplans/one-bedroom-ranch-style">View</a>'
+        '<a href="/floorplans/sibling-plan">Recommended</a>',
+        1,
+    )
+    plans = parse_thinkreside_plan_index(
+        ambiguous, "https://www.liveatdeerrunapts.com"
+    )
+    assert len(plans) == 3
+    assert "One Bedroom - Ranch Style" not in {p["name"] for p in plans}
+
+
 # ─── per-plan unit-table parsing ──────────────────────────────────────
 
 
@@ -155,8 +222,8 @@ def test_unit_table_parsed_from_indyflats_barbee_detail() -> None:
     u210 = next(u for u in units if u["unit_number"] == "210")
     assert u210["market_rent_low"] == 830
     assert u210["market_rent_high"] == 830
-    # date_date="Now" → today's UTC date.
-    assert u210["availability_date"] == datetime.now(tz=UTC).date().isoformat()
+    # The source-relative token survives until the capture-aware formatter.
+    assert u210["availability_date"] == "Now"
     assert u210["availability_status"] == "AVAILABLE"
     # Plan-level dims spliced onto each row.
     assert u210["bedrooms"] == "1"
@@ -171,6 +238,37 @@ def test_unit_table_parsed_from_indyflats_barbee_detail() -> None:
     # 06/23/2026 → 2026-06-23 (ISO normalised).
     u312 = next(u for u in units if u["unit_number"] == "312")
     assert u312["availability_date"] == "2026-06-23"
+
+
+def test_thinkreside_now_and_future_dates_survive_source_to_final() -> None:
+    """Formatter owns capture-date resolution and provenance classification."""
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    plan = {
+        "name": "Barbee 1 Bedroom",
+        "beds": "1",
+        "baths": "1",
+        "sqft": "650",
+    }
+    html = """
+    <table class="fp-availability-list"><tbody>
+      <tr><td>210</td><td data-date="Now">Now</td><td></td><td>$830.0000</td></tr>
+      <tr><td>312</td><td data-date="08/25/2026">08/25/2026</td><td></td><td>$850.0000</td></tr>
+    </tbody></table>
+    """
+    parsed = parse_thinkreside_unit_table(
+        html, plan, "https://www.indyflatsapts.com/floorplans/barbee-1-bedroom"
+    )
+    capture = datetime(2026, 8, 1, 23, 30, tzinfo=UTC)
+    now_out = _format_v2_unit(parsed[0], capture, "271195")
+    future_out = _format_v2_unit(parsed[1], capture, "271195")
+
+    assert parsed[0]["availability_date"] == "Now"
+    assert now_out["available_date"] == "2026-08-01"
+    assert now_out["availability_date_provenance"] == "available_now"
+    assert parsed[1]["availability_date"] == "2026-08-25"
+    assert future_out["available_date"] == "2026-08-25"
+    assert future_out["availability_date_provenance"] == "explicit_future"
 
 
 def test_unit_table_empty_tbody_returns_no_rows() -> None:
@@ -201,8 +299,8 @@ def test_unit_table_no_fp_availability_list_returns_no_rows() -> None:
 # ─── plan-level summary fallback ──────────────────────────────────────
 
 
-def test_plan_summary_emits_available_for_plan_with_rent() -> None:
-    """A plan with a parseable rent → AVAILABLE plan-level summary row."""
+def test_plan_summary_price_without_inventory_remains_unknown() -> None:
+    """A catalogue rent without a roster/count is not availability proof."""
     plan = {
         "name": "Barbee 1 Bedroom",
         "beds": "1",
@@ -215,12 +313,31 @@ def test_plan_summary_emits_available_for_plan_with_rent() -> None:
     }
     row = thinkreside_plan_summary_row(plan, plan["detail_url"])
     assert row is not None
-    assert row["availability_status"] == "AVAILABLE"
+    assert row["availability_status"] == "UNKNOWN"
     assert row["market_rent_low"] == 850
     assert row["floor_plan_name"] == "Barbee 1 Bedroom"
     assert row["unit_number"] == ""  # plan-level, no unit
     assert row["bedrooms"] == "1"
     assert row["source_ids"]["thinkreside_plan_slug"] == "barbee-1-bedroom"
+
+
+def test_plan_summary_positive_unit_count_is_available() -> None:
+    plan = {
+        "name": "Barbee 1 Bedroom",
+        "beds": "1",
+        "baths": "1",
+        "sqft": "650",
+        "rent_low": 850,
+        "rent_high": 875,
+        "detail_url": "https://x.com/floorplans/barbee-1-bedroom",
+        "status_units": 3,
+    }
+    row = thinkreside_plan_summary_row(plan, plan["detail_url"])
+    assert row is not None
+    assert row["availability_status"] == "AVAILABLE"
+    assert row["available_units"] == "3"
+    assert row["market_rent_low"] == 850
+    assert row["market_rent_high"] == 875
 
 
 def test_plan_summary_emits_unknown_for_call_for_pricing() -> None:
@@ -434,6 +551,83 @@ def test_adapter_extract_falls_back_to_plan_level_when_detail_empty() -> None:
     assert len(result.plan_summaries) == 3
     # All plans were "Call for pricing" → UNKNOWN status.
     assert {s["availability_status"] for s in result.plan_summaries} == {"UNKNOWN"}
+
+
+def test_adapter_extract_deer_run_emits_exact_four_undated_plans() -> None:
+    """Dedicated Pattern-C success suppresses the lossy generic overlap."""
+    from ma_poc.scripts.runners.jugnu import _format_v2_floor_plan
+
+    fetches: list[str] = []
+
+    def mock_fetch(url: str, timeout: int = 20) -> str:
+        fetches.append(url)
+        if url.rstrip("/").endswith("/floorplans"):
+            return DEER_FLOORPLANS
+        return "<html><body><p>Catalogue detail only.</p></body></html>"
+
+    adapter = ThinkResideAdapter()
+    ctx = _ctx(DEER_HOME, "https://www.liveatdeerrunapts.com")
+    with patch(
+        "ma_poc.pms.adapters.thinkreside._fetch_text", side_effect=mock_fetch
+    ):
+        result = asyncio.run(adapter.extract(page=None, ctx=ctx))  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_1_DOM_THINKRESIDE"
+    assert result.units == []
+    assert len(result.plan_summaries) == 4
+    assert [row["floor_plan_name"] for row in result.plan_summaries] == [
+        "2 Bdrm 1.5 Bath -Ranch or Split Ranch Style",
+        "One Bedroom - Ranch Style",
+        "Two Bedroom 1.5 Bath - Garden Style",
+        "Two Bedroom 2 Bath - Ranch or Garden Style",
+    ]
+    assert {row["availability_status"] for row in result.plan_summaries} == {
+        "UNKNOWN"
+    }
+    assert {row["availability_date"] for row in result.plan_summaries} == {""}
+    assert [row["source_ids"]["thinkreside_plan_slug"] for row in result.plan_summaries] == [
+        "2-bdrm-15-bath-ranch-or-split-ranch-style",
+        "one-bedroom-ranch-style",
+        "two-bedroom-15-bath-garden-style",
+        "two-bedroom-2-bath-ranch-or-garden-style",
+    ]
+    assert result.plan_summaries[2]["rent_range"] == "$1,420 - $1,430"
+    assert result.plan_summaries[3]["sqft"] == "1,050 - 1,150"
+    assert fetches[0] == "https://www.liveatdeerrunapts.com/floorplans"
+
+    final = [
+        _format_v2_floor_plan(
+            row,
+            datetime(2026, 8, 2, 12, tzinfo=UTC),
+            "51921",
+        )
+        for row in result.plan_summaries
+    ]
+    assert [row["area"] for row in final] == [1050, 728, 1150, 1050]
+    assert [(row["rent_low"], row["rent_high"]) for row in final] == [
+        (1430, 1430),
+        (1225, 1225),
+        (1420, 1430),
+        (1450, 1450),
+    ]
+    assert {row["availability_status"] for row in final} == {"UNKNOWN"}
+    assert {row["available_date"] for row in final} == {None}
+    assert {row["availability_date_provenance"] for row in final} == {"missing"}
+
+
+def test_fetch_text_disables_web_unlocker() -> None:
+    """The production ThinkReside route stays on direct first-party HTTP."""
+    class Response:
+        status_code = 200
+        text = "ok"
+
+    with patch(
+        "ma_poc.pms.adapters._probe.probe_get", return_value=Response()
+    ) as mocked:
+        assert _fetch_text("https://example.test/floorplans") == "ok"
+    mocked.assert_called_once_with(
+        "https://example.test/floorplans", timeout=20, unlocker=False
+    )
 
 
 def test_adapter_extract_no_fingerprint_bails_without_fetch() -> None:

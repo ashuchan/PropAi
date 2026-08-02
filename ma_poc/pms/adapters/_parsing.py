@@ -935,6 +935,23 @@ def _titleize_slug(slug: str, *, trim_trailing_id: bool = True) -> str:
     return " ".join(out_tokens).strip()
 
 
+_OPAQUE_UUID_SLUG_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+_RESERVED_PLAN_PATH_SEGMENTS = frozenset({"unit", "units"})
+
+
+def _is_semantic_plan_slug(value: str) -> bool:
+    """Reject route mechanics and opaque IDs masquerading as plan names."""
+    slug = unquote(value or "").strip().strip("/")
+    return bool(
+        slug
+        and slug.casefold() not in _RESERVED_PLAN_PATH_SEGMENTS
+        and not _OPAQUE_UUID_SLUG_RE.fullmatch(slug)
+    )
+
+
 def derive_plan_name_from_url(url: str | None) -> str:
     """Best-effort plan-name derivation from a floorplan URL.
 
@@ -958,7 +975,7 @@ def derive_plan_name_from_url(url: str | None) -> str:
         lc_params: dict[str, list[str]] = {k.lower(): v for k, v in params.items()}
         for key in _PLAN_SLUG_QUERY_KEYS:
             vals = lc_params.get(key)
-            if vals and vals[0].strip():
+            if vals and _is_semantic_plan_slug(vals[0]):
                 derived = _titleize_slug(vals[0])
                 if derived:
                     return derived
@@ -969,7 +986,11 @@ def derive_plan_name_from_url(url: str | None) -> str:
             continue
         tail = parts.path[i + len(prefix):]
         first_seg = tail.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
-        if first_seg and first_seg.lower() not in _PLAN_PATH_PREFIXES:
+        if (
+            first_seg
+            and first_seg.lower() not in _PLAN_PATH_PREFIXES
+            and _is_semantic_plan_slug(first_seg)
+        ):
             derived = _titleize_slug(first_seg)
             if derived:
                 return derived
@@ -1037,10 +1058,24 @@ _STREET_TYPE_RE = re.compile(
 # ``\b`` + the AND-gate on a street token / ZIP / suffix keeps plan
 # descriptors ("2 Bed", "550 Sqft Studio") out.
 _HOUSE_NUMBER_RE = re.compile(r"^\s*\d{1,6}[A-Za-z]?\b")
+# Wisconsin grid addresses encode the two road coordinates as one leading
+# token (for example ``N72W12759`` or ``W359N5890``), so they have no ordinary
+# digit-led house number.  Keep this grammar bounded to two cardinal prefixes
+# with numeric coordinates; the existing street/ZIP/suffix corroborator below
+# still has to pass, preventing plan codes such as ``N72W12759`` by themselves
+# from becoming addresses.
+_WI_GRID_HOUSE_NUMBER_RE = re.compile(
+    r"^\s*[NSEW]\d{1,4}[NSEW]\d{1,6}\b",
+    re.IGNORECASE,
+)
 # The same house number, UNANCHORED — see ``contains_street_address``. Both
 # ``\b``s are load-bearing: without the leading one "A1" matches on its "1"
 # and a bare unit label starts looking like an address.
 _HOUSE_NUMBER_ANYWHERE_RE = re.compile(r"\b\d{1,6}[A-Za-z]?\b")
+_WI_GRID_HOUSE_NUMBER_ANYWHERE_RE = re.compile(
+    r"\b[NSEW]\d{1,4}[NSEW]\d{1,6}\b",
+    re.IGNORECASE,
+)
 _SUFFIX_MARKER_RE = re.compile(
     r"(?:#|\bapt\b|\bunit\b|\bsuite\b|\bste\b)", re.IGNORECASE
 )
@@ -1057,7 +1092,9 @@ def is_street_address(s: str) -> bool:
     Bath", "2 Bed / 2 Bath", "550 Sqft Studio") — those carry no street
     token, ZIP, or suffix marker and are correctly rejected.
     """
-    if not s or not isinstance(s, str) or not _HOUSE_NUMBER_RE.match(s):
+    if not s or not isinstance(s, str) or not (
+        _HOUSE_NUMBER_RE.match(s) or _WI_GRID_HOUSE_NUMBER_RE.match(s)
+    ):
         return False
     return bool(
         _US_ZIP_RE.search(s)
@@ -1093,7 +1130,10 @@ def contains_street_address(s: str) -> bool:
     """
     if not s or not isinstance(s, str):
         return False
-    if not _HOUSE_NUMBER_ANYWHERE_RE.search(s):
+    if not (
+        _HOUSE_NUMBER_ANYWHERE_RE.search(s)
+        or _WI_GRID_HOUSE_NUMBER_ANYWHERE_RE.search(s)
+    ):
         return False
     return bool(
         _US_ZIP_RE.search(s)

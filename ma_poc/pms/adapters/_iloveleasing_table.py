@@ -94,20 +94,39 @@ def parse_iloveleasing_table(html: str, source_url: str) -> list[dict[str, Any]]
             continue
         seen.add(key)
 
+        # The hidden detail modal is part of the same first-party page and
+        # publishes the street-qualified apartment label.  Keep it as display
+        # context: short labels such as "1" repeat across Rose Park's separate
+        # buildings, while the modal says "1614 W Eldridge Ave, # 1".
+        modal_address = ""
+        if uid:
+            detail = soup.find(id=f"{uid}-detail")
+            heading = detail.find(["h1", "h2", "h3"]) if detail else None
+            if heading:
+                modal_address = " ".join(heading.get_text(" ", strip=True).split())
+
         date_txt = _txt(row, "unit-date")  # "Now" or "8/1/2026"
         avail_iso = _iso(date_txt) or _iso(str(row.get("data-date") or ""))
 
-        out.append(
-            make_unit_dict(
-                unit_number=unum,
-                bedrooms=_txt(row, "unit-beds"),
-                sqft=_txt(row, "unit-sqft"),
-                rent_low=rent,
-                rent_high=rent,
-                availability_status="AVAILABLE",
-                availability_date=avail_iso,
-                source_api_url=source_url,
-                extraction_tier=_TIER,
-            )
+        unit = make_unit_dict(
+            unit_number=unum,
+            unit_name=modal_address,
+            bedrooms=_txt(row, "unit-beds"),
+            sqft=_txt(row, "unit-sqft"),
+            rent_low=rent,
+            rent_high=rent,
+            availability_status="AVAILABLE",
+            availability_date=avail_iso,
+            source_api_url=source_url,
+            extraction_tier=_TIER,
+            source_ids={"iloveleasing_unit_id": uid} if uid else None,
         )
+        # The detail ID is the native property-scoped row identity.  Promote
+        # it before the shared exact-fingerprint pass so byte-identical short
+        # apartment labels from different street addresses cannot collapse.
+        if uid:
+            unit["unit_id"] = uid
+        if modal_address:
+            unit["address"] = modal_address
+        out.append(unit)
     return out

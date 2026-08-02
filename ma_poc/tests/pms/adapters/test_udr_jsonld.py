@@ -17,9 +17,9 @@ import pytest
 from ma_poc.pms.adapters._udr import (
     _extract_unit_from_udr_name,
     _format_udr_plan_code,
+    _udr_view_model_dates,
     canonical_udr_url_from_html,
     is_udr_url,
-    _udr_view_model_dates,
     parse_udr_jsonld,
     udr_pricing_urls,
 )
@@ -217,6 +217,44 @@ def test_parse_udr_jsonld_joins_first_party_view_model_date_by_unit() -> None:
     assert units[0]["availability_date"] == "9/25/2026"
     assert units[0]["available_date"] == "9/25/2026"
     assert units[1]["availability_date"] == "2026-08-20"
+
+
+def test_udr_date_join_prefers_native_id_when_labels_repeat_across_buildings() -> None:
+    html = """
+    <script type="application/ld+json">
+    {"@type":"ItemList","itemListElement":[
+      {"@type":"ListItem","item":{"@type":"Apartment",
+       "name":"Apartment #7 - 105","url":"?unitid=13670653",
+       "offers":{"price":2100,"availability":"https://schema.org/InStock"}}},
+      {"@type":"ListItem","item":{"@type":"Apartment",
+       "name":"Apartment #19 - 105","url":"?unitid=13679999",
+       "offers":{"price":2200,"availability":"https://schema.org/InStock"}}},
+      {"@type":"ListItem","item":{"@type":"Apartment",
+       "name":"Apartment #7 - 106","url":"?unitid=13670654",
+       "offers":{"price":2150,"availability":"https://schema.org/InStock"}}}
+    ]}
+    </script>
+    <script>
+    window.udr.jsonObjPropertyViewModel = {"floorPlans":[{"units":[
+      {"marketingName":"105","apartmentId":13670653,
+       "AvailableDateLabel":"9/19/2026"},
+      {"marketingName":"105","realpageunitid":"13679999",
+       "AvailableDateLabel":"10/2/2026"},
+      {"marketingName":"106","apartmentId":13670654,
+       "AvailableDateLabel":"9/25/2026"}
+    ]}]};
+    </script>
+    """
+
+    units = parse_udr_jsonld(html, source_url="https://www.udr.com/example")
+    by_id = {row["source_ids"]["udr_unitid"]: row for row in units}
+
+    assert by_id["13670653"]["unit_number"] == "7-105"
+    assert by_id["13670653"]["availability_date"] == "9/19/2026"
+    assert by_id["13679999"]["unit_number"] == "19-105"
+    assert by_id["13679999"]["availability_date"] == "10/2/2026"
+    # The repeated public label is deliberately not accepted as a fallback.
+    assert "label:105" not in _udr_view_model_dates(html)
 
 
 def test_udr_view_model_date_parse_is_non_fatal() -> None:

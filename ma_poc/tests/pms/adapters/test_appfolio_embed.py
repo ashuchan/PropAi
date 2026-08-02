@@ -845,13 +845,14 @@ def _nested_card(
     title: str,
     *,
     description: str = "",
+    availability: str = "9/17/26",
 ) -> str:
     return f"""
     <div class="listing-item js-listing-item" id="listing_{listing_id}">
       <div class="js-listing-blurb-rent">$1,755</div>
       <div class="js-listing-blurb-bed-bath">1 bd / 1 ba</div>
       <div class="js-listing-square-feet">Square Feet: 854</div>
-      <div class="js-listing-available">9/17/26</div>
+      <div class="js-listing-available">{availability}</div>
       <span class="js-listing-address">{address}</span>
       <h2 class="js-listing-title"><a href="/listings/detail/{uid}">{title}</a></h2>
       <p>{description}</p>
@@ -892,8 +893,8 @@ async def test_wix_page_data_bridge_recovers_units_and_drops_waitlists() -> None
             "1765",
             wait_uid,
             "4660 Monroe Way, Fredericksburg, VA 22407",
-            "Essex Waitlist",
-            description="Waitlist only - no specific home",
+            "Apply for our 1brm waiting list",
+            description="Application only - no specific home",
         )
     )
     page = _FakePage(
@@ -920,6 +921,17 @@ async def test_wix_page_data_bridge_recovers_units_and_drops_waitlists() -> None
     assert units[0]["_floor_plan_name_provenance"] == (
         "appfolio.listing_title_nested_widget"
     )
+    assert ctx._embed_recovery_unit_source_provenance[0]["provider"] == "appfolio"  # type: ignore[attr-defined]
+    assert ctx._embed_recovery_unit_source_provenance[0]["unit_count"] == 1  # type: ignore[attr-defined]
+    rejected = ctx._embed_recovery_unit_source_provenance[0]["identity"]["rejected_cards"]  # type: ignore[attr-defined]
+    assert rejected == [
+        {
+            "appfolio_listing_id": "1765",
+            "appfolio_listable_uid": wait_uid,
+            "published_address": "4660 Monroe Way, Fredericksburg, VA 22407",
+            "reason": "waitlist_application",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -1013,3 +1025,99 @@ async def test_wix_bridge_declines_multizip_roster_without_group_title_scope() -
     units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
 
     assert units == []
+
+
+@pytest.mark.asyncio
+async def test_wix_component_without_property_group_requires_full_address_and_records_rejections() -> None:
+    """Millennium shape: an authored index is evidence, not portfolio scope."""
+
+    component = (
+        "https://www-millenniumnw-com.filesusr.com/html/"
+        "millennium_properties_for_rent.html"
+    )
+    data_url = (
+        "https://siteassets.parastorage.com/pages/pages/thunderbolt?"
+        "module=thunderbolt-features&amp;contentType=application%2Fjson&amp;"
+        "externalBaseUrl=https%3A%2F%2Fwww.millenniumnw.com&amp;"
+        "pageId=properties-for-rent.json"
+    )
+    data_fetch_url = data_url.replace("&amp;", "&")
+    index = "https://newmpm.appfolio.com/listings"
+    entry = (
+        '<script src="https://static.wixstatic.com/site.js"></script>'
+        f'<link href="{data_url}" rel="prefetch">'
+    )
+    component_body = """
+    <script>document.write("//newmpm.appfolio.com/javascripts/listing.js")</script>
+    <script>Appfolio.Listing({hostUrl: 'newmpm.appfolio.com'});</script>
+    """
+    matching = [
+        ("102", "2002 N Monroe St Apt 102, Spokane, WA 99205", "NOW"),
+        ("405", "2002 N Monroe Street Apt 405, Spokane, WA 99205", "NOW"),
+        ("307", "2002 North Monroe St Apt 307, Spokane, WA 99205", "NOW"),
+        ("409", "2002 N Monroe St Apt 409, Spokane, WA 99205", "8/9/26"),
+    ]
+    foreign = [
+        ("201", "1428 W 8th Ave Apt 201, Spokane, WA 99204"),
+        ("202", "1428 W 8th Ave Apt 202, Spokane, WA 99204"),
+        ("11", "1724 E Pacific Ave Apt 11, Spokane, WA 99202"),
+        ("12", "1724 E Pacific Ave Apt 12, Spokane, WA 99202"),
+        ("1", "3003 N Division St Apt 1, Spokane, WA 99207"),
+        ("2", "3003 N Division St Apt 2, Spokane, WA 99207"),
+        ("3", "901 W Broadway Ave Apt 3, Spokane, WA 99201"),
+    ]
+    listings = "".join(
+        _nested_card(
+            str(3000 + position),
+            f"00000000-0000-4000-8000-{position:012d}",
+            address,
+            f"Apartment {unit}",
+            availability=availability,
+        )
+        for position, (unit, address, availability) in enumerate(matching, 1)
+    ) + "".join(
+        _nested_card(
+            str(4000 + position),
+            f"10000000-0000-4000-8000-{position:012d}",
+            address,
+            f"Apartment {unit}",
+        )
+        for position, (unit, address) in enumerate(foreign, 1)
+    )
+    page = _FakePage(
+        url="https://www.millenniumnw.com/properties-for-rent",
+        live=[],
+        responses={
+            data_fetch_url: component.replace("/", r"\/"),
+            component: component_body,
+            index: listings,
+        },
+    )
+    ctx = _ctx(
+        "https://www.millenniumnw.com/",
+        "2002 N Monroe St",
+        "99205",
+    )
+    ctx.property_name = "Millennium on Monroe"
+    ctx.city = "Spokane"
+    ctx.state = "WA"
+    ctx.fetch_result = SimpleNamespace(body=entry)
+
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+
+    assert len(units) == 4
+    assert {unit["unit_number"] for unit in units} == {"102", "405", "307", "409"}
+    by_unit = {unit["unit_number"]: unit for unit in units}
+    assert by_unit["409"]["availability_date"] == "8/9/26"
+    provenance = ctx._embed_recovery_unit_source_provenance[0]  # type: ignore[attr-defined]
+    assert provenance["source_url"] == index
+    assert provenance["unit_count"] == 4
+    identity = provenance["identity"]
+    assert identity["property_group"] is None
+    assert identity["admitted_count"] == 4
+    assert identity["rejected_count"] == 7
+    assert len(identity["admitted_cards"]) == 4
+    assert len(identity["rejected_cards"]) == 7
+    assert {row["reason"] for row in identity["rejected_cards"]} == {
+        "configured_street_mismatch"
+    }

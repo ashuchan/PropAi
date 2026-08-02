@@ -105,10 +105,7 @@ def parse_maac_units(items: list[dict[str, Any]], url: str) -> list[dict[str, st
             first = specials[0]
             if isinstance(first, dict):
                 concession = str(
-                    first.get("title")
-                    or first.get("specialTitle")
-                    or first.get("description")
-                    or ""
+                    first.get("title") or first.get("specialTitle") or first.get("description") or ""
                 ).strip()
             elif isinstance(first, str):
                 concession = first.strip()
@@ -118,29 +115,63 @@ def parse_maac_units(items: list[dict[str, Any]], url: str) -> list[dict[str, st
         floor = item.get("floor")
         building = item.get("building")
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=fp_name,
-                bed_label=bed_label_from(beds, fp_name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=(
-                    str(int(baths)) if baths is not None and baths == int(baths)
-                    else (str(baths) if baths is not None else "")
-                ),
-                sqft=sqft,
-                unit_number=unit_no,
-                floor=str(floor) if floor not in (None, "") else "",
-                building=str(building) if building not in (None, "") else "",
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                rent_low=rent_lo,
-                rent_high=rent_hi,
-                concession=concession,
-                availability_status="AVAILABLE",
-                availability_date=avail_date,
-                source_api_url=url,
-                extraction_tier=OLL_TIER,
-            )
+        # ``apartmentName`` is the public label. The public Apply route uses
+        # ``rentCafeApartmentId`` as UnitID, while MAAC also publishes a
+        # distinct item ULID plus exact plan/property boundaries in the same
+        # row. Preserve all of them before shared deduplication and make the
+        # property-scoped RentCafe apartment ID canonical when present.
+        maac_unit_id = str(item.get("id") or "").strip()
+        rentcafe_unit_id = str(item.get("rentCafeApartmentId") or "").strip()
+        rentcafe_plan_id = str(item.get("rentCafeFloorplanId") or "").strip()
+        rentcafe_property_id = str(item.get("rentCafePropertyId") or "").strip()
+        maac_property_id = str(item.get("propertyId") or "").strip()
+        property_name = str(item.get("propertyName") or "").strip()
+        source_ids: dict[str, str] = {}
+        if rentcafe_unit_id:
+            source_ids["maac_rentcafe_apartment_id"] = rentcafe_unit_id
+        if maac_unit_id:
+            source_ids["maac_unit_id"] = maac_unit_id
+        if rentcafe_plan_id:
+            source_ids["maac_rentcafe_floorplan_id"] = rentcafe_plan_id
+        if rentcafe_property_id:
+            source_ids["maac_rentcafe_property_id"] = rentcafe_property_id
+        if maac_property_id:
+            source_ids["maac_property_id"] = maac_property_id
+
+        unit = make_unit_dict(
+            floor_plan_name=fp_name,
+            bed_label=bed_label_from(beds, fp_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=(
+                str(int(baths))
+                if baths is not None and baths == int(baths)
+                else (str(baths) if baths is not None else "")
+            ),
+            sqft=sqft,
+            unit_number=unit_no,
+            unit_name=unit_no,
+            floor=str(floor) if floor not in (None, "") else "",
+            building=str(building) if building not in (None, "") else "",
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            rent_low=rent_lo,
+            rent_high=rent_hi,
+            concession=concession,
+            availability_status="AVAILABLE",
+            availability_date=avail_date,
+            source_api_url=url,
+            extraction_tier=OLL_TIER,
+            source_ids=source_ids or None,
         )
+        canonical_unit_id = rentcafe_unit_id or maac_unit_id
+        if canonical_unit_id:
+            unit["unit_id"] = canonical_unit_id
+        if maac_property_id or rentcafe_property_id:
+            unit["source_property_id"] = maac_property_id or rentcafe_property_id
+        if property_name:
+            unit["source_property_name"] = property_name
+        if source_ids or property_name:
+            unit["source_property_provenance"] = "maac_available_units_row"
+        units.append(unit)
     return units
 
 
@@ -181,8 +212,7 @@ def _is_maac_units(items: list[dict[str, Any]]) -> bool:
         return False
     first = items[0]
     return isinstance(first, dict) and (
-        "apartmentName" in first
-        or ("minimumRent" in first and "floorplanName" in first)
+        "apartmentName" in first or ("minimumRent" in first and "floorplanName" in first)
     )
 
 
@@ -439,21 +469,14 @@ class MaacAdapter:
             if _pp.n_admitted > 0:
                 result.units = _pp.admitted
                 result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
                 result.confidence = min(0.90, 0.7 + 0.05 * _pp.n_admitted)
             else:
                 result.confidence = 0.0
-                result.errors.append(
-                    f"MAAC_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                    f"failed unit_validity"
-                )
+                result.errors.append(f"MAAC_VALIDITY_REJECTED: {_pp_parsed} parsed rows failed unit_validity")
         else:
             result.confidence = 0.0
-            result.errors.append(
-                "No MAAC unit data (propertyIntegrationID not found or API empty)"
-            )
+            result.errors.append("No MAAC unit data (propertyIntegrationID not found or API empty)")
 
         return result
 

@@ -285,6 +285,12 @@ def parse_knock_units(
     layouts: dict[Any, dict[str, Any]] = {
         layout.get("id"): layout for layout in layouts_list if isinstance(layout, dict)
     }
+    buildings_list = units_data.get("buildings") or []
+    buildings: dict[Any, dict[str, Any]] = {
+        building.get("id"): building
+        for building in buildings_list
+        if isinstance(building, dict)
+    }
 
     for u in raw_units:
         if not isinstance(u, dict):
@@ -336,10 +342,20 @@ def parse_knock_units(
         # reserved filter at line 117 + a $200-$50,000 rent gate at
         # line 127, so by the time we're here they are real
         # rent-published offerings. Default AVAILABLE; only mark
-        # UNAVAILABLE when explicitly occupied. This is what the
-        # downstream consumer (and the schema_v2 Q1 fallback) needs
-        # for the available_date scrape-time default to fire.
-        status = "UNAVAILABLE" if u.get("occupied") else "AVAILABLE"
+        # UNAVAILABLE when explicitly occupied *unless the source also
+        # explicitly publishes the apartment as available*.  ``occupied`` is
+        # current-tenancy state; it cannot negate an on-notice future offer.
+        # This exception is evidence-backed by all eight AspenSquare
+        # properties plus the independent Bridgepoint control: every affected
+        # row is unhidden/unleased/unreserved, priced, ``available=true`` and
+        # carries a public future date.  False/null ``available`` semantics are
+        # deliberately unchanged.
+        source_available = u.get("available") is True or u.get("availableRaw") is True
+        status = (
+            "AVAILABLE"
+            if source_available or not u.get("occupied")
+            else "UNAVAILABLE"
+        )
 
         # Knock exposes a stable UUID on every unit object. Preserve it as
         # both the canonical native unit_id and auditable source provenance.
@@ -368,8 +384,17 @@ def parse_knock_units(
             if concession:
                 break
 
+        building_id = u.get("buildingId") or u.get("building_id")
+        building = buildings.get(building_id, {}) if building_id else {}
+        building_name = u.get("buildingName") or building.get("name") or ""
+
         row = {
             "unit_number": str(unit_number),
+            # Keep the operator-displayed apartment label even when the
+            # canonical identity below is the stronger Knock UUID.  Without a
+            # separate display field the production formatter replaces all
+            # labels with ``knock_unit_id-*``.
+            "unit_name": str(unit_number),
             "floor_plan_name": str(u.get("layoutName") or layout.get("name") or ""),
             "bedrooms": str(beds) if beds is not None else "",
             "bathrooms": str(baths) if baths is not None else "",
@@ -379,7 +404,9 @@ def parse_knock_units(
             "rent_range": str(rent),
             "availability_status": status,
             "availability_date": str(avail)[:30],
-            "building": str(u.get("buildingName") or ""),
+            # Doorway normally supplies only ``buildingId`` on the unit; the
+            # human label lives in the sibling ``units_data.buildings`` map.
+            "building": str(building_name),
             "concession": concession,
             "extraction_tier": "TIER_1_KNOCK_API",
             "source_ids": source_ids,

@@ -84,6 +84,7 @@ import html as html_lib
 import json
 import logging
 import re
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import make_unit_dict
@@ -243,7 +244,17 @@ def _avail_date(unit: dict[str, Any]) -> str:
     return f"{int(yyyy):04d}-{int(mm):02d}-{int(dd):02d}"
 
 
-def _avail_status(unit: dict[str, Any]) -> str:
+def _capture_date_iso(value: date | str | None = None) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value.strip()):
+        return value.strip()
+    return datetime.now(UTC).date().isoformat()
+
+
+def _avail_status(
+    unit: dict[str, Any], *, capture_date: date | str | None = None
+) -> str:
     """Edifice unit-roster shape → AVAILABLE / UNAVAILABLE / UNKNOWN.
 
     Only units the API actually returns in the ``units[plan_id]`` list
@@ -254,6 +265,19 @@ def _avail_status(unit: dict[str, Any]) -> str:
     """
     leased = str(unit.get("UnitLeasedStatus") or "").strip().lower()
     occupancy = str(unit.get("UnitOccupancyStatus") or "").strip().lower()
+    available_date = _avail_date(unit)
+    # Edifice includes on-notice apartments in a plan's positive
+    # ``UnitsAvailable`` roster once they have an explicit future ready date.
+    # Present occupancy therefore describes today's tenancy, not whether the
+    # apartment can be leased for that published date.  This exact shape is
+    # present on all five current properties (30/89 rows).  A stale/historical
+    # date does not receive the exception.
+    if (
+        leased == "on_notice"
+        and available_date
+        and available_date > _capture_date_iso(capture_date)
+    ):
+        return "AVAILABLE"
     if leased == "available" or (occupancy == "vacant" and leased != "leased"):
         return "AVAILABLE"
     if leased in ("leased", "rented") or occupancy == "occupied":
@@ -284,6 +308,8 @@ def parse_edificecms_units(
     plan: dict[str, Any],
     units_list: list[dict[str, Any]],
     source_url: str,
+    *,
+    capture_date: date | str | None = None,
 ) -> list[dict[str, Any]]:
     """Emit one unit-level dict per row in the per-plan ``units`` array.
 
@@ -329,7 +355,7 @@ def parse_edificecms_units(
                 rent_low=rent_i,
                 rent_high=rent_i,
                 deposit=deposit,
-                availability_status=_avail_status(u),
+                availability_status=_avail_status(u, capture_date=capture_date),
                 availability_date=_avail_date(u),
                 source_api_url=source_url,
                 extraction_tier=_TIER,
@@ -385,6 +411,36 @@ def parse_edificecms_plan_summary(
         extraction_tier=_TIER,
         source_ids={"edifice_plan_id": plan_id},
     )
+
+
+def select_edificecms_catalogue(
+    candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str]:
+    """Choose one identity-matched catalogue without unioning sibling data.
+
+    Each candidate contains ``property_id``, ``response``, ``identity`` and a
+    non-empty ``plan_ids`` set.  A strict superset is the aggregate catalogue
+    (Newport Village's five-plan response over its two-plan phase subset).
+    Identical sets are equivalent and preserve source order.  Overlapping or
+    disjoint non-contained sets are ambiguous and fail closed; the caller must
+    not manufacture a cross-property union.
+    """
+    if not candidates:
+        return None, "none"
+    if len(candidates) == 1:
+        return candidates[0], "single"
+
+    plan_sets = [set(candidate.get("plan_ids") or set()) for candidate in candidates]
+    aggregate_indexes = [
+        index
+        for index, plan_ids in enumerate(plan_sets)
+        if plan_ids and all(other <= plan_ids for other in plan_sets)
+    ]
+    if len(aggregate_indexes) == 1:
+        return candidates[aggregate_indexes[0]], "aggregate_over_strict_subset"
+    if plan_sets and all(plan_ids == plan_sets[0] for plan_ids in plan_sets[1:]):
+        return candidates[0], "equivalent_duplicate"
+    return None, "ambiguous_noncontained"
 
 
 async def _fetch_json(url: str, params: dict[str, str]) -> dict[str, Any] | None:
@@ -511,9 +567,11 @@ class EdificeCmsAdapter:
         property_uuid = ""
         fp_resp: dict[str, Any] | None = None
         identity = None
+        catalogue_relation = "none"
         configured_identity = bool(getattr(ctx, "property_name", "") or getattr(ctx, "address", ""))
         from ma_poc.pms.property_identity import MATCH, evaluate_from_context
 
+        matched_catalogues: list[dict[str, Any]] = []
         for candidate_uuid in property_uuids:
             candidate_resp = await _fetch_json(
                 fp_url,
@@ -535,13 +593,54 @@ class EdificeCmsAdapter:
                     f"evidence={','.join(candidate_identity.evidence)}"
                 )
                 continue
-            property_uuid = candidate_uuid
-            fp_resp = candidate_resp
-            identity = candidate_identity
-            break
+            candidate_plans = candidate_resp.get("data")
+            if not isinstance(candidate_plans, list) or not candidate_plans:
+                result.errors.append(
+                    "EDIFICECMS: floorplans API returned 0 plans for "
+                    f"property_id={candidate_uuid}"
+                )
+                continue
+            plan_ids = {
+                str(plan.get("Id") or "").strip()
+                for plan in candidate_plans
+                if isinstance(plan, dict) and str(plan.get("Id") or "").strip()
+            }
+            matched_catalogues.append(
+                {
+                    "property_id": candidate_uuid,
+                    "response": candidate_resp,
+                    "identity": candidate_identity,
+                    "plan_ids": plan_ids,
+                }
+            )
+
+        selected_catalogue, catalogue_relation = select_edificecms_catalogue(
+            matched_catalogues
+        )
+        if selected_catalogue is not None:
+            property_uuid = str(selected_catalogue["property_id"])
+            fp_resp = selected_catalogue["response"]
+            identity = selected_catalogue["identity"]
+            if len(matched_catalogues) > 1:
+                rejected_ids = [
+                    str(candidate["property_id"])
+                    for candidate in matched_catalogues
+                    if candidate is not selected_catalogue
+                ]
+                result.errors.append(
+                    "EDIFICECMS_CATALOGUE_RELATION: "
+                    f"selected={property_uuid} relation={catalogue_relation} "
+                    f"other={','.join(rejected_ids)}"
+                )
 
         if not fp_resp:
-            if any("PROPERTY_IDENTITY_REJECTED" in error for error in result.errors):
+            if catalogue_relation == "ambiguous_noncontained":
+                result.tier_used = f"{_TIER}_CATALOGUE_AMBIGUOUS"
+                result.errors.append(
+                    "EDIFICECMS_CATALOGUE_AMBIGUOUS: identity-matched UUIDs "
+                    "publish non-contained plan sets"
+                )
+            elif any("PROPERTY_IDENTITY_REJECTED" in error for error in result.errors):
                 result.tier_used = f"{_TIER}_PROPERTY_IDENTITY_REJECTED"
             else:
                 result.tier_used = f"{_TIER}_FLOORPLANS_FAIL"
@@ -639,6 +738,8 @@ class EdificeCmsAdapter:
                 "status": 200,
                 "body": "<edificecms-floorplans>",
                 "via": "edificecms_probe",
+                "property_id": property_uuid,
+                "catalogue_relation": catalogue_relation,
             }
         )
         # Catalog provenance is needed whenever plan summaries survive; if no

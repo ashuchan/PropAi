@@ -25,6 +25,7 @@ Each floorplan: ``name``, ``apartment_type``/``display_bed`` ("Studio",
 sq_ft, display_bed} ]`` array of the actually-available units. Each
 unit has a real numeric ``id`` + concrete ``rent`` ⇒ true unit-level.
 """
+
 from __future__ import annotations
 
 import re
@@ -68,11 +69,7 @@ def _rent_range(val: Any) -> tuple[int | None, int | None]:
     """
     if val is None:
         return (None, None)
-    nums = [
-        int(m.replace(",", ""))
-        for m in re.findall(r"[\d,]+", str(val))
-        if m.replace(",", "").isdigit()
-    ]
+    nums = [int(m.replace(",", "")) for m in re.findall(r"[\d,]+", str(val)) if m.replace(",", "").isdigit()]
     nums = [n for n in nums if n >= 100]  # drop stray small numbers (fees, etc.)
     if not nums:
         return (None, None)
@@ -91,9 +88,7 @@ def _sqft_low(val: Any) -> str:
     ``""`` / ``"Call for details."`` → ``""``.
     """
     nums = [
-        int(m.replace(",", ""))
-        for m in re.findall(r"[\d,]+", str(val or ""))
-        if m.replace(",", "").isdigit()
+        int(m.replace(",", "")) for m in re.findall(r"[\d,]+", str(val or "")) if m.replace(",", "").isdigit()
     ]
     nums = [n for n in nums if n >= 100]  # drop stray small numbers (fees, etc.)
     return str(min(nums)) if nums else ""
@@ -118,9 +113,7 @@ def find_apts247_api_key(html: str) -> str | None:
     return m.group(1) if m else None
 
 
-def parse_apts247_floorplans(
-    data: dict[str, Any], source_url: str
-) -> list[dict[str, Any]]:
+def parse_apts247_floorplans(data: dict[str, Any], source_url: str) -> list[dict[str, Any]]:
     """Apts247 ``/api/v1/floorplans/`` envelope → unit-level dicts.
 
     One row per available Unit (real unit ``id`` + concrete rent).
@@ -140,6 +133,11 @@ def parse_apts247_floorplans(
         baths_s = str(baths) if baths is not None else ""
         plan_sqft = str(plan.get("sq_ft") or "").strip()
         plan_lo, plan_hi = _rent_range(plan.get("rent"))
+        plan_source_ids = {
+            "apts247_floor_plan_id": str(plan.get("id") or "").strip(),
+            "apts247_slug": str(plan.get("slug") or "").strip(),
+        }
+        plan_source_ids = {key: value for key, value in plan_source_ids.items() if value}
         glist = plan.get("units") or []
         if isinstance(glist, list) and glist:
             for u in glist:
@@ -154,31 +152,39 @@ def parse_apts247_floorplans(
                 # unit_id and is demoted to floorplan-level. The numeric id
                 # IS the unit's canonical system identity — use it so the
                 # row is admitted as true unit-level.
+                native_unit_id = str(u.get("id") or "").strip()
                 unum = str(u.get("number") or "").strip()
-                if not unum and u.get("id") is not None:
-                    unum = f"apt-{u.get('id')}"
-                units.append(
-                    make_unit_dict(
-                        floor_plan_name=plan_name,
-                        bed_label=str(plan.get("display_bed") or ""),
-                        bedrooms=_beds_from_label(
-                            u.get("display_bed") or plan.get("display_bed")
-                        )
-                        or beds,
-                        bathrooms=baths_s,
-                        sqft=_sqft_low(u.get("sq_ft") or plan_sqft),
-                        unit_number=unum,
-                        floor=str(u.get("floor") or ""),
-                        building=str(u.get("building") or ""),
-                        rent_low=rent_lo,
-                        rent_high=rent_hi,
-                        rent_range=format_rent_range(rent_lo, rent_hi),
-                        availability_status="AVAILABLE",
-                        availability_date=str(u.get("available_date") or ""),
-                        source_api_url=source_url,
-                        extraction_tier=_TIER,
-                    )
+                if not unum and native_unit_id:
+                    unum = f"apt-{native_unit_id}"
+                source_ids = dict(plan_source_ids)
+                if native_unit_id:
+                    source_ids["apts247_unit_id"] = native_unit_id
+                unit = make_unit_dict(
+                    floor_plan_name=plan_name,
+                    bed_label=str(plan.get("display_bed") or ""),
+                    bedrooms=_beds_from_label(u.get("display_bed") or plan.get("display_bed")) or beds,
+                    bathrooms=baths_s,
+                    sqft=_sqft_low(u.get("sq_ft") or plan_sqft),
+                    unit_number=unum,
+                    unit_name=unum,
+                    floor=str(u.get("floor") or ""),
+                    building=str(u.get("building") or ""),
+                    rent_low=rent_lo,
+                    rent_high=rent_hi,
+                    rent_range=format_rent_range(rent_lo, rent_hi),
+                    availability_status="AVAILABLE",
+                    availability_date=str(u.get("available_date") or ""),
+                    source_api_url=source_url,
+                    extraction_tier=_TIER,
+                    source_ids=source_ids or None,
                 )
+                # The numeric PMS id is present and unique on every current
+                # physical row, including rows whose public number repeats in
+                # another building. Keep the public/fallback label above, but
+                # make the source identity canonical before shared dedup.
+                if native_unit_id:
+                    unit["unit_id"] = native_unit_id
+                units.append(unit)
         elif plan_lo is not None:
             units.append(
                 make_unit_dict(
@@ -194,6 +200,7 @@ def parse_apts247_floorplans(
                     availability_status="UNKNOWN",
                     source_api_url=source_url,
                     extraction_tier=_TIER,
+                    source_ids=plan_source_ids or None,
                 )
             )
     return units
@@ -271,9 +278,7 @@ class Apts247Adapter:
             raw = await _fetch(api_url)
         except Exception as exc:
             result.tier_used = f"{_TIER}_FETCH_ERROR"
-            result.errors.append(
-                f"apts247-fetch-error: {type(exc).__name__}: {str(exc)[:120]}"
-            )
+            result.errors.append(f"apts247-fetch-error: {type(exc).__name__}: {str(exc)[:120]}")
             return result
 
         import json

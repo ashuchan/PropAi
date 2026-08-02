@@ -25,10 +25,20 @@ from typing import Any
 from ma_poc.pms.adapters.knock import parse_knock_units
 
 
-def _wrap(units: list[dict[str, Any]], layouts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _wrap(
+    units: list[dict[str, Any]],
+    layouts: list[dict[str, Any]] | None = None,
+    buildings: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Wrap a units list in the ``{units_data: {units, layouts}}`` envelope
     that ``parse_knock_units`` expects."""
-    return {"units_data": {"units": units, "layouts": layouts or []}}
+    return {
+        "units_data": {
+            "units": units,
+            "layouts": layouts or [],
+            "buildings": buildings or [],
+        }
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -80,6 +90,26 @@ def test_native_uuid_is_preserved_as_unit_identity() -> None:
         "knock_unit_id": "a91f39ed-5603-40be-b405-6a7a98c31980"
     }
     assert out[0]["source_property_id"] == "2010515"
+    assert out[0]["unit_name"] == "A"
+
+
+def test_building_id_resolves_through_response_building_map() -> None:
+    """The public unit carries an ID; its display label is a sibling map."""
+    out = parse_knock_units(
+        _wrap(
+            [
+                {
+                    "name": "303",
+                    "price": 1665,
+                    "buildingId": "building-7",
+                }
+            ],
+            buildings=[{"id": "building-7", "name": "G"}],
+        )
+    )
+
+    assert out[0]["unit_name"] == "303"
+    assert out[0]["building"] == "G"
 
 
 def test_property_scoped_source_endpoint_is_preserved() -> None:
@@ -157,14 +187,36 @@ def test_occupied_true_is_UNAVAILABLE() -> None:
     assert out[0]["availability_status"] == "UNAVAILABLE"
 
 
-def test_occupied_true_with_available_true_still_UNAVAILABLE() -> None:
-    """``occupied`` wins over ``available`` — that's the post-fix
-    semantics (occupied is the unambiguous 'someone's living there'
-    signal; available is the noisy one)."""
+def test_occupied_true_with_available_true_is_future_AVAILABLE() -> None:
+    """Current tenancy cannot reverse an explicit on-notice offering."""
     out = parse_knock_units(_wrap([{
         "name": "OCC-2",
         "price": 1500,
         "available": True,
+        "occupied": True,
+        "availableOn": "2026-08-15",
+    }]))
+    assert out[0]["availability_status"] == "AVAILABLE"
+    assert out[0]["availability_date"] == "2026-08-15"
+
+
+def test_occupied_true_with_available_false_remains_UNAVAILABLE() -> None:
+    """The evidence-backed exception does not change false semantics."""
+    out = parse_knock_units(_wrap([{
+        "name": "OCC-FALSE",
+        "price": 1500,
+        "available": False,
+        "occupied": True,
+    }]))
+    assert out[0]["availability_status"] == "UNAVAILABLE"
+
+
+def test_occupied_true_with_available_null_remains_UNAVAILABLE() -> None:
+    """The evidence-backed exception does not change null semantics."""
+    out = parse_knock_units(_wrap([{
+        "name": "OCC-NULL",
+        "price": 1500,
+        "available": None,
         "occupied": True,
     }]))
     assert out[0]["availability_status"] == "UNAVAILABLE"

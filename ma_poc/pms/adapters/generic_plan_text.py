@@ -1449,22 +1449,33 @@ class GenericPlanTextAdapter:
             )
 
             static_residences = recover_static_residence_table(ctx)
+            static_plans = list(
+                getattr(ctx, "_static_residence_table_plan_summaries", []) or []
+            )
         except Exception as static_exc:
             result.errors.append(
                 "generic_plan_text: static-residence wiring error: "
                 f"{type(static_exc).__name__}"
             )
             static_residences = []
+            static_plans = []
         if static_residences:
             result.units = static_residences
+            result.plan_summaries = static_plans
             result.tier_used = "TIER_1_DOM_STATIC_RESIDENCE_TABLE"
             result.winning_url = str(
                 static_residences[0].get("source_api_url") or ""
             ) or None
             result.confidence = 0.95
+            from ma_poc.pms.source_provenance import (
+                context_unit_source_provenance,
+            )
+
+            result.unit_source_provenance = context_unit_source_provenance(ctx)
             result.errors.append(
                 "generic_plan_text: exact static residence table recovered "
-                f"{len(static_residences)} physical unit row(s)"
+                f"{len(static_residences)} physical unit row(s) and "
+                f"{len(static_plans)} plan stack(s)"
             )
             return result
 
@@ -1504,45 +1515,6 @@ class GenericPlanTextAdapter:
                 "generic_plan_text: static team roster failed exact identity/row validation"
             )
             return result
-
-        # 2026-06-27: Camden Living NEXT_DATA short-circuit.
-        # Camden's 165+ properties route here (no PMS fingerprint hits);
-        # inventory lives in __NEXT_DATA__.props.pageProps.suggestedFloorPlans
-        # rather than the visible DOM, so plan-text regex sees only the
-        # "Starting at $X" hero. Parse the blob directly.
-        try:
-            from ma_poc.pms.adapters._camden import (
-                detect_camden_next_data as _detect_camden,
-            )
-            from ma_poc.pms.adapters._camden import (
-                is_camden_host as _is_camden_host,
-            )
-            from ma_poc.pms.adapters._camden import (
-                parse_camden_next_data as _parse_camden,
-            )
-            _camden_url = str(getattr(ctx, "base_url", "") or "")
-            if _is_camden_host(_camden_url):
-                fr = getattr(ctx, "fetch_result", None)
-                raw = getattr(fr, "body", None) if fr is not None else None
-                if isinstance(raw, bytes):
-                    raw_html = raw.decode("utf-8", errors="replace")
-                elif isinstance(raw, str):
-                    raw_html = raw
-                else:
-                    raw_html = ""
-                if raw_html and _detect_camden(raw_html):
-                    try:
-                        camden_units = _parse_camden(raw_html, source_url=_camden_url)
-                    except Exception as _cx:
-                        result.errors.append(f"camden-parse-error: {_cx}")
-                        camden_units = []
-                    if camden_units:
-                        result.units = camden_units
-                        result.tier_used = "TIER_1_DOM_CAMDEN_NEXT_DATA"
-                        result.confidence = 0.9
-                        return result
-        except Exception as _cx_outer:
-            result.errors.append(f"camden-wiring-error: {_cx_outer}")
 
         # 2026-07-11 adapter audit: UDR short-circuit. UDR's ~16 portfolio
         # properties (udr.com) also route here (zero PMS fingerprints on

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -134,6 +135,38 @@ def test_mri_property_identity_normalizes_cir_to_circle() -> None:
     )
 
 
+def test_mri_property_identity_allows_bound_phase_roman_suffix() -> None:
+    """Bridgepoint I may match Bridgepoint only inside the full identity gate."""
+    html = (
+        INDEX_HTML.replace("CHARTER CLUB APARTMENT HOMES", "Bridgepoint")
+        .replace(
+            "1040 Windward Drive, London, OH 43140",
+            "1500 Monument Road, Jacksonville, FL 32225",
+        )
+        .replace('data-propertyid="cca"', 'data-propertyid="BRI"')
+    )
+    assert mri_property_identity_matches(
+        html,
+        _ctx(
+            property_name="Bridgepoint I",
+            address="1500 Monument Rd",
+            city="Jacksonville",
+            state="FL",
+            zip_code="32225",
+        ),
+        "BRI",
+    )
+    assert not mri_property_identity_matches(
+        html,
+        _ctx(
+            property_name="Bridgepoint South I",
+            address="1500 Monument Rd",
+            city="Jacksonville",
+            state="FL",
+            zip_code="32225",
+        ),
+        "BRI",
+    )
 def test_parse_mri_search_units_preserves_native_row_and_dimensions() -> None:
     units = parse_mri_search_units(
         SEARCH_HTML,
@@ -148,6 +181,8 @@ def test_parse_mri_search_units_preserves_native_row_and_dimensions() -> None:
     assert units[0]["source_property_id"] == "CCA"
     assert units[0]["sqft"] == "750"
     assert units[0]["market_rent_low"] == 1099
+    assert units[0]["market_rent_high"] == 1099
+    assert units[0]["rent_range_source_field"] == "data-rent-range"
     assert units[0]["availability_date"] == "2026-08-01"
     assert units[0]["available_end_date"] == "2026-08-30"
     assert units[0]["source_api_url"] == SEARCH_URL
@@ -157,6 +192,45 @@ def test_parse_mri_search_units_rejects_unpriced_or_dimensionless_rows() -> None
     assert not parse_mri_search_units(
         SEARCH_HTML.replace('data-rent-range="1,099.00"', 'data-rent-range="0"'),
         community="CCA",
+        source_url=SEARCH_URL,
+    )
+
+
+def test_parse_mri_search_units_preserves_labeled_range_endpoints() -> None:
+    elmtree = SEARCH_HTML.replace(
+        'data-rent-range="1,099.00"',
+        'data-rent-range="$695.00 – $865.00"',
+    ).replace(">1,099.00</td>", ">$695.00 – $865.00</td>")
+
+    units = parse_mri_search_units(
+        elmtree,
+        community="ELM",
+        source_url=SEARCH_URL,
+    )
+
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] == 695
+    assert units[0]["market_rent_high"] == 865
+
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    final = _format_v2_unit(
+        units[0],
+        datetime(2026, 8, 2, 12, 0, tzinfo=UTC),
+        "235871",
+    )
+    assert final["rent_low"] == 695
+    assert final["rent_high"] == 865
+
+
+def test_parse_mri_search_units_rejects_inverted_range() -> None:
+    inverted = SEARCH_HTML.replace(
+        'data-rent-range="1,099.00"',
+        'data-rent-range="$1,305.00 – $1,005.00"',
+    )
+    assert not parse_mri_search_units(
+        inverted,
+        community="ELM",
         source_url=SEARCH_URL,
     )
     assert not parse_mri_search_units(

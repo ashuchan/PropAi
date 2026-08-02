@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -17,6 +18,7 @@ from ma_poc.pms.adapters.yotta import (
 )
 from ma_poc.pms.detector import DetectedPMS, detect_pms
 from ma_poc.pms.scraper import scrape_jugnu
+from ma_poc.scripts.runners.jugnu import _format_v2_unit
 
 
 def _ctx(**overrides: object) -> AdapterContext:
@@ -71,6 +73,7 @@ def _units_payload() -> dict[str, Any]:
                 "MoveInDateAvailable": "2026-10-03T00:00:00",
                 "dbaUnitType": "One Bed / One Bath",
                 "dbaUnitTypeId": 390,
+                "dbaUnitTypeCode": "11MA",
                 "bedRooms": "1",
                 "bathRooms": "1",
                 "squareFeet": 567.0,
@@ -81,10 +84,14 @@ def _units_payload() -> dict[str, Any]:
                 "unitNumber": "1016",
                 "rent": 983,
                 "MoveInDateAvailable": "2026-08-08T00:00:00",
+                "dateAvailable": "Today",
                 "dbaUnitType": "One Bed / One Bath",
+                "dbaUnitTypeId": 391,
+                "dbaUnitTypeCode": "11MB",
                 "bedRooms": "1",
                 "bathRooms": "1",
                 "squareFeet": 653,
+                "floorLevel": "First Floor",
             },
         ]
     }
@@ -146,11 +153,45 @@ def test_parse_yotta_units_preserves_native_ids_rent_dates_and_property() -> Non
     units = parse_yotta_units(_units_payload(), dba_id="55", source_url=source_url)
     assert len(units) == 2
     assert units[0]["unit_number"] == "0215"
-    assert units[0]["source_ids"] == {"yotta_unit_id": "9795"}
+    assert units[0]["source_ids"] == {
+        "yotta_dba_id": "55",
+        "yotta_floor_plan_code": "11MA",
+        "yotta_floor_plan_id": "390",
+        "yotta_unit_id": "9795",
+    }
     assert units[0]["source_property_id"] == "55"
+    assert units[0]["floor_plan_name"] == "11MA"
+    assert units[0]["floor_plan_description"] == "One Bed / One Bath"
+    assert units[0]["_canonical_floor_plan_id"]
     assert units[0]["market_rent_low"] == 905
     assert units[0]["availability_date"] == "2026-10-03"
+    assert units[1]["availability_date"] == "Today"
+    assert units[0]["_canonical_floor_plan_id"] != units[1]["_canonical_floor_plan_id"]
     assert units[0]["source_api_url"] == source_url
+
+
+def test_yotta_formatter_preserves_provider_plan_floor_and_today_semantics() -> None:
+    source_url = "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1"
+    rows = parse_yotta_units(_units_payload(), dba_id="55", source_url=source_url)
+    capture_ts = datetime(2026, 8, 2, 15, 30, tzinfo=UTC)
+    formatted = [_format_v2_unit(row, capture_ts, "34785") for row in rows]
+
+    assert [row["floor_plan_name"] for row in formatted] == ["11MA", "11MB"]
+    assert len({row["floor_plan_id"] for row in formatted}) == 2
+    assert [row["floor_plan_description"] for row in formatted] == [
+        "One Bed / One Bath",
+        "One Bed / One Bath",
+    ]
+    assert [row["floor"] for row in formatted] == [2, 1]
+    assert [row["floor_raw"] for row in formatted] == [
+        "Second Floor",
+        "First Floor",
+    ]
+    assert formatted[0]["available_date"] == "2026-10-03"
+    assert formatted[0]["availability_date_provenance"] == "explicit_future"
+    assert formatted[1]["available_date"] == "2026-08-02"
+    assert formatted[1]["available_date_raw"] == "Today"
+    assert formatted[1]["availability_date_provenance"] == "available_now"
 
 
 def test_parse_yotta_units_rejects_missing_native_id_or_positive_rent() -> None:
@@ -199,7 +240,19 @@ async def test_yotta_adapter_full_property_scoped_api_recovery(
     assert len(result.units) == 2
     assert result.winning_url and result.winning_url.endswith("GetFloorPlans/55/1")
     assert result.units[0]["source_ids"]["yotta_unit_id"] == "9795"
+    assert result.units[0]["source_ids"]["yotta_dba_id"] == "55"
+    assert result.units[0]["source_ids"]["yotta_floor_plan_id"] == "390"
     assert result.units[0]["source_property_id"] == "55"
+    assert len(result.unit_source_provenance) == 1
+    provenance = result.unit_source_provenance[0]
+    assert provenance["provider"] == "yotta"
+    assert provenance["response_kind"] == "available_unit_roster"
+    assert provenance["source_url"].endswith("GetFloorPlans/55/1")
+    assert provenance["unit_count"] == 2
+    assert provenance["identity"]["status"] == "MATCH"
+    assert provenance["identity"]["source_count"] == 2
+    assert provenance["identity"]["admitted_count"] == 2
+    assert len(provenance["response_sha256"]) == 64
     assert calls == [
         "https://residentapis.yottareal.com/api/DBA/GetDBADetails/55",
         "https://residentapis.yottareal.com/api/DBA/GetFloorPlans/55/1",
@@ -277,3 +330,4 @@ async def test_yotta_configured_route_full_scraper_e2e(
     assert result["extraction_tier_used"] == "TIER_1_API_YOTTA"
     assert len(result["units"]) == 2
     assert {unit["source_property_id"] for unit in result["units"]} == {"55"}
+    assert len(result["_unit_source_provenance"]) == 1

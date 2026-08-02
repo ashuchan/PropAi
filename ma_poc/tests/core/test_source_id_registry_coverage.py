@@ -189,10 +189,19 @@ def test_registry_has_no_stale_entries_beyond_dead_and_apartment_id() -> None:
     be contingent on a foreign session's uncommitted file sitting in the
     working tree, and committing this PR alone would fail CI. Delete the
     allowlist entry in the diagnostics PR that lands the writer.
+
+    The three historical Camden preview keys remain PLAN-scoped so old run
+    artifacts cannot reinterpret them as apartment identity.  Their unsafe
+    writers were deliberately removed when the exact detail walker replaced
+    the representative/cross-product fallback.
     """
     allowed_writerless = {k for k, s in SOURCE_ID_SCOPES.items() if s is SourceIdScope.DEAD} | {
         "apartment_id",
         "api_floorplan_id",
+        "camden_unit_id",
+        "realpage_unit_id",
+        "realpage_floorplan_id",
+        "scrape_ts",
     }
     stale = {k for k in SOURCE_ID_SCOPES if k not in _WRITERS and k not in allowed_writerless}
     assert not stale, (
@@ -504,6 +513,20 @@ _ADMISSION_EVIDENCE: dict[str, str] = {
     "venterra_unit_code": "fixtures 19/19 and 20/20",
     "realpage_oll_unit_id": "fixture 4/4 (UnitId= off the per-unit application URL)",
     "securecafe_apartment_id": "fixtures 7/7 and 18/18",
+    "amli_unit_id": "254/254 non-empty and unique across the complete 11-property "
+    "property-bound AMLI target cohort (live 2026-08-02); Toscana public-number "
+    "collision requires the native anchor",
+    "repli360_unit_id": "94/94 non-empty and unique across three complete public "
+    "Repli360 controls (live 2026-08-02); every native ID differs from the public label",
+    "cortland_apartment_id": "39/39 modern Mirror Lake cards and 28/28 legacy "
+    "Royal Palm availprice rows carry unique native IDs; public short numbers collide "
+    "within both complete current rosters (live 2026-08-02)",
+    "g5_apartment_id": "43/43 non-empty and unique across complete Shadowbrook, "
+    "Hawthorn Village, and Brookside Village GraphQL rosters (live 2026-08-02); "
+    "the repeated G5 name field is a plan type, not an apartment identity",
+    "avalonbay_unit_id": "133/133 non-empty and unique across complete Arlington "
+    "Square, Meydenbauer, and Montville Fusion rosters (live 2026-08-02); Arlington "
+    "has 81 native IDs but only 47 visible unitName values",
     "knock_unit_id": "440 rows / 5 exact GSC props @ 1.000 (live 2026-08-01); "
     "two consecutive public fetches returned identical UUID sets",
     "rently_full_address": "fixture 5/5 (Jodeco searchQuery) — scattered-site street "

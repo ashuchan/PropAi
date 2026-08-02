@@ -57,6 +57,41 @@ def test_rent_present_zero_units_never_gold_even_without_marker() -> None:
     assert r.gold_eligible is False
 
 
+def test_unverified_plan_rows_do_not_bypass_the_madrid_rent_guard() -> None:
+    r = _assess(
+        plan_summaries=[{"plan": "A1", "rent_low": 1500}],
+        html_signals={"rent_signal_count": 4, "spa_confidence": 0.0},
+        verified_plan_only_surface=False,
+    )
+    assert r.verdict is PublishCeiling.EXTRACTION_MISS
+    assert r.gold_eligible is False
+
+
+def test_verified_complete_plan_surface_explains_its_rent_tokens() -> None:
+    r = _assess(
+        plan_summaries=[
+            {"plan": "1 Bedroom/ 1 Bath", "rent_low": 1475},
+            {"plan": "2 Bedroom/ 2 Bath", "rent_low": 1750},
+        ],
+        html_signals={"rent_signal_count": 8, "spa_confidence": 0.0},
+        verified_plan_only_surface=True,
+    )
+    assert r.verdict is PublishCeiling.CONFIRMED_PLAN_ONLY
+    assert r.gold_eligible is True
+    assert r.evidence["n_plan_summaries"] == 2
+    assert r.evidence["verified_plan_only_surface"] is True
+
+
+def test_verified_plan_surface_cannot_hide_unit_vocabulary() -> None:
+    r = _assess(
+        plan_summaries=[{"plan": "A1", "rent_low": 1500}],
+        verified_plan_only_surface=True,
+        page_html='<div class="AvailUnitRow">Unit 101</div>',
+    )
+    assert r.verdict is PublishCeiling.EXTRACTION_MISS
+    assert r.gold_eligible is False
+
+
 # ── Positive (gold-eligible) paths ──────────────────────────────────────────
 
 def test_genuine_no_availability_is_confirmed_no_data() -> None:

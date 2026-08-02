@@ -1691,6 +1691,41 @@ def _sc_applicant_int(v: Any) -> int | None:
     return n if 0 < n < 1_000_000 else None
 
 
+def _sc_applicant_nonnegative_int(v: Any) -> int | None:
+    """Coerce count fields while preserving the meaningful zero value."""
+    try:
+        n = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    return n if 0 <= n < 1_000_000 else None
+
+
+def _sc_applicant_bool(v: Any) -> bool | None:
+    """Read the Applicant API's bool-or-string flag variants conservatively."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if v == 1:
+            return True
+        if v == 0:
+            return False
+    text = str(v or "").strip().casefold()
+    if text in {"true", "yes", "y", "1"}:
+        return True
+    if text in {"false", "no", "n", "0"}:
+        return False
+    return None
+
+
+def _sc_applicant_first(entry: dict[str, Any], floor_plan: dict[str, Any], *keys: str) -> Any:
+    """Return the first present Applicant field from wrapper then plan."""
+    for owner in (entry, floor_plan):
+        for key in keys:
+            if key in owner and owner.get(key) not in (None, ""):
+                return owner.get(key)
+    return None
+
+
 def _sc_applicant_exact_area(floor_plan: dict[str, Any]) -> int | None:
     """Return an exact SecureCafe floor-plan area, never a published range.
 
@@ -1793,13 +1828,22 @@ def parse_securecafe_applicant_floorplans(payload: Any, source_url: str) -> list
         baths_s = "" if baths is None else str(baths)
         sqft_s = "" if sqft_v is None else str(sqft_v)
         avail = entry.get("UnitAvailability") or entry.get("unitAvailability") or []
+        emitted_physical = 0
+        waitlist_only_evidence = False
         if isinstance(avail, list) and avail:
             for u in avail:
                 if not isinstance(u, dict):
                     continue
+                raw_code = u.get("unitcode") or u.get("UnitCode")
+                raw_status = u.get("Status") or u.get("status")
+                if (
+                    _SC_APPLICANT_PLACEHOLDER_CODE_RE.match(str(raw_code or "").strip())
+                    or "wait" in str(raw_status or "").casefold()
+                ):
+                    waitlist_only_evidence = True
                 unit_code = _sc_applicant_physical_unit_code(
-                    u.get("unitcode") or u.get("UnitCode"),
-                    u.get("Status") or u.get("status"),
+                    raw_code,
+                    raw_status,
                 )
                 if not unit_code:
                     continue
@@ -1827,7 +1871,15 @@ def parse_securecafe_applicant_floorplans(payload: Any, source_url: str) -> list
                     rent_low=rent,
                     rent_high=rent_high,
                     deposit=(f"${unit_deposit:,}" if unit_deposit else deposit),
-                    availability_date=str(u.get("AvailableDate") or u.get("availableDate") or ""),
+                    # The current availability window is authoritative over
+                    # Applicant's legacy/historical AvailableDate field.
+                    availability_date=str(
+                        u.get("UnitAvailableStartDate")
+                        or u.get("unitAvailableStartDate")
+                        or u.get("AvailableDate")
+                        or u.get("availableDate")
+                        or ""
+                    ),
                     availability_status="AVAILABLE",
                     source_api_url=source_url,
                     extraction_tier=("TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2"),
@@ -1836,23 +1888,64 @@ def parse_securecafe_applicant_floorplans(payload: Any, source_url: str) -> list
                 unit_row["source_property_id"] = str(fp.get("PropertyID") or "").strip()
                 unit_row["source_property_name"] = str(fp.get("PropertyName") or "").strip()
                 units.append(unit_row)
-        elif name:
+                emitted_physical += 1
+        if name and emitted_physical == 0:
             fp_lo = _sc_applicant_int(fp.get("MinimumRent"))
             floorplan_id = str(fp.get("FloorPlanID") or "").strip()
-            units.append(
-                make_unit_dict(
-                    floor_plan_name=name,
-                    bedrooms=beds_s,
-                    bathrooms=baths_s,
-                    sqft=sqft_s,
-                    rent_low=fp_lo,
-                    rent_high=_sc_applicant_int(fp.get("MaximumRent")) or fp_lo,
-                    deposit=deposit,
-                    source_api_url=source_url,
-                    extraction_tier=("TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_PLAN_LEVEL"),
-                    source_ids=({"securecafe_floorplan_id": floorplan_id} if floorplan_id else {}),
+            available_count = _sc_applicant_nonnegative_int(
+                _sc_applicant_first(
+                    entry,
+                    fp,
+                    "AvailableUnits",
+                    "availableUnits",
+                    "AvailableUnitCount",
                 )
             )
+            fully_occupied = _sc_applicant_bool(
+                _sc_applicant_first(entry, fp, "IsFullyOccupied", "isFullyOccupied")
+            )
+            floorplan_available = _sc_applicant_bool(
+                _sc_applicant_first(
+                    entry,
+                    fp,
+                    "FloorPlanAvailable",
+                    "floorPlanAvailable",
+                )
+            )
+            if waitlist_only_evidence:
+                plan_status = "WAITLIST"
+            elif (
+                available_count == 0
+                or fully_occupied is True
+                or floorplan_available is False
+            ):
+                plan_status = "UNAVAILABLE"
+            elif (
+                (available_count is not None and available_count > 0)
+                or floorplan_available is True
+            ):
+                plan_status = "AVAILABLE"
+            else:
+                plan_status = "UNKNOWN"
+
+            plan_row = make_unit_dict(
+                floor_plan_name=name,
+                bedrooms=beds_s,
+                bathrooms=baths_s,
+                sqft=sqft_s,
+                rent_low=fp_lo,
+                rent_high=_sc_applicant_int(fp.get("MaximumRent")) or fp_lo,
+                deposit=deposit,
+                availability_status=plan_status,
+                available_units=(str(available_count) if available_count is not None else ""),
+                source_api_url=source_url,
+                extraction_tier=("TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_PLAN_LEVEL"),
+                source_ids=({"securecafe_floorplan_id": floorplan_id} if floorplan_id else {}),
+            )
+            plan_row["is_floor_plan_level"] = True
+            plan_row["source_property_id"] = str(fp.get("PropertyID") or "").strip()
+            plan_row["source_property_name"] = str(fp.get("PropertyName") or "").strip()
+            units.append(plan_row)
     return _demote_cross_plan_duplicate_unit_codes(units)
 
 

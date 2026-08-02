@@ -100,7 +100,7 @@ def has_funnel_spaces_unit_markup(html: str) -> bool:
 
 def _spaces_attr(tag: str, name: str) -> str:
     """Return the value of HTML attribute *name* in *tag*, or ''."""
-    m = re.search(r'\b' + re.escape(name) + r'="([^"]*)"', tag, re.IGNORECASE)
+    m = re.search(r"\b" + re.escape(name) + r'="([^"]*)"', tag, re.IGNORECASE)
     return m.group(1).strip() if m else ""
 
 
@@ -110,9 +110,12 @@ def parse_funnel_spaces_ssr(html: str, source_url: str) -> list[dict[str, str]]:
     Each available unit is one ``<article class="spaces-unit"`` (legacy) or
     ``<article class="spaces__unit"`` (modern)
     data-spaces-obj="unit" ...>`` carrying a complete data-attribute set:
-    ``data-spaces-unit`` (unit number), ``data-spaces-sort-price``,
+    ``data-spaces-unit`` (display unit number), ``data-spaces-unit-id``
+    (native apartment identity), ``data-spaces-sort-price``,
     ``data-spaces-sort-bed/bath/area``, ``data-spaces-sort-plan-name``,
-    ``data-spaces-soonest`` (avail date), ``data-spaces-available``.
+    ``data-spaces-plan-id``, ``data-spaces-asset`` (property boundary),
+    ``data-spaces-community`` (source property name),
+    ``data-spaces-soonest`` (avail date), and ``data-spaces-available``.
     Returns ``[]`` when the markup is absent (caller falls through).
     """
     if not has_funnel_spaces_unit_markup(html):
@@ -125,6 +128,22 @@ def parse_funnel_spaces_ssr(html: str, source_url: str) -> list[dict[str, str]]:
         unit_no = _spaces_attr(tag, "data-spaces-unit")
         if not unit_no:
             continue
+        # The public number is a mutable display label. Every current Spaces
+        # unit card also carries a property-scoped native id (mirrored in the
+        # generic card id), plus its plan and property asset boundaries. Keep
+        # those values before shared deduplication so a display-number change
+        # does not manufacture a disappeared/new apartment pair.
+        native_unit_id = _spaces_attr(tag, "data-spaces-unit-id") or _spaces_attr(tag, "data-spaces-id")
+        plan_id = _spaces_attr(tag, "data-spaces-plan-id")
+        asset_id = _spaces_attr(tag, "data-spaces-asset")
+        community_name = unescape(_spaces_attr(tag, "data-spaces-community")).strip()
+        source_ids: dict[str, str] = {}
+        if native_unit_id:
+            source_ids["funnel_spaces_unit_id"] = native_unit_id
+        if plan_id:
+            source_ids["funnel_spaces_plan_id"] = plan_id
+        if asset_id:
+            source_ids["funnel_spaces_asset_id"] = asset_id
         price = _spaces_attr(tag, "data-spaces-sort-price")
         rent = money_to_int(price) if price else None
         beds = _spaces_attr(tag, "data-spaces-sort-bed")
@@ -135,22 +154,31 @@ def parse_funnel_spaces_ssr(html: str, source_url: str) -> list[dict[str, str]]:
         except ValueError:
             beds_int = None
         avail = _spaces_attr(tag, "data-spaces-available") == "true"
-        units.append(
-            make_unit_dict(
-                floor_plan_name=plan,
-                bed_label=bed_label_from(beds_int, plan),
-                bedrooms=beds,
-                bathrooms=baths,
-                sqft=_spaces_attr(tag, "data-spaces-sort-area"),
-                unit_number=unit_no,
-                rent_low=rent,
-                rent_high=rent,
-                availability_status="AVAILABLE" if avail else "UNAVAILABLE",
-                availability_date=_spaces_attr(tag, "data-spaces-soonest"),
-                source_api_url=source_url,
-                extraction_tier=_TIER_SPACES_SSR,
-            )
+        unit = make_unit_dict(
+            floor_plan_name=plan,
+            bed_label=bed_label_from(beds_int, plan),
+            bedrooms=beds,
+            bathrooms=baths,
+            sqft=_spaces_attr(tag, "data-spaces-sort-area"),
+            unit_number=unit_no,
+            unit_name=unit_no,
+            rent_low=rent,
+            rent_high=rent,
+            availability_status="AVAILABLE" if avail else "UNAVAILABLE",
+            availability_date=_spaces_attr(tag, "data-spaces-soonest"),
+            source_api_url=source_url,
+            extraction_tier=_TIER_SPACES_SSR,
+            source_ids=source_ids or None,
         )
+        if native_unit_id:
+            unit["unit_id"] = native_unit_id
+        if asset_id:
+            unit["source_property_id"] = asset_id
+        if community_name:
+            unit["source_property_name"] = community_name
+        if asset_id or community_name:
+            unit["source_property_provenance"] = "funnel_spaces_ssr_article"
+        units.append(unit)
     return units
 
 
@@ -219,9 +247,7 @@ def _spaces_floorplans_url(html: str, base_url: str) -> str | None:
         if final_segment not in {"floorplans", "apartments"}:
             continue
         canonical_path = path.rstrip("/") + "/"
-        clean = urlunsplit(
-            (target.scheme, target.netloc, canonical_path, "", "")
-        )
+        clean = urlunsplit((target.scheme, target.netloc, canonical_path, "", ""))
         candidates.setdefault(clean, None)
 
     if len(candidates) != 1:
@@ -282,9 +308,7 @@ def _spaces_body_from_ctx(ctx: AdapterContext) -> tuple[str, str]:
         body = raw.decode("utf-8", errors="replace")
     else:
         body = raw if isinstance(raw, str) else ""
-    source_url = str(getattr(fetch_result, "final_url", "") or "") or str(
-        getattr(ctx, "base_url", "") or ""
-    )
+    source_url = str(getattr(fetch_result, "final_url", "") or "") or str(getattr(ctx, "base_url", "") or "")
     return body, source_url
 
 
@@ -383,6 +407,7 @@ def _is_funnel_current_items_response(body: Any) -> bool:
         and str(first.get("unit_number") or "").strip()
         and str(first.get("id") or "").isdigit()
     )
+
 
 # Listing-level keys that identify a Funnel listing (the outer envelope).
 _FUNNEL_LISTING_KEYS = {
@@ -498,16 +523,10 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
 
         current_building = row.get("building") if isinstance(row.get("building"), dict) else {}
         current_community = (
-            current_building.get("community")
-            if isinstance(current_building.get("community"), dict)
-            else {}
+            current_building.get("community") if isinstance(current_building.get("community"), dict) else {}
         )
         unit_id = _pick(row, "unit_number", "unit", "listingId", "listingid", "id")
-        building = (
-            _pick(row, "buildingName", "buildingname")
-            or current_building.get("name")
-            or ""
-        )
+        building = _pick(row, "buildingName", "buildingname") or current_building.get("name") or ""
         if unit_id and building and unit_id != building:
             unit_number = f"{unit_id}"
         else:
@@ -578,11 +597,19 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
         # incentives). Often empty (no active special — correct, not a
         # bug) but capture raw when present; v2's widened concession
         # alias chain maps it.
-        concession = str(_pick(
-            row, "incentives_marketing_description", "special_offers",
-            "incentives", "concession", "concessions", "specials",
-            "specials_description",
-        ) or "")
+        concession = str(
+            _pick(
+                row,
+                "incentives_marketing_description",
+                "special_offers",
+                "incentives",
+                "concession",
+                "concessions",
+                "specials",
+                "specials_description",
+            )
+            or ""
+        )
 
         source_ids: dict[str, Any] = {}
         listing_id = str(row.get("id") or row.get("listingId") or row.get("listingid") or "").strip()
@@ -596,37 +623,33 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
             source_ids["funnel_community_id"] = community_id
 
         unit = make_unit_dict(
-                floor_plan_name=floor_plan_name,
-                bed_label=bed_label_from(beds, floor_plan_name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
-                sqft=sqft,
-                unit_number=unit_number,
-                floor=floor,
-                building=str(building or ""),
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                rent_low=rent_lo,
-                rent_high=rent_hi,
-                availability_status="AVAILABLE" if avail_date else "AVAILABLE",
-                available_units="1",
-                availability_date=avail_date,
-                concession=concession,
-                source_api_url=url,
-                extraction_tier=(
-                    _TIER_PUBLISHED_LISTINGS
-                    if _is_funnel_current_items_response(body)
-                    else _TIER_BASE
-                ),
-                source_ids=source_ids,
-            )
+            floor_plan_name=floor_plan_name,
+            bed_label=bed_label_from(beds, floor_plan_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=sqft,
+            unit_number=unit_number,
+            floor=floor,
+            building=str(building or ""),
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            rent_low=rent_lo,
+            rent_high=rent_hi,
+            availability_status="AVAILABLE" if avail_date else "AVAILABLE",
+            available_units="1",
+            availability_date=avail_date,
+            concession=concession,
+            source_api_url=url,
+            extraction_tier=(
+                _TIER_PUBLISHED_LISTINGS if _is_funnel_current_items_response(body) else _TIER_BASE
+            ),
+            source_ids=source_ids,
+        )
         if current_community:
             unit["source_property_id"] = community_id
             unit["source_property_name"] = str(
                 current_community.get("name") or current_building.get("name") or ""
             ).strip()
-            unit["source_property_website"] = str(
-                current_community.get("website_url") or ""
-            ).strip()
+            unit["source_property_website"] = str(current_community.get("website_url") or "").strip()
             unit["source_property_address"] = ", ".join(
                 part
                 for part in (
@@ -658,18 +681,15 @@ def _published_nestio_listings_url(html: str) -> tuple[str, str] | None:
     if not html:
         return None
     pairs: dict[tuple[str, str], str] = {}
-    for match in _PUBLISHED_NESTIO_LISTINGS_RE.finditer(
-        unescape(html.replace("\\/", "/"))
-    ):
+    for match in _PUBLISHED_NESTIO_LISTINGS_RE.finditer(unescape(html.replace("\\/", "/"))):
         raw = match.group(0).rstrip(".,);]")
         try:
             parsed = urlsplit(raw)
         except ValueError:
             continue
-        if (
-            (parsed.hostname or "").casefold() != "nestiolistings.com"
-            or parsed.path.rstrip("/").casefold() != "/api/v2/listings/all"
-        ):
+        if (parsed.hostname or "").casefold() != "nestiolistings.com" or parsed.path.rstrip(
+            "/"
+        ).casefold() != "/api/v2/listings/all":
             continue
         query = parse_qs(parsed.query)
         keys = query.get("key", [])
@@ -678,9 +698,8 @@ def _published_nestio_listings_url(html: str) -> tuple[str, str] | None:
             continue
         public_key = str(keys[0]).strip()
         property_id = str(property_ids[0]).strip()
-        if (
-            not re.fullmatch(r"[a-z0-9]{16,64}", public_key, re.IGNORECASE)
-            or not re.fullmatch(r"\d{1,16}", property_id)
+        if not re.fullmatch(r"[a-z0-9]{16,64}", public_key, re.IGNORECASE) or not re.fullmatch(
+            r"\d{1,16}", property_id
         ):
             continue
         canonical = "https://nestiolistings.com/api/v2/listings/all/?" + urlencode(
@@ -728,9 +747,7 @@ def _funnel_name_key(value: Any) -> str:
         *_FUNNEL_ADDRESS_NOISE,
     }
     return "".join(
-        token
-        for token in re.findall(r"[a-z0-9]+", str(value or "").casefold())
-        if token not in ignored
+        token for token in re.findall(r"[a-z0-9]+", str(value or "").casefold()) if token not in ignored
     )
 
 
@@ -739,11 +756,7 @@ def _funnel_street_matches(expected: Any, observed: Any) -> bool:
     observed_tokens = set(re.findall(r"[a-z0-9]+", str(observed or "").casefold()))
     if not expected_tokens or expected_tokens[0] not in observed_tokens:
         return False
-    core = {
-        token
-        for token in expected_tokens[1:]
-        if len(token) >= 2 and token not in _FUNNEL_ADDRESS_NOISE
-    }
+    core = {token for token in expected_tokens[1:] if len(token) >= 2 and token not in _FUNNEL_ADDRESS_NOISE}
     return bool(core and core <= observed_tokens)
 
 
@@ -761,9 +774,7 @@ def _funnel_current_items_match_context(
     expected_city = _funnel_normalize(getattr(ctx, "city", ""))
     expected_state = _funnel_normalize(getattr(ctx, "state", ""))
     expected_zip = _funnel_normalize(getattr(ctx, "zip_code", ""))
-    if not all(
-        (expected_name, expected_address, expected_city, expected_state, expected_zip)
-    ):
+    if not all((expected_name, expected_address, expected_city, expected_state, expected_zip)):
         return False
 
     observed_boundaries: set[tuple[str, str, str, str, str, str]] = set()
@@ -775,12 +786,8 @@ def _funnel_current_items_match_context(
         if not isinstance(community, dict):
             return False
         community_id = str(community.get("id") or "").strip()
-        community_name = str(
-            community.get("name") or building.get("name") or ""
-        ).strip()
-        street = str(
-            community.get("street_address") or building.get("street_address") or ""
-        ).strip()
+        community_name = str(community.get("name") or building.get("name") or "").strip()
+        street = str(community.get("street_address") or building.get("street_address") or "").strip()
         city = _funnel_normalize(community.get("city"))
         state = _funnel_normalize(community.get("state"))
         zip_code = _funnel_normalize(community.get("postal_code"))
@@ -789,9 +796,7 @@ def _funnel_current_items_match_context(
         )
     if len(observed_boundaries) != 1:
         return False
-    community_id, name_key, street, city, state, zip_code = next(
-        iter(observed_boundaries)
-    )
+    community_id, name_key, street, city, state, zip_code = next(iter(observed_boundaries))
     return bool(
         community_id == native_property_id
         and name_key == expected_name
@@ -828,10 +833,7 @@ def _strict_published_funnel_rows(
             return False
         unit_numbers.append(unit_number.casefold())
         listing_ids.append(listing_id)
-    return bool(
-        len(unit_numbers) == len(set(unit_numbers))
-        and len(listing_ids) == len(set(listing_ids))
-    )
+    return bool(len(unit_numbers) == len(set(unit_numbers)) and len(listing_ids) == len(set(listing_ids)))
 
 
 def _classify_funnel_failure(
@@ -908,9 +910,7 @@ class FunnelAdapter:
             if _pp.n_admitted > 0:
                 result.units = _pp.admitted
                 result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
                 result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
                 result.tier_used = _TIER_BASE
                 return result
@@ -948,13 +948,10 @@ class FunnelAdapter:
                 payload: Any = None
                 if status == 200:
                     payload = json.loads(str(getattr(response, "text", "") or ""))
-                if (
-                    status == 200
-                    and _funnel_current_items_match_context(
-                        payload,
-                        native_property_id,
-                        ctx,
-                    )
+                if status == 200 and _funnel_current_items_match_context(
+                    payload,
+                    native_property_id,
+                    ctx,
                 ):
                     parsed = parse_funnel_listings(payload, published_url)
                     expected_count = len(payload.get("items") or [])
@@ -969,11 +966,7 @@ class FunnelAdapter:
                             parsed,
                             property_id=getattr(ctx, "property_id", None),
                         )
-                        admitted = [
-                            row
-                            for row in processed.admitted
-                            if isinstance(row, dict)
-                        ]
+                        admitted = [row for row in processed.admitted if isinstance(row, dict)]
                         if _strict_published_funnel_rows(
                             admitted,
                             native_property_id,
@@ -997,8 +990,7 @@ class FunnelAdapter:
                             )
                             return result
                     result.errors.append(
-                        "FUNNEL_PUBLISHED_LISTINGS_STRICT_REJECTED: "
-                        "native IDs/rents/completeness failed"
+                        "FUNNEL_PUBLISHED_LISTINGS_STRICT_REJECTED: native IDs/rents/completeness failed"
                     )
                 elif status == 200:
                     result.errors.append(
@@ -1006,18 +998,14 @@ class FunnelAdapter:
                         "payload community does not match canonical property"
                     )
                 else:
-                    result.errors.append(
-                        f"FUNNEL_PUBLISHED_LISTINGS_HTTP_{status or 'ERROR'}"
-                    )
+                    result.errors.append(f"FUNNEL_PUBLISHED_LISTINGS_HTTP_{status or 'ERROR'}")
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 result.errors.append(
-                    "FUNNEL_PUBLISHED_LISTINGS_PARSE_ERROR: "
-                    f"{type(exc).__name__}: {str(exc)[:100]}"
+                    f"FUNNEL_PUBLISHED_LISTINGS_PARSE_ERROR: {type(exc).__name__}: {str(exc)[:100]}"
                 )
             except Exception as exc:
                 result.errors.append(
-                    "FUNNEL_PUBLISHED_LISTINGS_FETCH_ERROR: "
-                    f"{type(exc).__name__}: {str(exc)[:100]}"
+                    f"FUNNEL_PUBLISHED_LISTINGS_FETCH_ERROR: {type(exc).__name__}: {str(exc)[:100]}"
                 )
 
         # Funnel "Spaces" SSR fallback: customers on the WordPress Spaces
@@ -1045,9 +1033,7 @@ class FunnelAdapter:
         if _sp_units:
             from ma_poc.extraction.post_process import post_process
 
-            _sp_pp = post_process(
-                _sp_units, property_id=getattr(ctx, "property_id", None)
-            )
+            _sp_pp = post_process(_sp_units, property_id=getattr(ctx, "property_id", None))
             if _sp_pp.n_admitted > 0:
                 result.units = _sp_pp.admitted
                 result.plan_summaries = _sp_pp.plan_summaries

@@ -11,6 +11,7 @@ from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
 from ma_poc.pms.adapters._betternoi_public import recover_betternoi_public
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
+from ma_poc.pms.source_provenance import context_unit_source_provenance
 
 CLIENT = "01a0e491-f0fd-4d03-9529-00d881128a10"
 FP1 = "c508d086-25cf-493b-a3d8-cf90c7fb9a9e"
@@ -91,7 +92,8 @@ async def test_exact_published_client_recovers_native_units(
         return {"results": [_row()], "next": None}, url
 
     monkeypatch.setattr(module, "_fetch_betternoi_page", fake_fetch)
-    rows = await recover_betternoi_public(_ctx(_html((CLIENT, FP1), (CLIENT, FP2))))
+    ctx = _ctx(_html((CLIENT, FP1), (CLIENT, FP2)))
+    rows = await recover_betternoi_public(ctx)
 
     assert len(rows) == 1
     assert rows[0]["unit_number"] == "C-06"
@@ -100,6 +102,12 @@ async def test_exact_published_client_recovers_native_units(
     assert rows[0]["source_ids"]["betternoi_unit_uuid"]
     assert rows[0]["source_property_id"] == CLIENT
     assert rows[0]["source_property_provenance"] == ("exact_property_page_published_betternoi_client")
+    provenance = context_unit_source_provenance(ctx)
+    assert len(provenance) == 1
+    assert provenance[0]["provider"] == "betternoi"
+    assert provenance[0]["unit_count"] == 1
+    assert provenance[0]["identity"]["status"] == "MATCH"
+    assert provenance[0]["identity"]["betternoi_client_uuid"] == CLIENT
 
 
 @pytest.mark.asyncio
@@ -251,4 +259,6 @@ async def test_fetch_only_scrape_runs_exact_betternoi_bridge_with_body_resolver_
     assert len(result["units"]) == 1
     assert result["units"][0]["unit_number"] == "C-06"
     assert result["units"][0]["market_rent_low"] == 1230
+    assert len(result["_unit_source_provenance"]) == 1
+    assert result["_unit_source_provenance"][0]["provider"] == "betternoi"
     assert "page_published_native:betternoi_public" in result["_fallback_chain"]

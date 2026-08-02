@@ -15,6 +15,7 @@ Jugnu deltas applied:
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import os
 import re
@@ -162,10 +163,10 @@ def _hop_url_key(url: str) -> str:
     floor-plans/`` followed by ``http://www.villagegatenc.com/floor-plans/``;
     256603's was ``…/floorplans/`` followed by ``…/floorplans``. In both the
     first entry tarpitted for >147s. This key exists so budget freed by the
-    per-fetch cap is not spent re-fetching the page that just tarpitted; it is
-    deliberately NOT wired into ``visited`` itself, because an http/https
-    fallback is a legitimate recovery when the first variant *fails* rather than
-    hangs.
+    per-fetch cap is not spent re-fetching the page that just tarpitted. It is
+    also used by the success-only guard in :func:`_try_link_hop`: an equivalent
+    variant is suppressed only after the first surface produced inventory, so
+    an http/https fallback remains eligible after a real failure or empty page.
     """
     from urllib.parse import urlsplit
 
@@ -185,6 +186,285 @@ def _hop_url_key(url: str) -> str:
         return f"{host}{path}{tail}".lower()
     except Exception:  # pragma: no cover — defensive; urlsplit is total
         return raw.lower()
+
+
+_ROSTER_VOLATILE_FIELDS: frozenset[str] = frozenset(
+    {
+        "rent",
+        "rent_low",
+        "rent_high",
+        "market_rent_low",
+        "market_rent_high",
+        "rent_range",
+        "asking_rent",
+        "availability_status",
+        "available_date",
+        "availability_date",
+        "move_in_date",
+        "lease_term",
+    }
+)
+
+
+def _present_roster_value(value: Any) -> bool:
+    """Whether *value* is real source data rather than an empty sentinel."""
+
+    return value not in (None, "", "null", "None", -1, "-1")
+
+
+def _roster_native_unit_id(unit: dict[str, Any]) -> str:
+    """Return a physical source identity suitable for repeated-roster joins.
+
+    Plan placeholders and inferred IDs are deliberately excluded: the
+    reconciliation contract is only safe when both responses publish the same
+    property-scoped apartment anchor.
+    """
+
+    if unit.get("is_floor_plan_level") is True:
+        return ""
+    flags = str(unit.get("data_quality_flag") or "").upper()
+    if "PLAN" in flags or "WAITLIST" in flags:
+        return ""
+    raw = unit.get("unit_id") or unit.get("unit_number")
+    if not _present_roster_value(raw):
+        return ""
+    value = str(raw).strip()
+    if not value or value.casefold().startswith(("inferred_", "unkeyable_")):
+        return ""
+    return value.casefold()
+
+
+def _is_resman_availability_snapshot(snapshot: dict[str, Any]) -> bool:
+    """Whether one accumulated response is ResMan's public available subset."""
+
+    tier = str(snapshot.get("tier") or "").upper()
+    url = str(snapshot.get("source_url") or "").casefold()
+    return tier.startswith("TIER_1_API_RESMAN") or (
+        ".myresman.com" in url and "/portal/applicants/availability" in url
+    )
+
+
+def _roster_rows_conflict(entries: list[tuple[dict[str, Any], dict[str, Any]]]) -> bool:
+    """Return True when one public label demonstrably names distinct units.
+
+    Some PMSes repeat short apartment labels across buildings or floor plans.
+    Those are not repeated snapshots and must survive for the downstream
+    building/floor-plan disambiguators. Missing evidence is not a conflict;
+    two different non-empty values are.
+    """
+
+    for keys in (
+        ("building", "building_number"),
+        ("floor_plan_id",),
+        ("floor_plan_name", "floorplan_name"),
+    ):
+        values: set[str] = set()
+        for row, _snapshot in entries:
+            value = next(
+                (row.get(key) for key in keys if _present_roster_value(row.get(key))),
+                None,
+            )
+            if _present_roster_value(value):
+                values.add(" ".join(str(value).casefold().split()))
+        if len(values) > 1:
+            return True
+    return False
+
+
+def _merge_roster_entry_group(
+    entries: list[tuple[dict[str, Any], dict[str, Any]]],
+    *,
+    resman_pair: bool,
+) -> dict[str, Any]:
+    """Merge one proven native apartment across immutable-ID snapshots."""
+
+    available_entries = [entry for entry in entries if _is_resman_availability_snapshot(entry[1])]
+    catalogue_entries = [entry for entry in entries if not _is_resman_availability_snapshot(entry[1])]
+
+    # Catalogue rows are the stable full-roll record; public ResMan rows are
+    # the authority for current price/date/status. Outside that verified pair,
+    # retain deterministic first-success precedence.
+    stable_order = catalogue_entries + available_entries if resman_pair else entries
+    volatile_order = available_entries + catalogue_entries if resman_pair else entries
+    merged = copy.deepcopy(stable_order[0][0])
+
+    # Fill missing catalogue/dimension fields without overwriting evidence
+    # already supplied by the preferred stable source.
+    for row, _snapshot in stable_order:
+        for key, value in row.items():
+            if key in _ROSTER_VOLATILE_FIELDS:
+                continue
+            if key == "source_ids" and isinstance(value, dict):
+                current = merged.get("source_ids")
+                combined = dict(current) if isinstance(current, dict) else {}
+                for source_key, source_value in value.items():
+                    if source_key not in combined and _present_roster_value(source_value):
+                        combined[source_key] = copy.deepcopy(source_value)
+                if combined:
+                    merged["source_ids"] = combined
+                continue
+            if not _present_roster_value(merged.get(key)) and _present_roster_value(value):
+                merged[key] = copy.deepcopy(value)
+
+    # Resolve mutable fields independently. This is intentionally not part of
+    # identity: a routine price or move-in-date change cannot create a second
+    # physical apartment.
+    for field in _ROSTER_VOLATILE_FIELDS:
+        for row, _snapshot in volatile_order:
+            value = row.get(field)
+            if _present_roster_value(value):
+                merged[field] = copy.deepcopy(value)
+                break
+        else:
+            merged.pop(field, None)
+
+    return merged
+
+
+def _reconcile_accumulated_rosters(
+    snapshots: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Reconcile link-hop snapshots by immutable property-scoped unit ID.
+
+    This handles two evidence-backed production shapes:
+
+    * equivalent Jonah pages observed at different moments, where rent changed;
+    * a Razz/Vike full catalogue plus its overlapping ResMan available subset.
+
+    Rows with no native apartment ID, or with contradictory building/plan
+    evidence, fail open and remain separate. Rent, date and status never enter
+    the identity key.
+    """
+
+    entries: list[tuple[dict[str, Any], dict[str, Any], int]] = []
+    for snapshot in snapshots:
+        for row in snapshot.get("units") or []:
+            if isinstance(row, dict):
+                entries.append((row, snapshot, len(entries)))
+    if not entries:
+        return []
+
+    resman_ids = {
+        _roster_native_unit_id(row)
+        for row, snapshot, _order in entries
+        if _is_resman_availability_snapshot(snapshot) and _roster_native_unit_id(row)
+    }
+    catalogue_ids = {
+        _roster_native_unit_id(row)
+        for row, snapshot, _order in entries
+        if not _is_resman_availability_snapshot(snapshot) and _roster_native_unit_id(row)
+    }
+    # Require an actual overlapping full-roll/subset shape. A lone ResMan page
+    # or two same-sized sources must not make absence mean unavailable.
+    resman_pair = bool(
+        resman_ids
+        and catalogue_ids
+        and resman_ids.intersection(catalogue_ids)
+        and len(catalogue_ids) > len(resman_ids)
+    )
+
+    grouped: dict[str, list[tuple[dict[str, Any], dict[str, Any], int]]] = {}
+    anonymous: list[tuple[dict[str, Any], int]] = []
+    for row, snapshot, order in entries:
+        unit_id = _roster_native_unit_id(row)
+        if not unit_id:
+            anonymous.append((copy.deepcopy(row), order))
+            continue
+        grouped.setdefault(unit_id, []).append((row, snapshot, order))
+
+    output: list[tuple[int, dict[str, Any]]] = list(anonymous)
+    for unit_id, group in grouped.items():
+        pair_entries = [(row, snapshot) for row, snapshot, _order in group]
+        if _roster_rows_conflict(pair_entries):
+            # A repeated public label with contradictory stable evidence is not
+            # proof of one physical unit. Preserve each row for the existing
+            # building/floor-plan disambiguators rather than guessing.
+            output.extend((order, copy.deepcopy(row)) for row, _snapshot, order in group)
+            continue
+
+        merged = _merge_roster_entry_group(pair_entries, resman_pair=resman_pair)
+        if resman_pair and unit_id not in resman_ids:
+            # The public ResMan response is the property's available subset.
+            # A catalogue-only apartment is therefore not currently published
+            # as available; never retain the catalogue parser's manufactured
+            # capture date on it.
+            merged["availability_status"] = "UNAVAILABLE"
+            for field in ("available_date", "availability_date", "move_in_date"):
+                merged.pop(field, None)
+        output.append((min(order for _row, _snapshot, order in group), merged))
+
+    output.sort(key=lambda item: item[0])
+    return [row for _order, row in output]
+
+
+def _merge_unit_source_provenance(
+    snapshots: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return unique exact-response provenance from all roster snapshots."""
+
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for snapshot in snapshots:
+        for item in snapshot.get("provenance") or []:
+            if not isinstance(item, dict):
+                continue
+            key = (
+                str(item.get("source_url") or ""),
+                str(item.get("response_sha256") or ""),
+                str(item.get("response_kind") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(copy.deepcopy(item))
+    return out
+
+
+def _build_link_hop_roster_snapshot(
+    *,
+    units: list[dict[str, Any]],
+    source_url: str,
+    final_url: str,
+    tier: str,
+    adapter: str,
+    body: Any,
+    status: Any,
+    property_id: str,
+    existing_provenance: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Capture one unit-producing hop without retaining its response body."""
+
+    snapshot_stub = {"tier": tier, "source_url": source_url}
+    response_kind = "available_subset" if _is_resman_availability_snapshot(snapshot_stub) else "unit_roster"
+    try:
+        response_status = int(status)
+    except (TypeError, ValueError):
+        response_status = 200
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    generated = build_unit_source_provenance(
+        provider=adapter or tier or "link_hop",
+        source_url=source_url,
+        body=body,
+        unit_count=len(units),
+        identity={
+            "property_id": str(property_id),
+            "requested_url": source_url,
+            "final_url": final_url,
+        },
+        response_kind=response_kind,
+        status=response_status,
+    )
+    provenance = [copy.deepcopy(item) for item in (existing_provenance or []) if isinstance(item, dict)]
+    provenance.append(generated)
+    return {
+        "units": copy.deepcopy(units),
+        "source_url": source_url,
+        "final_url": final_url,
+        "tier": tier,
+        "adapter": adapter,
+        "provenance": provenance,
+    }
 
 
 def _hop_surface_key(url: str) -> str:
@@ -497,6 +777,7 @@ def _try_page_local_static_recovery(
 
     winning_url = str(getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or "")
     rows: list[dict[str, Any]] = []
+    static_plans: list[dict[str, Any]] = []
     adapter_name = "generic_plan_text"
     tier = "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK"
 
@@ -530,8 +811,12 @@ def _try_page_local_static_recovery(
             )
 
             rows = recover_static_residence_table(ctx)
+            static_plans = list(
+                getattr(ctx, "_static_residence_table_plan_summaries", []) or []
+            )
         except Exception:
             rows = []
+            static_plans = []
         if rows:
             adapter_name = "static_residence_table"
             tier = "TIER_1_DOM_STATIC_RESIDENCE_TABLE"
@@ -586,14 +871,21 @@ def _try_page_local_static_recovery(
     if pp.n_admitted <= 0:
         return None
 
+    plan_summaries = list(pp.plan_summaries)
+    for plan in static_plans:
+        if isinstance(plan, dict) and plan not in plan_summaries:
+            plan_summaries.append(plan)
+    from ma_poc.pms.source_provenance import context_unit_source_provenance
+
     recovered = AdapterResult(
         units=pp.admitted,
-        plan_summaries=pp.plan_summaries,
+        plan_summaries=plan_summaries,
         tier_used=tier,
         winning_url=winning_url or None,
         errors=list(previous.errors or [])
         + [f"page-local static recovery: {adapter_name} admitted {pp.n_admitted} row(s)"],
         confidence=min(0.90, 0.65 + 0.03 * pp.n_admitted),
+        unit_source_provenance=context_unit_source_provenance(ctx),
     )
     return recovered, adapter_name
 
@@ -717,6 +1009,8 @@ async def _try_page_published_native_recovery(
     winning_url = str(
         rows[0].get("source_portal_url") or getattr(fr, "final_url", "") or getattr(ctx, "base_url", "") or ""
     )
+    from ma_poc.pms.source_provenance import context_unit_source_provenance
+
     recovered = AdapterResult(
         units=pp.admitted,
         plan_summaries=plan_summaries,
@@ -724,6 +1018,7 @@ async def _try_page_published_native_recovery(
         winning_url=winning_url or None,
         errors=list(previous.errors or []),
         confidence=min(0.94, 0.78 + 0.03 * pp.n_admitted),
+        unit_source_provenance=context_unit_source_provenance(ctx),
     )
     return recovered, adapter_name
 
@@ -4066,9 +4361,7 @@ async def scrape(
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
-    result["_unit_source_provenance"] = list(
-        adapter_result.unit_source_provenance
-    )
+    result["_unit_source_provenance"] = list(adapter_result.unit_source_provenance)
 
     # Learn a marketing-page DOM parser from this run's gold units + rendered
     # HTML ($0, no LLM) → serialized parser stashed for profile_updater to
@@ -5420,9 +5713,155 @@ def _attach_hop_plans(result: dict[str, Any], harvested: list[dict[str, Any]]) -
     if not harvested:
         return
     existing = [p for p in (result.get("plan_summaries") or []) if isinstance(p, dict)]
+    candidates = [*existing, *harvested]
+
+    def normalized_name(row: dict[str, Any]) -> str:
+        value = (
+            row.get("floor_plan_name")
+            or row.get("floorplan_name")
+            or row.get("name")
+            or ""
+        )
+        return re.sub(r"[^a-z0-9]+", "", str(value).casefold())
+
+    def is_rs365(row: dict[str, Any]) -> bool:
+        tier = str(
+            row.get("extraction_tier")
+            or row.get("extraction_tier_used")
+            or row.get("tier_used")
+            or ""
+        )
+        return "365RESIDENTSERVICES" in tier.upper()
+
+    def is_exact_aspensquare_plan(row: dict[str, Any]) -> bool:
+        tier = str(
+            row.get("extraction_tier")
+            or row.get("extraction_tier_used")
+            or row.get("tier_used")
+            or ""
+        ).upper()
+        source_ids = row.get("source_ids")
+        return bool(
+            "ASPENSQUARE_NEXT" in tier
+            and isinstance(source_ids, dict)
+            and source_ids.get("aspensquare_floor_plan_id")
+        )
+
+    def is_exact_edifice_plan(row: dict[str, Any]) -> bool:
+        tier = str(
+            row.get("extraction_tier")
+            or row.get("extraction_tier_used")
+            or row.get("tier_used")
+            or ""
+        ).upper()
+        source_ids = row.get("source_ids")
+        return bool(
+            tier == "TIER_1_API_EDIFICECMS"
+            and isinstance(source_ids, dict)
+            and source_ids.get("edifice_plan_id")
+        )
+
+    def is_exact_marketapts_plan(row: dict[str, Any]) -> bool:
+        tier = str(
+            row.get("extraction_tier")
+            or row.get("extraction_tier_used")
+            or row.get("tier_used")
+            or ""
+        ).upper()
+        return tier.startswith("TIER_1_DOM_MARKETAPTS")
+
+    def is_exact_rentcafe_lt_plan(row: dict[str, Any]) -> bool:
+        tier = str(
+            row.get("extraction_tier")
+            or row.get("extraction_tier_used")
+            or row.get("tier_used")
+            or ""
+        ).upper()
+        return tier.startswith("TIER_1_DOM_RENTCAFE_LT")
+
+    result_tier = str(
+        result.get("extraction_tier_used")
+        or result.get("tier_used")
+        or result.get("extraction_tier")
+        or ""
+    ).upper()
+    exact_edifice_plans = [row for row in existing if is_exact_edifice_plan(row)]
+    if result_tier == "TIER_1_API_EDIFICECMS" or exact_edifice_plans:
+        # The exact Edifice catalogue already represents active plans through
+        # its physical units and empty plans through source-ID-bearing plan
+        # rows. Turtle Dove I proves a generic entry-page harvest can contain
+        # 24 degraded duplicates plus three Turtle Dove II-only shapes. Once
+        # the property-bound catalogue wins, none of those rows is independent
+        # evidence; retain only the exact empty-plan channel.
+        result["plan_summaries"] = exact_edifice_plans
+        result["_hop_plan_harvest"] = len(harvested)
+        result["_hop_plan_harvest_suppressed"] = len(harvested)
+        return
+
+    # Aspen's current Next.js ``floorPlans.styles`` is the complete exact
+    # property catalogue. Once the winning result carries it, generic hopped
+    # bedroom summaries are not additive evidence: Adley @ 72nd proved they
+    # created two anonymous "2 Bedroom"/"3 Bedroom" extras beside its exact
+    # Duke/Essex/Monarch catalogue. Keep the bounded source-ID-bearing surface
+    # and suppress only the lower-authority hop harvest for this adapter.
+    exact_aspen_plans = [row for row in existing if is_exact_aspensquare_plan(row)]
+    if exact_aspen_plans:
+        result["plan_summaries"] = exact_aspen_plans
+        result["_hop_plan_harvest"] = len(harvested)
+        result["_hop_plan_harvest_suppressed"] = len(harvested)
+        return
+
+    # MarketApts' property-bound adapter reads the exact per-plan drill rows.
+    # Ellis Midtown and Riverbank prove that entry-page generic cards are not
+    # independent plan evidence: six such rows survived beside the exact winner
+    # and interpreted visibly labelled deposits ($200 / $1,000) as rent.  When
+    # the winning MarketApts result carries physical units or its own no-unit
+    # plan rows, retain only that authoritative plan channel.
+    exact_marketapts_plans = [row for row in existing if is_exact_marketapts_plan(row)]
+    if result_tier.startswith("TIER_1_DOM_MARKETAPTS") and (
+        result.get("units") or exact_marketapts_plans
+    ):
+        result["plan_summaries"] = exact_marketapts_plans
+        result["_hop_plan_harvest"] = len(harvested)
+        result["_hop_plan_harvest_suppressed"] = len(harvested)
+        return
+
+    # RentCafe layout-tab's plan-specific pages are the property-bound source.
+    # The generic entry-page pass turned 31 exact plans into anonymous bedroom
+    # labels, collapsed rent highs, and assigned capture dates to UNKNOWN plan
+    # rows. Once the exact adapter has physical units or its own empty-plan
+    # rows, the generic harvest is a lower-authority restatement, not additive
+    # evidence.
+    exact_rentcafe_lt_plans = [
+        row for row in existing if is_exact_rentcafe_lt_plan(row)
+    ]
+    if result_tier.startswith("TIER_1_DOM_RENTCAFE_LT") and (
+        result.get("units") or exact_rentcafe_lt_plans
+    ):
+        result["plan_summaries"] = exact_rentcafe_lt_plans
+        result["_hop_plan_harvest"] = len(harvested)
+        result["_hop_plan_harvest_suppressed"] = len(harvested)
+        return
+
+    # RS365's authoritative tile catalogue and a generic link-hop can describe
+    # the same plan with different missing fields/rent, so the general identity
+    # intentionally does not collapse them. Narrowly suppress the generic
+    # restatement only when an exact non-empty normalized plan name is shared;
+    # keep all dedicated RS365 offers and leave every other adapter untouched.
+    rs365_names = {
+        normalized_name(row)
+        for row in candidates
+        if is_rs365(row) and normalized_name(row)
+    }
+    candidates = [
+        row
+        for row in candidates
+        if is_rs365(row) or normalized_name(row) not in rs365_names
+    ]
+
     merged: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()
-    for row in [*existing, *harvested]:
+    for row in candidates:
         ident = _hop_plan_identity(row)
         if ident in seen:
             continue
@@ -5884,8 +6323,14 @@ async def _try_link_hop(
     # ``_first_successful_result`` holds the base result; ``_accumulated_units``
     # merges all unit lists.
     _first_successful_result: dict[str, Any] | None = None
+    _accumulated_snapshots: list[dict[str, Any]] = []
     _accumulated_units: list[dict[str, Any]] = []
     _in_floorplan_accumulation = False
+
+    # Equivalent scheme/www/trailing-slash variants remain valid fallbacks
+    # until one of them actually produces units. Once a surface succeeds, a
+    # second spelling can only be a redundant snapshot of the same roster.
+    _successful_surface_keys: set[str] = set()
 
     # Rule: once profile:winning_page_url delivers >1 units, skip lower-scored
     # candidates (priors, generic links) — they are speculative and waste hops.
@@ -6005,6 +6450,15 @@ async def _try_link_hop(
         if sub_url in visited:
             # Phase 9: defensive — should already be filtered above, but
             # double-check to enforce H5 invariant under all code paths.
+            continue
+        if _hop_url_key(sub_url) in _successful_surface_keys:
+            emit(
+                EventKind.LINK_HOP_FETCHED,
+                property_id,
+                url=sub_url,
+                outcome="HOP_SKIPPED_SUCCESSFUL_EQUIVALENT",
+                hop_index=idx,
+            )
             continue
         # Budget freed by the per-fetch cap must not be spent re-fetching the
         # page that just consumed it. ``visited`` is an exact-string set, and
@@ -6452,6 +6906,23 @@ async def _try_link_hop(
         has_plan_evidence = bool(sub_result.get("plan_summaries"))
         has_inventory_evidence = had_data or has_plan_evidence
         explored[sub_url] = has_inventory_evidence
+        _current_roster_snapshot: dict[str, Any] | None = None
+        if had_data:
+            # Suppress only after extraction succeeds. A 200 shell or failed
+            # http variant does not poison the equivalent https fallback.
+            _successful_surface_keys.add(_hop_url_key(sub_url))
+            _successful_surface_keys.add(_hop_url_key(str(_sub_final_url)))
+            _current_roster_snapshot = _build_link_hop_roster_snapshot(
+                units=list(sub_result.get("units") or []),
+                source_url=sub_url,
+                final_url=str(_sub_final_url),
+                tier=str(sub_result.get("extraction_tier_used") or ""),
+                adapter=str(sub_result.get("_adapter_used") or ""),
+                body=getattr(sub_fetch, "body", None),
+                status=getattr(sub_fetch, "status", 200),
+                property_id=property_id,
+                existing_provenance=list(sub_result.get("_unit_source_provenance") or []),
+            )
 
         # Dynamic portal discovery must happen before any inventory branch
         # returns or continues.  A plan-only /floorplans page is exactly where
@@ -6655,13 +7126,19 @@ async def _try_link_hop(
                     )
                     sub_result["_best_units_page"] = _best_units_page[0] or sub_url
                     sub_result["_best_units_count"] = _best_units_page[1]
+                    if _current_roster_snapshot is not None:
+                        sub_result["_unit_source_provenance"] = _merge_unit_source_provenance(
+                            [_current_roster_snapshot]
+                        )
                     _attach_hop_plans(sub_result, hop_plan_summaries)
                     return sub_result
                 # Mark accumulation mode so recursive sub-pages are merged,
                 # not treated as new floor-plan index pages.
                 _in_floorplan_accumulation = True
                 _first_successful_result = sub_result
-                _accumulated_units.extend(sub_result.get("units") or [])
+                if _current_roster_snapshot is not None:
+                    _accumulated_snapshots.append(_current_roster_snapshot)
+                _accumulated_units = _reconcile_accumulated_rosters(_accumulated_snapshots)
                 # Checkpoint partial results so the timeout handler can
                 # salvage accumulated units if the property wall-clock budget
                 # expires mid-hop. Write to both shared_budget (in-process
@@ -6713,7 +7190,9 @@ async def _try_link_hop(
 
             elif _in_floorplan_accumulation:
                 # Accumulating sub-page units — merge into the running total.
-                _accumulated_units.extend(sub_result.get("units") or [])
+                if _current_roster_snapshot is not None:
+                    _accumulated_snapshots.append(_current_roster_snapshot)
+                _accumulated_units = _reconcile_accumulated_rosters(_accumulated_snapshots)
                 if shared_budget is not None:
                     shared_budget["_partial_units"] = list(_accumulated_units)
                     shared_budget["_partial_result"] = _first_successful_result or sub_result
@@ -6765,6 +7244,10 @@ async def _try_link_hop(
             )
             sub_result["_best_units_page"] = _best_units_page[0] or sub_url
             sub_result["_best_units_count"] = _best_units_page[1]
+            if _current_roster_snapshot is not None:
+                sub_result["_unit_source_provenance"] = _merge_unit_source_provenance(
+                    [_current_roster_snapshot]
+                )
             _attach_hop_plans(sub_result, hop_plan_summaries)
             return sub_result
 
@@ -6792,26 +7275,19 @@ async def _try_link_hop(
                 )
                 dynamic_appended += 1
 
-    # If we were in floor-plan accumulation mode, return the merged result.
-    # Deduplicate by (unit_id or unit_number + floor_plan_name + rent_low).
+    # If we were in floor-plan accumulation mode, return the reconciled result.
+    # Identity is the property-scoped native apartment anchor; rent, date and
+    # status are mutable field-resolution inputs and never part of this key.
     if _in_floorplan_accumulation and _first_successful_result is not None:
-        seen_ids: set[str] = set()
-        deduped: list[dict[str, Any]] = []
-        for u in _accumulated_units:
-            key = (
-                u.get("unit_id") or u.get("unit_number") or "",
-                u.get("floor_plan_name") or u.get("floor_plan_id") or "",
-                str(u.get("rent_low") or u.get("market_rent_low") or ""),
-            )
-            key_str = "|".join(key)
-            if key_str not in seen_ids:
-                seen_ids.add(key_str)
-                deduped.append(u)
-        _first_successful_result["units"] = deduped
+        reconciled = _reconcile_accumulated_rosters(_accumulated_snapshots)
+        _first_successful_result["units"] = reconciled
+        _first_successful_result["_unit_source_provenance"] = _merge_unit_source_provenance(
+            _accumulated_snapshots
+        )
         # Post-dedupe checkpoint: this is the authoritative hop-crawl unit set.
         checkpoint_partial(
             shared_budget,
-            deduped,
+            reconciled,
             tier_used=_first_successful_result.get("extraction_tier_used"),
             winning_page_url=_best_units_page[0] or None,
             plan_summaries=_first_successful_result.get("plan_summaries"),

@@ -28,7 +28,8 @@ def _unit_card(
 ) -> str:
     return f"""
     <article class="{css_class} price_3000-4000"
-      data-spaces-asset="3137" data-spaces-available="true"
+      data-spaces-id="{unit_id}" data-spaces-asset="3137"
+      data-spaces-available="true" data-spaces-community="Arrivé Seattle"
       data-spaces-obj="unit" data-spaces-plan-id="188659"
       data-spaces-soonest="2099-08-25" data-spaces-sort-area="755"
       data-spaces-sort-bath="1" data-spaces-sort-bed="1"
@@ -70,6 +71,16 @@ def test_parser_accepts_only_the_two_verified_unit_classes(css_class: str) -> No
     assert rows[0]["floor_plan_name"] == "Floorplan A-11"
     assert rows[0]["market_rent_low"] == 3215
     assert rows[0]["availability_date"] == "2099-08-25"
+    assert rows[0]["unit_id"] == "3372874"
+    assert rows[0]["unit_name"] == "1115"
+    assert rows[0]["source_ids"] == {
+        "funnel_spaces_unit_id": "3372874",
+        "funnel_spaces_plan_id": "188659",
+        "funnel_spaces_asset_id": "3137",
+    }
+    assert rows[0]["source_property_id"] == "3137"
+    assert rows[0]["source_property_name"] == "Arrivé Seattle"
+    assert rows[0]["source_property_provenance"] == "funnel_spaces_ssr_article"
     assert unit_has_real_anchor(rows[0])
 
 
@@ -128,9 +139,7 @@ async def test_crossroute_recovers_native_units_from_one_authored_page(
       <script src="/wp-content/plugins/ecs-spaces/public/assets/spaces_scripts.js"></script>
       <a href="https://www.arrive.test/apartments/">Apartments</a>
     """
-    inventory = _unit_card("1115") + _unit_card(
-        "3820", unit_id="3373187", plan="Floorplan X", price="4295"
-    )
+    inventory = _unit_card("1115") + _unit_card("3820", unit_id="3373187", plan="Floorplan X", price="4295")
 
     async def fake_fetch(url: str) -> tuple[str, str]:
         assert url == "https://www.arrive.test/apartments/"
@@ -141,6 +150,7 @@ async def test_crossroute_recovers_native_units_from_one_authored_page(
     rows = await funnel.recover_funnel_spaces(_ctx(source))
 
     assert {row["unit_number"] for row in rows} == {"1115", "3820"}
+    assert {row["unit_id"] for row in rows} == {"3372874", "3373187"}
     assert all(unit_has_real_anchor(row) for row in rows)
     assert all(row["source_api_url"] == "https://www.arrive.test/apartments/" for row in rows)
 

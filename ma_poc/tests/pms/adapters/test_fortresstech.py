@@ -23,9 +23,12 @@ Acceptance (canary 1ef1060 regr#14, 2026-05-25):
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import ma_poc.pms.adapters  # noqa: F401  # populate adapter registry
+from ma_poc.core.schema_v2 import _format_v2_unit as _format_core_v2_unit
+from ma_poc.extraction.post_process import post_process
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.fortresstech import (
     FortressTechAdapter,
@@ -35,12 +38,21 @@ from ma_poc.pms.adapters.fortresstech import (
     _prefer_availability_host,
     find_fortresstech_iframe_url,
     fortresstech_availability_url,
+    fortresstech_scope_ids,
     parse_fortresstech_iframe_html,
 )
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.detector import _detect_html_markers
 
 FIXTURES = Path(__file__).parent / "fixtures" / "fortresstech"
+
+_ORG_ID = "26b2b2cc-7df5-4d1f-b437-23fdf9e45d83"
+_PROPERTY_ID = "08c07271-eb06-4536-909a-7c6afe663068"
+_UNIT_ID = "95e1da1e-f12a-42fc-93f1-5f39529a7fe2"
+_EXACT_SOURCE_URL = (
+    "https://www.availability.fortresstech.io/unit-availability/"
+    f"{_ORG_ID}/{_PROPERTY_ID}/"
+)
 
 
 def _load_iframe_html() -> str:
@@ -88,6 +100,19 @@ def test_find_iframe_url_rejects_portal_subdomain() -> None:
 def test_find_iframe_url_no_iframe() -> None:
     assert find_fortresstech_iframe_url("") is None
     assert find_fortresstech_iframe_url("<html><body>nothing here</body></html>") is None
+
+
+def test_scope_ids_require_exact_availability_host_and_path() -> None:
+    assert fortresstech_scope_ids(_EXACT_SOURCE_URL) == (_ORG_ID, _PROPERTY_ID)
+    assert fortresstech_scope_ids(
+        f"https://www.portal.fortresstech.io/{_ORG_ID}/{_PROPERTY_ID}/register"
+    ) is None
+    assert fortresstech_scope_ids(
+        f"https://example.com/unit-availability/{_ORG_ID}/{_PROPERTY_ID}/"
+    ) is None
+    assert fortresstech_scope_ids(
+        f"{_EXACT_SOURCE_URL}another-community"
+    ) is None
 
 
 def test_balanced_json_array_handles_nested_brackets_and_strings() -> None:
@@ -227,6 +252,114 @@ def test_items_to_units_skips_rows_without_unit_number() -> None:
     assert rows[0]["unit_number"] == "ok-1"
 
 
+def _vivo_micro_unit() -> dict:
+    return {
+        "unitId": _UNIT_ID,
+        "unitNumber": "BFT-101",
+        "unitQuotingRent": 1_125,
+        "unitMoveInDate": "2026-09-01",
+        "floorPlanName": "Beaufort",
+        "floorPlanBeds": 1,
+        "floorPlanBaths": 1,
+        "floorPlanSquareFeet": 282,
+    }
+
+
+def test_typed_first_party_micro_unit_survives_bedroom_heuristic() -> None:
+    raw = _items_to_units([_vivo_micro_unit()], _EXACT_SOURCE_URL)[0]
+    assert raw["source_ids"] == {
+        "fortresstech_unit_id": _UNIT_ID,
+        "fortresstech_org_id": _ORG_ID,
+        "fortresstech_property_id": _PROPERTY_ID,
+    }
+
+    admitted = post_process([raw], property_id="296916").admitted
+    assert len(admitted) == 1
+    row = admitted[0]
+    assert row["sqft"] == "282"
+    assert row.get("_sanity_dropped") in (None, [])
+    assert row["_sanity_preserved"] == [
+        {
+            "field": "area",
+            "decision": "PRESERVED",
+            "reason": "TRUSTED_TYPED_FIRST_PARTY_FIELD",
+            "raw_value": "282",
+            "value": 282.0,
+            "heuristic_floor": 350.0,
+            "provider": "fortresstech",
+            "source_field": "floorPlanSquareFeet",
+            "source_url": _EXACT_SOURCE_URL,
+            "org_id": _ORG_ID,
+            "property_id": _PROPERTY_ID,
+            "unit_id": _UNIT_ID,
+        }
+    ]
+
+
+def test_micro_unit_exception_fails_closed_without_complete_provenance() -> None:
+    raw = _items_to_units([_vivo_micro_unit()], _EXACT_SOURCE_URL)[0]
+    controls = []
+
+    no_marker = dict(raw)
+    no_marker.pop("_trusted_typed_area")
+    controls.append(no_marker)
+
+    llm_tier = dict(raw)
+    llm_tier["extraction_tier"] = "TIER_4_LLM_DOM"
+    controls.append(llm_tier)
+
+    wrong_url = dict(raw)
+    wrong_url["_trusted_typed_area"] = {
+        **raw["_trusted_typed_area"],
+        "source_url": f"https://example.com/unit-availability/{_ORG_ID}/{_PROPERTY_ID}/",
+    }
+    controls.append(wrong_url)
+
+    mismatched_property = dict(raw)
+    mismatched_property["source_ids"] = {
+        **raw["source_ids"],
+        "fortresstech_property_id": "11111111-1111-4111-8111-111111111111",
+    }
+    controls.append(mismatched_property)
+
+    for control in controls:
+        row = post_process([control], property_id="P").admitted[0]
+        assert row.get("sqft") is None
+        assert "area_implausible_for_beds" in row["_sanity_dropped"]
+        assert row.get("_sanity_preserved") in (None, [])
+
+
+def test_typed_marker_never_bypasses_absolute_area_bound() -> None:
+    item = {**_vivo_micro_unit(), "floorPlanSquareFeet": 149}
+    row = post_process(
+        _items_to_units([item], _EXACT_SOURCE_URL), property_id="P"
+    ).admitted[0]
+    assert row.get("sqft") is None
+    assert "area" in row["_sanity_dropped"]
+    assert row.get("_sanity_preserved") in (None, [])
+
+
+def test_final_formatters_emit_area_preservation_evidence() -> None:
+    row = post_process(
+        _items_to_units([_vivo_micro_unit()], _EXACT_SOURCE_URL),
+        property_id="296916",
+    ).admitted[0]
+    ts = datetime(2026, 8, 2, 12, 0, tzinfo=UTC)
+
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit as _format_jugnu_v2_unit
+
+    for formatted in (
+        _format_core_v2_unit(row, ts, "296916"),
+        _format_jugnu_v2_unit(row, ts, "296916"),
+    ):
+        assert formatted["area"] == 282
+        assert formatted["area_pre_sanity_value"] == "282"
+        assert formatted["area_sanity_decision"] == "PRESERVED"
+        assert formatted["area_sanity_reason"] == "TRUSTED_TYPED_FIRST_PARTY_FIELD"
+        assert formatted["area_sanity_source"] == "fortresstech.floorPlanSquareFeet"
+        assert "_trusted_typed_area" not in (formatted.get("_extra") or {})
+
+
 def test_detector_routes_fortresstech_iframe_marker() -> None:
     """Squarespace + FortressTech iframe → pms="fortresstech"."""
     html = (
@@ -321,6 +454,26 @@ def test_prefer_availability_host_noop_on_availability() -> None:
     assert _prefer_availability_host(src) == src
 
 
+async def test_fetch_explicitly_disables_paid_unlocker(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Response:
+        status_code = 200
+        text = "<html>ok</html>"
+
+    def _fake_probe_get(url: str, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return _Response()
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
+    from ma_poc.pms.adapters.fortresstech import _fetch
+
+    status, body = await _fetch(_EXACT_SOURCE_URL)
+    assert (status, body) == (200, "<html>ok</html>")
+    assert captured["unlocker"] is False
+
+
 def test_detector_routes_portal_only_landing() -> None:
     """A page carrying only the portal.fortresstech.io link now routes to
     fortresstech (the adapter recovers the roster via the id-built SSR URL)."""
@@ -336,7 +489,7 @@ async def test_adapter_recovers_units_via_id_builder(monkeypatch) -> None:
 
     async def _fake_fetch(url: str):
         captured["url"] = url
-        return 200, ssr
+        return 503, ssr
 
     monkeypatch.setattr("ma_poc.pms.adapters.fortresstech._fetch", _fake_fetch)
 
@@ -361,3 +514,20 @@ async def test_adapter_recovers_units_via_id_builder(monkeypatch) -> None:
     assert "availability.fortresstech.io/unit-availability" in captured["url"]
     assert "4e8caee8-c99e-406c-864c-c8a5ba3e4a03" in captured["url"]
     assert len(result.units) >= 1
+    assert result.api_responses[0]["status"] == 503
+    assert result.api_responses[0]["response_sha256"]
+    assert result.unit_source_provenance[0]["response_status"] == 503
+    assert result.unit_source_provenance[0]["response_sha256"]
+    assert result.unit_source_provenance[0]["identity"] == {
+        "org_id": "4e8caee8-c99e-406c-864c-c8a5ba3e4a03",
+        "property_id": "ec66b2c0-571e-4bdc-95ae-6e859ea18166",
+        "configured_property_id": "P_FT",
+        "configured_property_name": "",
+        "marketing_url": "https://www.theeastlandnashville.com/",
+    }
+    assert result.units[0]["source_ids"]["fortresstech_org_id"] == (
+        "4e8caee8-c99e-406c-864c-c8a5ba3e4a03"
+    )
+    assert result.units[0]["source_ids"]["fortresstech_property_id"] == (
+        "ec66b2c0-571e-4bdc-95ae-6e859ea18166"
+    )

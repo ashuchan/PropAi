@@ -4,8 +4,11 @@ Pins the static ``var vt_units = [...]`` island parse that recovers Venterra
 props the roster-confirmation sweep mis-routed to SightMap + needs_render.
 Fixtures wrap the REAL island captured 2026-07-19 (forest-view 20 / canton-mill 19).
 """
+
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,6 +21,10 @@ from ma_poc.pms.adapters.venterra import (
     parse_venterra_units,
 )
 from ma_poc.pms.detector import _STRATEGY_BY_PMS, detect_pms
+from ma_poc.scripts.runners.jugnu import (
+    _emit_v2_units_for_property,
+    _format_v2_unit,
+)
 
 FIX = Path(__file__).parent / "fixtures" / "venterra"
 
@@ -44,6 +51,8 @@ def test_parse_forest_view_20_units() -> None:
     assert first["availability_date"] == "2026-09-29"
     assert first["concession_text"] == "$500 gift card. Limited time only"
     assert first["source_ids"]["venterra_unit_code"] == "TX4FV-01-0116"
+    assert first["unit_id"] == "TX4FV-01-0116"
+    assert first["unit_name"] == "0116"
     assert first["extraction_tier"] == "TIER_1_DOM_VENTERRA"
 
 
@@ -51,6 +60,108 @@ def test_parse_canton_mill_19_units() -> None:
     rows = parse_venterra_units(_body("canton_mill"), "u")
     assert len(rows) == 19
     assert all(r["concession_text"] for r in rows)
+
+
+_METROPOLITAN_CURRENT = [
+    ("KY4MP-2601-107", "107", "1343-A1"),
+    ("KY4MP-2601-207", "207", "1343-A1"),
+    ("KY4MP-2602-202", "202", "1343-B1"),
+    ("KY4MP-2614-110", "110", "1343-A1"),
+    ("KY4MP-2614-220", "220", "1343-A1"),
+    ("KY4MP-2616-202", "202", "1343-A1"),
+    ("KY4MP-2618-126", "126", "1343-A1"),
+    ("KY4MP-2618-218", "218", "1343-A1"),
+    ("KY4MP-2624-112", "112", "1343-B1"),
+    ("KY4MP-2628-120", "120", "1343-B1"),
+    ("KY4MP-2632-106", "106", "1343-B1"),
+    ("KY4MP-2632-208", "208", "1343-B1"),
+    ("KY4MP-2634-202", "202", "1343-B1"),
+    ("KY4MP-2638-212", "212", "1343-B1"),
+]
+
+_PARKER_CURRENT = [
+    ("OK4TP-02-0214", "0214", "3490-C1"),
+    ("OK4TP-03-0317", "0317", "3490-B1"),
+    ("OK4TP-03-0323", "0323", "3490-B1"),
+    ("OK4TP-04-0433", "0433", "3490-C1"),
+    ("OK4TP-04-0436", "0436", "3490-C1"),
+    ("OK4TP-06-0625", "0625", "3490-C1"),
+    ("OK4TP-06-0626", "0626", "3490-C1"),
+    ("OK4TP-06-0635", "0635", "3490-C1"),
+    ("OK4TP-06-0638", "0638", "3490-C1"),
+    ("OK4TP-08-0826", "0826", "3490-C1"),
+    ("OK4TP-08-0833", "0833", "3490-C1"),
+    ("OK4TP-08-0834", "0834", "3490-C1"),
+    ("OK4TP-08-0835", "0835", "3490-C1"),
+    ("OK4TP-09-0913", "0913", "3490-B1"),
+    ("OK4TP-10-1036", "1036", "3490-B1"),
+    ("OK4TP-11-1123", "1123", "3490-C1"),
+    ("OK4TP-11-1124", "1124", "3490-C1"),
+    ("OK4TP-11-1125", "1125", "3490-C1"),
+]
+
+
+def _current_island(rows: list[tuple[str, str, str]]) -> str:
+    payload = [
+        {
+            "unit_code": code,
+            "unit_name": label,
+            "unit_parent_floorplan_code": plan,
+            "unit_bedrooms": "2",
+            "unit_bathrooms": "1",
+            "unit_sqft": "740",
+            "unit_rent_min": "1051",
+            "unit_rent_max": "1127",
+            "unit_available": "1",
+            "unit_available_on": "2026-10-06",
+        }
+        for code, label, plan in rows
+    ]
+    return f"<script>var vt_units = {json.dumps(payload)};</script>"
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_count"),
+    [
+        (_body("forest_view"), 20),
+        (_body("canton_mill"), 19),
+        (_current_island(_METROPOLITAN_CURRENT), 14),
+        (_current_island(_PARKER_CURRENT), 18),
+    ],
+)
+def test_native_codes_survive_source_to_final_for_four_property_regression(
+    body: str,
+    expected_count: int,
+) -> None:
+    parsed = parse_venterra_units(body, "https://venterraliving.com/property/")
+    formatted = [_format_v2_unit(row, datetime(2026, 8, 2, 12, 0), "VENTERRA-TEST") for row in parsed]
+    final = _emit_v2_units_for_property(formatted)
+
+    assert len(parsed) == expected_count
+    assert len(final) == expected_count
+    assert len({row["unit_id"] for row in final}) == expected_count
+    assert {row["unit_id"] for row in final} == {row["source_ids"]["venterra_unit_code"] for row in final}
+
+
+def test_same_number_same_plan_different_buildings_do_not_collapse() -> None:
+    parsed = parse_venterra_units(
+        _current_island(
+            [
+                ("KY4MP-2602-202", "202", "1343-B1"),
+                ("KY4MP-2634-202", "202", "1343-B1"),
+            ]
+        ),
+        "https://venterraliving.com/apartments/the-metropolitan/",
+    )
+    final = _emit_v2_units_for_property(
+        [_format_v2_unit(row, datetime(2026, 8, 2, 12, 0), "48177") for row in parsed]
+    )
+
+    assert [row["unit_number"] for row in parsed] == ["202", "202"]
+    assert {row["unit_id"] for row in final} == {
+        "KY4MP-2602-202",
+        "KY4MP-2634-202",
+    }
 
 
 def test_parse_no_island_returns_empty() -> None:

@@ -12,6 +12,7 @@ from ma_poc.pms.adapters._nesthub_public import recover_nesthub_public
 from ma_poc.pms.adapters._parsing import make_unit_dict
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
+from ma_poc.pms.source_provenance import context_unit_source_provenance
 
 CONFIGURED_URL = (
     "https://www.augustarentalhomes.net/_system/listings/56/"
@@ -275,6 +276,14 @@ async def test_exact_chain_emits_e7_and_excludes_stale_and_two_portfolio_control
     assert "canonical_street_and_native_unit_suffix_mismatch" in rejected["606"]
     assert "canonical_city_mismatch" in rejected["606"]
     assert "canonical_zip_mismatch" in rejected["606"]
+    provenance = context_unit_source_provenance(ctx)
+    assert len(provenance) == 1
+    assert provenance[0]["provider"] == "nesthub"
+    assert provenance[0]["response_kind"] == "unit_detail"
+    assert provenance[0]["source_url"] == TARGET_URL
+    assert provenance[0]["unit_count"] == 1
+    assert provenance[0]["identity"]["status"] == "MATCH"
+    assert provenance[0]["identity"]["portfolio_count"] == 3
 
 
 @pytest.mark.asyncio
@@ -557,5 +566,7 @@ async def test_fetch_only_scrape_runs_nesthub_bridge_with_body_resolver_off(
     assert result["units"][0]["floor_plan_name"] == "Chesapeake"
     assert result["units"][0]["availability_date"] == "2026-08-19"
     assert result["plan_summaries"] == []
+    assert len(result["_unit_source_provenance"]) == 1
+    assert result["_unit_source_provenance"][0]["provider"] == "nesthub"
     assert "page_published_native:nesthub_public" in result["_fallback_chain"]
     assert result["_nesthub_official_chain"]["native_listing_ids"] == ["602"]

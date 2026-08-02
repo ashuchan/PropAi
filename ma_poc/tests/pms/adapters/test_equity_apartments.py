@@ -17,7 +17,6 @@ from ma_poc.pms.adapters.equity_apartments import (
 )
 from ma_poc.pms.detector import detect_pms
 
-
 # Live-captured card text + href from Pegasus Apartments unit #718:
 _REAL_UNIT_CARD = {
     "text": (
@@ -108,6 +107,26 @@ def test_parse_full_payload() -> None:
     assert studio["extraction_tier"] == "TIER_1_DOM_EQUITY_APARTMENTS"
     # Building id is preserved in the .building field for entity resolution.
     assert studio["building"] == "1"
+    assert studio["unit_id"] == "1:718"
+    assert studio["source_ids"] == {
+        "equity_building_unit_id": "1:718",
+        "equity_unit_id": "718",
+        "equity_building_id": "1",
+        "equity_property_id": "29280",
+    }
+    assert studio["source_property_id"] == "29280"
+    assert studio["source_property_provenance"] == ("equity_unitfees_href.property_id")
+    assert studio["source_response_provenance"] == "equity_visible_unit_card"
+
+
+def test_dom_path_preserves_same_unit_number_in_two_buildings() -> None:
+    second = dict(_REAL_UNIT_CARD)
+    second["unitFeesHref"] = "/UnitFees/29280/2/718"
+
+    rows = parse_equity_apartments([_REAL_UNIT_CARD, second], "u")
+
+    assert [row["unit_number"] for row in rows] == ["718", "718"]
+    assert [row["unit_id"] for row in rows] == ["1:718", "2:718"]
 
 
 # ── adapter end-to-end ──
@@ -136,6 +155,8 @@ async def test_adapter_extracts_visible_units() -> None:
     assert result.tier_used == "TIER_1_DOM_EQUITY_APARTMENTS"
     assert len(result.units) == 2
     assert result.confidence > 0.7
+    assert result.api_responses[0]["via"] == "equity_apartments_dom"
+    assert result.api_responses[0]["rows"] == 2
 
 
 @pytest.mark.asyncio
@@ -157,6 +178,7 @@ async def test_adapter_bails_when_no_unit_cards() -> None:
 
 def test_detector_routes_equity_host() -> None:
     from ma_poc.pms.detector import _iter_html_markers
+
     html = '<link href="https://www.equityapartments.com/Content/Styles/x.css">'
     markers = list(_iter_html_markers(html.lower()))
     assert any(m[0] == "equity_apartments" for m in markers), markers
@@ -167,6 +189,7 @@ def test_detector_routes_unit_expanded_card_with_unitfees() -> None:
     is not on a particular HAR sample, the .unit-expanded-card +
     /UnitFees/ combination is uniquely Equity's pattern."""
     from ma_poc.pms.detector import _iter_html_markers
+
     html = """
     <html><body>
       <div class="unit-expanded-card">
@@ -185,4 +208,5 @@ def test_adapter_registered() -> None:
 
 def test_strategy_is_dom_first() -> None:
     from ma_poc.pms.detector import _STRATEGY_BY_PMS
+
     assert _STRATEGY_BY_PMS["equity_apartments"] == "dom_first"

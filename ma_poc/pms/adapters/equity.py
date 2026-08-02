@@ -84,7 +84,7 @@ def parse_equity_units(html: str, url: str) -> list[dict[str, str]]:
     d = _html.unescape(html or "")
     units: list[dict[str, str]] = []
     for m in _UNIT_BLOCK_RE.finditer(d):
-        _ledger, building, unit_id, seg = m.groups()
+        ledger, building, unit_id, seg = m.groups()
         pm = _PRICE_RE.search(seg)
         rent = money_to_int(pm.group(1)) if pm else None
         if rent is None:
@@ -111,29 +111,41 @@ def parse_equity_units(html: str, url: str) -> list[dict[str, str]]:
         flm = _FLOOR_RE.search(seg)
         floor = flm.group(1).strip() if flm else ""
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=fp_name,
-                bed_label=bed_label_from(beds, fp_name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=(
-                    str(int(baths)) if baths is not None and baths == int(baths)
-                    else (str(baths) if baths is not None else "")
-                ),
-                sqft=sqft,
-                unit_number=str(unit_id),
-                floor=floor,
-                building=str(building),
-                rent_range=format_rent_range(rent, rent),
-                rent_low=rent,
-                rent_high=rent,
-                lease_term=lease_term,
-                availability_status="AVAILABLE",
-                availability_date=avail,
-                source_api_url=url,
-                extraction_tier=OLL_TIER,
-            )
+        composite_id = f"{building}:{unit_id}"
+        source_ids = {
+            "equity_building_unit_id": composite_id,
+            "equity_unit_id": str(unit_id),
+            "equity_building_id": str(building),
+            "equity_ledger_id": str(ledger),
+        }
+        unit = make_unit_dict(
+            floor_plan_name=fp_name,
+            bed_label=bed_label_from(beds, fp_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=(
+                str(int(baths))
+                if baths is not None and baths == int(baths)
+                else (str(baths) if baths is not None else "")
+            ),
+            sqft=sqft,
+            unit_number=str(unit_id),
+            floor=floor,
+            building=str(building),
+            rent_range=format_rent_range(rent, rent),
+            rent_low=rent,
+            rent_high=rent,
+            lease_term=lease_term,
+            availability_status="AVAILABLE",
+            availability_date=avail,
+            source_api_url=url,
+            extraction_tier=OLL_TIER,
+            source_ids=source_ids,
         )
+        unit["unit_id"] = composite_id
+        unit["source_property_id"] = str(ledger)
+        unit["source_property_provenance"] = "equity_unit_comment.ledgerId"
+        unit["source_response_provenance"] = "equity_server_rendered_ea5_unit"
+        units.append(unit)
     return units
 
 
@@ -157,11 +169,7 @@ def _html_for(ctx: AdapterContext, page: Page | None) -> tuple[str, str]:
     # template present but with empty Angular ``{{}}`` bindings (server
     # values wiped by client hydration / CF), which parses to 0 units —
     # whereas the raw server HTML (curl_cffi, below) has them inlined.
-    if (
-        isinstance(body, str)
-        and "ledgerId:" in body
-        and _PRICE_RE.search(body) is not None
-    ):
+    if isinstance(body, str) and "ledgerId:" in body and _PRICE_RE.search(body) is not None:
         return body, base
     if base:
         try:
@@ -214,14 +222,22 @@ class EquityAdapter:
                 result.plan_summaries = _pp.plan_summaries
                 result.winning_url = url or None
                 result.confidence = min(0.90, 0.7 + 0.05 * _pp.n_admitted)
+                result.api_responses.append(
+                    {
+                        "url": url,
+                        "status": 200,
+                        "body": "<equity-server-rendered-ea5-units>",
+                        "via": "equity_server_rendered_html",
+                        "rows": _pp.n_admitted,
+                    }
+                )
             else:
                 # ea5-unit blocks parsed but validity gate rejected all rows.
                 # Surface as empty-exit so Path B/C + Step 8 can engage.
                 result.tier_used = f"{OLL_TIER}_EMPTY"
                 result.confidence = 0.0
                 result.errors.append(
-                    f"EQUITY_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                    f"failed unit_validity"
+                    f"EQUITY_VALIDITY_REJECTED: {_pp_parsed} parsed rows failed unit_validity"
                 )
         else:
             # No ea5-unit blocks at all. The cluster #7 pattern:
@@ -231,9 +247,7 @@ class EquityAdapter:
             # paths run.
             result.tier_used = f"{OLL_TIER}_NO_RESPONSE"
             result.confidence = 0.0
-            result.errors.append(
-                "No Equity unit data (ea5-unit blocks not found in HTML)"
-            )
+            result.errors.append("No Equity unit data (ea5-unit blocks not found in HTML)")
         return result
 
     def static_fingerprints(self) -> list[str]:

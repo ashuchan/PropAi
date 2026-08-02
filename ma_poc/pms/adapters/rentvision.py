@@ -208,6 +208,23 @@ _APPLY_MOVE_IN_DATE_RE = re.compile(
     r"moveInDate(?:&#61;|=)(\d{1,2}/\d{1,2}/\d{4})",
     re.IGNORECASE,
 )
+_APPLY_UNIT_ID_RE = re.compile(
+    r"\bUnitId(?:&#61;|=)([A-Za-z0-9_-]+)",
+    re.IGNORECASE,
+)
+# The first cell after the apartment <th> is the provider-labelled Building
+# column on the current detail template. Anchor at the start of the row slice
+# so nested term-pricing tables cannot be mistaken for the building.
+_UNIT_BUILDING_CELL_RE = re.compile(
+    r'^\s*<td\b[^>]*class="[^"]*\bstandard\b[^"]*\bwrap\b[^"]*"[^>]*>'
+    r"([\s\S]{0,100}?)</td>",
+    re.IGNORECASE,
+)
+_SIGHTMAP_ROW_ID_RE = re.compile(
+    r"openEngrainSightMapPopup\(\s*\[\s*['\"]([A-Za-z0-9_-]+)['\"]\s*\]\s*,"
+    r"\s*['\"]([A-Za-z0-9_-]+)['\"]\s*\)",
+    re.IGNORECASE,
+)
 # Backup: term-pricing-popup <h3> confirms unit-number (used to validate
 # that a <th> match isn't a column-header false positive on edge themes).
 _TERM_PRICING_H3_RE = re.compile(
@@ -393,9 +410,7 @@ def parse_rentvision_unit_table(
 
     heading_match = _DETAIL_H1_RE.search(detail_html)
     heading = _html_text(heading_match.group(1)) if heading_match else ""
-    plan_name = (
-        floor_plan_name or heading or _plan_name_from_url(source_url)
-    ).strip()
+    plan_name = (floor_plan_name or heading or _plan_name_from_url(source_url)).strip()
     plan_beds = _beds_from_url(source_url)
     if plan_beds is None:
         if re.search(r"\bStudio\b", heading, re.IGNORECASE):
@@ -409,9 +424,7 @@ def parse_rentvision_unit_table(
     sqft_match = _DETAIL_SQFT_BLOCK_RE.search(detail_html)
     sqft_text = _html_text(sqft_match.group("sqft_body")) if sqft_match else ""
     plan_sqft_match = _SQFT_RE.search(sqft_text)
-    plan_sqft = (
-        plan_sqft_match.group(1).replace(",", "") if plan_sqft_match else ""
-    )
+    plan_sqft = plan_sqft_match.group(1).replace(",", "") if plan_sqft_match else ""
 
     # Find every <th class="left wrap"> anchor; each one starts a row.
     anchors: list[tuple[int, int, str]] = []
@@ -443,6 +456,13 @@ def parse_rentvision_unit_table(
         slice_end = anchors[i + 1][0] if i + 1 < len(anchors) else len(detail_html)
         block = detail_html[end:slice_end]
 
+        building_match = _UNIT_BUILDING_CELL_RE.search(block)
+        building = _html_text(building_match.group(1)) if building_match else ""
+        apply_unit_match = _APPLY_UNIT_ID_RE.search(block)
+        apply_unit_id = apply_unit_match.group(1) if apply_unit_match else ""
+        sightmap_match = _SIGHTMAP_ROW_ID_RE.search(block)
+        sightmap_unit_id = sightmap_match.group(2) if sightmap_match else ""
+
         # Asking rent — first $X.XX span in the row (the term-pricing
         # table inside the popup is full of additional $X spans, so we
         # constrain to the FIRST occurrence of the rent-cell pattern).
@@ -472,23 +492,38 @@ def parse_rentvision_unit_table(
             if apply_m:
                 availability_date = _to_iso_date(apply_m.group(1))
 
-        out.append(
-            make_unit_dict(
-                floor_plan_name=plan_name,
-                bed_label=bed_label_from(plan_beds, plan_name),
-                bedrooms=str(plan_beds) if plan_beds is not None else "",
-                bathrooms=plan_baths,
-                sqft=plan_sqft,
-                unit_number=unit_number,
-                rent_range=format_rent_range(rent, rent),
-                rent_low=rent,
-                rent_high=rent,
-                availability_status=availability_status,
-                availability_date=availability_date,
-                source_api_url=source_url,
-                extraction_tier="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
-            )
+        source_ids: dict[str, Any] = {}
+        if apply_unit_id:
+            source_ids["rentvision_unit_id"] = apply_unit_id
+        if sightmap_unit_id:
+            source_ids["sightmap_unit_id"] = sightmap_unit_id
+
+        unit = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(plan_beds, plan_name),
+            bedrooms=str(plan_beds) if plan_beds is not None else "",
+            bathrooms=plan_baths,
+            sqft=plan_sqft,
+            unit_number=unit_number,
+            unit_name=unit_number,
+            building=building,
+            rent_range=format_rent_range(rent, rent),
+            rent_low=rent,
+            rent_high=rent,
+            availability_status=availability_status,
+            availability_date=availability_date,
+            source_api_url=source_url,
+            extraction_tier="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+            source_ids=source_ids or None,
         )
+        # Prefer the property-scoped Apply UnitId. When a legacy row omits it,
+        # an explicit Building + apartment pair is still a bounded physical
+        # identity and prevents cross-building display-number collisions.
+        if apply_unit_id:
+            unit["unit_id"] = apply_unit_id
+        elif building:
+            unit["unit_id"] = f"{building}-{unit_number}"
+        out.append(unit)
     return out
 
 
@@ -955,6 +990,7 @@ class RentVisionAdapter:
                 max_keepalive_connections=concurrency,
             ),
         ) as client:
+
             async def _one(detail_url: str) -> tuple[str, str]:
                 async with semaphore:
                     try:

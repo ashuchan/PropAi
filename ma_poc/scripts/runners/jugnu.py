@@ -136,7 +136,8 @@ def _pull_profiles_from_gcs(profiles_dir: Path) -> None:
         _PROFILE_PULL_WATERMARK = _time.time() + 0.001
         log.info(
             "profile warm-start: pulled %d profiles from %s (push-watermark set)",
-            n, _PROFILE_GCS_PREFIX,
+            n,
+            _PROFILE_GCS_PREFIX,
         )
     except Exception as exc:  # never block the runner on a sync blip
         log.warning("profile GCS pull failed (cold start this run): %s", exc)
@@ -162,7 +163,8 @@ def _push_profiles_to_gcs(profiles_dir: Path) -> None:
         )
         log.info(
             "profile persistence: pushed %d modified profiles to %s",
-            n, _PROFILE_GCS_PREFIX,
+            n,
+            _PROFILE_GCS_PREFIX,
         )
     except Exception as exc:
         log.warning("profile GCS push failed (learning not persisted): %s", exc)
@@ -241,8 +243,12 @@ def _resurface_stale_profiles(profiles_dir: Path, run_dir: Path) -> None:
         log.info(
             "resurface maintenance (stride=%d offset=%d): checked=%d alive=%d "
             "migrated=%d (winning=%d endpoints=%d)",
-            stride, offset, stats.get("checked", 0), stats.get("alive", 0),
-            stats.get("stale_flagged", 0), stats.get("invalidated_winning_url", 0),
+            stride,
+            offset,
+            stats.get("checked", 0),
+            stats.get("alive", 0),
+            stats.get("stale_flagged", 0),
+            stats.get("invalidated_winning_url", 0),
             stats.get("invalidated_endpoints", 0),
         )
     except Exception as exc:  # never block the runner on a maintenance blip
@@ -387,9 +393,7 @@ def _retry_improved(old: dict[str, Any], new: dict[str, Any]) -> bool:
     return new_units > old_units
 
 
-def _select_transient_retry_tasks(
-    tasks: list[Any], results: list[Any]
-) -> list[Any]:
+def _select_transient_retry_tasks(tasks: list[Any], results: list[Any]) -> list[Any]:
     """Build RETRY CrawlTasks for the transient-failed subset. ``results`` is
     order-aligned with ``tasks`` (pool.map preserves order)."""
     from ma_poc.discovery.contracts import TaskReason
@@ -558,6 +562,7 @@ async def run_jugnu(
     # AsyncPool's single-thread event loop.  save() happens once after the pool
     # completes so we pay only two file-IO round-trips regardless of run size.
     from ma_poc.core.state_store import StateStore as _RunStateStore
+
     run_state_store = _RunStateStore(state_dir)
     try:
         run_state_store.load()
@@ -584,9 +589,8 @@ async def run_jugnu(
     # so won't poison the DB with the output of a half-broken run). Toggle
     # via ENABLE_PERSISTENCE_PROBE=false (default true).
     from services.profile_persistence_probe import run_sentinel_probe
-    run_sentinel_probe(
-        profile_store.backing if hasattr(profile_store, "backing") else profile_store
-    )
+
+    run_sentinel_probe(profile_store.backing if hasattr(profile_store, "backing") else profile_store)
 
     scheduler = Scheduler(
         frontier=frontier,
@@ -685,7 +689,8 @@ async def run_jugnu(
         except TimeoutError as exc:
             log.error(
                 "Property %s timed out after %.0fs — attempting partial recovery",
-                task.property_id, PER_PROPERTY_TIMEOUT_SECONDS,
+                task.property_id,
+                PER_PROPERTY_TIMEOUT_SECONDS,
             )
             # _partial_state was written by _try_link_hop via shared_budget
             # while the coroutine was running. Because it was created in THIS
@@ -698,23 +703,20 @@ async def run_jugnu(
             # dict rows, so a non-dict here would credit SUCCESS_PLAN_LEVEL yet
             # emit an empty floor_plans[] (the empty-plans false positive).
             _partial_plans: list[Any] = [
-                p
-                for p in (_partial_state.get("plan_summaries") or [])
-                if isinstance(p, dict)
+                p for p in (_partial_state.get("plan_summaries") or []) if isinstance(p, dict)
             ]
             if _partial_units:
                 log.info(
                     "Property %s: recovered %d partial units from hop accumulation",
-                    task.property_id, len(_partial_units),
+                    task.property_id,
+                    len(_partial_units),
                 )
                 # Persist partial units to state-store so carry-forward works
                 # on the next run and the data isn't completely lost.
                 try:
                     if run_state_store is not None and run_dir is not None:
                         _run_date_str = run_dir.name
-                        run_state_store.upsert_units(
-                            task.property_id, _partial_units, _run_date_str
-                        )
+                        run_state_store.upsert_units(task.property_id, _partial_units, _run_date_str)
                 except Exception as _su_exc:
                     log.warning("partial state_store.upsert_units failed: %s", _su_exc)
             # 2026-05-19: persist the discovered route/profile EVEN WHEN zero
@@ -776,9 +778,7 @@ async def run_jugnu(
                 # zero-numeric-rent so partial salvages that DID capture real
                 # prices are left untouched. See _neutralize_unearned_rent_gap.
                 if not any(
-                    _salvage_unit_has_numeric_rent(_u)
-                    for _u in _partial_units
-                    if isinstance(_u, dict)
+                    _salvage_unit_has_numeric_rent(_u) for _u in _partial_units if isinstance(_u, dict)
                 ):
                     for _u in _partial_units:
                         if isinstance(_u, dict):
@@ -818,9 +818,9 @@ async def run_jugnu(
                         )
                     except Exception as _fmt_exc:
                         log.warning(
-                            "salvage v2-format failed for %s: %s — "
-                            "emitting raw units",
-                            task.property_id, _fmt_exc,
+                            "salvage v2-format failed for %s: %s — emitting raw units",
+                            task.property_id,
+                            _fmt_exc,
                         )
             elif _partial_plans:
                 # #81 plan-only timeout salvage: zero units survived, but
@@ -836,7 +836,8 @@ async def run_jugnu(
                 # below then lands SUCCESS_PLAN_LEVEL, not FAILED_NO_DATA.
                 log.info(
                     "Property %s: recovered %d partial plan rows (no units)",
-                    task.property_id, len(_partial_plans),
+                    task.property_id,
+                    len(_partial_plans),
                 )
                 failed.setdefault("_meta", {})["partial_recovery"] = True
                 if schema_version == "v2":
@@ -854,7 +855,8 @@ async def run_jugnu(
                     except Exception as _fmt_exc:
                         log.warning(
                             "salvage v2 plan-format failed for %s: %s",
-                            task.property_id, _fmt_exc,
+                            task.property_id,
+                            _fmt_exc,
                         )
             # 2026-05-27: stamp a verdict on the salvage record so run_report
             # and slo_watcher tally these properties correctly. Without this,
@@ -864,15 +866,14 @@ async def run_jugnu(
             # salvage marker is preserved; verdict is a separate field.
             try:
                 from ma_poc.reporting.verdict import compute as _compute_verdict
+
                 # Pass partial units as a dict-shaped extract_result so
                 # compute() flows past the no-records FAILED branch and
                 # applies the rent-signal / inferred-UID downgrade rules
                 # to decide SUCCESS vs SUCCESS_PLAN_LEVEL vs PARTIAL.
                 # With zero partial units we want FAILED_NO_DATA — keep
                 # extract_result=None in that case.
-                _salvage_extract: Any = (
-                    {"units": _partial_units} if _partial_units else None
-                )
+                _salvage_extract: Any = {"units": _partial_units} if _partial_units else None
                 # 2026-07-12: honor the operator-published zero-availability
                 # statement seen BEFORE the timeout. scrape_jugnu/_try_link_hop
                 # checkpoint the flag into _partial_state (survives coroutine
@@ -892,9 +893,7 @@ async def run_jugnu(
                     extract_result=_salvage_extract,
                     units=_partial_units or None,
                     plan_summaries=_partial_plans or None,
-                    operator_no_availability=bool(
-                        _partial_state.get("operator_no_availability")
-                    ),
+                    operator_no_availability=bool(_partial_state.get("operator_no_availability")),
                 )
                 _salvage_meta = failed.setdefault("_meta", {})
                 _salvage_meta["verdict"] = _salvage_verdict.verdict.value
@@ -917,7 +916,8 @@ async def run_jugnu(
             except Exception as _vexc:
                 log.warning(
                     "partial-recovery verdict compute failed for %s: %s",
-                    task.property_id, _vexc,
+                    task.property_id,
+                    _vexc,
                 )
             return failed
         except Exception as exc:
@@ -936,9 +936,7 @@ async def run_jugnu(
     _push_interval = _profile_push_interval_s()
     _profile_pusher: asyncio.Task[None] | None = None
     if _push_interval > 0 and _PROFILE_GCS_PREFIX:
-        _profile_pusher = asyncio.create_task(
-            _periodic_profile_push(_profiles_dir, _push_interval)
-        )
+        _profile_pusher = asyncio.create_task(_periodic_profile_push(_profiles_dir, _push_interval))
         log.info(
             "profile persistence: periodic push every %.0fs (task-death insurance)",
             _push_interval,
@@ -963,9 +961,9 @@ async def run_jugnu(
                 _delay = _end_of_run_retry_delay_s()
                 if _delay > 0:
                     log.info(
-                        "end-of-run retry: waiting %ds then re-running %d "
-                        "transient-failed properties",
-                        _delay, len(retry_tasks),
+                        "end-of-run retry: waiting %ds then re-running %d transient-failed properties",
+                        _delay,
+                        len(retry_tasks),
                     )
                     await asyncio.sleep(_delay)
                 else:
@@ -973,23 +971,14 @@ async def run_jugnu(
                         "end-of-run retry: re-running %d transient-failed properties",
                         len(retry_tasks),
                     )
-                retry_results = await pool.map(
-                    _process_one, [(t,) for t in retry_tasks]
-                )
-                _before = sum(
-                    1 for r in results
-                    if isinstance(r, dict) and _is_transient_fetch_failure(r)
-                )
-                results = _apply_retry_results(
-                    tasks, results, retry_tasks, retry_results
-                )
-                _after = sum(
-                    1 for r in results
-                    if isinstance(r, dict) and _is_transient_fetch_failure(r)
-                )
+                retry_results = await pool.map(_process_one, [(t,) for t in retry_tasks])
+                _before = sum(1 for r in results if isinstance(r, dict) and _is_transient_fetch_failure(r))
+                results = _apply_retry_results(tasks, results, retry_tasks, retry_results)
+                _after = sum(1 for r in results if isinstance(r, dict) and _is_transient_fetch_failure(r))
                 log.info(
                     "end-of-run retry: recovered %d of %d transient-failed properties",
-                    _before - _after, len(retry_tasks),
+                    _before - _after,
+                    len(retry_tasks),
                 )
         except Exception as _eor_exc:  # never break the run on the retry pass
             log.warning("end-of-run retry pass failed (non-fatal): %s", _eor_exc)
@@ -1034,9 +1023,7 @@ async def run_jugnu(
     try:
         from ma_poc.core.roster_identity import apply_roster_identity
 
-        merged_properties, _roster_report = apply_roster_identity(
-            merged_properties, demote=False
-        )
+        merged_properties, _roster_report = apply_roster_identity(merged_properties, demote=False)
         if _roster_report.annotated_properties:
             log.info(
                 "roster-identity: annotated %d of %d properties (%d unit rows) — "
@@ -1352,9 +1339,7 @@ def _emit_route_shadow(
         # The 2026-07-31 shadow run otherwise produced STOP for every one of
         # 549 unitless plan properties because this used the both-channel
         # profile counter.
-        sig = compute_signals(
-            fetch_result, None, profile, units_extracted=_unit_level_row_count(result)
-        )
+        sig = compute_signals(fetch_result, None, profile, units_extracted=_unit_level_row_count(result))
         dec = route(sig, profile)
         rec = {
             "property_id": getattr(task, "property_id", "?"),
@@ -1442,9 +1427,7 @@ async def _process_property(
     api_provider = ""
     if profile_for_dispatch is not None:
         try:
-            api_provider = (
-                profile_for_dispatch.api_hints.api_provider or ""
-            ).lower()
+            api_provider = (profile_for_dispatch.api_hints.api_provider or "").lower()
         except Exception:
             api_provider = ""
 
@@ -1582,9 +1565,7 @@ async def _process_property(
         # L3 (no extra bootstrap call there).
         if profile_for_dispatch is None and hasattr(profile_store, "bootstrap"):
             try:
-                profile_for_dispatch = profile_store.bootstrap(
-                    task.property_id, {}, task.url
-                )
+                profile_for_dispatch = profile_store.bootstrap(task.property_id, {}, task.url)
             except Exception as _bs_exc:  # defensive — never block fetch
                 log.warning(
                     "profile bootstrap failed for %s: %s — fetching without profile",
@@ -1610,9 +1591,7 @@ async def _process_property(
             # queue: the clean render tier aborts (never solves) on interactive
             # CAPTCHA / never-clearing CF JS, stamping captcha_detected. This
             # makes them filterable, distinct from routine carry-forwards.
-            reason = carry_forward_reason_for(
-                reason, getattr(fetch_result, "captcha_detected", False)
-            )
+            reason = carry_forward_reason_for(reason, getattr(fetch_result, "captcha_detected", False))
 
             try:
                 # Use the run-level shared StateStore when available so
@@ -1622,15 +1601,14 @@ async def _process_property(
                 _cf_ss = state_store
                 if _cf_ss is None:
                     from ma_poc.core.state_store import StateStore as _SS
+
                     _cf_ss = _SS(data_dir / "state")
                 # Prefer the concrete dated run_dir so carry_forward_property
                 # can derive the schema root reliably. Fall back to the
                 # "latest" symlink only when run_dir wasn't injected (e.g.
                 # ad-hoc invocations without a run context).
                 _cf_run_dir = run_dir if run_dir is not None else data_dir / "runs" / "latest"
-                cf_record = carry_forward_property(
-                    task.property_id, _cf_run_dir, _cf_ss, reason
-                )
+                cf_record = carry_forward_property(task.property_id, _cf_run_dir, _cf_ss, reason)
                 if cf_record:
                     # Stamp a SUCCESS verdict so run_report counts this
                     # correctly. Without this the verdict stays None and
@@ -1751,8 +1729,7 @@ async def _process_property(
                 # units; the plan-level case wants MORE real unit-level rows
                 # than we already had (never regress a plan-level success).
                 if (_zero_units and len(render_result.get("units") or []) > 0) or (
-                    _unit_level_row_count(render_result)
-                    > _unit_level_row_count(result)
+                    _unit_level_row_count(render_result) > _unit_level_row_count(result)
                 ):
                     result = render_result
                     fetch_result = render_fetch
@@ -1795,9 +1772,7 @@ async def _process_property(
             from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
 
             hb_task = _dc_replace(task, render_mode=RenderMode.RENDER)
-            hb_fetch = await HyperbrowserProvider(mode="render").fetch(
-                hb_task, profile_for_dispatch
-            )
+            hb_fetch = await HyperbrowserProvider(mode="render").fetch(hb_task, profile_for_dispatch)
             if hb_fetch.ok():
                 hb_result = await scrape_jugnu(
                     task=hb_task,
@@ -1811,9 +1786,7 @@ async def _process_property(
                     result = hb_result
                     fetch_result = hb_fetch
         except Exception as _hb_exc:  # never let recovery crash a property
-            log.debug(
-                "hb-shell recovery failed for %s: %s", task.property_id, _hb_exc
-            )
+            log.debug("hb-shell recovery failed for %s: %s", task.property_id, _hb_exc)
 
     # ── Track 2b (task #37): encore per-plan render fan-out ──
     # When the encoreskyline adapter discovered plan URLs from the body but
@@ -1836,9 +1809,7 @@ async def _process_property(
     ):
         try:
             _eb = fetch_result.body
-            _entry_html = (
-                _eb.decode("utf-8", "replace") if isinstance(_eb, bytes) else str(_eb or "")
-            )
+            _entry_html = _eb.decode("utf-8", "replace") if isinstance(_eb, bytes) else str(_eb or "")
             _enc_units = await _encore_plan_render_units(
                 task,
                 _entry_html,
@@ -1965,13 +1936,16 @@ async def _process_property(
 
                     # Persist patches surfaced by the recovery.
                     from services.profile_updater import save_field_patch
+
                     for patch_dict in result.get("_field_patches", []) or []:
                         if isinstance(patch_dict, dict):
                             save_field_patch(profile, patch_dict)
                 except Exception as exc:
                     log.warning(
                         "F2 null_field_recovery hoist failed for %s: %s",
-                        task.property_id, exc, exc_info=True,
+                        task.property_id,
+                        exc,
+                        exc_info=True,
                     )
 
             if hasattr(profile_store, "save"):
@@ -1983,10 +1957,13 @@ async def _process_property(
             # Previously at log.debug — invisible in production INFO logs.
             log.warning(
                 "profile update failed for %s: %s",
-                task.property_id, exc, exc_info=True,
+                task.property_id,
+                exc,
+                exc_info=True,
             )
             try:
                 from ma_poc.observability.events import EventKind, emit
+
                 emit(
                     EventKind.PROFILE_UPDATE_FAILED,
                     task.property_id or "unknown",
@@ -2070,8 +2047,13 @@ async def _process_property(
 
         if ENABLE_ROUTE_SHADOW and run_dir is not None:
             _emit_route_shadow(
-                fetch_result, result, task, run_dir, profile,
-                getattr(extract_result, "tier_used", None), verdict.verdict.value,
+                fetch_result,
+                result,
+                task,
+                run_dir,
+                profile,
+                getattr(extract_result, "tier_used", None),
+                verdict.verdict.value,
             )
     except Exception:
         pass
@@ -2081,9 +2063,7 @@ async def _process_property(
     # per-property data-quality mix) onto _meta.provenance. Additive +
     # never-fail, same contract as the _meta.publish_ceiling stamp below.
     try:
-        meta["provenance"] = _provenance_block(
-            result, csv_row or {}, fetch_result, outcome_val
-        )
+        meta["provenance"] = _provenance_block(result, csv_row or {}, fetch_result, outcome_val)
     except Exception:  # provenance must never sink a property record
         pass
 
@@ -2099,15 +2079,12 @@ async def _process_property(
         try:
             from ma_poc.reporting.publish_ceiling import assess_publish_ceiling
 
-            _pc_extract = extract_result
-            _pc_plans = getattr(_pc_extract, "plan_summaries", None)
-            if _pc_plans is None and isinstance(_pc_extract, dict):
-                _pc_plans = _pc_extract.get("plan_summaries")
+            _pc_plans, _pc_verified_plan_only = _publish_ceiling_plan_inputs(
+                result
+            )
             _pc_body = getattr(fetch_result, "body", None)
             _pc_html = (
-                _pc_body.decode("utf-8", "replace")
-                if isinstance(_pc_body, bytes)
-                else (_pc_body or "")
+                _pc_body.decode("utf-8", "replace") if isinstance(_pc_body, bytes) else (_pc_body or "")
             )
             # 2026-07-30 — plan-level unavailability tag. This property reached
             # no unit-level rows; if its page carries a positive "no bookable
@@ -2132,6 +2109,7 @@ async def _process_property(
                 html_signals=result.get("_html_characterization"),
                 tier_trace=result.get("_tier_attempts"),
                 page_html=_pc_html,
+                verified_plan_only_surface=_pc_verified_plan_only,
             )
             meta["publish_ceiling"] = {
                 "verdict": _pc.verdict.value,
@@ -2147,15 +2125,11 @@ async def _process_property(
             # narrow: FAILED_NO_DATA only, and only on the two CONFIRMED grades.
             # EXTRACTION_MISS (rent tokens present + zero units) is OUR bug and
             # stays a visible failure.
-            _upgraded = verdict_for_publish_ceiling(
-                meta.get("verdict"), _pc.verdict.value
-            )
+            _upgraded = verdict_for_publish_ceiling(meta.get("verdict"), _pc.verdict.value)
             if _upgraded:
                 meta["verdict"] = _upgraded
                 meta["verdict_upgraded_from"] = verdict_value
-                meta["verdict_reason"] = (
-                    f"publish ceiling proven ({_pc.verdict.value}): {_pc.reason}"
-                )
+                meta["verdict_reason"] = f"publish ceiling proven ({_pc.verdict.value}): {_pc.reason}"
                 verdict_value = _upgraded
             emit(
                 EventKind.PROPERTY_EMITTED,  # publish_ceiling ride-along
@@ -2166,7 +2140,8 @@ async def _process_property(
         except Exception as _pc_exc:  # never-fail contract
             log.debug(
                 "publish_ceiling assessment failed for %s: %s",
-                task.property_id, _pc_exc,
+                task.property_id,
+                _pc_exc,
             )
 
     emit(
@@ -2189,6 +2164,7 @@ async def _process_property(
         from ma_poc.data_provider.dtos import IssueEntry as _IssueEntry
         from ma_poc.data_provider.dtos import UnitDiff as _UnitDiff
         from ma_poc.services.merge_yield import evaluate as _merge_yield_evaluate
+
         try:
             _run_date_str = run_dir.name  # "YYYY-MM-DD"
             _diff_raw = state_store.upsert_units(task.property_id, _today_units, _run_date_str)
@@ -2222,7 +2198,8 @@ async def _process_property(
         except Exception as _exc:
             log.warning(
                 "state_store upsert / keyless gate failed for %s: %s",
-                task.property_id, _exc,
+                task.property_id,
+                _exc,
             )
             _append_issue_to_run(
                 run_dir,
@@ -2314,11 +2291,7 @@ async def _process_property(
         and any(mk in _tier_used.upper() for mk in _API_SAMPLE_TIER_MARKERS)
     ):
         try:
-            _adapter = next(
-                mk.lower()
-                for mk in _API_SAMPLE_TIER_MARKERS
-                if mk in _tier_used.upper()
-            )
+            _adapter = next(mk.lower() for mk in _API_SAMPLE_TIER_MARKERS if mk in _tier_used.upper())
             if _API_SAMPLE_COUNTS.get(_adapter, 0) < _API_SAMPLE_CAP_PER_ADAPTER:
                 _apis = result.get("_raw_api_responses") or []
                 if _apis:
@@ -2342,13 +2315,9 @@ async def _process_property(
                             json.dumps(_sample, ensure_ascii=False),
                             encoding="utf-8",
                         )
-                        _API_SAMPLE_COUNTS[_adapter] = (
-                            _API_SAMPLE_COUNTS.get(_adapter, 0) + 1
-                        )
+                        _API_SAMPLE_COUNTS[_adapter] = _API_SAMPLE_COUNTS.get(_adapter, 0) + 1
         except Exception as _exc:
-            log.debug(
-                "api_sample capture failed for %s: %s", task.property_id, _exc
-            )
+            log.debug("api_sample capture failed for %s: %s", task.property_id, _exc)
 
     return result
 
@@ -2402,6 +2371,11 @@ def _provenance_block(
     from ma_poc.core.schema_v2 import _is_floor_plan_level
 
     units = result.get("units") or []
+    plan_summaries = [
+        plan
+        for plan in (result.get("plan_summaries") or [])
+        if isinstance(plan, dict)
+    ]
     by_family: dict[str, int] = {}
     n_plan = n_synth = n_realid = 0
     # Same property-level marker the output formatter uses, so this counter and
@@ -2420,15 +2394,19 @@ def _provenance_block(
         # all 505 SightMap properties in the 2026-07-25 5k canary while 4,024
         # plan rows were in fact shipping. Delegate to the canonical predicate,
         # which reads the flag as well as the tier suffix.
-        if _is_floor_plan_level(
-            u, property_plan_level=prop_plan_level
-        ) or tier.upper().endswith("_PLAN_LEVEL"):
+        if _is_floor_plan_level(u, property_plan_level=prop_plan_level) or tier.upper().endswith(
+            "_PLAN_LEVEL"
+        ):
             n_plan += 1
         uid = str(u.get("unit_id") or u.get("unit_number") or "")
         if uid.startswith(("inferred_", "unkeyable_")):
             n_synth += 1
         elif uid:
             n_realid += 1
+    # ``floor_plans[]`` is a first-class output channel. Count those rows in
+    # the plan-level metric even though they are intentionally absent from the
+    # physical-unit count and identity counters above.
+    n_plan += len(plan_summaries)
     det = result.get("_detected_pms") or {}
     rm = getattr(fetch_result, "render_mode", None)
     return {
@@ -2463,8 +2441,30 @@ def _provenance_block(
             "real_id_units": n_realid,
             "synthetic_id_units": n_synth,
             "plan_level_units": n_plan,
+            "plan_summary_count": len(plan_summaries),
         },
     }
+
+
+def _publish_ceiling_plan_inputs(
+    result: dict[str, Any],
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return the exact final plan collection and its complete-surface proof."""
+    from ma_poc.pms.adapters.base import VERIFIED_PLAN_ONLY_SURFACE_KEY
+
+    plans = [
+        plan
+        for plan in (result.get("plan_summaries") or [])
+        if isinstance(plan, dict)
+    ]
+    verified = bool(
+        plans
+        and all(
+            str(plan.get(VERIFIED_PLAN_ONLY_SURFACE_KEY) or "").strip()
+            for plan in plans
+        )
+    )
+    return plans, verified
 
 
 def _format_output(
@@ -2697,9 +2697,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
 
             for _u in units:
                 if isinstance(_u, dict):
-                    enrich_unit_concession_fields(
-                        _u, property_concession_text=concessions_text
-                    )
+                    enrich_unit_concession_fields(_u, property_concession_text=concessions_text)
         except Exception:  # defensive — never block the property emit
             pass
 
@@ -2764,9 +2762,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         # A floor-plan card is useful public evidence but never an apartment.
         # The dedicated formatter removes any fallback ``inferred_*`` ID.
         "floor_plans": [
-            _format_v2_floor_plan(
-                plan, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)
-            )
+            _format_v2_floor_plan(plan, scrape_ts, _v2_property_id_for_unit(meta, apartment_id))
             for plan in plan_summaries
             if isinstance(plan, dict)
         ],
@@ -2833,9 +2829,7 @@ def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> 
     return str(meta.get("canonical_id") or apartment_id or "").strip()
 
 
-def _format_v2_floor_plan(
-    plan: dict[str, Any], scrape_ts: datetime, property_id: str = ""
-) -> dict[str, Any]:
+def _format_v2_floor_plan(plan: dict[str, Any], scrape_ts: datetime, property_id: str = "") -> dict[str, Any]:
     """Format plan evidence while guaranteeing it has no unit identity.
 
     The normal formatter is intentionally allowed to mint a fallback ID for
@@ -2868,15 +2862,12 @@ def _format_v2_floor_plan(
     # ``available_date_raw`` (jugnu emits first-class ``<field>_raw`` columns,
     # not the underscore-private ones core/ uses); a date without one was
     # manufactured by definition.
-    if out.get("availability_status") == "UNAVAILABLE" and not out.get(
+    if out.get("availability_status") != "AVAILABLE" and not out.get(
         "available_date_raw"
     ):
         out["available_date"] = None
-    flags = [
-        part.strip()
-        for part in str(out.get("data_quality_flag") or "").split("|")
-        if part.strip()
-    ]
+        out["availability_date_provenance"] = "missing"
+    flags = [part.strip() for part in str(out.get("data_quality_flag") or "").split("|") if part.strip()]
     if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
         flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
     out["data_quality_flag"] = "|".join(flags)
@@ -3250,10 +3241,12 @@ def _format_v2_unit(
         _is_floor_plan_level,
         _resolve_available_date,
         _row_has_availability_date,
+        area_sanity_provenance,
         classify_area_absence,
         resolve_plan_row_availability,
         withdraw_unsupported_available,
     )
+
     _available_date_raw = _availability_date_value(unit)
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
@@ -3268,27 +3261,13 @@ def _format_v2_unit(
         "beds": unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds"),
         "baths": unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths"),
         "floor_plan_name": (
-            unit.get("_floor_plan")
-            or unit.get("floor_plan_name")
-            or unit.get("floorplan_name")
+            unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
         ),
         "floor_plan_id": unit.get("floor_plan_id"),
         "area": unit.get("_sqft") or unit.get("sqft") or unit.get("area"),
-        "unit_id": (
-            unit.get("unit_id")
-            or unit.get("unit_number")
-            or unit.get("_unit_number")
-        ),
-        "rent_low": (
-            unit.get("market_rent_low")
-            or unit.get("asking_rent")
-            or unit.get("rent_range")
-        ),
-        "rent_high": (
-            unit.get("market_rent_high")
-            or unit.get("asking_rent")
-            or unit.get("rent_range")
-        ),
+        "unit_id": (unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")),
+        "rent_low": (unit.get("market_rent_low") or unit.get("asking_rent") or unit.get("rent_range")),
+        "rent_high": (unit.get("market_rent_high") or unit.get("asking_rent") or unit.get("rent_range")),
         "floor": (
             unit.get("floor")
             or unit.get("_floor")
@@ -3300,13 +3279,9 @@ def _format_v2_unit(
         "available_units": unit.get("available_units"),
         "date_captured": None,
         "available_date": _available_date_raw,
-        "availability_status": (
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        "availability_status": (unit.get("availability_status") or unit.get("_availability_status")),
         "lease_term": unit.get("lease_term") or unit.get("_lease_term"),
-        "move_in_date": (
-            unit.get("move_in_date") or unit.get("_move_in_date")
-        ),
+        "move_in_date": (unit.get("move_in_date") or unit.get("_move_in_date")),
     }
 
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
@@ -3337,16 +3312,15 @@ def _format_v2_unit(
             is_junk_unit_number,
         )
 
-        # BetterNOI's strict UUID-scoped API publishes ``floor_plan.name``
-        # explicitly, and real operator names on that surface include
-        # ``1 Bed 1 Bath``.  Keep the generic placeholder filter everywhere
-        # else; bypass it only for the exact provenance token stamped by the
-        # property-scoped BetterNOI parser.
-        _explicit_betternoi_plan = (
-            unit.get("_floor_plan_name_provenance")
-            == "betternoi.floor_plan.name"
-        )
-        if is_junk_floor_plan(fp_name) and not _explicit_betternoi_plan:
+        # BetterNOI and On-Site both publish an explicit provider-side plan
+        # name. Real names on those bounded sources include generic-looking
+        # labels such as ``1 Bed 1 Bath``; their exact provenance separates
+        # them from the same text synthesized by generic fallback paths.
+        _explicit_provider_plan = unit.get("_floor_plan_name_provenance") in {
+            "betternoi.floor_plan.name",
+            "onsite.floorplans[].name",
+        }
+        if is_junk_floor_plan(fp_name) and not _explicit_provider_plan:
             fp_name = None
         if is_junk_unit_number(uid):
             uid = None
@@ -3366,11 +3340,7 @@ def _format_v2_unit(
     # cardinality. Nulling lets ``compute_floor_plan_id`` below
     # derive a deterministic id from beds+baths only — units with
     # the same bed/bath count will then correctly share a plan id.
-    if (
-        fp_name is not None
-        and uid is not None
-        and str(fp_name).strip() == str(uid).strip()
-    ):
+    if fp_name is not None and uid is not None and str(fp_name).strip() == str(uid).strip():
         fp_name = None
 
     # Bed/bath fallback inference from the floor-plan name. Only fills
@@ -3410,12 +3380,7 @@ def _format_v2_unit(
     # bath count impossible *relative to the bed count* (regentsparkchicago.com's
     # RentCafe feed ships ``2bn09`` units with Baths=9). Drop to None rather than
     # emit an impossible value; ``>= 4`` protects a small unit's real 2–2.5 baths.
-    if (
-        norm_baths is not None
-        and norm_beds is not None
-        and norm_baths >= 4
-        and norm_baths > norm_beds + 2
-    ):
+    if norm_baths is not None and norm_beds is not None and norm_baths >= 4 and norm_baths > norm_beds + 2:
         norm_baths = None
 
     # Phase 3: stamp a deterministic floor_plan_id so analytics can
@@ -3423,14 +3388,16 @@ def _format_v2_unit(
     # post-normalisation values so two units with the same plan always
     # share the id even when one source emitted "Studio" and another
     # emitted "0".
-    try:
-        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+    _provider_plan_anchor = str(unit.get("_canonical_floor_plan_id") or "").strip()
+    if _provider_plan_anchor:
+        floor_plan_id = _provider_plan_anchor
+    else:
+        try:
+            from ma_poc.pms.adapters._parsing import compute_floor_plan_id
 
-        floor_plan_id = compute_floor_plan_id(
-            property_id, fp_name, norm_beds, norm_baths
-        )
-    except Exception:
-        floor_plan_id = None
+            floor_plan_id = compute_floor_plan_id(property_id, fp_name, norm_beds, norm_baths)
+        except Exception:
+            floor_plan_id = None
 
     # 2026-05-25 (canary 1ef1060 follow-up — per-unit concession + offer
     # fields). The canonical ma_poc/core/schema_v2.py:_format_v2_unit emits
@@ -3460,11 +3427,23 @@ def _format_v2_unit(
         # (the dict/list shapes get captured via the property-level
         # ``concessions`` field upstream).
         for _ck in (
-            "concession", "concessions", "specials_description",
-            "specialsDescription", "special", "specials",
-            "promotion", "promo", "offer", "offers",
-            "incentive", "incentives", "deal", "savings",
-            "discount", "free_rent", "look_and_lease",
+            "concession",
+            "concessions",
+            "specials_description",
+            "specialsDescription",
+            "special",
+            "specials",
+            "promotion",
+            "promo",
+            "offer",
+            "offers",
+            "incentive",
+            "incentives",
+            "deal",
+            "savings",
+            "discount",
+            "free_rent",
+            "look_and_lease",
             "move_in_special",
         ):
             _cv = unit.get(_ck)
@@ -3483,6 +3462,7 @@ def _format_v2_unit(
                 classify_concession_quality,
                 clean_concession_text,
             )
+
             concession_text_clean = clean_concession_text(concession_text)
             concession_quality = classify_concession_quality(concession_text)
         except Exception:
@@ -3524,6 +3504,12 @@ def _format_v2_unit(
         supplied_value=sqft,
         property_publishes_area=property_has_area,
     )
+    (
+        area_pre_sanity_value,
+        area_sanity_decision,
+        area_sanity_reason,
+        area_sanity_source,
+    ) = area_sanity_provenance(unit)
 
     # Zero-inventory availability contract (2026-07-29) — resolved ONCE, before
     # the dict literal, so ``availability_status`` and the ``available_date``
@@ -3549,9 +3535,7 @@ def _format_v2_unit(
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
     _has_anchor = unit_has_real_anchor(unit)
     _availability_status = resolve_plan_row_availability(
-        _norm_avail_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        _norm_avail_status(unit.get("availability_status") or unit.get("_availability_status")),
         plan_level=_plan_level,
         has_rent=_has_rent,
         has_anchor=_has_anchor,
@@ -3575,6 +3559,7 @@ def _format_v2_unit(
         _availability_status,
         scrape_ts,
         has_rent=(_has_rent and uid not in (None, "", "null")),
+        raw_value=_available_date_raw,
     )
     _available_date_provenance = _classify_availability_date_provenance(
         _available_date_raw,
@@ -3587,10 +3572,19 @@ def _format_v2_unit(
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name or None,
+        "floor_plan_description": (
+            str(unit.get("floor_plan_description")).strip() or None
+            if unit.get("floor_plan_description") not in (None, "", "null")
+            else None
+        ),
         "floor_plan_id": floor_plan_id,
         "area": area_out,
         "area_absence": area_absence,
         "area_absence_evidence": area_absence_evidence,
+        "area_pre_sanity_value": area_pre_sanity_value,
+        "area_sanity_decision": area_sanity_decision,
+        "area_sanity_reason": area_sanity_reason,
+        "area_sanity_source": area_sanity_source,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         # As-displayed operator label. Kept in lock-step with
         # core/schema_v2.py — this fork is the one production actually runs,
@@ -3624,8 +3618,7 @@ def _format_v2_unit(
         "floor": _format_floor(_raw_src["floor"]),
         "building": (
             None
-            if not _raw_src["building"]
-            or str(_raw_src["building"]).strip() == ""
+            if not _raw_src["building"] or str(_raw_src["building"]).strip() == ""
             else str(_raw_src["building"]).strip()
         ),
         "available_units": (
@@ -3677,22 +3670,12 @@ def _format_v2_unit(
         # resolution.  The previous ordering populated source_ids after
         # assign_fallback_unit_id(), making real CWS/Apts247/etc. anchors
         # unreachable and fabricating inferred IDs instead.
-        "source_ids": (
-            dict(unit.get("source_ids"))
-            if isinstance(unit.get("source_ids"), dict)
-            else {}
-        ),
+        "source_ids": (dict(unit.get("source_ids")) if isinstance(unit.get("source_ids"), dict) else {}),
         # Row-level lineage and data-quality gaps are required to distinguish
         # an API plan summary from a real unit after output formatting.
-        "extraction_tier": (
-            unit.get("extraction_tier") or unit.get("_extraction_tier") or None
-        ),
+        "extraction_tier": (unit.get("extraction_tier") or unit.get("_extraction_tier") or None),
         "data_quality_flag": unit.get("data_quality_flag") or None,
-        "data_gaps": (
-            list(unit.get("data_gaps"))
-            if isinstance(unit.get("data_gaps"), list)
-            else []
-        ),
+        "data_gaps": (list(unit.get("data_gaps")) if isinstance(unit.get("data_gaps"), list) else []),
     }
 
     # Merge-rescue: if no natural id survived, derive a stable inferred id
@@ -3715,9 +3698,7 @@ def _format_v2_unit(
     # column; consumers that don't know these keys simply ignore them.
     for _k in list(out.keys()):
         _v = _raw_src.get(_k)
-        out[f"{_k}_raw"] = (
-            None if _v is None or str(_v).strip() == "" else str(_v).strip()
-        )
+        out[f"{_k}_raw"] = None if _v is None or str(_v).strip() == "" else str(_v).strip()
 
     return out
 
@@ -3752,10 +3733,11 @@ def _resolve_source_url(raw_apis: list[dict[str, Any]], target_unit: dict[str, A
     # Short-needle patterns: the value must appear as a JSON string/number value
     # e.g. `": "1A"`, `": 1A,`, `": 1A}`, `":1A"` (whitespace-tolerant).
     import re as _re
+
     short_patterns = [
         _re.compile(
             r':\s*"' + _re.escape(n) + r'"'
-            r'|:\s*' + _re.escape(n) + r'[,}\]\n\r\s]',
+            r"|:\s*" + _re.escape(n) + r"[,}\]\n\r\s]",
             _re.IGNORECASE,
         )
         for n in short_needles
@@ -3792,6 +3774,7 @@ def _url_pattern_from(url: str) -> str:
         return ""
     try:
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         return parsed.path or url
     except Exception:
@@ -3860,8 +3843,7 @@ async def _run_null_field_recovery(
         # this is parser-tier failure (no fields identified at all), not
         # field-level recovery territory. F2 won't help.
         all_units_total_null = bool(units) and all(
-            u.get("rent_low") is None and u.get("unit_id") is None
-            for u in units
+            u.get("rent_low") is None and u.get("unit_id") is None for u in units
         )
         if all_units_total_null:
             log.info(
@@ -3886,13 +3868,25 @@ async def _run_null_field_recovery(
             "state": str(formatted.get("state") or ""),
         }
 
-        _PATCH_FIELDS = frozenset({
-            "rent_low", "rent_high", "asking_rent",
-            "market_rent_low", "market_rent_high",
-            "unit_id", "unit_number", "floor_plan_name",
-            "beds", "bedrooms", "baths", "bathrooms", "sqft",
-            "available_date", "availability_date",
-        })
+        _PATCH_FIELDS = frozenset(
+            {
+                "rent_low",
+                "rent_high",
+                "asking_rent",
+                "market_rent_low",
+                "market_rent_high",
+                "unit_id",
+                "unit_number",
+                "floor_plan_name",
+                "beds",
+                "bedrooms",
+                "baths",
+                "bathrooms",
+                "sqft",
+                "available_date",
+                "availability_date",
+            }
+        )
 
         for i, unit in enumerate(null_units[:5]):
             source_url, source_body = _resolve_source_url(raw_apis, unit)
@@ -3952,17 +3946,20 @@ async def _run_null_field_recovery(
                 env_hash = ""
                 try:
                     from ma_poc.models.source import envelope_hash_of
+
                     env_hash = envelope_hash_of(source_body)
                 except Exception:
                     pass
-                patch_payloads.append({
-                    "api_url_pattern": _url_pattern_from(source_url),
-                    "field_name": field_name,
-                    "json_path": raw_path,
-                    "confidence": float(rf.confidence),
-                    "parser_fix": getattr(rf, "parser_fix", None),
-                    "_envelope_hash": env_hash,
-                })
+                patch_payloads.append(
+                    {
+                        "api_url_pattern": _url_pattern_from(source_url),
+                        "field_name": field_name,
+                        "json_path": raw_path,
+                        "confidence": float(rf.confidence),
+                        "parser_fix": getattr(rf, "parser_fix", None),
+                        "_envelope_hash": env_hash,
+                    }
+                )
     except Exception as exc:
         log.debug("F2 null_field_recovery hook failed for %s: %s", canonical_id, exc)
     finally:
@@ -4108,9 +4105,7 @@ def _find_prior_run_properties(run_dir: Path) -> list[dict[str, Any]] | None:
     return None
 
 
-def _emit_run_invariant_issues(
-    properties: list[dict[str, Any]], run_dir: Path | None
-) -> None:
+def _emit_run_invariant_issues(properties: list[dict[str, Any]], run_dir: Path | None) -> None:
     """Run the whole-run invariants and record what they find.
 
     These two checks need the entire run in hand, which is why they live here
@@ -4216,8 +4211,7 @@ def _emit_run_invariant_issues(
                         # n_properties_compared against the expected run size.
                         "scope": "single_process",
                         "full_run_check": (
-                            "python -m ma_poc.scripts.checks.run_invariants "
-                            "--run-dir <assembled-run-dir>"
+                            "python -m ma_poc.scripts.checks.run_invariants --run-dir <assembled-run-dir>"
                         ),
                     },
                 ),
@@ -4231,9 +4225,7 @@ def _emit_run_invariant_issues(
                 _IE(
                     severity="WARNING",
                     code="PUBLISHED_ENVELOPE_DRIFT",
-                    message=(
-                        f"{drift.property_name}: " + "; ".join(drift.findings)
-                    ),
+                    message=(f"{drift.property_name}: " + "; ".join(drift.findings)),
                     canonical_id=drift.property_id,
                     details={
                         "findings": drift.findings,
@@ -4261,8 +4253,7 @@ def _emit_run_invariant_issues(
                     "n_prior_properties": len(prior),
                     "scope": "single_process",
                     "full_run_check": (
-                        "python -m ma_poc.scripts.checks.run_invariants "
-                        "--run-dir <assembled-run-dir>"
+                        "python -m ma_poc.scripts.checks.run_invariants --run-dir <assembled-run-dir>"
                     ),
                 },
             ),
@@ -4345,9 +4336,10 @@ def persist_timeout_route_hints(
         nav.winning_page_url = winning
         profile_store.save(prof)
         log.info(
-            "Property %s: persisted winning_page_url=%s from timed-out run "
-            "(units=%d) — next run starts warm",
-            property_id, winning, unit_count,
+            "Property %s: persisted winning_page_url=%s from timed-out run (units=%d) — next run starts warm",
+            property_id,
+            winning,
+            unit_count,
         )
         return True
     except Exception as exc:
@@ -4368,8 +4360,12 @@ def _salvage_unit_has_numeric_rent(unit: dict[str, Any]) -> bool:
     :func:`_neutralize_unearned_rent_gap`).
     """
     for k in (
-        "asking_rent", "market_rent_low", "market_rent_high",
-        "rent_low", "rent_high", "rent",
+        "asking_rent",
+        "market_rent_low",
+        "market_rent_high",
+        "rent_low",
+        "rent_high",
+        "rent",
     ):
         v = unit.get(k)
         if v in (None, ""):
@@ -4547,8 +4543,7 @@ def _norm_avail_status(val: Any) -> str | None:
         return None
     u = s.upper()
     # 1. Exact enum match — single source of truth for the verb set.
-    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
-             "LEASED", "PENDING", "UNKNOWN"):
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED", "LEASED", "PENDING", "UNKNOWN"):
         return u
     # 2. Phrase-based partial matches. Order matters — PENDING and
     # WAITLIST are checked before AVAILABLE because "application
@@ -4561,12 +4556,7 @@ def _norm_avail_status(val: Any) -> str | None:
         return "WAITLIST"
     # UNAVAILABLE-shaped phrases checked BEFORE LEASED so "leased out"
     # / "not available" don't get caught as plain LEASED.
-    if (
-        "NOT AVAILABLE" in u
-        or "UNAVAILABLE" in u
-        or "SOLD OUT" in u
-        or "LEASED OUT" in u
-    ):
+    if "NOT AVAILABLE" in u or "UNAVAILABLE" in u or "SOLD OUT" in u or "LEASED OUT" in u:
         return "UNAVAILABLE"
     if "LEASED" in u or "OCCUPIED" in u:
         return "LEASED"
@@ -4701,9 +4691,7 @@ def _format_area(
     """
     from ma_poc.core.schema_v2 import _format_area as _canon
 
-    return _canon(
-        val, record_as=record_as, property_id=property_id, unit_id=unit_id
-    )
+    return _canon(val, record_as=record_as, property_id=property_id, unit_id=unit_id)
 
 
 def _format_date_str(
@@ -4740,9 +4728,32 @@ def _format_floor(val: Any) -> int | None:
     """
     if val is None:
         return None
-    m = _re.search(r"\d+", str(val))
+    text = str(val).strip()
+    m = _re.search(r"\d+", text)
     if not m:
-        return None
+        # Yotta's current exact public vocabulary is First/Second/Third
+        # Floor. Keep this deliberately bounded to ordinal + "floor" so a
+        # prose occurrence elsewhere cannot be mistaken for a unit floor.
+        ordinal = _re.fullmatch(
+            r"(?:floor\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\s+floor)?",
+            text,
+            _re.IGNORECASE,
+        )
+        if not ordinal:
+            return None
+        n = {
+            "first": 1,
+            "second": 2,
+            "third": 3,
+            "fourth": 4,
+            "fifth": 5,
+            "sixth": 6,
+            "seventh": 7,
+            "eighth": 8,
+            "ninth": 9,
+            "tenth": 10,
+        }[ordinal.group(1).casefold()]
+        return n
     try:
         n = int(m.group(0))
     except (ValueError, TypeError):
@@ -5062,9 +5073,7 @@ class _SimpleProfileStore:
     def put(self, profile: Any) -> None:
         self.save(profile)
 
-    def iter_profiles_by_cluster_key(
-        self, cluster_key: str, limit: int = 100
-    ) -> list[Any]:
+    def iter_profiles_by_cluster_key(self, cluster_key: str, limit: int = 100) -> list[Any]:
         """Delegate cluster-mate lookup to whichever backing implements it.
 
         Used by ``services.cluster_store`` for cross-property warm-start. The

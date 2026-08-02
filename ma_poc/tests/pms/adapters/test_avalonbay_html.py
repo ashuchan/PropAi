@@ -19,9 +19,11 @@ alderwood/union (matches the canary's plan-only counts within
 expected delta — those reflected only the available subset of total
 inventory).
 """
+
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 from ma_poc.pms.adapters.avalonbay import (
     _extract_balanced_array,
@@ -84,7 +86,47 @@ def test_parse_units_extracts_nested_price_int() -> None:
     assert u["bedrooms"] == "0"
     assert u["bathrooms"] == "1"
     assert u["floor_plan_name"] == "SM04.1"
+    assert u["unit_id"] == "AVB-NJ043-001-422"
     assert u["unit_number"] == "422"
+    assert u["unit_name"] == "422"
+    assert u["source_ids"] == {"avalonbay_unit_id": "AVB-NJ043-001-422"}
+
+
+def test_native_ids_preserve_three_complete_avalon_roster_shapes() -> None:
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    cohorts = (
+        ("ARLINGTON", 81, 47),
+        ("MEYDENBAUER", 27, 27),
+        ("MONTVILLE", 25, 25),
+    )
+    for property_code, source_count, visible_count in cohorts:
+        items = [
+            _avalon_unit_shape(
+                unit_id=f"AVB-{property_code}-{index:03d}",
+                unit_name=f"{index % visible_count:03d}",
+                beds=index % 3,
+                sqft=600 + index,
+                price=2_000 + index,
+                fp_name=f"PLAN-{index % 5}",
+            )
+            for index in range(source_count)
+        ]
+
+        parsed = parse_avalonbay_units(items, "https://avaloncommunities.com/test")
+        formatted = [
+            _format_v2_unit(
+                row,
+                datetime(2026, 8, 2, tzinfo=UTC),
+                property_code,
+            )
+            for row in parsed
+        ]
+
+        assert len(parsed) == source_count
+        assert len({row["unit_id"] for row in formatted}) == source_count
+        assert len({row["unit_name"] for row in formatted}) == visible_count
+        assert all(row["source_ids"]["avalonbay_unit_id"] == row["unit_id"] for row in formatted)
 
 
 def test_parse_units_falls_back_to_net_effective_price() -> None:
@@ -98,13 +140,18 @@ def test_parse_units_falls_back_to_net_effective_price() -> None:
 def test_parse_units_prefers_flat_price_over_nested() -> None:
     """If a flat ``minRent`` is present (the legacy XHR shape), it must
     still win — don't reorder the parser's priority."""
-    items = [{
-        "unitId": "AVB-X-1", "unitName": "101",
-        "bedroomNumber": 1, "bathroomNumber": 1, "squareFeet": 700,
-        "floorPlan": {"name": "A1"},
-        "minRent": 1500,  # legacy flat path
-        "startingAtPricesUnfurnished": {"prices": {"price": 9999}},  # would-be nested
-    }]
+    items = [
+        {
+            "unitId": "AVB-X-1",
+            "unitName": "101",
+            "bedroomNumber": 1,
+            "bathroomNumber": 1,
+            "squareFeet": 700,
+            "floorPlan": {"name": "A1"},
+            "minRent": 1500,  # legacy flat path
+            "startingAtPricesUnfurnished": {"prices": {"price": 9999}},  # would-be nested
+        }
+    ]
     units = parse_avalonbay_units(items, "https://x.com")
     assert units[0]["market_rent_low"] == 1500  # flat wins
 
@@ -134,7 +181,7 @@ def test_parse_units_summary_fallback_still_works() -> None:
 
 
 def test_extract_balanced_array_simple() -> None:
-    html = 'prefix [1, 2, 3] suffix'
+    html = "prefix [1, 2, 3] suffix"
     assert _extract_balanced_array(html, 7) == "[1, 2, 3]"
 
 
@@ -153,13 +200,13 @@ def test_extract_balanced_array_string_with_brackets_inside() -> None:
 def test_extract_balanced_array_unbalanced_returns_empty() -> None:
     """Defensive: a truncated array (no matching close) returns ''
     rather than reading past EOF."""
-    html = '[1, 2, 3'
+    html = "[1, 2, 3"
     assert _extract_balanced_array(html, 0) == ""
 
 
 def test_extract_balanced_array_wrong_start_char() -> None:
     """If the caller hands a non-'[' index, fail safely."""
-    html = 'abc'
+    html = "abc"
     assert _extract_balanced_array(html, 0) == ""
 
 
@@ -170,23 +217,24 @@ def _wrap_fusion_blob(units_array_json: str) -> str:
     """Wrap a units-array JSON string in minimal HTML mimicking the
     Avalon Fusion fusion-metadata layout."""
     return (
-        '<html><head>'
+        "<html><head>"
         '<script id="fusion-metadata" type="application/javascript">'
-        'window.Fusion=window.Fusion||{};'
-        'Fusion.globalContent = {'
+        "window.Fusion=window.Fusion||{};"
+        "Fusion.globalContent = {"
         '  "community": {"id":"AVB-NJ043", "name":"Avalon Test"},'
-        '  "units": ' + units_array_json
-        + '};'
-        '</script></head><body></body></html>'
+        '  "units": ' + units_array_json + "};"
+        "</script></head><body></body></html>"
     )
 
 
 def test_parse_html_extracts_full_unit_inventory() -> None:
-    units_json = json.dumps([
-        _avalon_unit_shape(unit_id="AVB-X-001", unit_name="101", price=1500, sqft=600, beds=1, baths=1),
-        _avalon_unit_shape(unit_id="AVB-X-002", unit_name="102", price=1750, sqft=750, beds=1, baths=1),
-        _avalon_unit_shape(unit_id="AVB-X-003", unit_name="201", price=2400, sqft=1100, beds=2, baths=2),
-    ])
+    units_json = json.dumps(
+        [
+            _avalon_unit_shape(unit_id="AVB-X-001", unit_name="101", price=1500, sqft=600, beds=1, baths=1),
+            _avalon_unit_shape(unit_id="AVB-X-002", unit_name="102", price=1750, sqft=750, beds=1, baths=1),
+            _avalon_unit_shape(unit_id="AVB-X-003", unit_name="201", price=2400, sqft=1100, beds=2, baths=2),
+        ]
+    )
     html = _wrap_fusion_blob(units_json)
     units = parse_avalonbay_html(html, "https://avaloncommunities.com/test")
     assert len(units) == 3
@@ -211,10 +259,7 @@ def test_parse_html_empty_when_blob_truncated() -> None:
     catches no exception, but a partial array would feed bogus units
     downstream."""
     units_json = '[{"unitId":"AVB-X-001","unitName":"101"'  # no close
-    html = (
-        '<script id="fusion-metadata">'
-        'Fusion.globalContent = {"units": ' + units_json
-    )
+    html = '<script id="fusion-metadata">Fusion.globalContent = {"units": ' + units_json
     assert parse_avalonbay_html(html, "https://x.com") == []
 
 

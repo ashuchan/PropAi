@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -171,6 +171,7 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
         return []
 
     units: list[dict[str, Any]] = []
+    plans: list[dict[str, Any]] = []
     skipped_stack_ranges: list[str] = []
     for row in raw_rows:
         cells = row.select(":scope > .table-cell")
@@ -183,11 +184,11 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
         ):
             return []
         residence = " ".join(residence_cell.get_text(" ", strip=True).split())
-        if _NUMERIC_STACK_RANGE_RE.fullmatch(residence):
-            skipped_stack_ranges.append(residence)
-            continue
-        if not _UNIT_CODE_RE.fullmatch(residence) or not any(
+        is_stack_range = bool(_NUMERIC_STACK_RANGE_RE.fullmatch(residence))
+        if not is_stack_range and (
+            not _UNIT_CODE_RE.fullmatch(residence) or not any(
             char.isdigit() for char in residence
+            )
         ):
             return []
         bed_bath = _BED_BATH_RE.fullmatch(
@@ -199,6 +200,55 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
         bedrooms = bed_bath.group("beds")
         bathrooms = bed_bath.group("baths")
         rent_low, rent_high = rents
+        if is_stack_range:
+            links = [
+                urljoin(page_url, str(anchor.get("href") or ""))
+                for anchor in cells[3].select("a[href]")
+                if str(anchor.get("href") or "").strip()
+            ]
+            links = list(dict.fromkeys(links))
+            if (
+                len(links) != 1
+                or urlparse(links[0]).scheme not in {"http", "https"}
+                or urlparse(links[0]).hostname != urlparse(page_url).hostname
+            ):
+                return []
+            plan_asset_url = links[0]
+            plan = make_unit_dict(
+                floor_plan_name=residence,
+                bed_label=bed_label_from(bedrooms, residence),
+                bedrooms=bedrooms,
+                bathrooms=bathrooms,
+                sqft="",
+                unit_number="",
+                rent_low=rent_low,
+                rent_high=rent_high,
+                availability_status="UNKNOWN",
+                available_units="0",
+                availability_date="",
+                source_api_url=page_url,
+                extraction_tier="TIER_1_DOM_STATIC_RESIDENCE_TABLE_PLAN",
+                source_ids={
+                    "static_residence_stack_id": residence,
+                    "static_residence_plan_asset": plan_asset_url,
+                },
+                data_gaps=["sqft", "availability_date", "unit_id"],
+                data_quality_flag="STATIC_RESIDENCE_TABLE_PLAN_STACK",
+            )
+            plan.update(
+                {
+                    "is_floor_plan_level": True,
+                    "floor_plan_url": plan_asset_url,
+                    "floor_plan_name_provenance": "provider_residence_stack_code",
+                    "availability_date_provenance": "missing",
+                    "source_property_provenance": (
+                        "exact_property_identity_server_rendered_availability_table"
+                    ),
+                }
+            )
+            plans.append(plan)
+            skipped_stack_ranges.append(residence)
+            continue
         unit = make_unit_dict(
             floor_plan_name="",
             bed_label=bed_label_from(bedrooms, ""),
@@ -253,9 +303,44 @@ def recover_static_residence_table(ctx: AdapterContext) -> list[dict[str, Any]]:
     if not units or len(unit_numbers) != len(set(unit_numbers)):
         return []
     try:
-        ctx._static_residence_table_telemetry = {"raw_rows": len(raw_rows), "accepted_physical_residences": len(units), "skipped_numeric_stack_ranges": skipped_stack_ranges, "source_url": page_url}
+        ctx._static_residence_table_plan_summaries = list(plans)
+        ctx._static_residence_table_telemetry = {
+            "raw_rows": len(raw_rows),
+            "accepted_physical_residences": len(units),
+            "accepted_plan_stacks": len(plans),
+            "skipped_numeric_stack_ranges": skipped_stack_ranges,
+            "source_url": page_url,
+        }
     except Exception:
         pass
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        record_context_unit_source_provenance,
+    )
+
+    record_context_unit_source_provenance(
+        ctx,
+        build_unit_source_provenance(
+            provider="static_residence_table",
+            source_url=page_url,
+            body=html,
+            unit_count=len(units),
+            identity={
+                "status": "MATCH",
+                "evidence": [
+                    "configured_name",
+                    "configured_address",
+                    "city_state_zip",
+                    "single_exact_table_shape",
+                ],
+                "configured_property_id": str(ctx.property_id or ""),
+                "source_count": len(raw_rows),
+                "admitted_unit_count": len(units),
+                "admitted_plan_count": len(plans),
+            },
+            response_kind="mixed_unit_plan_table",
+        ),
+    )
     return units
 
 

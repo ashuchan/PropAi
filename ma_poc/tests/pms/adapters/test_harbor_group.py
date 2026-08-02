@@ -9,6 +9,7 @@ Coverage:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -268,14 +269,29 @@ def test_parse_harbor_units_page_available_now():
     u0 = units[0]
     assert u0["availability_status"] == "AVAILABLE"
     # "Available Now" → no ISO date but move_in_date from apply link
-    assert u0["available_date_post_fix"] == "2026-05-19"
+    assert u0["available_date"] == "2026-05-19"
 
 
 def test_parse_harbor_units_page_future_date():
     units = parse_harbor_units_page(_UNITS_HTML, plan_slug="the-azalea")
     u1 = units[1]
     assert u1["availability_status"] == "AVAILABLE"
-    assert u1["available_date_post_fix"] == "2026-06-11"
+    assert u1["available_date"] == "2026-06-11"
+
+
+def test_harbor_future_date_survives_production_formatter() -> None:
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    units = parse_harbor_units_page(_UNITS_HTML, plan_slug="the-azalea")
+    output = _format_v2_unit(
+        units[1],
+        datetime(2026, 5, 20, 12, tzinfo=UTC),
+        "riverworks",
+    )
+
+    assert output["available_date"] == "2026-06-11"
+    assert output["available_date_raw"] == "2026-06-11"
+    assert output["availability_date_provenance"] == "explicit_future"
 
 
 def test_parse_harbor_units_page_plan_slug_as_fp_id():

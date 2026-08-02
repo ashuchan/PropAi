@@ -31,9 +31,12 @@ all aspensquare.com. Failure mode pre-fix: ``tier=NONE`` (no adapter).
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -111,6 +114,347 @@ _BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bath", re.IGNORECASE)
 _SQFT_RE = re.compile(r"(\d[\d,]*)\s*sq", re.IGNORECASE)
 _MONEY_RE = re.compile(r"\$([\d,]+)")
 _AVAIL_COUNT_RE = re.compile(r"(\d+)\s*Available", re.IGNORECASE)
+
+# AspenSquare's current Next.js app-router pages stream the property payload in
+# React Server Component frames.  The second ``push`` argument is a normal JSON
+# string; after decoding it, the value following ``"floorPlans":`` is an
+# ordinary JSON object.  This deliberately parses the data contract rather
+# than depending on generated component/chunk IDs.
+_NEXT_RSC_PUSH_RE = re.compile(
+    r'self\.__next_f\.push\(\[1,("(?:\\.|[^"\\])*")\]\)', re.DOTALL
+)
+
+
+@dataclass(slots=True)
+class AspenSquareSurface:
+    """Exact current marketing catalogue embedded in one community page."""
+
+    plans: list[dict[str, Any]]
+    units: list[dict[str, Any]]
+    source_url: str
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        parsed = int(float(str(value).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _capture_date_iso(value: date | str | None) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value.strip()):
+        return value.strip()
+    # The production formatter also captures in UTC.  Using the same calendar
+    # boundary avoids introducing the one-day timezone shift found elsewhere
+    # in the availability audit.
+    return datetime.now(UTC).date().isoformat()
+
+
+def _current_availability_token(raw: Any, capture_date: str) -> str:
+    """Return visible current/future semantics from Aspen's availability."""
+    if not isinstance(raw, dict):
+        return ""
+    value = str(raw.get("madeReadyDate") or raw.get("vacantDate") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return ""
+    # Aspen's rendered table labels reached dates "Available Now".  Preserve
+    # that source semantic token so the shared formatter uses its own capture
+    # date and records ``available_now`` provenance.  Future dates remain
+    # byte-for-byte exact.
+    return "Available Now" if value <= capture_date else value
+
+
+def _floorplans_objects_from_next_html(html: str) -> list[dict[str, Any]]:
+    """Decode unique ``floorPlans`` objects from current Next.js HTML."""
+    if not html or '"floorPlans"' not in html and r'\"floorPlans\"' not in html:
+        return []
+    decoder = json.JSONDecoder()
+    objects: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for match in _NEXT_RSC_PUSH_RE.finditer(html):
+        try:
+            payload = json.loads(match.group(1))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, str):
+            continue
+        cursor = 0
+        while True:
+            marker = payload.find('"floorPlans":', cursor)
+            if marker < 0:
+                break
+            value_start = marker + len('"floorPlans":')
+            try:
+                candidate, _ = decoder.raw_decode(payload, value_start)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                cursor = marker + 1
+                continue
+            cursor = marker + 1
+            if not isinstance(candidate, dict) or not isinstance(candidate.get("styles"), list):
+                continue
+            fingerprint = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+            if fingerprint not in seen:
+                seen.add(fingerprint)
+                objects.append(candidate)
+    return objects
+
+
+def parse_aspensquare_next_surface(
+    html: str,
+    source_url: str,
+    *,
+    capture_date: date | str | None = None,
+) -> AspenSquareSurface | None:
+    """Parse Aspen's current catalogue and capped availability window.
+
+    ``price`` is retained only for plans with a published apartment roster.
+    Empty plans render "Call For Pricing" even though the RSC payload can
+    carry an internal revenue-management number, so emitting that hidden
+    number would contradict the public page.
+    """
+    objects = _floorplans_objects_from_next_html(html)
+    if not objects:
+        return None
+    # A community should expose one object.  If a future page repeats it, use
+    # the richest exact catalogue rather than unioning possible sibling data.
+    floorplans = max(objects, key=lambda item: len(item.get("styles") or []))
+    capture_iso = _capture_date_iso(capture_date)
+    plans: list[dict[str, Any]] = []
+    units: list[dict[str, Any]] = []
+
+    for raw_plan in floorplans.get("styles") or []:
+        if not isinstance(raw_plan, dict):
+            continue
+        plan_name = str(raw_plan.get("name") or "").strip()
+        if not plan_name:
+            continue
+        asset_id = str(raw_plan.get("assetId") or "").strip()
+        floor_plan_id = str(
+            raw_plan.get("xRefFloorPlanID") or raw_plan.get("floorPlanID") or ""
+        ).strip()
+        bedrooms = _positive_int(raw_plan.get("bedrooms"))
+        # Studio is a legitimate zero; preserve it separately from missing.
+        if raw_plan.get("bedrooms") == 0:
+            bedrooms = 0
+        bathrooms = raw_plan.get("bathrooms")
+        sqft = _positive_int(raw_plan.get("squareFeet"))
+        available_units = [
+            unit for unit in (raw_plan.get("availableUnits") or []) if isinstance(unit, dict)
+        ]
+        explicit_empty = bool(raw_plan.get("showAvailability") is True and not available_units)
+        plan_price = (
+            _positive_int(raw_plan.get("price"))
+            if available_units and raw_plan.get("showFloorPlanPricing") is not False
+            else None
+        )
+        plan_source_ids: dict[str, str] = {}
+        if asset_id:
+            plan_source_ids["aspensquare_asset_id"] = asset_id
+        if floor_plan_id:
+            plan_source_ids["aspensquare_floor_plan_id"] = floor_plan_id
+
+        plan_row = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(bedrooms, plan_name),
+            bedrooms=str(bedrooms) if bedrooms is not None else "",
+            bathrooms=str(bathrooms) if bathrooms is not None else "",
+            sqft=str(sqft) if sqft is not None else "",
+            rent_low=plan_price,
+            rent_high=plan_price,
+            availability_status="UNAVAILABLE" if explicit_empty else "AVAILABLE",
+            available_units=str(len(available_units)),
+            source_api_url=source_url,
+            extraction_tier="TIER_1_DOM_ASPENSQUARE_NEXT",
+            source_ids=plan_source_ids,
+        )
+
+        plan_meta: dict[str, Any] = {
+            "name": plan_name,
+            "bedrooms": bedrooms,
+            "bathrooms": str(bathrooms) if bathrooms is not None else "",
+            "sqft": sqft,
+            "asset_id": asset_id,
+            "floor_plan_id": floor_plan_id,
+            "explicit_empty": explicit_empty,
+            "internal_names": [],
+            "row": plan_row,
+        }
+
+        for raw_unit in available_units:
+            address = raw_unit.get("address")
+            address = address if isinstance(address, dict) else {}
+            nested_plan = raw_unit.get("floorPlan")
+            nested_plan = nested_plan if isinstance(nested_plan, dict) else {}
+            unit_number = str(address.get("unitNumber") or "").strip()
+            building = str(address.get("buildingNumber") or "").strip()
+            internal_name = str(nested_plan.get("floorPlanName") or "").strip()
+            nested_plan_id = str(nested_plan.get("floorPlanID") or floor_plan_id).strip()
+            unit_id = str(raw_unit.get("xRefUnitId") or address.get("unitID") or "").strip()
+            unit_asset_id = str(raw_unit.get("assetId") or asset_id).strip()
+            if internal_name and internal_name not in plan_meta["internal_names"]:
+                plan_meta["internal_names"].append(internal_name)
+            source_ids: dict[str, str] = {}
+            if unit_asset_id:
+                source_ids["aspensquare_asset_id"] = unit_asset_id
+            if unit_id:
+                source_ids["aspensquare_unit_id"] = unit_id
+            if nested_plan_id:
+                source_ids["aspensquare_floor_plan_id"] = nested_plan_id
+            units.append(
+                {
+                    "unit_number": unit_number,
+                    "building": building,
+                    "floor_plan_name": str(raw_unit.get("floorPlanName") or plan_name).strip(),
+                    "internal_plan_name": internal_name,
+                    "bedrooms": bedrooms,
+                    "bathrooms": str(bathrooms) if bathrooms is not None else "",
+                    "sqft": sqft,
+                    "availability_date": _current_availability_token(
+                        raw_unit.get("availability"), capture_iso
+                    ),
+                    "source_ids": source_ids,
+                    "floor_plan_id": nested_plan_id,
+                }
+            )
+        plans.append(plan_meta)
+
+    return AspenSquareSurface(plans=plans, units=units, source_url=source_url) if plans else None
+
+
+def _normalized_identity(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+
+def _dimension_key(row: dict[str, Any]) -> tuple[str, str, str]:
+    def norm_number(value: Any) -> str:
+        try:
+            number = float(str(value).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return ""
+        return str(int(number)) if number.is_integer() else str(number)
+
+    return (
+        norm_number(row.get("bedrooms")),
+        norm_number(row.get("bathrooms")),
+        norm_number(row.get("sqft")),
+    )
+
+
+def reconcile_aspensquare_knock_units(
+    knock_units: list[dict[str, Any]],
+    surface: AspenSquareSurface,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Bind stable Knock apartments to Aspen's exact public catalogue."""
+    direct_by_triplet: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    direct_by_pair: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    direct_by_number: dict[str, list[dict[str, Any]]] = {}
+    plan_by_name = {
+        _normalized_identity(plan.get("name")): plan for plan in surface.plans
+    }
+    for direct in surface.units:
+        number = _normalized_identity(direct.get("unit_number"))
+        building = _normalized_identity(direct.get("building"))
+        internal_plan = _normalized_identity(direct.get("internal_plan_name"))
+        direct_by_triplet.setdefault((building, number, internal_plan), []).append(direct)
+        direct_by_pair.setdefault((building, number), []).append(direct)
+        direct_by_number.setdefault(number, []).append(direct)
+
+    internal_plan_index: dict[str, list[dict[str, Any]]] = {}
+    dimension_plan_index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for plan in surface.plans:
+        for internal_name in plan.get("internal_names") or []:
+            internal_plan_index.setdefault(_normalized_identity(internal_name), []).append(plan)
+        dimension_plan_index.setdefault(_dimension_key(plan), []).append(plan)
+
+    def exact_one(values: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+        return values[0] if values and len(values) == 1 else None
+
+    admitted: list[dict[str, Any]] = []
+    conflicts: list[str] = []
+    for source_row in knock_units:
+        row = dict(source_row)
+        number = _normalized_identity(row.get("unit_name") or row.get("unit_number"))
+        building = _normalized_identity(row.get("building"))
+        internal_plan = _normalized_identity(row.get("floor_plan_name"))
+        direct = exact_one(direct_by_triplet.get((building, number, internal_plan)))
+        # Some vendors omit either building or internal plan.  Relax only when
+        # the remaining public key is still one-to-one; never let repeated
+        # labels such as Waters Edge's five distinct ``11 / 103`` apartments
+        # inherit one displayed source row across sibling layouts.
+        if direct is None and not internal_plan:
+            direct = exact_one(direct_by_pair.get((building, number)))
+        if direct is None and not building:
+            direct = exact_one(direct_by_number.get(number))
+
+        plan: dict[str, Any] | None = None
+        if direct is not None:
+            plan = plan_by_name.get(_normalized_identity(direct.get("floor_plan_name")))
+        if plan is None:
+            plan = exact_one(
+                internal_plan_index.get(_normalized_identity(row.get("floor_plan_name")))
+            )
+        if plan is None:
+            plan = exact_one(dimension_plan_index.get(_dimension_key(row)))
+        if plan is None:
+            knock_name = _normalized_identity(row.get("floor_plan_name"))
+            contained = [
+                candidate
+                for candidate in surface.plans
+                if _normalized_identity(candidate.get("name"))
+                and _normalized_identity(candidate.get("name")) in knock_name
+            ]
+            plan = exact_one(contained)
+
+        native_id = str((row.get("source_ids") or {}).get("knock_unit_id") or "")
+        if plan is None:
+            conflicts.append(f"unmapped_plan:{native_id or number}")
+            continue
+        if plan.get("explicit_empty"):
+            conflicts.append(
+                f"marketing_empty_withheld:{plan.get('name')}:{native_id or number}"
+            )
+            continue
+
+        row["floor_plan_name"] = str(plan.get("name") or row.get("floor_plan_name") or "")
+        source_ids = dict(row.get("source_ids") or {})
+        if plan.get("asset_id"):
+            source_ids["aspensquare_asset_id"] = str(plan["asset_id"])
+        if plan.get("floor_plan_id"):
+            source_ids["aspensquare_floor_plan_id"] = str(plan["floor_plan_id"])
+
+        if direct is not None:
+            row["unit_name"] = str(direct.get("unit_number") or row.get("unit_name") or "")
+            row["building"] = str(direct.get("building") or row.get("building") or "")
+            direct_source_ids = direct.get("source_ids")
+            if isinstance(direct_source_ids, dict):
+                source_ids.update(
+                    {str(key): str(value) for key, value in direct_source_ids.items() if value}
+                )
+            visible_date = str(direct.get("availability_date") or "")
+            if visible_date:
+                row["availability_date"] = visible_date
+                row["available_date"] = visible_date
+            row["availability_status"] = "AVAILABLE"
+        else:
+            existing_flag = str(row.get("data_quality_flag") or "").strip()
+            fallback_flag = "ASPENSQUARE_KNOCK_FALLBACK_NOT_IN_PUBLIC_WINDOW"
+            row["data_quality_flag"] = (
+                f"{existing_flag}|{fallback_flag}" if existing_flag else fallback_flag
+            )
+
+        row["source_ids"] = source_ids
+        row["extraction_tier"] = "TIER_1_API_ASPENSQUARE_KNOCK_RECONCILED"
+        admitted.append(row)
+    return admitted, conflicts
+
+
+def _surface_plan_rows(surface: AspenSquareSurface) -> list[dict[str, Any]]:
+    return [dict(plan["row"]) for plan in surface.plans if isinstance(plan.get("row"), dict)]
 
 
 def _parse_specs(specs: str) -> tuple[int | None, str, str]:
@@ -237,6 +581,24 @@ class AspenSquareAdapter:
         Adley 72nd / The Avenue / Edgewood Court / Country Manor.
         """
         result = AdapterResult(tier_used="TIER_1_DOM_ASPENSQUARE")
+
+        # The current site no longer renders the legacy card/table selectors;
+        # its complete catalogue is embedded in the L1 Next.js response.  Give
+        # that exact, property-scoped surface first priority and reconcile it
+        # with Knock before considering the legacy DOM path.
+        fetch_result = getattr(ctx, "fetch_result", None)
+        fetch_body = getattr(fetch_result, "body", None) if fetch_result is not None else None
+        if isinstance(fetch_body, bytes):
+            modern_html = fetch_body.decode("utf-8", errors="replace")
+        elif isinstance(fetch_body, str):
+            modern_html = fetch_body
+        else:
+            modern_html = ""
+        if parse_aspensquare_next_surface(modern_html, str(ctx.base_url or "")) is not None:
+            modern = await self._try_knock_community_fallback(ctx, result)
+            if modern is not None and (modern.units or modern.plan_summaries):
+                return modern
+
         evaluate = getattr(page, "evaluate", None)
         if not callable(evaluate):
             # L1-only fallback: try the Knock community-hash recovery.
@@ -254,6 +616,14 @@ class AspenSquareAdapter:
             cards = None
 
         if not isinstance(cards, list) or not cards:
+            # A rendered page can still carry only the modern Next.js shape.
+            # If the first attempt was skipped (for example a minimal L1 body),
+            # let Knock recovery run before declaring the adapter empty.
+            knock_result = await self._try_knock_community_fallback(ctx, result)
+            if knock_result is not None and (
+                knock_result.units or knock_result.plan_summaries
+            ):
+                return knock_result
             result.confidence = 0.0
             result.errors.append("aspensquare: no .aspen-c-full-width-card blocks found")
             return result
@@ -312,6 +682,17 @@ class AspenSquareAdapter:
         base_url = str(getattr(ctx, "base_url", "") or "")
         if not html or not base_url:
             return None
+        surface = parse_aspensquare_next_surface(html, base_url)
+
+        def surface_only() -> AdapterResult | None:
+            if surface is None:
+                return None
+            result.plan_summaries = _surface_plan_rows(surface)
+            result.tier_used = "TIER_1_DOM_ASPENSQUARE_NEXT"
+            result.winning_url = base_url
+            result.confidence = min(0.90, 0.72 + 0.03 * len(result.plan_summaries))
+            return result
+
         try:
             from ma_poc.pms.adapters.knock import (
                 _current_knock_responses,
@@ -325,7 +706,7 @@ class AspenSquareAdapter:
         # config blob — otherwise the API calls would burn time on a
         # property that isn't really Knock-backed.
         if not find_knock_community_hash(html):
-            return None
+            return surface_only()
         try:
             pid, units = await _fetch_knock_units_by_domain(base_url, html)
         except Exception as exc:
@@ -334,19 +715,46 @@ class AspenSquareAdapter:
                 f"{str(exc)[:120]}"
             )
             return None
-        if not pid or not units:
-            return None
+        if not pid:
+            return surface_only()
         if _validate_and_record_knock_identity(ctx, result) is None:
-            return None
+            return surface_only()
         result.api_responses.extend(_current_knock_responses())
         from ma_poc.extraction.post_process import post_process
 
-        pp = post_process(units, property_id=getattr(ctx, "property_id", None))
+        reconciled = units
+        conflicts: list[str] = []
+        if surface is not None:
+            reconciled, conflicts = reconcile_aspensquare_knock_units(units, surface)
+            if conflicts:
+                withheld = sum(item.startswith("marketing_empty_withheld:") for item in conflicts)
+                unmapped = sum(item.startswith("unmapped_plan:") for item in conflicts)
+                result.errors.append(
+                    "ASPENSQUARE_MARKETING_RECONCILIATION: "
+                    f"withheld_empty={withheld} unmapped={unmapped}"
+                )
+
+        pp = post_process(reconciled, property_id=getattr(ctx, "property_id", None))
+        plan_summaries = _surface_plan_rows(surface) if surface is not None else []
+        for plan in pp.plan_summaries:
+            if isinstance(plan, dict) and plan not in plan_summaries:
+                plan_summaries.append(plan)
+        result.plan_summaries = plan_summaries
         if pp.n_admitted == 0:
+            if result.plan_summaries:
+                result.tier_used = "TIER_1_API_ASPENSQUARE_KNOCK_RECONCILED"
+                result.winning_url = base_url
+                result.confidence = min(
+                    0.90, 0.72 + 0.03 * len(result.plan_summaries)
+                )
+                return result
             return None
         result.units = pp.admitted
-        result.plan_summaries = pp.plan_summaries
-        result.tier_used = "TIER_1_API_ASPENSQUARE_KNOCK"
+        result.tier_used = (
+            "TIER_1_API_ASPENSQUARE_KNOCK_RECONCILED"
+            if surface is not None
+            else "TIER_1_API_ASPENSQUARE_KNOCK"
+        )
         result.winning_url = (
             f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
         )

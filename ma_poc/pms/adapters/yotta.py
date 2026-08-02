@@ -171,11 +171,19 @@ def _positive_finite_number(value: object) -> float | None:
 
 
 def _availability_date(item: dict[str, Any]) -> str:
+    # ``dateAvailable`` is the provider's public semantic label.  A literal
+    # ``Today`` must survive to the shared formatter so it can be normalized
+    # against the run capture date and classified as ``available_now``.  The
+    # adjacent MoveInDateAvailable value is generated as an ISO midnight and
+    # loses that meaning if it wins this precedence chain.
+    public_label = str(item.get("dateAvailable") or "").strip()
+    if public_label.casefold() == "today":
+        return public_label
     raw = str(
         item.get("MoveInDateAvailable")
         or item.get("unitAvailableDate")
         or item.get("availableDate")
-        or item.get("dateAvailable")
+        or public_label
         or ""
     ).strip()
     iso_match = re.match(r"^(\d{4}-\d{2}-\d{2})", raw)
@@ -203,9 +211,14 @@ def parse_yotta_units(
         if not native_id or not unit_number or rent is None or native_id in seen_ids:
             continue
         seen_ids.add(native_id)
-        plan_name = str(
-            item.get("dbaUnitType") or item.get("dbaUnitTypeCode") or ""
-        ).strip()
+        plan_description = str(item.get("dbaUnitType") or "").strip()
+        plan_code = str(item.get("dbaUnitTypeCode") or "").strip()
+        plan_id = str(item.get("dbaUnitTypeId") or "").strip()
+        # The public code is the actual distinguishing layout label (A1, A2,
+        # 11MA, ...).  The prose description is useful display provenance but
+        # is shared by otherwise distinct plans, so it cannot be the primary
+        # plan name or identity anchor.
+        plan_name = plan_code or plan_description
         bedrooms = str(item.get("bedRooms") or "").strip()
         try:
             bedrooms_number = int(float(bedrooms))
@@ -215,6 +228,15 @@ def parse_yotta_units(
         sqft_raw = _positive_finite_number(item.get("squareFeet"))
         sqft = str(int(sqft_raw)) if sqft_raw is not None else ""
         rounded_rent = int(round(rent))
+        source_ids = {
+            "yotta_dba_id": dba_id,
+            "yotta_unit_id": native_id,
+        }
+        if plan_id:
+            source_ids["yotta_floor_plan_id"] = plan_id
+        if plan_code:
+            source_ids["yotta_floor_plan_code"] = plan_code
+
         unit = make_unit_dict(
             floor_plan_name=plan_name,
             bed_label=bed_label_from(bedrooms_number, plan_name),
@@ -231,9 +253,23 @@ def parse_yotta_units(
             availability_date=_availability_date(item),
             source_api_url=source_url,
             extraction_tier=_TIER,
-            source_ids={"yotta_unit_id": native_id},
+            source_ids=source_ids,
         )
         unit["source_property_id"] = dba_id
+        if plan_description:
+            unit["floor_plan_description"] = plan_description
+        if plan_id:
+            # Trusted adapter-only contract consumed by both V2 formatters.
+            # The provider id is property-scoped by the exact DBA gate above,
+            # so qualify it before hashing; do not use rent/sqft/unit number.
+            from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+
+            unit["_canonical_floor_plan_id"] = compute_floor_plan_id(
+                dba_id,
+                f"yotta:{plan_id}",
+                None,
+                None,
+            )
         units.append(unit)
     return units
 
@@ -353,4 +389,34 @@ class YottaAdapter:
         result.winning_url = units_url
         result.tier_used = _TIER
         result.confidence = min(0.94, 0.78 + 0.02 * processed.n_admitted)
+        from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+        source_rows = payload.get("hotSheetUnitsModel")
+        source_count = len(source_rows) if isinstance(source_rows, list) else 0
+        result.unit_source_provenance.append(
+            build_unit_source_provenance(
+                provider="yotta",
+                source_url=units_url,
+                body=payload,
+                unit_count=processed.n_admitted,
+                identity={
+                    "status": "MATCH",
+                    "evidence": [
+                        "exact_dba_id",
+                        "provider_name",
+                        "street",
+                        "city_state_zip",
+                    ],
+                    "configured_property_id": str(ctx.property_id or ""),
+                    "configured_property_name": str(ctx.property_name or ""),
+                    "yotta_dba_id": dba_id,
+                    "provider_property_name": str(details.get("dbaName") or ""),
+                    "source_count": source_count,
+                    "parsed_count": len(raw_units),
+                    "admitted_count": processed.n_admitted,
+                },
+                response_kind="available_unit_roster",
+                status=units_status,
+            )
+        )
         return result

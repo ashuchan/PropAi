@@ -209,6 +209,7 @@ async def recover_betternoi_public(
     )
     seen_pages: set[str] = set()
     raw_rows: list[tuple[dict[str, Any], str]] = []
+    page_payloads: list[tuple[dict[str, Any], str, int]] = []
     for _ in range(_MAX_PAGES):
         if next_url in seen_pages or not _same_api_page(next_url, client_id):
             return []
@@ -219,6 +220,7 @@ async def recover_betternoi_public(
         results = payload.get("results")
         if not isinstance(results, list):
             return []
+        page_payloads.append((payload, final_url, len(results)))
         raw_rows.extend((raw, final_url) for raw in results if isinstance(raw, dict))
         following = payload.get("next")
         if not following:
@@ -315,6 +317,42 @@ async def recover_betternoi_public(
 
     if not units or len(native_ids) != len(set(native_ids)) or len(unit_numbers) != len(set(unit_numbers)):
         return []
+    from collections import Counter
+
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        record_context_unit_source_provenance,
+    )
+
+    admitted_by_url = Counter(str(unit.get("source_api_url") or "") for unit in units)
+    for payload, source_url, source_count in page_payloads:
+        admitted_count = admitted_by_url.get(source_url, 0)
+        if admitted_count <= 0:
+            continue
+        record_context_unit_source_provenance(
+            ctx,
+            build_unit_source_provenance(
+                provider="betternoi",
+                source_url=source_url,
+                body=payload,
+                unit_count=admitted_count,
+                identity={
+                    "status": "MATCH",
+                    "evidence": [
+                        "configured_property_identity",
+                        "page_published_client_uuid",
+                        "page_published_floor_plan_uuids",
+                        "street_city_state_boundary",
+                    ],
+                    "configured_property_id": str(ctx.property_id or ""),
+                    "betternoi_client_uuid": client_id,
+                    "published_floor_plan_count": len(floorplans),
+                    "source_count": source_count,
+                    "admitted_count": admitted_count,
+                },
+                response_kind="available_unit_roster_page",
+            ),
+        )
     return units
 
 

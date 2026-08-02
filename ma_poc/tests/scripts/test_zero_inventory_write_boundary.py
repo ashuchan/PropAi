@@ -511,3 +511,60 @@ def test_floor_plan_wrapper_leaves_a_rent_bearing_card_alone(formatter) -> None:
     assert out["rent_low"] == 1775.0
     assert out["availability_status"] == "AVAILABLE"
     assert out["available_date"] == "2026-07-27"
+
+
+@pytest.mark.parametrize(
+    "formatter",
+    [_core_format_v2_floor_plan, jugnu._format_v2_floor_plan],
+    ids=["core.schema_v2", "runners.jugnu"],
+)
+def test_inquiry_only_priced_plan_does_not_get_a_fake_date(formatter) -> None:
+    """Cedar Ridge publishes rent plus Check Availability, not Available Now."""
+    out = formatter(
+        {
+            "floor_plan_name": "1 Bedroom/ 1 Bath",
+            "bedrooms": 1,
+            "bathrooms": 1,
+            "sqft": 598,
+            "market_rent_low": 1475,
+            "market_rent_high": 1475,
+            "availability_status": "UNKNOWN",
+        },
+        datetime(2026, 8, 2, 3, 0, 0),
+        "218586",
+    )
+    assert out["availability_status"] == "UNKNOWN"
+    assert out["available_date"] is None
+    assert out["availability_date_provenance"] == "missing"
+
+
+@pytest.mark.parametrize(
+    "formatter",
+    [_core_format_v2_floor_plan, jugnu._format_v2_floor_plan],
+    ids=["core.schema_v2", "runners.jugnu"],
+)
+@pytest.mark.parametrize(
+    ("status", "raw_date", "expected_date", "expected_provenance"),
+    [
+        ("AVAILABLE", "Available Now", "2026-08-02", "available_now"),
+        ("UNKNOWN", "2026-09-15", "2026-09-15", "explicit_future"),
+        ("UNAVAILABLE", None, None, "missing"),
+    ],
+)
+def test_plan_date_wrapper_preserves_only_source_supported_semantics(
+    formatter,
+    status,
+    raw_date,
+    expected_date,
+    expected_provenance,
+) -> None:
+    plan = {
+        "floor_plan_name": "A1",
+        "market_rent_low": 1500,
+        "availability_status": status,
+    }
+    if raw_date is not None:
+        plan["availability_date"] = raw_date
+    out = formatter(plan, datetime(2026, 8, 2, 3, 0, 0), "P1")
+    assert out["available_date"] == expected_date
+    assert out["availability_date_provenance"] == expected_provenance

@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 
+# Adapter-row marker for a bounded source whose entire public inventory surface
+# has been parsed and proven to publish plans only.  This is deliberately opt-in:
+# ordinary plan rows must not bypass the publish-ceiling rent-token guard merely
+# because an extractor found some floor-plan cards.
+VERIFIED_PLAN_ONLY_SURFACE_KEY = "_verified_plan_only_surface"
+
+
 @dataclass
 class AdapterContext:
     base_url: str

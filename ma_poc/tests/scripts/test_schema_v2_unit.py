@@ -413,11 +413,8 @@ def test_no_status_with_empty_date_stays_none() -> None:
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_rent_present_status_unavailable_defaults_to_scrape_date() -> None:
-    """Canary 1ef1060 signature case: Knock-style unit with rent +
-    sqft + plan + unit_number, but status=UNAVAILABLE and no parseable
-    date. Pre-fix → available_date=None. Post-fix → scrape date.
-    """
+def test_rent_present_status_unavailable_does_not_invent_scrape_date() -> None:
+    """A catalogue/full-roster rent cannot override explicit UNAVAILABLE."""
     unit = {
         "unit_id": "u-knock-001",
         "floor_plan_name": "A1",
@@ -430,15 +427,16 @@ def test_rent_present_status_unavailable_defaults_to_scrape_date() -> None:
         # No date field at all
     }
     out = _format_v2_unit(unit, _TS)
-    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+    assert out["available_date"] is None
     # Status is preserved as-is — we don't rewrite it, just fix the date.
     assert out["availability_status"] == "UNAVAILABLE"
-    # All 5 core fields populated → row is now "full"
+    # The source-backed fields remain populated; date completeness must not be
+    # achieved by contradicting the explicit status.
     assert out["unit_id"] == "u-knock-001"
     assert out["rent_low"] == 1495.0
     assert out["area"] == 750
     assert out["floor_plan_name"] == "A1"
-    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+    assert out["available_date"] is None
 
 
 def test_rent_present_status_null_defaults_to_scrape_date() -> None:
@@ -1143,7 +1141,8 @@ def test_resolve_plan_row_availability_table() -> None:
         (None, True, False, False, "UNAVAILABLE"),
         ("UNKNOWN", True, False, False, "UNAVAILABLE"),
         ("UNAVAILABLE", True, False, False, "UNAVAILABLE"),
-        ("WAITLIST", True, False, False, "UNAVAILABLE"),
+        # Preserve the operator's more specific explicit negative state.
+        ("WAITLIST", True, False, False, "WAITLIST"),
         # -- must NOT coerce: rent-bearing plan rows
         ("AVAILABLE", True, True, False, "AVAILABLE"),
         ("UNAVAILABLE", True, True, False, "UNAVAILABLE"),

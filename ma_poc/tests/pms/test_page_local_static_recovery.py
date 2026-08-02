@@ -170,11 +170,15 @@ def test_exact_identity_static_residence_table_emits_units_before_plan_text() ->
     assert recovered is not None
     result, adapter_name = recovered
     assert adapter_name == "static_residence_table"
-    assert result.plan_summaries == []
+    assert [plan["floor_plan_name"] for plan in result.plan_summaries] == [
+        "205-805"
+    ]
     assert [row["unit_number"] for row in result.units] == ["102", "101"]
     assert [row["market_rent_low"] for row in result.units] == [3000, 4500]
     assert all(row["floor_plan_name"] == "" for row in result.units)
     assert result.tier_used == "TIER_1_DOM_STATIC_RESIDENCE_TABLE"
+    assert len(result.unit_source_provenance) == 1
+    assert result.unit_source_provenance[0]["identity"]["status"] == "MATCH"
 
 
 def test_zero_rows_never_replace_previous_result() -> None:

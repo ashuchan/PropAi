@@ -85,9 +85,7 @@ _ONSITE_PROPERTY_ID_RE = re.compile(
     re.IGNORECASE,
 )
 
-_ONLINE_APP3_URL = (
-    "https://www.on-site.com/web/online_app3?property_id={pid}&unit_id=0"
-)
+_ONLINE_APP3_URL = "https://www.on-site.com/web/online_app3?property_id={pid}&unit_id=0"
 
 
 def extract_onsite_property_id(body: str) -> str | None:
@@ -146,6 +144,113 @@ def _extract_balanced_object(text: str, start_key: str) -> str:
     return ""  # unbalanced
 
 
+def _extract_balanced_array(text: str, start_key: str) -> str:
+    """Return the balanced ``[...]`` array that begins at ``start_key``.
+
+    On-Site's current floor-plan objects contain nested arrays and nested
+    pricing objects.  Counting brackets while respecting strings keeps those
+    objects intact instead of stopping at the first nested ``]``.
+    """
+    i = text.find(start_key)
+    if i < 0:
+        return ""
+    j = i + len(start_key) - 1
+    if j >= len(text) or text[j] != "[":
+        return ""
+    depth = 0
+    in_str = False
+    esc = False
+    for k in range(j, len(text)):
+        c = text[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return text[j : k + 1]
+    return ""
+
+
+def _iter_top_level_objects(array: str) -> list[str]:
+    """Return the top-level object literals from a balanced JS array."""
+    objects: list[str] = []
+    depth = 0
+    start: int | None = None
+    in_str = False
+    esc = False
+    for i, c in enumerate(array):
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif c == "}":
+            if depth == 0:
+                continue
+            depth -= 1
+            if depth == 0 and start is not None:
+                objects.append(array[start : i + 1])
+                start = None
+    return objects
+
+
+def _top_level_only(obj: str) -> str:
+    """Mask nested JS objects/arrays while retaining top-level scalar fields."""
+    out: list[str] = []
+    brace_depth = 0
+    array_depth = 0
+    in_str = False
+    esc = False
+    keep_string = False
+    for c in obj:
+        if in_str:
+            out.append(c if keep_string else " ")
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            keep_string = brace_depth == 1 and array_depth == 0
+            in_str = True
+            out.append(c if keep_string else " ")
+        elif c == "{":
+            brace_depth += 1
+            out.append(c if brace_depth == 1 and array_depth == 0 else " ")
+        elif c == "}":
+            out.append(c if brace_depth == 1 and array_depth == 0 else " ")
+            brace_depth = max(0, brace_depth - 1)
+        elif c == "[":
+            array_depth += 1
+            out.append(" ")
+        elif c == "]":
+            out.append(" ")
+            array_depth = max(0, array_depth - 1)
+        else:
+            out.append(c if brace_depth == 1 and array_depth == 0 else " ")
+    return "".join(out)
+
+
 def _str_field(field: str, obj: str) -> str:
     m = re.search(r"\b" + field + r':"([^"]*)"', obj)
     return m.group(1) if m else ""
@@ -160,12 +265,110 @@ def _int_field(field: str, obj: str) -> int | None:
 # which floorplan-level objects never carry. Units contain only empty
 # ``amenities:[]`` arrays (no nested ``{}``), so a brace-free window is safe.
 _UNIT_OBJ_RE = re.compile(r"\{[^{}]*?apartment_num:\"[^\"]*\"[^{}]*?\}")
-# floorplan-level ``style_id -> plan name`` map (name precedes abbreviation).
-_PLAN_NAME_RE = re.compile(
-    r'name:"([^"]+)",abbreviation:"[^"]*"[^}]*?style_id:(\d+)'
-)
 _UNIT_LIST_RE = re.compile(r"\bunit_list:\[([^\]]*)\]")
 _JS_STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
+
+
+def _plan_names_by_style(island: str) -> dict[str, str]:
+    """Build an exact top-level ``style_id -> name`` map.
+
+    Current shells place nested ``starting_term.best_price`` objects between
+    ``name`` and ``style_id``.  Masking nested values prevents their braces or
+    similarly named child fields from changing the join.
+    """
+    floorplans = _extract_balanced_array(island, "floorplans:[")
+    result: dict[str, str] = {}
+    for obj in _iter_top_level_objects(floorplans):
+        top_level = _top_level_only(obj)
+        name = _str_field("name", top_level).strip()
+        style_id = _int_field("style_id", top_level)
+        if name and style_id is not None:
+            result.setdefault(str(style_id), name)
+    return result
+
+
+def _normalize_onsite_bathrooms(label: str) -> str:
+    """Convert a bounded On-Site label (including mixed halves) to a number.
+
+    The live source currently emits ``1 bath``, ``2 bath``, ``1 1/2 bath``,
+    and ``2 1/2 bath``.  A zero or non-half-step value is not promoted into a
+    dwelling fact; it remains missing for downstream quality reporting.
+    """
+    match = re.fullmatch(
+        r"\s*(\d+(?:\.\d+)?)\s*(?:(\d+)\s*/\s*(\d+))?\s+baths?\s*",
+        label,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return ""
+    value = float(match.group(1))
+    if match.group(2) and match.group(3):
+        denominator = int(match.group(3))
+        if denominator == 0:
+            return ""
+        value += int(match.group(2)) / denominator
+    if not 0 < value <= 10 or abs(value * 2 - round(value * 2)) > 1e-9:
+        return ""
+    return f"{value:g}"
+
+
+def _is_non_unit_application_option(
+    *,
+    apartment_number: str,
+    display_number: str,
+    plan_name: str,
+    bedrooms: int | None,
+    bathrooms_label: str,
+    sqft: int | None,
+) -> bool:
+    """Identify the proven On-Site roommate-application sentinel.
+
+    Seville at Mace Ranch currently whitelists an application choice named
+    ``Roommate Add O`` under plan ``Roommate Add On``.  It carries 0 beds,
+    ``0 bath``, no area, and is not a physical apartment.  Require every one
+    of those source signals so a real unit with an unusual label cannot be
+    removed by a broad text heuristic.
+    """
+
+    def _is_roommate_add_on(value: str) -> bool:
+        return bool(
+            re.fullmatch(
+                r"roommate\s+add(?:\s+on|\s+o)?",
+                value.strip(),
+                flags=re.IGNORECASE,
+            )
+        )
+
+    return (
+        _is_roommate_add_on(apartment_number)
+        and _is_roommate_add_on(display_number)
+        and _is_roommate_add_on(plan_name)
+        and bedrooms == 0
+        and bathrooms_label.strip().lower() == "0 bath"
+        and sqft is None
+    )
+
+
+def _onsite_property_metadata(body: str) -> dict[str, str]:
+    """Extract the authoritative property boundary from the application shell."""
+    marker = re.search(r"(?<![A-Za-z0-9_])property:\{", body)
+    if marker is None:
+        return {}
+    obj = _extract_balanced_object(body[marker.start() :], "property:{")
+    property_id = _int_field("property_id", obj)
+    if property_id is None:
+        return {}
+    street = _str_field("street_addr", obj).strip()
+    city = _str_field("city", obj).strip()
+    state = _str_field("state", obj).strip()
+    zip_code = _str_field("zip_code", obj).strip()
+    region = " ".join(part for part in (state, zip_code) if part)
+    address = ", ".join(part for part in (street, city, region) if part)
+    return {
+        "property_id": str(property_id),
+        "property_name": _str_field("property_name", obj).strip(),
+        "property_address": address,
+    }
 
 
 def _active_unit_identifiers(island: str) -> set[str] | None:
@@ -189,7 +392,10 @@ def _active_unit_identifiers(island: str) -> set[str] | None:
 
 
 def parse_onsite_online_app3(
-    body: str, source_url: str = ""
+    body: str,
+    source_url: str = "",
+    *,
+    expected_property_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Parse the On-Site ``online_app3`` props island into unit dicts.
 
@@ -205,9 +411,12 @@ def parse_onsite_online_app3(
     if not island:
         return []
 
-    plan_name: dict[str, str] = {}
-    for m in _PLAN_NAME_RE.finditer(island):
-        plan_name.setdefault(m.group(2), m.group(1))
+    property_metadata = _onsite_property_metadata(body)
+    returned_property_id = property_metadata.get("property_id", "")
+    if expected_property_id is not None and returned_property_id != str(expected_property_id):
+        return []
+
+    plan_name = _plan_names_by_style(island)
     active_identifiers = _active_unit_identifiers(island)
 
     units: list[dict[str, Any]] = []
@@ -222,45 +431,79 @@ def parse_onsite_online_app3(
         # is the page's own active roster, so do not publish any object outside
         # it.  Compare both identifiers because some communities prefix the
         # display number with the building (e.g. ``725-301B`` vs ``301B``).
-        if active_identifiers is not None and not (
-            {apt, display_apt} & active_identifiers
-        ):
+        if active_identifiers is not None and not ({apt, display_apt} & active_identifiers):
             continue
         rent = _int_field("rent", obj)
         sqft = _int_field("sq_feet", obj)
         beds = _int_field("num_bedrooms", obj)
-        baths = _str_field("bathrooms", obj)
+        baths_raw = _str_field("bathrooms", obj)
+        baths = _normalize_onsite_bathrooms(baths_raw)
         style_id = _int_field("style_id", obj)
         sid = str(style_id) if style_id is not None else ""
         plan = plan_name.get(sid, "")
         onsite_id = _int_field("id", obj)
+        unit_property_id = _int_field("property_id", obj)
         date_avail = _str_field("date_available", obj)
         street = _str_field("street_address", obj)
+
+        if _is_non_unit_application_option(
+            apartment_number=apt,
+            display_number=display_apt,
+            plan_name=plan,
+            bedrooms=beds,
+            bathrooms_label=baths_raw,
+            sqft=sqft,
+        ):
+            continue
 
         source_ids: dict[str, Any] = {}
         if onsite_id is not None:
             source_ids["onsite_unit_id"] = onsite_id
         if sid:
             source_ids["onsite_style_id"] = sid
+        if returned_property_id:
+            source_ids["onsite_property_id"] = returned_property_id
+        if unit_property_id is not None:
+            source_ids["onsite_unit_property_id"] = str(unit_property_id)
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=plan,
-                bed_label=bed_label_from(beds, plan),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=baths,
-                sqft=str(sqft) if sqft is not None else "",
-                unit_number=apt,
-                rent_low=rent,
-                rent_high=rent,
-                availability_status="AVAILABLE",
-                availability_date=date_avail,
-                source_api_url=source_url,
-                extraction_tier="TIER_1_API_ONSITE_APPLY",
-                source_ids=source_ids or None,
-                building=street,
-            )
+        unit = make_unit_dict(
+            floor_plan_name=plan,
+            bed_label=bed_label_from(beds, plan),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=baths,
+            sqft=str(sqft) if sqft is not None else "",
+            unit_number=apt,
+            unit_name=display_apt or apt,
+            rent_low=rent,
+            rent_high=rent,
+            availability_status="AVAILABLE",
+            availability_date=date_avail,
+            source_api_url=source_url,
+            extraction_tier="TIER_1_API_ONSITE_APPLY",
+            source_ids=source_ids or None,
+            building=street,
         )
+        if onsite_id is not None:
+            unit["unit_id"] = str(onsite_id)
+        if street:
+            unit["address"] = street
+        if baths_raw:
+            unit["source_bathrooms_label"] = baths_raw
+        if plan:
+            unit["_floor_plan_name_provenance"] = "onsite.floorplans[].name"
+        if returned_property_id:
+            unit["source_property_id"] = returned_property_id
+        if property_metadata.get("property_name"):
+            unit["source_property_name"] = property_metadata["property_name"]
+        if property_metadata.get("property_address"):
+            unit["source_property_address"] = property_metadata["property_address"]
+        if returned_property_id:
+            unit["source_property_provenance"] = "onsite_online_app3_property_object"
+            unit["source_request_payload"] = {
+                "property_id": str(expected_property_id or returned_property_id),
+                "unit_id": "0",
+            }
+        units.append(unit)
     return units
 
 
@@ -277,6 +520,7 @@ class OnSiteApplyAdapter:
       ``TIER_1_API_ONSITE_APPLY_EMPTY``     — island parsed but 0 admitted
       ``TIER_1_API_ONSITE_APPLY_NO_ID``     — no on-site.com portal link found
       ``TIER_1_API_ONSITE_APPLY_NO_DATA``   — fetched but island absent/empty
+      ``TIER_1_API_ONSITE_APPLY_PROPERTY_MISMATCH`` — shell boundary rejected
     """
 
     pms_name: str = "onsite_apply"
@@ -313,18 +557,29 @@ class OnSiteApplyAdapter:
         except Exception as exc:  # noqa: BLE001
             result.tier_used = "TIER_1_API_ONSITE_APPLY_NO_DATA"
             result.confidence = 0.0
+            result.errors.append(f"onsite-online_app3-probe-error: {type(exc).__name__}: {str(exc)[:90]}")
+            return result
+
+        property_metadata = _onsite_property_metadata(shell)
+        returned_property_id = property_metadata.get("property_id", "")
+        if returned_property_id != pid:
+            result.tier_used = "TIER_1_API_ONSITE_APPLY_PROPERTY_MISMATCH"
+            result.confidence = 0.0
             result.errors.append(
-                f"onsite-online_app3-probe-error: {type(exc).__name__}: {str(exc)[:90]}"
+                "On-Site property boundary mismatch: "
+                f"requested={pid}, returned={returned_property_id or '<missing>'}"
             )
             return result
 
-        units = parse_onsite_online_app3(shell, source_url=url)
+        units = parse_onsite_online_app3(
+            shell,
+            source_url=url,
+            expected_property_id=pid,
+        )
         if not units:
             result.tier_used = "TIER_1_API_ONSITE_APPLY_NO_DATA"
             result.confidence = 0.0
-            result.errors.append(
-                f"online_app3 shell for property_id={pid} carried no available units"
-            )
+            result.errors.append(f"online_app3 shell for property_id={pid} carried no available units")
             return result
 
         # Stage 1 validity gate (same as every API-class adapter).
@@ -342,14 +597,17 @@ class OnSiteApplyAdapter:
                     "status": 200,
                     "body": "<onsite-online_app3>",
                     "via": "onsite_apply_probe",
+                    "requested_property_id": pid,
+                    "returned_property_id": returned_property_id,
+                    "returned_property_name": property_metadata.get("property_name", ""),
+                    "returned_property_address": property_metadata.get("property_address", ""),
                 }
             )
         else:
             result.tier_used = "TIER_1_API_ONSITE_APPLY_EMPTY"
             result.confidence = 0.0
             result.errors.append(
-                f"ONSITE_APPLY_VALIDITY_REJECTED: {len(units)} parsed rows "
-                f"failed unit_validity"
+                f"ONSITE_APPLY_VALIDITY_REJECTED: {len(units)} parsed rows failed unit_validity"
             )
         return result
 

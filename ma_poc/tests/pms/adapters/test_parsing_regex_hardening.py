@@ -221,6 +221,17 @@ class TestDerivePlanNameFromUrl:
             == "The Elm"
         )
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://x/Marketing/FloorPlans/Units/95d137e7-6c24-4843-9dd8-0bd645b15195",
+            "https://x/floorplan/6f852f38-fad8-41dc-a594-dda77320fc32",
+            "https://x/?floorplan=6f852f38-fad8-41dc-a594-dda77320fc32",
+        ],
+    )
+    def test_route_mechanics_and_uuid_are_not_plan_names(self, url: str) -> None:
+        assert derive_plan_name_from_url(url) == ""
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # regr #17 — unit_number sqft-leak guard

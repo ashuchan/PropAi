@@ -686,7 +686,7 @@ async def recover_nesthub_public(ctx: AdapterContext) -> list[dict[str, Any]]:
         )
         return []
 
-    accepted: list[tuple[dict[str, Any], dict[str, Any], str]] = []
+    accepted: list[tuple[dict[str, Any], dict[str, Any], str, str]] = []
     for row in candidates:
         detail_response = await _fetch_direct_html(
             str(row["detail_url"]),
@@ -706,10 +706,10 @@ async def recover_nesthub_public(ctx: AdapterContext) -> list[dict[str, Any]]:
                     parsed_rows[index] = (existing, existing_reasons + reasons)
                     break
             continue
-        accepted.append((row, detail, detail_final_url))
+        accepted.append((row, detail, detail_final_url, detail_html))
 
-    accepted_ids = [str(row["provider_listing_id"]) for row, _, _ in accepted]
-    accepted_units = [str(row["unit_number"]).casefold() for row, _, _ in accepted]
+    accepted_ids = [str(row["provider_listing_id"]) for row, _, _, _ in accepted]
+    accepted_units = [str(row["unit_number"]).casefold() for row, _, _, _ in accepted]
     if (
         not accepted
         or len(accepted_ids) != len(set(accepted_ids))
@@ -719,7 +719,7 @@ async def recover_nesthub_public(ctx: AdapterContext) -> list[dict[str, Any]]:
         return []
 
     units: list[dict[str, Any]] = []
-    for row, detail, detail_final_url in accepted:
+    for row, detail, detail_final_url, _detail_html in accepted:
         floor_plan_name = str(detail["floor_plan_names"][0])
         rent = int(detail["rent"])
         unit = make_unit_dict(
@@ -781,6 +781,38 @@ async def recover_nesthub_public(ctx: AdapterContext) -> list[dict[str, Any]]:
         rejected_rows=rejected,
         failure_reason="",
     )
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        record_context_unit_source_provenance,
+    )
+
+    for row, _detail, detail_final_url, detail_html in accepted:
+        record_context_unit_source_provenance(
+            ctx,
+            build_unit_source_provenance(
+                provider="nesthub",
+                source_url=detail_final_url,
+                body=detail_html,
+                unit_count=1,
+                identity={
+                    "status": "MATCH",
+                    "evidence": [
+                        "configured_native_detail",
+                        "same_host_community",
+                        "published_property_filter",
+                        "exact_address_candidate",
+                        "detail_revalidation",
+                    ],
+                    "configured_property_id": str(ctx.property_id or ""),
+                    "configured_listing_id": str(configured["listing_id"]),
+                    "admitted_listing_id": str(row["provider_listing_id"]),
+                    "portfolio_count": len(rows),
+                    "candidate_count": len(candidates),
+                    "admitted_count": 1,
+                },
+                response_kind="unit_detail",
+            ),
+        )
     return units
 
 

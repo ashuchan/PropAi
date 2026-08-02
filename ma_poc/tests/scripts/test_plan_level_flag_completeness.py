@@ -178,6 +178,46 @@ def test_provenance_plan_level_counter_agrees_with_the_shipped_column() -> None:
     assert prov["data_quality"]["plan_level_units"] == shipped == 2
 
 
+def test_provenance_counts_the_floor_plan_output_channel() -> None:
+    from ma_poc.scripts.runners.jugnu import _provenance_block
+
+    result = {
+        "units": [],
+        "plan_summaries": [
+            {"floor_plan_name": "A1"},
+            {"floor_plan_name": "B2"},
+        ],
+    }
+    prov = _provenance_block(result, {}, None, "SUCCESS_PLAN_LEVEL")
+    assert prov["unit_count"] == 0
+    assert prov["data_quality"]["plan_level_units"] == 2
+    assert prov["data_quality"]["plan_summary_count"] == 2
+
+
+def test_publish_ceiling_reads_final_plan_summaries_and_complete_surface_proof() -> None:
+    from ma_poc.pms.adapters.base import VERIFIED_PLAN_ONLY_SURFACE_KEY
+    from ma_poc.scripts.runners.jugnu import _publish_ceiling_plan_inputs
+
+    plans = [
+        {
+            "floor_plan_name": "A1",
+            VERIFIED_PLAN_ONLY_SURFACE_KEY: "rentaladdress.floor_plan_list",
+        },
+        {
+            "floor_plan_name": "B2",
+            VERIFIED_PLAN_ONLY_SURFACE_KEY: "rentaladdress.floor_plan_list",
+        },
+    ]
+    got, verified = _publish_ceiling_plan_inputs({"plan_summaries": plans})
+    assert got == plans
+    assert verified is True
+
+    _, mixed_verified = _publish_ceiling_plan_inputs(
+        {"plan_summaries": [plans[0], {"floor_plan_name": "generic"}]}
+    )
+    assert mixed_verified is False
+
+
 # ── 2026-07-29 zero-inventory availability contract, at the PRODUCTION boundary
 # Same reason the flag itself is tested here rather than in the library copy:
 # jugnu.py carries its own fork of the unit formatter and it is the one that

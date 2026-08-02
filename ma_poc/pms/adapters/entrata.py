@@ -1702,6 +1702,43 @@ def _pp_extract_card_fpid(card: Any) -> str:
     return ""
 
 
+def _pp_extract_card_building(card: Any, text: str) -> str:
+    """Return the public building/address discriminator for a PP unit card.
+
+    Older ProspectPortal cards spell the field as ``Building 15`` in their
+    flattened text.  The current card template does not render a text label;
+    it renders the building as the fourth ``.unit-specs .spec-item`` and marks
+    that item with a ``lucide-building`` SVG.  Reading only flattened text
+    therefore discarded the one stable public field that distinguishes units
+    such as building 48 unit 207 from building 60 unit 207.
+
+    The positional fallback is deliberately gated by the provider's semantic
+    building icon.  A generic fourth token (lease term, floor, fee, etc.) is
+    not accepted as a building merely because it occupies that position.
+    """
+    labelled = re.search(r"\bbuilding\s+([A-Za-z0-9-]+)", text, re.IGNORECASE)
+    if labelled:
+        return labelled.group(1).strip()
+
+    spec_items = card.select(".unit-specs .spec-item")
+    if len(spec_items) < 4:
+        return ""
+    item = spec_items[3]
+    has_building_icon = any(
+        "building" in str(css_class).casefold()
+        for node in item.find_all(True)
+        for css_class in (node.get("class") or [])
+    )
+    if not has_building_icon:
+        return ""
+    return re.sub(
+        r"^building\s*",
+        "",
+        item.get_text(" ", strip=True),
+        flags=re.IGNORECASE,
+    ).strip()
+
+
 _PP_OPT_ROW_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE)
 _PP_OPT_ROW_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE)
 # Aria emits ``data-date="06/06/2026"`` (MM/DD/YYYY) on the See-Details
@@ -2117,12 +2154,11 @@ def parse_entrata_pp_unit_cards(html: str, url: str, floor_plan_name: str = "") 
         # No availability token/date leaves the field blank; status stays
         # AVAILABLE so the downstream gate does not reject a real unit row.
 
-        # Building / floor — best-effort, useful for downstream merge
-        # but not required for validity.
-        building = ""
-        bld_m = re.search(r"\bbuilding\s+([A-Za-z0-9-]+)", text, re.IGNORECASE)
-        if bld_m:
-            building = bld_m.group(1)
+        # Building / address discriminator — the current PP template renders
+        # this as an icon-labelled fourth spec with no visible "Building"
+        # word.  Retaining it lets the property-level output pass qualify
+        # colliding apartment numbers instead of dropping a physical unit.
+        building = _pp_extract_card_building(card, text)
 
         source_ids: dict[str, Any] = {}
         if uid:

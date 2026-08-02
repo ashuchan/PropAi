@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _SENSITIVE_QUERY_PARTS = ("auth", "key", "password", "secret", "signature", "token")
+_CONTEXT_PROVENANCE_ATTR = "_bare_recovery_unit_source_provenance"
 
 
 def sanitise_source_url(url: str) -> str:
@@ -67,3 +69,50 @@ def build_unit_source_provenance(
         "unit_count": int(unit_count or 0),
         "identity": identity_dict,
     }
+
+
+def record_context_unit_source_provenance(ctx: Any, record: dict[str, Any]) -> None:
+    """Attach one deduplicated response record to a bare-list recovery context.
+
+    Several narrowly scoped recovery helpers predate :class:`AdapterResult`
+    and return only a row list. This context bridge lets them preserve the
+    exact winning response without changing their public return type or ever
+    retaining a response body.
+    """
+
+    if not isinstance(record, dict):
+        return
+    try:
+        existing = getattr(ctx, _CONTEXT_PROVENANCE_ATTR, None)
+        records = list(existing) if isinstance(existing, list) else []
+        key = (
+            str(record.get("source_url") or ""),
+            str(record.get("response_sha256") or ""),
+            str(record.get("response_kind") or ""),
+        )
+        if not any(
+            (
+                str(item.get("source_url") or ""),
+                str(item.get("response_sha256") or ""),
+                str(item.get("response_kind") or ""),
+            )
+            == key
+            for item in records
+            if isinstance(item, dict)
+        ):
+            records.append(deepcopy(record))
+        setattr(ctx, _CONTEXT_PROVENANCE_ATTR, records)
+    except Exception:
+        return
+
+
+def context_unit_source_provenance(ctx: Any) -> list[dict[str, Any]]:
+    """Return safe copies of response records attached by bare recoveries."""
+
+    try:
+        records = getattr(ctx, _CONTEXT_PROVENANCE_ATTR, None)
+        if not isinstance(records, list):
+            return []
+        return [deepcopy(item) for item in records if isinstance(item, dict)]
+    except Exception:
+        return []

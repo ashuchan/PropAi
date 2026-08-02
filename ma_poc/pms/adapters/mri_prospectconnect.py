@@ -82,6 +82,7 @@ _ADDRESS_STOPWORDS = frozenset(
         "w",
     }
 )
+_PHASE_ROMAN_SUFFIXES = frozenset({"i", "ii", "iii", "iv", "v"})
 
 
 @dataclass(frozen=True)
@@ -164,9 +165,19 @@ def mri_property_identity_matches(
     city_tokens = _tokens(ctx.city)
     state_tokens = _tokens(ctx.state)
     zip_tokens = _tokens(ctx.zip_code)
+    name_matches = bool(expected_name and all(token in heading_tokens for token in expected_name))
+    if (
+        not name_matches
+        and len(expected_name) >= 2
+        and expected_name[-1] in _PHASE_ROMAN_SUFFIXES
+    ):
+        # Bridgepoint I is configured with a phase suffix while the marketing
+        # page, Knock metadata, and exact MRI heading all publish Bridgepoint.
+        # This is safe only inside the existing provider-code + full-address +
+        # city/state/ZIP gate below; do not make the general name match fuzzy.
+        name_matches = all(token in heading_tokens for token in expected_name[:-1])
     return bool(
-        expected_name
-        and all(token in heading_tokens for token in expected_name)
+        name_matches
         and street_number
         and street_number in page_tokens
         and street_words
@@ -189,6 +200,24 @@ def _number(value: object) -> float | None:
     except ValueError:
         return None
     return number if number > 0 else None
+
+
+def _number_range(value: object) -> tuple[float | None, float | None]:
+    """Parse a labeled MRI rent range without collapsing its upper bound."""
+    numbers: list[float] = []
+    for raw in _MONEY_RE.findall(str(value or "")):
+        try:
+            number = float(raw.replace(",", ""))
+        except ValueError:
+            continue
+        if number > 0:
+            numbers.append(number)
+    if not numbers:
+        return None, None
+    low, high = numbers[0], numbers[-1]
+    if high < low:
+        return None, None
+    return low, high
 
 
 def _cell_text(row: Tag, label: str) -> str:
@@ -221,9 +250,11 @@ def parse_mri_search_units(
         if not unit_number or native_key in seen:
             continue
         rent_node = row.find(attrs={"data-rent-range": True})
-        rent = _number(rent_node.get("data-rent-range") if isinstance(rent_node, Tag) else "")
+        rent_low, rent_high = _number_range(
+            rent_node.get("data-rent-range") if isinstance(rent_node, Tag) else ""
+        )
         sqft = _number(_cell_text(row, "Sqft"))
-        if rent is None or sqft is None:
+        if rent_low is None or rent_high is None or sqft is None:
             continue
         title_node = card.select_one(".pc-card-title")
         subtitle_node = card.select_one(".pc-card-subtitle")
@@ -237,7 +268,8 @@ def parse_mri_search_units(
         bedrooms_number = int(float(bed_match.group(1))) if bed_match else None
         bedrooms = str(bedrooms_number) if bedrooms_number is not None else ""
         bathrooms = bath_match.group(1) if bath_match else ""
-        rounded_rent = int(round(rent))
+        rounded_rent_low = int(round(rent_low))
+        rounded_rent_high = int(round(rent_high))
         native_unit_id = f"{building}:{unit_number}" if building else unit_number
         unit = make_unit_dict(
             floor_plan_name=plan_name,
@@ -247,8 +279,8 @@ def parse_mri_search_units(
             sqft=str(int(sqft)),
             unit_number=unit_number,
             building=building,
-            rent_low=rounded_rent,
-            rent_high=rounded_rent,
+            rent_low=rounded_rent_low,
+            rent_high=rounded_rent_high,
             availability_status="AVAILABLE",
             available_units="1",
             availability_date=str(
@@ -263,6 +295,7 @@ def parse_mri_search_units(
         unit["provider_native_unit_id"] = native_unit_id
         unit["available_end_date"] = str(button.get("data-available-end-date") or "").strip()
         unit["unit_address"] = str(button.get("data-unit-address") or "").strip()
+        unit["rent_range_source_field"] = "data-rent-range"
         seen.add(native_key)
         units.append(unit)
     return units

@@ -184,6 +184,56 @@ def _plan_name_key(raw: Any) -> str:
     return " ".join(name.split()).casefold()
 
 
+def _is_degenerate_internal_floor_plan(fp: dict[str, Any]) -> bool:
+    """Return True only for a provable SightMap internal placeholder.
+
+    Current first-party evidence is provider record 442397 at 250 High:
+    ``name=TEMP``, zero beds, zero baths, no joined apartment, and no area,
+    price or availability payload.  ``TEMP`` alone is not enough to reject a
+    row; every semantic absence must agree so a legitimately operator-named
+    plan cannot be lost.
+    """
+    if _plan_name_key(fp.get("name") or "") != "temp":
+        return False
+
+    def _is_explicit_zero(value: Any) -> bool:
+        if value in (None, "") or isinstance(value, bool):
+            return False
+        try:
+            return float(str(value).replace(",", "").strip()) == 0
+        except (TypeError, ValueError):
+            return False
+
+    if not (
+        _is_explicit_zero(fp.get("bedroom_count"))
+        and _is_explicit_zero(fp.get("bathroom_count"))
+    ):
+        return False
+
+    semantic_fields = (
+        "area",
+        "sqft",
+        "square_feet",
+        "min_area",
+        "max_area",
+        "min_square_feet",
+        "max_square_feet",
+        "price",
+        "rent",
+        "min_rent",
+        "max_rent",
+        "available_on",
+        "available_date",
+        "availability_date",
+    )
+    for key in semantic_fields:
+        value = fp.get(key)
+        if value in (None, "", 0, 0.0, "0", "0.0"):
+            continue
+        return False
+    return True
+
+
 def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
@@ -329,6 +379,11 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
 
     for fp_id, fp in fp_by_id.items():
         if fp_id in seen_fp_ids:
+            continue
+        # A unitless provider record named TEMP with explicit 0/0 dimensions
+        # and no area/rent/date is an internal staging artifact, not a
+        # client-facing plan.  The helper deliberately rejects nothing else.
+        if _is_degenerate_internal_floor_plan(fp):
             continue
         plan_key = _plan_name_key(fp.get("name") or fp.get("filter_label") or "")
         # Contradiction guard: this plan already shipped a real, priced,

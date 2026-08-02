@@ -67,7 +67,11 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
 )
-from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.base import (
+    VERIFIED_PLAN_ONLY_SURFACE_KEY,
+    AdapterContext,
+    AdapterResult,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -145,22 +149,26 @@ def parse_rentaladdress_floorplans(html: str, source_url: str) -> list[dict[str,
         rent_lo = money_to_int(rent_matches[0]) if rent_matches else None
         rent_hi = money_to_int(rent_matches[-1]) if rent_matches else None
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=plan_name,
-                bed_label=bed_label_from(beds, plan_name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths),
-                sqft=sqft,
-                unit_number="",  # plan-level — operator publishes CTA, not per-unit
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                rent_low=rent_lo,
-                rent_high=rent_hi,
-                availability_status="UNKNOWN",  # CTA-only; no per-unit available info
-                source_api_url=source_url,
-                extraction_tier=_TIER,
-            )
+        row = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(beds, plan_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths),
+            sqft=sqft,
+            unit_number="",  # plan-level — operator publishes CTA, not per-unit
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            rent_low=rent_lo,
+            rent_high=rent_hi,
+            availability_status="UNKNOWN",  # CTA-only; no per-unit available info
+            source_api_url=source_url,
+            extraction_tier=_TIER,
         )
+        # The complete current RentalAddress cohort exposes one bounded
+        # ``.floor_plan_list`` catalogue and no apartment-detail route.  Mark
+        # the exact parsed cards so publish-ceiling may distinguish their rent
+        # tokens from an unverified zero-unit extraction miss.
+        row[VERIFIED_PLAN_ONLY_SURFACE_KEY] = "rentaladdress.floor_plan_list"
+        units.append(row)
     return units
 
 

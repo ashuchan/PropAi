@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlunparse
+
+from bs4 import BeautifulSoup, Tag
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -84,6 +88,11 @@ _BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*Bath", re.IGNORECASE)
 _SQFT_RE = re.compile(r"(\d[\d,]*)\s*sqft", re.IGNORECASE)
 _MONEY_RE = re.compile(r"\$([\d,]+)")
 _AVAIL_COUNT_RE = re.compile(r"(\d+)\s+Units?\s+Available", re.IGNORECASE)
+_ONLY_LEFT_RE = re.compile(r"Only\s+(\d+)\s+Left", re.IGNORECASE)
+_GUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 # 2026-05-25 (user-flagged via Village Square Wheaton — pid 16196): the
 # per-plan unit-detail URL pattern. Each .floorplan-tile's primary anchor
@@ -126,6 +135,75 @@ _UNIT_LIST_DIVIDER_RE = re.compile(
 )
 _UNIT_LI_RE = re.compile(r'<li[^>]*>([\s\S]*?)</li>', re.IGNORECASE)
 _TAG_STRIP_RE = re.compile(r'<[^>]+>')
+
+
+@dataclass(frozen=True)
+class RS365PlanTarget:
+    """One exact plan tile and its same-property detail route."""
+
+    url: str
+    plan_id: str
+    name: str
+    beds: str
+    baths: str
+    sqft: str
+    rent_low: int | None
+    rent_high: int | None
+    availability_status: str
+    available_units: str
+
+
+def _node_text(node: Tag | None) -> str:
+    return " ".join(node.get_text(" ", strip=True).split()) if node else ""
+
+
+def _int_money(value: Any) -> int | None:
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        parsed = int(float(str(value).replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _normal_plan_name(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+
+def _parse_source_date(value: Any) -> str:
+    """Parse one visible RS365 date without timezone conversion."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"\s+", " ", text)
+    for fmt in (
+        "%m/%d/%Y %I:%M:%S %p",
+        "%m/%d/%Y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+    ):
+        try:
+            return datetime.strptime(text, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
+
+
+def _labeled_value(block: Tag, label: str) -> str:
+    """Read a value from ``<li><label>Label:</label> value`` markup."""
+    wanted = label.casefold().rstrip(":")
+    for item in block.find_all("li"):
+        label_node = item.find("label")
+        if not isinstance(label_node, Tag):
+            continue
+        label_text = _node_text(label_node).casefold().rstrip(":")
+        if label_text != wanted:
+            continue
+        full = _node_text(item)
+        prefix = _node_text(label_node)
+        return full[len(prefix) :].strip(" :") if full.startswith(prefix) else full
+    return ""
 
 
 def _html_from_ctx(ctx: AdapterContext) -> str:
@@ -245,6 +323,130 @@ def parse_residentservices365_tiles(
     return units
 
 
+def parse_rs365_plan_targets(
+    floorplans_html: str, base_url: str
+) -> list[RS365PlanTarget]:
+    """Parse the authoritative plan catalogue and detail-route association."""
+    if not floorplans_html or "floorplan-tile" not in floorplans_html:
+        return []
+    try:
+        soup = BeautifulSoup(floorplans_html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(floorplans_html, "html.parser")
+
+    targets: list[RS365PlanTarget] = []
+    seen: set[str] = set()
+    for tile in soup.select(".floorplan-tile"):
+        if not isinstance(tile, Tag):
+            continue
+        anchors: list[tuple[str, str]] = []
+        for candidate in tile.find_all("a", href=True):
+            href = str(candidate.get("href") or "")
+            if re.search(
+                r"/(?:Marketing/FloorPlans/Units|floorplan)/[0-9a-f-]{36}/?$",
+                href,
+                re.IGNORECASE,
+            ):
+                url = urljoin(base_url, href)
+                plan_id = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1].lower()
+                if _GUID_RE.fullmatch(plan_id) and plan_id not in seen:
+                    seen.add(plan_id)
+                    anchors.append((url, plan_id))
+        if not anchors:
+            continue
+
+        title = _node_text(tile.select_one(".title-row"))
+        specs = _node_text(tile.select_one(".list-divider"))
+        name = str(tile.get("data-name") or "").strip() or _plan_name(title, specs)
+
+        beds_raw = str(tile.get("data-beds") or tile.get("data-sort-bed") or "").strip()
+        if beds_raw.casefold() in {"s", "studio"}:
+            beds = "0"
+        elif re.fullmatch(r"\d+", beds_raw):
+            beds = beds_raw
+        elif re.search(r"\bStudio\b", specs, re.IGNORECASE):
+            beds = "0"
+        else:
+            bed_match = _BED_RE.search(specs)
+            beds = bed_match.group(1) if bed_match else ""
+
+        baths = str(tile.get("data-baths") or "").strip()
+        if not baths and (bath_match := _BATH_RE.search(specs)):
+            baths = bath_match.group(1)
+        sqft = str(tile.get("data-size") or "").strip()
+        if not sqft and (sqft_match := _SQFT_RE.search(specs)):
+            sqft = sqft_match.group(1).replace(",", "")
+
+        pricing = _node_text(tile.select_one(".pricing"))
+        rent_low = _int_money(tile.get("data-rent-min"))
+        rent_high = _int_money(tile.get("data-rent-max"))
+        if rent_low is None and (money := _MONEY_RE.findall(pricing)):
+            rent_low = money_to_int(money[0])
+            rent_high = money_to_int(money[-1])
+        if rent_high is None:
+            rent_high = rent_low
+
+        availability = _node_text(tile.select_one(".availability"))
+        count_match = _AVAIL_COUNT_RE.search(availability) or _ONLY_LEFT_RE.search(
+            availability
+        )
+        available_units = count_match.group(1) if count_match else ""
+        if re.search(r"waitlist", availability, re.IGNORECASE):
+            status = "UNAVAILABLE"
+        elif re.search(
+            r"\b(?:\d+\s+Units?\s+Available|Only\s+\d+\s+Left|Availability\s+Available)\b",
+            availability,
+            re.IGNORECASE,
+        ):
+            status = "AVAILABLE"
+        else:
+            status = "UNKNOWN"
+
+        for url, plan_id in anchors:
+            targets.append(
+                RS365PlanTarget(
+                    url=url,
+                    plan_id=plan_id,
+                    name=name,
+                    beds=beds,
+                    baths=baths,
+                    sqft=sqft,
+                    rent_low=rent_low,
+                    rent_high=rent_high,
+                    availability_status=status,
+                    available_units=available_units,
+                )
+            )
+    return targets
+
+
+def rs365_plan_rows(targets: list[RS365PlanTarget]) -> list[dict[str, Any]]:
+    """Convert exact plan tiles to the standard plan-row shape."""
+    return [
+        make_unit_dict(
+            floor_plan_name=target.name,
+            bed_label=bed_label_from(
+                int(target.beds) if target.beds.isdigit() else None,
+                target.name,
+            ),
+            bedrooms=target.beds,
+            bathrooms=target.baths,
+            sqft=target.sqft,
+            unit_number="",
+            rent_range=format_rent_range(target.rent_low, target.rent_high),
+            rent_low=target.rent_low,
+            rent_high=target.rent_high,
+            availability_status=target.availability_status,
+            available_units=target.available_units,
+            source_api_url=target.url,
+            extraction_tier="TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL",
+            source_ids={"rs365_floorplan_guid": target.plan_id},
+        )
+        for target in targets
+        if target.name
+    ]
+
+
 def find_unit_detail_urls(floorplans_html: str, base_url: str) -> list[str]:
     """Extract RS365 per-plan detail URLs from the plan-grid HTML.
 
@@ -257,32 +459,79 @@ def find_unit_detail_urls(floorplans_html: str, base_url: str) -> list[str]:
     that hasn't yet linked the FloorPlans grid — caller falls through to
     plan-level extraction).
     """
-    lower_html = (floorplans_html or "").lower()
-    if not lower_html or not any(
-        marker in lower_html
-        for marker in ("/marketing/floorplans/units/", "/floorplan/")
-    ):
+    if not floorplans_html:
         return []
     try:
-        p = urlparse(base_url)
+        soup = BeautifulSoup(floorplans_html, "lxml")
     except Exception:
-        return []
-    if not p.scheme or not p.netloc:
-        return []
-    out: list[str] = []
+        soup = BeautifulSoup(floorplans_html, "html.parser")
+    urls: list[str] = []
     seen: set[str] = set()
-    for m in _UNIT_DETAIL_HREF_RE.finditer(floorplans_html):
-        href = m.group(1)
-        if href in seen:
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "")
+        if not re.search(
+            r"/(?:Marketing/FloorPlans/Units|floorplan)/[0-9a-f-]{36}/?$",
+            href,
+            re.IGNORECASE,
+        ):
             continue
-        seen.add(href)
-        out.append(urlunparse((p.scheme, p.netloc, href, "", "", "")))
-    return out
+        url = urljoin(base_url, href)
+        plan_id = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+        if _GUID_RE.fullmatch(plan_id) and url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
+
+
+def _best_value_tuple(block: Tag) -> tuple[int, str, str] | None:
+    """Return Telfair's coherent best-value ``(rent, term, move-in)`` tuple."""
+    anchor = block.select_one("a.better-pricing[data-content]")
+    if not isinstance(anchor, Tag):
+        return None
+    title = str(anchor.get("title") or "")
+    if "best" not in title.casefold():
+        return None
+    content = str(anchor.get("data-content") or "")
+    if not content:
+        return None
+    try:
+        content_text = _node_text(BeautifulSoup(content, "html.parser"))
+    except Exception:
+        content_text = _TAG_STRIP_RE.sub(" ", content)
+    rent_match = re.search(
+        r"Per\s+Month:\s*\$([\d,]+(?:\.\d+)?)",
+        content_text,
+        re.IGNORECASE,
+    )
+    term_match = re.search(r"Lease\s+Term:\s*(\d+)", content_text, re.IGNORECASE)
+    date_match = re.search(
+        r"Move-In-Date:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
+        content_text,
+        re.IGNORECASE,
+    )
+    button = BeautifulSoup(content, "html.parser").find(attrs={"data-moveindate": True})
+    date_raw = str(button.get("data-moveindate") or "") if isinstance(button, Tag) else ""
+    term_raw = str(button.get("data-term") or "") if isinstance(button, Tag) else ""
+    rent = _int_money(rent_match.group(1)) if rent_match else None
+    term = term_match.group(1) if term_match else term_raw
+    move_in = _parse_source_date(date_raw or (date_match.group(1) if date_match else ""))
+    if rent is None or not term or not move_in:
+        return None
+    return rent, term, move_in
+
+
+def _visible_availability(block: Tag) -> str:
+    visible = _node_text(block.select_one("p.availability"))
+    if visible:
+        return visible
+    return _labeled_value(block, "Available")
 
 
 def parse_rs365_unit_blocks(
-    unit_detail_html: str, source_url: str
-) -> list[dict[str, str]]:
+    unit_detail_html: str,
+    source_url: str,
+    plan_target: RS365PlanTarget | None = None,
+) -> list[dict[str, Any]]:
     """Parse the per-unit-detail page HTML into unit dicts.
 
     Each ``<div class="unit-details">`` block carries:
@@ -303,128 +552,170 @@ def parse_rs365_unit_blocks(
     """
     if not unit_detail_html or "unit-details" not in unit_detail_html:
         return []
+    try:
+        soup = BeautifulSoup(unit_detail_html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(unit_detail_html, "html.parser")
 
-    out: list[dict[str, str]] = []
-    # Split on the unit-details boundary so each subsequent slice is one
-    # unit block (plus optional trailing markup we don't care about).
-    parts = re.split(
-        r'(?=<div[^>]*class="[^"]*\bunit-details\b[^"]*")',
-        unit_detail_html,
-    )
-    for part in parts:
-        if "unit-details" not in part[:200]:
+    out: list[dict[str, Any]] = []
+    for block in soup.select("div.unit-details"):
+        if not isinstance(block, Tag):
+            continue
+        unit_id = str(block.get("data-unit-id") or "").strip().lower()
+        unit_number = str(block.get("data-unit-code") or "").strip()
+        h3_text = _node_text(block.find("h3", class_="standard"))
+        if not unit_number:
+            match = re.match(r"(?:Apartment|Apt|Unit)\s+(\S+)", h3_text, re.IGNORECASE)
+            unit_number = match.group(1) if match else ""
+        if not unit_number:
             continue
 
-        # Truncate the part at the NEXT unit-details boundary or page end
-        # so attr extraction doesn't bleed across blocks.
-        unit_id_m = _UNIT_ID_ATTR_RE.search(part)
-        unit_code_m = _UNIT_CODE_ATTR_RE.search(part)
-        avail_m = _AVAIL_EPOCH_RE.search(part)
-        rent_lo_m = _UNIT_RENT_MIN_RE.search(part)
-        rent_hi_m = _UNIT_RENT_MAX_RE.search(part)
+        beds_s = baths_s = sqft_s = ""
+        divider = block.select_one("ul.list-divider")
+        if isinstance(divider, Tag):
+            for item in divider.find_all("li"):
+                text = _node_text(item)
+                if not beds_s and (match := _BED_RE.search(text)):
+                    beds_s = match.group(1)
+                if not baths_s and (match := _BATH_RE.search(text)):
+                    baths_s = match.group(1)
+                if not sqft_s and (
+                    match := re.search(r"(\d[\d,]*)\s*(?:sq|square)", text, re.IGNORECASE)
+                ):
+                    sqft_s = match.group(1).replace(",", "")
 
-        # h3 fallback: extracts "Apartment 022009-202" → "022009-202" when
-        # data-unit-code attr is missing on the wrapper. Pin-tight regex.
-        #
-        # 2026-05-25 (Village Square 3rd-plan probe): when the
-        # /Marketing/FloorPlans/Units/{guid} page has NO available units
-        # the Apollo CMS still renders a single .unit-details block as a
-        # "plan summary" placeholder (no data-unit-* attrs, h3 = plan
-        # name like "3 Bedrooms + 2 Baths"). REQUIRE either
-        # data-unit-code OR an h3 matching "Apartment/Apt/Unit X" — do
-        # NOT fall back to using the plan name as a synthetic
-        # unit_number (that creates a duplicate of the plan-level row).
-        unit_number = unit_code_m.group(1) if unit_code_m else None
-        if not unit_number:
-            h3 = _UNIT_H3_RE.search(part)
-            if h3:
-                t = h3.group(1).strip()
-                # "Apartment 022009-202" → "022009-202" (must have the
-                # "Apartment / Apt / Unit" prefix; plan-name h3s like
-                # "3 Bedrooms + 2 Baths" deliberately fall through to
-                # the skip-this-block branch below).
-                m2 = re.match(
-                    r"(?:Apartment|Apt|Unit)\s+(\S+)", t, re.IGNORECASE
+        visible_plan = _labeled_value(block, "Floor Plan")
+        if (
+            plan_target is not None
+            and plan_target.name
+            and visible_plan
+            and _normal_plan_name(visible_plan) != _normal_plan_name(plan_target.name)
+        ):
+            # The requested plan route and the response disagree.  Do not let a
+            # sibling/cached detail response cross the property-plan boundary.
+            continue
+        plan_name = visible_plan or (plan_target.name if plan_target else "")
+        floor = _labeled_value(block, "Floor")
+
+        best_value = _best_value_tuple(block)
+        lease_term = ""
+        selected_move_in_date = ""
+        if best_value is not None:
+            rent_low = rent_high = best_value[0]
+            lease_term = best_value[1]
+            selected_move_in_date = best_value[2]
+            availability_date = ""
+            pricing_selection = "best_value"
+        else:
+            price_span: Tag | None = None
+            # Apollo publishes the same typed price attributes in two proven
+            # shapes: on a nested lease-option span and directly on the
+            # ``div.unit-details`` roster card.  Searching descendants alone
+            # silently discarded rent from the latter even though the card's
+            # native unit ID, label and dimensions were accepted.
+            price_candidates: list[Tag] = []
+            if block.has_attr("data-rent-min"):
+                price_candidates.append(block)
+            price_candidates.extend(
+                candidate
+                for candidate in block.find_all(attrs={"data-rent-min": True})
+                if isinstance(candidate, Tag)
+            )
+            for candidate in price_candidates:
+                if not isinstance(candidate, Tag):
+                    continue
+                term = str(candidate.get("data-term") or "")
+                if term.casefold().startswith("range-"):
+                    continue
+                if _int_money(candidate.get("data-rent-min")) is not None:
+                    price_span = candidate
+                    break
+            rent_low = _int_money(price_span.get("data-rent-min")) if price_span else None
+            rent_high = _int_money(price_span.get("data-rent-max")) if price_span else None
+            if rent_high is None:
+                rent_high = rent_low
+            lease_term = str(price_span.get("data-term") or "").strip() if price_span else ""
+            availability_date = ""
+            pricing_selection = "visible_primary"
+
+        visible_availability = _visible_availability(block)
+        if re.search(r"\b(?:Today|Now)\b", visible_availability, re.IGNORECASE):
+            # Availability and lease-option move-in are distinct source facts.
+            # Keep the visible semantic token for capture-date/available_now
+            # provenance even when Best Value publishes a dated move-in choice.
+            availability_date = "Available Now"
+        else:
+            availability_date = _parse_source_date(
+                re.sub(
+                    r"\s*/\s*Available\b",
+                    "",
+                    visible_availability,
+                    flags=re.IGNORECASE,
                 )
-                if m2:
-                    unit_number = m2.group(1)
-        if not unit_number:
-            continue
+            )
 
-        # Beds / baths / sqft from .list-divider <li>s
-        beds_s = ""
-        baths_s = ""
-        sqft_s = ""
-        ld = _UNIT_LIST_DIVIDER_RE.search(part)
-        if ld:
-            for li_m in _UNIT_LI_RE.finditer(ld.group(1)):
-                txt = _TAG_STRIP_RE.sub("", li_m.group(1)).strip()
-                if not beds_s and (m_ := _BED_RE.search(txt)):
-                    beds_s = m_.group(1)
-                if not baths_s and (m_ := _BATH_RE.search(txt)):
-                    baths_s = m_.group(1)
-                if not sqft_s and (m_ := re.search(r"(\d[\d,]*)\s*(?:sq|square)", txt, re.IGNORECASE)):
-                    sqft_s = m_.group(1).replace(",", "")
+        if not availability_date and selected_move_in_date:
+            availability_date = selected_move_in_date
 
-        # Rent — prefer data-* attrs over rendered text
-        rent_lo: int | None = None
-        rent_hi: int | None = None
-        if rent_lo_m:
-            try:
-                rent_lo = int(float(rent_lo_m.group(1)))
-            except (ValueError, TypeError):
-                rent_lo = None
-        if rent_hi_m:
-            try:
-                rent_hi = int(float(rent_hi_m.group(1)))
-            except (ValueError, TypeError):
-                rent_hi = None
-
-        # Availability date — Unix epoch ms → ISO YYYY-MM-DD
-        availability_date = ""
-        if avail_m:
+        if not availability_date:
+            epoch_raw = str(block.get("data-availabledate") or "").strip()
             try:
                 from datetime import UTC
-                from datetime import datetime as _dt
-                ts_ms = int(avail_m.group(1))
-                # Bound: reject obviously bogus values (< 2010, > 2050)
-                if 1262304000000 < ts_ms < 2524608000000:
-                    availability_date = _dt.fromtimestamp(
-                        ts_ms / 1000, tz=UTC
+
+                epoch_ms = int(epoch_raw)
+                if 1262304000000 < epoch_ms < 2524608000000:
+                    availability_date = datetime.fromtimestamp(
+                        epoch_ms / 1000, tz=UTC
                     ).strftime("%Y-%m-%d")
-            except (ValueError, OverflowError, OSError):
+            except (TypeError, ValueError, OverflowError, OSError):
                 availability_date = ""
 
-        # Status: if we have data-availabledate AND it's not in the past
-        # (or even just present), call it AVAILABLE. The unit-details
-        # block is only rendered for available units on this platform.
-        status = "AVAILABLE"
-
-        source_ids = {}
-        if unit_id_m:
-            source_ids["rs365_unit_guid"] = unit_id_m.group(1)
-
-        out.append(
-            make_unit_dict(
-                floor_plan_name="",  # plan name is from the parent floorplan tile
-                bed_label=bed_label_from(
-                    int(beds_s) if beds_s.isdigit() else None,
-                    "",
-                ),
-                bedrooms=beds_s,
-                bathrooms=baths_s,
-                sqft=sqft_s,
-                unit_number=unit_number,
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                rent_low=rent_lo,
-                rent_high=rent_hi,
-                availability_status=status,
-                availability_date=availability_date,
-                source_api_url=source_url,
-                source_ids=source_ids,
-                extraction_tier="TIER_1_DOM_365RESIDENTSERVICES_UNIT_LEVEL",
-            )
+        apply_link = block.find(attrs={"data-apply": True})
+        building = (
+            str(apply_link.get("data-building") or "").strip()
+            if isinstance(apply_link, Tag)
+            else ""
         )
+        source_ids: dict[str, Any] = {}
+        if unit_id and _GUID_RE.fullmatch(unit_id):
+            source_ids["rs365_unit_guid"] = unit_id
+        if plan_target is not None:
+            source_ids["rs365_floorplan_guid"] = plan_target.plan_id
+
+        row = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(
+                int(beds_s) if beds_s.isdigit() else None,
+                plan_name,
+            ),
+            bedrooms=beds_s,
+            bathrooms=baths_s,
+            sqft=sqft_s,
+            unit_number=unit_number,
+            unit_name=h3_text,
+            floor=floor,
+            building=building,
+            rent_range=format_rent_range(rent_low, rent_high),
+            rent_low=rent_low,
+            rent_high=rent_high,
+            availability_status="AVAILABLE",
+            availability_date=availability_date,
+            lease_term=lease_term,
+            move_in_date=(
+                selected_move_in_date
+                or (
+                    availability_date
+                    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", availability_date)
+                    else ""
+                )
+            ),
+            source_api_url=source_url,
+            source_ids=source_ids,
+            extraction_tier="TIER_1_DOM_365RESIDENTSERVICES_UNIT_LEVEL",
+        )
+        row["_rs365_pricing_selection"] = pricing_selection
+        row["_rs365_visible_availability"] = visible_availability
+        out.append(row)
     return out
 
 
@@ -445,7 +736,7 @@ class Residentservices365Adapter:
                 tiles = await evaluate(_RS365_DOM_JS)
             except Exception as exc:
                 log.debug("365rs DOM evaluate failed err=%s", exc)
-        units = (
+        dom_plan_rows = (
             parse_residentservices365_tiles(
                 tiles,
                 self._winning_url(page, ctx),
@@ -474,7 +765,7 @@ class Residentservices365Adapter:
         # NULL rent / NULL unit_number / NULL date. Unit-level emit is 4
         # real units (021927, 022009-202, 022009-303, 021925) with $1,818
         # / $1,862 / $1,978 / etc. + actual move-in dates.
-        unit_level_drill: list[dict[str, str]] = []
+        unit_level_drill: list[dict[str, Any]] = []
         floorplans_url = self._winning_url(page, ctx)
         try:
             floorplans_html = await self._fetch_floorplans_html(
@@ -484,19 +775,53 @@ class Residentservices365Adapter:
             log.debug("365rs floorplans-self-fetch failed err=%s", exc)
             floorplans_html = ""
 
-        if floorplans_html and (_has_rs365_marker(floorplans_html) or units):
-            detail_urls = [
-                url
-                for url in find_unit_detail_urls(floorplans_html, floorplans_url)
-                if _same_property_host(url, floorplans_url)
-            ][:_MAX_DETAIL_PAGES]
+        plan_targets = (
+            parse_rs365_plan_targets(floorplans_html, floorplans_url)
+            if floorplans_html
+            else []
+        )
+        dedicated_plan_rows = rs365_plan_rows(plan_targets) or dom_plan_rows
+
+        if floorplans_html and (_has_rs365_marker(floorplans_html) or dedicated_plan_rows):
+            target_by_url = {
+                target.url: target
+                for target in plan_targets
+                if _same_property_host(target.url, floorplans_url)
+            }
+            detail_urls = list(target_by_url)[:_MAX_DETAIL_PAGES]
             detail_documents = await self._fetch_detail_documents(detail_urls)
             for detail_url, detail_html in detail_documents:
-                unit_level_drill.extend(
-                    row
-                    for row in parse_rs365_unit_blocks(detail_html, detail_url)
-                    if _has_strict_unit_identity_and_rent(row)
+                parsed_rows = parse_rs365_unit_blocks(
+                    detail_html,
+                    detail_url,
+                    target_by_url.get(detail_url),
                 )
+                accepted_rows = [
+                    row for row in parsed_rows if _has_strict_unit_identity_and_rent(row)
+                ]
+                unit_level_drill.extend(accepted_rows)
+                if accepted_rows:
+                    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+                    target = target_by_url.get(detail_url)
+                    result.unit_source_provenance.append(
+                        build_unit_source_provenance(
+                            provider="residentservices365",
+                            source_url=detail_url,
+                            body=detail_html,
+                            unit_count=len(accepted_rows),
+                            identity={
+                                "configured_property_id": str(
+                                    getattr(ctx, "property_id", "") or ""
+                                ),
+                                "configured_property_name": str(
+                                    getattr(ctx, "property_name", "") or ""
+                                ),
+                                "floorplan_id": target.plan_id if target else None,
+                                "floorplan_name": target.name if target else None,
+                            },
+                        )
+                    )
 
         # When the drill produced real unit-level rows, prefer them over
         # the plan-level summary. When the drill produced nothing (the
@@ -511,8 +836,12 @@ class Residentservices365Adapter:
                 property_id=getattr(ctx, "property_id", None),
             )
             if pp.n_admitted > 0:
-                result.units = pp.admitted
-                result.plan_summaries = pp.plan_summaries
+                plan_pp = post_process(
+                    dedicated_plan_rows,
+                    property_id=getattr(ctx, "property_id", None),
+                )
+                result.units = pp.units
+                result.plan_summaries = plan_pp.plan_summaries
                 result.winning_url = floorplans_url
                 result.tier_used = "TIER_1_DOM_365RESIDENTSERVICES_UNIT_LEVEL"
                 result.confidence = min(0.95, 0.75 + 0.02 * pp.n_admitted)
@@ -522,18 +851,22 @@ class Residentservices365Adapter:
                 f"{len(unit_level_drill)} rows failed unit_validity"
             )
 
-        if units:
+        if dedicated_plan_rows:
             from ma_poc.extraction.post_process import post_process
 
-            pp = post_process(units, property_id=getattr(ctx, "property_id", None))
+            pp = post_process(
+                dedicated_plan_rows,
+                property_id=getattr(ctx, "property_id", None),
+            )
             if pp.n_admitted > 0:
-                result.units = pp.admitted
+                result.units = pp.units
                 result.plan_summaries = pp.plan_summaries
                 result.winning_url = self._winning_url(page, ctx)
+                result.tier_used = "TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL"
                 result.confidence = min(0.9, 0.65 + 0.05 * pp.n_admitted)
                 return result
             result.errors.append(
-                f"RS365_VALIDITY_REJECTED: {len(units)} rows failed unit_validity"
+                f"RS365_VALIDITY_REJECTED: {len(dedicated_plan_rows)} rows failed unit_validity"
             )
 
         result.confidence = 0.0

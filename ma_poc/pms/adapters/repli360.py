@@ -579,6 +579,63 @@ def extract_unit_building(tr: Any) -> str:
     return ""
 
 
+def _repli_availability_text(tr: Any) -> str:
+    """Return the row's labeled availability value, if present."""
+    try:
+        for td in tr.find_all("td"):
+            label = td.select_one("span.mobile_rrac")
+            label_text = label.get_text(" ", strip=True) if label is not None else ""
+            if _LABEL_NORM_RE.sub("", label_text.casefold()) != "availability":
+                continue
+            text = td.get_text(" ", strip=True)
+            return text.replace(label_text, "", 1).strip() if label_text else text
+    except Exception:  # noqa: BLE001
+        return ""
+    return ""
+
+
+def _repli_native_unit_id(tr: Any) -> str:
+    """Read the provider-native row/application ID without guessing."""
+    for attr in ("data-apartmentid", "data-apartment-id", "data-unitid", "data-unit-id"):
+        value = str(tr.get(attr) or "").strip()
+        if value and value.isdigit():
+            return value
+    for class_name in tr.get("class") or []:
+        value = str(class_name).strip()
+        if value.isdigit():
+            return value
+    try:
+        from urllib.parse import parse_qsl, unquote, urlsplit
+
+        for anchor in tr.find_all("a", href=True):
+            href = unquote(str(anchor.get("href") or ""))
+            for key, value in parse_qsl(urlsplit(href).query, keep_blank_values=True):
+                if key.casefold() in {"unitid", "apartmentid"} and value.strip().isdigit():
+                    return value.strip()
+    except Exception:  # noqa: BLE001
+        return ""
+    return ""
+
+
+def _is_repli_waitlist_sentinel(tr: Any, unit: str, rent: int | None) -> bool:
+    """Recognize only the complete four-signal Repli WAIT placeholder."""
+    if not unit.strip().upper().startswith("WAIT") or rent is not None:
+        return False
+    row_text = tr.get_text(" ", strip=True).casefold()
+    if "call for pricing" not in row_text:
+        return False
+    availability = _repli_availability_text(tr).strip().casefold()
+    if availability not in {"-", "--", "n/a", "na", "not available"}:
+        return False
+    action = " ".join(str(a.get("href") or "") for a in tr.find_all("a")).casefold()
+    action = action.replace("%2f", "/")
+    return (
+        "javascript:void" in action
+        or "12/31/1969" in action
+        or "1969-12-31" in action
+    )
+
+
 def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
     """Parse the ``str`` HTML from getUnitListByFloor → unit-level dicts.
 
@@ -614,6 +671,17 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
                     rent = int(mm.group(0).replace(",", ""))
                 except (TypeError, ValueError):
                     rent = None
+        if _is_repli_waitlist_sentinel(tr, unit, rent):
+            plan_row = make_unit_dict(
+                availability_status="WAITLIST",
+                availability_date="",
+                source_api_url=source_url,
+                extraction_tier=f"{_TIER}_PLAN_LEVEL_WAITLIST",
+                data_quality_flag="PLAN_WAITLIST",
+            )
+            plan_row["is_floor_plan_level"] = True
+            out.append(plan_row)
+            continue
         # The row's own "Unit SQFT" cell (2026-07-28). '' when the
         # template has no such column — merge_repli360_plan_meta then
         # falls back to the plan card and stamps the area as derived.
@@ -627,9 +695,15 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
         # All rows returned by this endpoint are AVAILABLE; status should
         # be unconditional. The ISO availability_date (from data-available_date)
         # is the authoritative date signal regardless of the cell text.
-        out.append(
-            make_unit_dict(
+        native_unit_id = _repli_native_unit_id(tr)
+        source_ids = (
+            {"repli360_unit_id": native_unit_id}
+            if native_unit_id
+            else {}
+        )
+        row = make_unit_dict(
                 unit_number=unit,
+                unit_name=unit,
                 building=building,
                 sqft=sqft,
                 rent_low=rent,
@@ -638,8 +712,11 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
                 availability_date=avail_date,
                 source_api_url=source_url,
                 extraction_tier=_TIER,
+                source_ids=source_ids,
             )
-        )
+        if native_unit_id:
+            row["unit_id"] = native_unit_id
+        out.append(row)
     return out
 
 
@@ -806,8 +883,41 @@ class Repli360Adapter:
             # plan card next to the onclick — merge them in. Per-unit
             # values (if any) win; meta only fills gaps.
             merge_repli360_plan_meta(fp_units, plan_meta.get(fpid, {}))
+            for unit in fp_units:
+                source_ids = unit.setdefault("source_ids", {})
+                source_ids["repli360_floor_plan_id"] = str(fpid)
+                source_ids["repli360_site_id"] = str(site_id)
+
+            if fp_units:
+                from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+                result.unit_source_provenance.append(
+                    build_unit_source_provenance(
+                        provider="repli360",
+                        source_url=f"{_API}?site_id={site_id}&floorPlanID={fpid}",
+                        body=str(j.get("str") or ""),
+                        unit_count=sum(
+                            1 for unit in fp_units if not unit.get("is_floor_plan_level")
+                        ),
+                        identity={
+                            "status": "MATCH",
+                            "evidence": ["property_published_repli_script", "site_floorplan_binding"],
+                            "site_id": str(site_id),
+                            "floor_plan_id": str(fpid),
+                        },
+                    )
+                )
             for u in fp_units:
-                key = f"{u.get('unit_number')}|{u.get('building')}"
+                native_id = (u.get("source_ids") or {}).get("repli360_unit_id")
+                key = (
+                    f"native:{native_id}"
+                    if native_id
+                    else (
+                        f"plan:{fpid}:{u.get('availability_status')}"
+                        if u.get("is_floor_plan_level")
+                        else f"visible:{u.get('unit_number')}|{u.get('building')}"
+                    )
+                )
                 if key in seen_units:
                     continue
                 seen_units.add(key)

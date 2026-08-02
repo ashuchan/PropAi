@@ -494,6 +494,81 @@ def test_status_default_and_missing_are_distinguishable(
     assert missing["availability_date_provenance"] == "missing"
 
 
+@pytest.mark.parametrize(
+    "status",
+    ["UNAVAILABLE", "LEASED", "PENDING", "WAITLIST", "WAITLISTED"],
+)
+def test_negative_status_with_rent_never_receives_capture_date_default(
+    formatter: Formatter,
+    status: str,
+) -> None:
+    output = formatter(
+        {
+            "unit_id": f"negative-{status.lower()}",
+            "market_rent_low": 1750,
+            "availability_status": status,
+        },
+        CAPTURE_TS,
+        "negative-status-property",
+    )
+
+    assert output["available_date"] is None
+    assert output["availability_date_provenance"] == "missing"
+
+
+def test_negative_raw_token_blocks_available_status_and_rent_defaults(
+    formatter: Formatter,
+) -> None:
+    output = formatter(
+        {
+            "unit_id": "contradictory-negative-token",
+            "market_rent_low": 1750,
+            "availability_status": "AVAILABLE",
+            "availability_date": "Not Available",
+        },
+        CAPTURE_TS,
+        "negative-token-property",
+    )
+
+    assert output["available_date"] is None
+    assert output["availability_date_provenance"] == "negative_or_unpublished"
+
+
+def test_explicit_future_date_survives_even_with_negative_current_status(
+    formatter: Formatter,
+) -> None:
+    output = formatter(
+        {
+            "unit_id": "future-offer",
+            "market_rent_low": 1750,
+            "availability_status": "UNAVAILABLE",
+            "availability_date": "2026-09-12",
+        },
+        CAPTURE_TS,
+        "future-offer-property",
+    )
+
+    assert output["available_date"] == "2026-09-12"
+    assert output["availability_date_provenance"] == "explicit_future"
+
+
+def test_plan_waitlist_status_survives_without_rent_or_unit_anchor(
+    formatter: Formatter,
+) -> None:
+    output = formatter(
+        {
+            "floor_plan_name": "Waitlist Plan",
+            "is_floor_plan_level": True,
+            "availability_status": "WAITLIST",
+        },
+        CAPTURE_TS,
+        "waitlist-property",
+    )
+
+    assert output["availability_status"] == "WAITLIST"
+    assert output["available_date"] is None
+
+
 def test_timezone_timestamp_preserves_operator_calendar_date(
     formatter: Formatter,
 ) -> None:

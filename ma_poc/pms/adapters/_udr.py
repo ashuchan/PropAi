@@ -184,7 +184,7 @@ _UDR_VIEW_MODEL_MARKER = "window.udr.jsonObjPropertyViewModel = "
 
 
 def _udr_view_model_dates(html: str) -> dict[str, str]:
-    """Return ``marketing unit number -> explicit available date``.
+    """Return namespaced native-ID and unambiguous-label date keys.
 
     The object is a JavaScript assignment whose value is strict JSON.  Decode
     only the first JSON value after the marker so adjacent script statements
@@ -206,6 +206,8 @@ def _udr_view_model_dates(html: str) -> dict[str, str]:
         return {}
 
     out: dict[str, str] = {}
+    label_dates: dict[str, str] = {}
+    label_counts: dict[str, int] = {}
     for floor_plan in payload.get("floorPlans") or []:
         if not isinstance(floor_plan, dict):
             continue
@@ -215,8 +217,6 @@ def _udr_view_model_dates(html: str) -> dict[str, str]:
             unit_number = str(
                 unit.get("marketingName") or unit.get("lookUpName") or ""
             ).strip()
-            if not unit_number:
-                continue
             raw_date = str(unit.get("AvailableDateLabel") or "").strip()
             if not raw_date:
                 for rent_option in unit.get("rentsMatrix") or []:
@@ -225,8 +225,39 @@ def _udr_view_model_dates(html: str) -> dict[str, str]:
                     raw_date = str(rent_option.get("MoveInDate") or "").strip()
                     if raw_date:
                         break
-            if raw_date:
-                out[unit_number.upper()] = raw_date
+            if not raw_date:
+                continue
+
+            # The JSON-LD offer URL carries this same immutable apartment ID.
+            # UDR's marketing label can repeat across buildings (for example
+            # 7-105 and 19-105 both appear as ``105`` in the view model), so
+            # native identity is the authoritative join.
+            for native_key in (
+                "apartmentId",
+                "realpageunitid",
+                "realPageUnitId",
+                "unitId",
+            ):
+                native_value = unit.get(native_key)
+                if isinstance(native_value, bool) or native_value in (None, ""):
+                    continue
+                if isinstance(native_value, float) and native_value.is_integer():
+                    native_text = str(int(native_value))
+                else:
+                    native_text = str(native_value).strip()
+                if native_text:
+                    out[f"id:{native_text}"] = raw_date
+
+            if unit_number:
+                label_key = unit_number.upper()
+                label_counts[label_key] = label_counts.get(label_key, 0) + 1
+                label_dates[label_key] = raw_date
+
+    # A display-label fallback is retained for older UDR shapes that do not
+    # expose a native ID, but only when exactly one view-model row owns it.
+    for label_key, raw_date in label_dates.items():
+        if label_counts.get(label_key) == 1:
+            out[f"label:{label_key}"] = raw_date
     return out
 
 
@@ -507,8 +538,19 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
                     # JSON-LD does not carry the move-in date, but UDR's
                     # adjacent first-party view model does, keyed by the same
                     # displayed marketing unit number.
-                    availability_date=view_model_dates.get(
-                        unit_number.upper(), ""
+                    availability_date=(
+                        view_model_dates.get(f"id:{internal_unitid}", "")
+                        if internal_unitid
+                        else ""
+                    )
+                    or view_model_dates.get(
+                        "label:"
+                        + (
+                            name_parts[1]
+                            if name_parts
+                            else unit_number
+                        ).upper(),
+                        "",
                     ),
                     source_ids=(
                         {"udr_unitid": internal_unitid} if internal_unitid else {}

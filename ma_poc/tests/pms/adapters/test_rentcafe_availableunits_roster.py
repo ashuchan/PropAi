@@ -207,7 +207,7 @@ async def test_inline_roster_wins_without_any_network_probe(
     assert result.winning_url == ctx.base_url
 
 
-# ── The adapter tries the URL, and prefers it over the drill fan-out ─────────
+# ── The adapter unions the shortcut with exact plan drills ──────────────────
 
 
 class _FakePage:
@@ -240,30 +240,97 @@ class _Resp:
 
 
 @pytest.mark.asyncio
-async def test_availableunits_short_circuits_the_drill_fanout(monkeypatch: pytest.MonkeyPatch) -> None:
-    """One request, whole roster, and NO per-plan drills afterwards.
-
-    Guards the cost property as well as the data property: if this regressed
-    into "fetch the roster AND still fan out", it would multiply request volume
-    across 341 properties without adding a single unit.
-    """
+async def test_availableunits_remains_a_fallback_when_no_drills_exist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The shortcut remains useful when the exact plan surface is absent."""
     seen: list[str] = []
 
     def fake_probe_get(url: str, **_kw: object) -> _Resp:
         seen.append(url)
         if url.endswith("/availableunits"):
             return _Resp(200, AVAILABLEUNITS_HTML)
-        raise AssertionError(f"drill fan-out should not have run; fetched {url}")
+        if url.endswith("/floorplans"):
+            return _Resp(404, "")
+        raise AssertionError(f"unexpected route: {url}")
 
     monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
 
     adapter = RentCafeLayoutTabAdapter()
     result = await adapter.extract(_FakePage(), _ctx())  # type: ignore[arg-type]
 
-    assert seen == ["https://www.oaksofnorthgatesanantonio.com/availableunits"]
+    assert seen == [
+        "https://www.oaksofnorthgatesanantonio.com/availableunits",
+        "https://www.oaksofnorthgatesanantonio.com/floorplans",
+    ]
     assert len(result.units) == 3
     assert result.confidence > 0.7
     assert result.winning_url.endswith("/availableunits")
+
+
+@pytest.mark.asyncio
+async def test_exact_plan_drills_expand_and_correct_the_shortcut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Northview/Broadway/Franklin/Jasper regression in a bounded fixture."""
+    shortcut = (
+        "<html><body><table>"
+        + _row("219H", "Studio", "Studio", "687", "1,800.00", "Available", "1")
+        + "</table></body></html>"
+    )
+    listing = """
+    <html><body>
+      <div class="page-content-floorplans floorplans-layout-tab">
+        <a href="/floorplans/1br%2f1ba">1BR/1BA</a>
+        <a href="/floorplans/2br%2f2ba">2BR/2BA</a>
+      </div>
+    </body></html>
+    """
+    drills = {
+        "/floorplans/1br%2f1ba": (
+            "<html><body>1 Bed 1 Bath 687 Sq. Ft."
+            + _row("219H", "1BR/1BA", "1 Bed(s)", "687", "1,800.00", "9/1/2026", "1")
+            + "</body></html>"
+        ),
+        "/floorplans/2br%2f2ba": (
+            "<html><body>2 Beds 2 Baths 1025 Sq. Ft."
+            + _row("402", "2BR/2BA", "2 Bed(s)", "1025", "2,400.00", "10/1/2026", "2")
+            + "</body></html>"
+        ),
+    }
+
+    def fake_probe_get(url: str, **_kw: object) -> _Resp:
+        if url.endswith("/availableunits"):
+            return _Resp(200, shortcut)
+        if url.endswith("/floorplans"):
+            return _Resp(200, listing)
+        for path, body in drills.items():
+            if url.endswith(path):
+                return _Resp(200, body)
+        return _Resp(404, "")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", fake_probe_get)
+
+    result = await RentCafeLayoutTabAdapter().extract(  # type: ignore[arg-type]
+        _FakePage(), _ctx()
+    )
+
+    assert {row["unit_number"] for row in result.units} == {"219H", "402"}
+    by_unit = {row["unit_number"]: row for row in result.units}
+    assert by_unit["219H"]["floor_plan_name"] == "1BR/1BA"
+    assert by_unit["219H"]["bedrooms"] == "1"
+    assert by_unit["219H"]["bathrooms"] == "1"
+    assert by_unit["402"]["bathrooms"] == "2"
+    assert result.winning_url.endswith("/floorplans/1br%2f1ba")
+    assert {
+        row["source_url"] for row in result.unit_source_provenance
+    } == {
+        "https://www.oaksofnorthgatesanantonio.com/floorplans/1br%2f1ba",
+        "https://www.oaksofnorthgatesanantonio.com/floorplans/2br%2f2ba",
+    }
+    assert sum(
+        row["unit_count"] for row in result.unit_source_provenance
+    ) == 2
 
 
 @pytest.mark.asyncio

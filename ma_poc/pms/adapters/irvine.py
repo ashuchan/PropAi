@@ -87,7 +87,11 @@ def _unit_rents(u: dict[str, Any]) -> tuple[int | None, int | None]:
     return min(prices), max(prices)
 
 
-def parse_irvine_units(groups: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
+def parse_irvine_units(
+    groups: list[dict[str, Any]],
+    url: str,
+    request_payload: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     """Flatten ``units/rank`` floorplan groups into standard unit dicts."""
     units: list[dict[str, str]] = []
     for g in groups:
@@ -96,12 +100,7 @@ def parse_irvine_units(groups: list[dict[str, Any]], url: str) -> list[dict[str,
         for u in g.get("units") or []:
             if not isinstance(u, dict):
                 continue
-            unit_no = str(
-                u.get("unitID")
-                or u.get("unitMarketingName")
-                or u.get("objectID")
-                or ""
-            ).strip()
+            unit_no = str(u.get("unitID") or u.get("unitMarketingName") or u.get("objectID") or "").strip()
             beds_raw = u.get("floorplanBed")
             baths_raw = u.get("floorplanBath")
             if u.get("unitIsStudio") and not beds_raw:
@@ -127,29 +126,73 @@ def parse_irvine_units(groups: list[dict[str, Any]], url: str) -> list[dict[str,
             building = str(u.get("buildingNumber") or "").strip()
             floor = u.get("unitFloor")
 
-            units.append(
-                make_unit_dict(
-                    floor_plan_name=fp_name,
-                    bed_label=bed_label_from(beds, fp_name),
-                    bedrooms=str(beds) if beds is not None else "",
-                    bathrooms=(
-                        str(int(baths)) if baths is not None and baths == int(baths)
-                        else (str(baths) if baths is not None else "")
-                    ),
-                    sqft=sqft,
-                    unit_number=unit_no,
-                    floor=str(floor) if floor not in (None, "") else "",
-                    building=building,
-                    rent_range=format_rent_range(rent_lo, rent_hi),
-                    rent_low=rent_lo,
-                    rent_high=rent_hi,
-                    concession="Discount" if u.get("unitHasDiscount") else "",
-                    availability_status="AVAILABLE",
-                    availability_date=avail_date,
-                    source_api_url=url,
-                    extraction_tier=OLL_TIER,
-                )
+            source_unit_id = str(u.get("unitID") or "").strip()
+            source_property_id = str(u.get("propertyID") or "").strip()
+            object_id = str(u.get("objectID") or "").strip()
+            floorplan_id = str(u.get("floorplanID") or "").strip()
+            floorplan_unique_id = str(u.get("floorplanUniqueID") or "").strip()
+            community_id = str(u.get("communityIDAEM") or "").strip()
+            community_name = str(u.get("communityMarketingName") or "").strip()
+            property_address = str(u.get("propertyAddress") or "").strip()
+            source_ids: dict[str, str] = {}
+            if source_unit_id:
+                source_ids["irvine_unit_id"] = source_unit_id
+            if object_id:
+                source_ids["irvine_object_id"] = object_id
+            if floorplan_id:
+                source_ids["irvine_floorplan_id"] = floorplan_id
+            if floorplan_unique_id:
+                source_ids["irvine_floorplan_unique_id"] = floorplan_unique_id
+            if source_property_id:
+                source_ids["irvine_property_id"] = source_property_id
+            if community_id:
+                source_ids["irvine_community_id"] = community_id
+
+            row = make_unit_dict(
+                floor_plan_name=fp_name,
+                bed_label=bed_label_from(beds, fp_name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=(
+                    str(int(baths))
+                    if baths is not None and baths == int(baths)
+                    else (str(baths) if baths is not None else "")
+                ),
+                sqft=sqft,
+                unit_number=unit_no,
+                unit_name=unit_no,
+                floor=str(floor) if floor not in (None, "") else "",
+                building=building,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                concession="Discount" if u.get("unitHasDiscount") else "",
+                availability_status="AVAILABLE",
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier=OLL_TIER,
+                source_ids=source_ids or None,
             )
+            # unitID repeats across property groups inside Irvine master
+            # communities. The public response proves propertyID + unitID is
+            # unique, while objectID carries the same pair plus plan context.
+            canonical_unit_id = (
+                f"{source_property_id}:{source_unit_id}"
+                if source_property_id and source_unit_id
+                else object_id
+            )
+            if canonical_unit_id:
+                row["unit_id"] = canonical_unit_id
+            if source_property_id:
+                row["source_property_id"] = source_property_id
+            if community_name:
+                row["source_property_name"] = community_name
+            if property_address:
+                row["source_property_address"] = property_address
+            if request_payload:
+                row["source_request_payload"] = dict(request_payload)
+            if source_ids or request_payload:
+                row["source_property_provenance"] = "irvine_units_rank_row"
+            units.append(row)
     return units
 
 
@@ -214,9 +257,7 @@ async def _community_html(page: Page | None, ctx: AdapterContext) -> str:
     return ""
 
 
-async def _active_fetch_irvine(
-    page: Page | None, ctx: AdapterContext
-) -> list[dict[str, Any]]:
+async def _active_fetch_irvine(page: Page | None, ctx: AdapterContext) -> list[dict[str, Any]]:
     """Resolve communityIdAEM from HTML and POST the public units/rank API.
 
     Public (no auth/cookie — confirmed), so curl_cffi via ``probe_post``
@@ -246,7 +287,13 @@ async def _active_fetch_irvine(
         if getattr(r, "status_code", 0) == 200:
             groups = _groups_from_body(r.json())
             if _is_irvine_rank(groups):
-                out.append({"url": _RANK_URL, "body": groups})
+                out.append(
+                    {
+                        "url": _RANK_URL,
+                        "body": groups,
+                        "request_payload": dict(payload),
+                    }
+                )
                 return out
     except Exception:
         pass
@@ -265,7 +312,13 @@ async def _active_fetch_irvine(
             if resp.ok:
                 groups = _groups_from_body(await resp.json())
                 if _is_irvine_rank(groups):
-                    out.append({"url": _RANK_URL, "body": groups})
+                    out.append(
+                        {
+                            "url": _RANK_URL,
+                            "body": groups,
+                            "request_payload": dict(payload),
+                        }
+                    )
         except Exception:
             return out
     return out
@@ -292,7 +345,11 @@ class IrvineAdapter:
             sources = await _active_fetch_irvine(page, ctx)
 
         for src in sources:
-            parsed = parse_irvine_units(src["body"], src.get("url", ""))
+            parsed = parse_irvine_units(
+                src["body"],
+                src.get("url", ""),
+                src.get("request_payload"),
+            )
             if parsed:
                 all_units.extend(parsed)
                 result.api_responses.append(src)
@@ -305,21 +362,16 @@ class IrvineAdapter:
             if _pp.n_admitted > 0:
                 result.units = _pp.admitted
                 result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
                 result.confidence = min(0.90, 0.7 + 0.05 * _pp.n_admitted)
             else:
                 result.confidence = 0.0
                 result.errors.append(
-                    f"IRVINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                    f"failed unit_validity"
+                    f"IRVINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows failed unit_validity"
                 )
         else:
             result.confidence = 0.0
-            result.errors.append(
-                "No Irvine unit data (communityIdAEM not found or units/rank empty)"
-            )
+            result.errors.append("No Irvine unit data (communityIdAEM not found or units/rank empty)")
 
         return result
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -152,7 +153,7 @@ def test_parser_uses_exact_unit_values_and_native_source_ids() -> None:
     assert row["source_property_name"] == "7400 Roosevelt Apartments"
 
 
-def test_parser_rejects_waitlist_model_and_office_placeholders() -> None:
+def test_parser_rejects_placeholder_units_but_preserves_waitlist_plan() -> None:
     placeholders = [
         {"id": 1, "unitcode": "WAIT11", "DisplayMinRent": 1400, "Area": 700},
         {"id": 2, "unitcode": "MODEL2", "DisplayMinRent": 1500, "Area": 700},
@@ -166,13 +167,110 @@ def test_parser_rejects_waitlist_model_and_office_placeholders() -> None:
         },
     ]
 
-    assert (
-        parse_securecafe_applicant_floorplans(
-            _payload(units=placeholders),
-            "https://example.securecafeapplicant.com/api",
-        )
-        == []
+    rows = parse_securecafe_applicant_floorplans(
+        _payload(units=placeholders),
+        "https://example.securecafeapplicant.com/api",
     )
+
+    assert len(rows) == 1
+    assert rows[0]["unit_number"] == ""
+    assert rows[0]["is_floor_plan_level"] is True
+    assert rows[0]["availability_status"] == "WAITLIST"
+
+
+def test_parser_preserves_inquiry_waitlist_and_current_unit_date_semantics() -> None:
+    """Zander-shaped regression through the production formatter boundary."""
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    payload = {
+        "status": True,
+        "floorPlanList": [
+            {
+                "floorPlan": {
+                    "PropertyName": "Zander Place",
+                    "PropertyID": "450410",
+                    "FloorPlanID": "F-NP",
+                    "FloorPlanName": "F-NP (Surface Lot Parking Only)",
+                    "Beds": 0,
+                    "Baths": 1,
+                    "MinimumRent": 1500,
+                    "AvailableUnits": 0,
+                    "IsFullyOccupied": True,
+                    "FloorPlanAvailable": False,
+                },
+                "UnitAvailability": [],
+            },
+            {
+                "floorPlan": {
+                    "PropertyName": "Zander Place",
+                    "PropertyID": "450410",
+                    "FloorPlanID": "C",
+                    "FloorPlanName": "C",
+                    "Beds": 1,
+                    "Baths": 1,
+                    "MinimumRent": 1600,
+                    "AvailableUnits": 0,
+                    "IsFullyOccupied": True,
+                },
+                "UnitAvailability": [
+                    {
+                        "id": 147,
+                        "unitcode": "WAIT147S",
+                        "Status": "Waitlist",
+                        "DisplayMinRent": 1600,
+                    }
+                ],
+            },
+            {
+                "floorPlan": {
+                    "PropertyName": "Zander Place",
+                    "PropertyID": "450410",
+                    "FloorPlanID": "B",
+                    "FloorPlanName": "B",
+                    "Beds": 2,
+                    "Baths": 1,
+                    "MinimumRent": 1745,
+                    "AvailableUnits": 1,
+                },
+                "UnitAvailability": [
+                    {
+                        "id": 20202,
+                        "unitcode": "202",
+                        "Status": "Vacant Unrented Ready",
+                        "DisplayMinRent": 1745,
+                        "AvailableDate": "04/01/2026",
+                        "UnitAvailableStartDate": "2026-08-02T00:00:00",
+                    }
+                ],
+            },
+        ],
+    }
+
+    rows = parse_securecafe_applicant_floorplans(
+        payload,
+        "https://zanderplace.securecafeapplicant.com/onlineleasing/api/floorplan/"
+        "getfloorplanandavailableunits?propertyId=450410",
+    )
+    by_plan = {row["floor_plan_name"]: row for row in rows}
+
+    assert len(rows) == 3
+    assert by_plan["F-NP (Surface Lot Parking Only)"]["availability_status"] == "UNAVAILABLE"
+    assert by_plan["F-NP (Surface Lot Parking Only)"]["available_units"] == "0"
+    assert by_plan["C"]["availability_status"] == "WAITLIST"
+    assert by_plan["C"]["unit_number"] == ""
+    assert by_plan["B"]["availability_date"] == "2026-08-02T00:00:00"
+
+    capture = datetime(2026, 8, 1, 18, tzinfo=UTC)
+    inquiry = _format_v2_unit(by_plan["F-NP (Surface Lot Parking Only)"], capture, "239094")
+    waitlist = _format_v2_unit(by_plan["C"], capture, "239094")
+    physical = _format_v2_unit(by_plan["B"], capture, "239094")
+
+    assert inquiry["availability_status"] == "UNAVAILABLE"
+    assert inquiry["available_date"] is None
+    assert waitlist["availability_status"] == "WAITLIST"
+    assert waitlist["available_date"] is None
+    assert physical["available_date"] == "2026-08-02"
+    assert physical["availability_date_provenance"] == "explicit_future"
 
 
 def test_vanity_applicant_shell_stamps_only_exact_subdomain_match() -> None:

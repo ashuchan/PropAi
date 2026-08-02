@@ -30,6 +30,9 @@ from urllib.parse import parse_qs, unquote_plus, urljoin, urlparse, urlsplit, ur
 
 from ma_poc.pms.adapters.appfolio import (
     ScopeEvidence,
+    _extract_zip,
+    _normalize_street,
+    _street_candidates,
     filter_listings_by_property_address,
     find_appfolio_property_group,
     parse_appfolio_listings_ssr,
@@ -189,7 +192,12 @@ _APPFOLIO_TENANT_HOST_RE = re.compile(
 _WIX_MARKER_RE = re.compile(
     r"(?:wixstatic\.com|parastorage\.com|filesusr\.com)", re.IGNORECASE
 )
-_WIX_ROUTE_NAMES: tuple[str, ...] = ("appfolio", "apply", "availability")
+_WIX_ROUTE_NAMES: tuple[str, ...] = (
+    "appfolio",
+    "apply",
+    "availability",
+    "properties-for-rent",
+)
 _ATTR_URL_RE = re.compile(r"(?:href|src)\s*=\s*['\"]([^'\"]+)['\"]", re.I)
 _FILESUSR_HTML_RE = re.compile(
     r"https://[a-z0-9-]+\.filesusr\.com/html/[a-z0-9_-]+\.html",
@@ -212,7 +220,7 @@ _LISTING_TITLE_RE = re.compile(
     r"\bjs-listing-title\b[^>]*>(.*?)</(?:h[1-6]|div|span)>",
     re.IGNORECASE | re.DOTALL,
 )
-_WAITLIST_RE = re.compile(r"\bwait\s*-?\s*list\b", re.IGNORECASE)
+_WAITLIST_RE = re.compile(r"\bwait(?:ing)?\s*-?\s*list\b", re.IGNORECASE)
 _PROPERTY_LABEL_STOPWORDS = frozenset(
     {"website", "apartment", "apartments", "community", "property", "the"}
 )
@@ -351,7 +359,12 @@ def _wix_page_data_urls(route_body: str, marketing_origin: str) -> list[str]:
 
 
 def _appfolio_config_in_component(body: str) -> tuple[str, str] | None:
-    """Validate and return ``(listings_root, property_group)`` from a Wix component."""
+    """Return the exact AppFolio root and optional group from a Wix component.
+
+    A missing ``propertyGroup`` is not property scope. It is retained only as
+    evidence that the operator authored the exact listings index; the caller
+    then applies the stricter full-address boundary.
+    """
     if not body or len(body) > 65_536 or "Appfolio.Listing" not in body:
         return None
     host_match = _APPFOLIO_HOST_CONFIG_RE.search(body)
@@ -365,9 +378,7 @@ def _appfolio_config_in_component(body: str) -> tuple[str, str] | None:
     if not appfolio_tenant_slug(root):
         return None
     group = _property_group_in(body)
-    if not group:
-        return None
-    return root, group
+    return root, group or ""
 
 
 def _origin(page: Page, ctx: AdapterContext) -> str:
@@ -442,7 +453,7 @@ async def _discover_wix_appfolio_components(
 ) -> dict[str, tuple[str, str]]:
     """Resolve Wix HtmlComponents to scoped AppFolio listing URLs.
 
-    The returned mapping is ``scoped_url -> (property_group, component_url)``.
+    The returned mapping is ``published_url -> (property_group, component_url)``.
     Request budget is deterministic: up to three already-published component
     URLs from the entry body, then at most two labelled routes, two Wix feature
     documents per route, and three component URLs total.  All fetches use the
@@ -456,6 +467,13 @@ async def _discover_wix_appfolio_components(
         return {}
 
     component_urls = _filesusr_urls(entry_body, origin)
+    # When the configured/warm route is already the inventory page, its exact
+    # component lives in that page's Thunderbolt feature document. Do not
+    # require another navigation hop merely to rediscover the current page.
+    for data_url in _wix_page_data_urls(entry_body, origin):
+        data_body = await _fetch(page, data_url)
+        if data_body and len(data_body) <= 1_000_000:
+            component_urls.extend(_filesusr_urls(data_body, origin))
     for route_url in _wix_route_urls(entry_body, ctx):
         route_body = await _fetch(page, route_url)
         if not route_body or len(route_body) > 2_000_000:
@@ -477,8 +495,8 @@ async def _discover_wix_appfolio_components(
         if config is None:
             continue
         root, group = config
-        scoped_url = scoped_listings_url(root, group)
-        configs[scoped_url] = (group, component_url)
+        published_url = scoped_listings_url(root, group) if group else root
+        configs[published_url] = (group, component_url)
     return configs
 
 
@@ -519,7 +537,7 @@ def _nested_wix_units(
     src: str,
     group: str,
     ctx: AdapterContext,
-) -> tuple[list[dict[str, str]], str]:
+) -> tuple[list[dict[str, str]], str, dict[str, object]]:
     """Parse and boundary-check a Wix-published AppFolio roster.
 
     AppFolio does not reliably honor ``filters[property_list]``.  Vestawood's
@@ -536,10 +554,89 @@ def _nested_wix_units(
       wait-list placeholders.
     """
     units = parse_appfolio_listings_ssr(html, src)
+    identity: dict[str, object] = {
+        "route_kind": "wix_authored_appfolio_component",
+        "property_group": group or None,
+        "source_card_count": len(units),
+        "admitted_cards": [],
+        "rejected_cards": [],
+    }
     if not units:
-        return [], "scoped_no_availability"
+        return [], "scoped_no_availability", identity
     metadata = _nested_card_metadata(html)
     group_tokens = _property_label_tokens(group)
+
+    def card_identity(unit: dict[str, str], reason: str = "") -> dict[str, object]:
+        listing_id = str(
+            (unit.get("source_ids") or {}).get("appfolio_listing_id") or ""
+        )
+        meta = metadata.get(listing_id) or {}
+        return {
+            "appfolio_listing_id": listing_id or None,
+            "appfolio_listable_uid": str(meta.get("listable_uid") or "") or None,
+            "published_address": str(unit.get("unit_name") or "") or None,
+            "reason": reason or None,
+        }
+
+    if not group:
+        ctx_address = str(getattr(ctx, "address", "") or "").strip()
+        ctx_city = str(getattr(ctx, "city", "") or "").strip()
+        ctx_state = str(getattr(ctx, "state", "") or "").strip()
+        ctx_zip = str(getattr(ctx, "zip_code", "") or "").strip()
+        if not all((ctx_address, ctx_city, ctx_state, ctx_zip)):
+            rejected = identity["rejected_cards"]
+            assert isinstance(rejected, list)
+            rejected.extend(card_identity(unit, "missing_full_property_context") for unit in units)
+            return [], "nested_widget_full_address_context_missing", identity
+
+        target_street = _normalize_street(ctx_address)
+        target_zip = _extract_zip(ctx_zip)
+        city_pattern = re.compile(
+            rf"\b{re.escape(re.sub(r'[^a-z0-9]+', ' ', ctx_city.casefold()).strip())}\b"
+        )
+        state_pattern = re.compile(rf"\b{re.escape(ctx_state.casefold())}\b")
+        clean: list[dict[str, str]] = []
+        admitted = identity["admitted_cards"]
+        rejected = identity["rejected_cards"]
+        assert isinstance(admitted, list) and isinstance(rejected, list)
+        for unit in units:
+            listing_id = str(
+                (unit.get("source_ids") or {}).get("appfolio_listing_id") or ""
+            )
+            meta = metadata.get(listing_id) or {}
+            listable_uid = str(meta.get("listable_uid") or "")
+            address = str(unit.get("unit_name") or "").strip()
+            normalized_full = re.sub(r"[^a-z0-9]+", " ", address.casefold()).strip()
+            street_match = any(
+                _normalize_street(candidate) == target_street
+                for candidate in _street_candidates(address)
+            )
+            locality_match = bool(
+                city_pattern.search(normalized_full)
+                and state_pattern.search(normalized_full)
+                and target_zip
+                and _extract_zip(address, prefer_last=True) == target_zip
+            )
+            reason = ""
+            if not listable_uid:
+                reason = "missing_stable_listable_uid"
+            elif bool(meta.get("waitlist")):
+                reason = "waitlist_application"
+            elif not street_match:
+                reason = "configured_street_mismatch"
+            elif not locality_match:
+                reason = "configured_locality_mismatch"
+            if reason:
+                rejected.append(card_identity(unit, reason))
+                continue
+            source_ids = dict(unit.get("source_ids") or {})
+            source_ids["appfolio_listable_uid"] = listable_uid
+            unit["source_ids"] = source_ids
+            admitted.append(card_identity(unit))
+            clean.append(unit)
+        identity["admitted_count"] = len(clean)
+        identity["rejected_count"] = len(units) - len(clean)
+        return clean, "published_component_full_address_scope", identity
 
     matching_card_ids = {
         card_id
@@ -563,10 +660,16 @@ def _nested_wix_units(
             if (match := re.search(r"\b(\d{5})(?:-\d{4})?\b", unit.get("unit_name") or ""))
         }
         if not ctx_zip or not observed_zips or observed_zips != {ctx_zip}:
-            return [], "nested_widget_property_boundary_failed"
+            rejected = identity["rejected_cards"]
+            assert isinstance(rejected, list)
+            rejected.extend(card_identity(unit, "property_boundary_failed") for unit in units)
+            return [], "nested_widget_property_boundary_failed", identity
         scope_reason = "property_group_single_zip_scope"
 
     clean: list[dict[str, str]] = []
+    admitted = identity["admitted_cards"]
+    rejected = identity["rejected_cards"]
+    assert isinstance(admitted, list) and isinstance(rejected, list)
     for unit in units:
         listing_id = str(
             (unit.get("source_ids") or {}).get("appfolio_listing_id") or ""
@@ -574,6 +677,14 @@ def _nested_wix_units(
         meta = metadata.get(listing_id) or {}
         listable_uid = str(meta.get("listable_uid") or "")
         if not listable_uid or bool(meta.get("waitlist")):
+            rejected.append(
+                card_identity(
+                    unit,
+                    "waitlist_application"
+                    if bool(meta.get("waitlist"))
+                    else "missing_stable_listable_uid",
+                )
+            )
             continue
         source_ids = dict(unit.get("source_ids") or {})
         source_ids["appfolio_listable_uid"] = listable_uid
@@ -589,8 +700,52 @@ def _nested_wix_units(
             unit["_floor_plan_name_provenance"] = (
                 "appfolio.listing_title_nested_widget"
             )
+        admitted.append(card_identity(unit))
         clean.append(unit)
-    return clean, scope_reason
+    identity["admitted_count"] = len(clean)
+    identity["rejected_count"] = len(units) - len(clean)
+    return clean, scope_reason, identity
+
+
+def _record_appfolio_response_provenance(
+    ctx: AdapterContext,
+    *,
+    source_url: str,
+    body: str,
+    status: int,
+    units: list[dict[str, str]],
+    identity: dict[str, object],
+) -> None:
+    """Attach the exact unit-producing response to the adapter boundary."""
+
+    if not units or not source_url or not body:
+        return
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        response_sha256,
+    )
+
+    api_response = {
+        "url": source_url,
+        "status": status,
+        "body": "<appfolio-listings-roster>",
+        "response_sha256": response_sha256(body),
+        "identity": identity,
+        "via": "wix_authored_appfolio_component",
+    }
+    provenance = build_unit_source_provenance(
+        provider="appfolio",
+        source_url=source_url,
+        body=body,
+        unit_count=len(units),
+        identity=identity,
+        status=status,
+    )
+    try:
+        ctx._embed_recovery_api_responses = [api_response]  # type: ignore[attr-defined]
+        ctx._embed_recovery_unit_source_provenance = [provenance]  # type: ignore[attr-defined]
+    except Exception:  # pragma: no cover - defensive context variants
+        pass
 
 
 def _property_group_in(html: str) -> str:
@@ -885,7 +1040,19 @@ async def recover_appfolio_embed(
         nested_config = nested_wix_configs.get(src)
         if nested_config is not None:
             group, component_url = nested_config
-            units, nested_reason = _nested_wix_units(html, src, group, ctx)
+            units, nested_reason, nested_identity = _nested_wix_units(
+                html, src, group, ctx
+            )
+            nested_identity.update(
+                {
+                    "component_url": component_url,
+                    "configured_property_name": getattr(ctx, "property_name", "") or None,
+                    "configured_address": getattr(ctx, "address", "") or None,
+                    "configured_city": getattr(ctx, "city", "") or None,
+                    "configured_state": getattr(ctx, "state", "") or None,
+                    "configured_zip": getattr(ctx, "zip_code", "") or None,
+                }
+            )
             if not units:
                 note_recovery(
                     ctx,
@@ -900,6 +1067,14 @@ async def recover_appfolio_embed(
                 nested_reason,
                 f"{src} component={component_url} kept={len(units)}",
             )
+            _record_appfolio_response_provenance(
+                ctx,
+                source_url=src,
+                body=html,
+                status=status,
+                units=units,
+                identity=nested_identity,
+            )
             return units
 
         if is_scoped_listings_url(src):
@@ -913,6 +1088,18 @@ async def recover_appfolio_embed(
                     "appfolio_embed",
                     "scoped_no_availability",
                     f"{src} (scope from {group_source})",
+                )
+            if units:
+                _record_appfolio_response_provenance(
+                    ctx,
+                    source_url=src,
+                    body=html,
+                    status=status,
+                    units=units,
+                    identity={
+                        "route_kind": "operator_scoped_appfolio_index",
+                        "property_group_source": group_source,
+                    },
                 )
             return units
 
@@ -931,6 +1118,18 @@ async def recover_appfolio_embed(
             evidence=evidence,
         )
         if kept:
+            _record_appfolio_response_provenance(
+                ctx,
+                source_url=src,
+                body=html,
+                status=status,
+                units=kept,
+                identity={
+                    "route_kind": "published_or_discovered_appfolio_index",
+                    "scope_evidence": evidence.value,
+                    "address_filter": tel,
+                },
+            )
             return kept
         declined = (
             str(tel.get("reason") or "unscopeable"),

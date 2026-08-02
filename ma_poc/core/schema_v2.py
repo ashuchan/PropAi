@@ -521,6 +521,34 @@ def classify_area_absence(
     return (AREA_ABSENCE_UNKNOWN, "no_evidence")
 
 
+def area_sanity_provenance(
+    unit: dict[str, Any],
+) -> tuple[Any, str | None, str | None, str | None]:
+    """Return emitted evidence for a source-qualified area preservation.
+
+    The sanity stage normally destroys a rejected value.  A narrowly trusted
+    typed-source exception instead records one ``_sanity_preserved`` entry.
+    Both V2 formatter implementations delegate here so the raw pre-sanity
+    value, decision, reason, and source field remain visible in final output.
+    """
+    records = unit.get("_sanity_preserved")
+    if not isinstance(records, (list, tuple)):
+        return (None, None, None, None)
+    for record in reversed(records):
+        if not isinstance(record, dict) or record.get("field") != "area":
+            continue
+        provider = str(record.get("provider") or "").strip()
+        source_field = str(record.get("source_field") or "").strip()
+        source = ".".join(part for part in (provider, source_field) if part) or None
+        return (
+            record.get("raw_value", record.get("value")),
+            str(record.get("decision") or "").strip() or None,
+            str(record.get("reason") or "").strip() or None,
+            source,
+        )
+    return (None, None, None, None)
+
+
 def resolve_plan_row_availability(
     status: str | None,
     *,
@@ -571,6 +599,11 @@ def resolve_plan_row_availability(
         The status to publish. Never ``None`` for a plan-level row.
     """
     if not plan_level:
+        return status
+    # Preserve a source's more specific explicit negative state. A WAITLIST,
+    # LEASED, or PENDING plan is zero current inventory, but flattening it to
+    # generic UNAVAILABLE discards useful operator semantics.
+    if status in {"UNAVAILABLE", "WAITLIST", "WAITLISTED", "LEASED", "PENDING"}:
         return status
     if not has_rent and not has_anchor:
         return "UNAVAILABLE"
@@ -1041,12 +1074,19 @@ def _format_v2_unit(
     # floor protects a small unit's real 2–2.5-bath count.
     if norm_baths is not None and norm_beds is not None and norm_baths >= 4 and norm_baths > norm_beds + 2:
         norm_baths = None
-    try:
-        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+    # A bounded adapter may provide a property-qualified canonical plan anchor
+    # after validating its source property.  Prefer that trusted internal
+    # value; ordinary adapters retain the existing display-name/bed/bath hash.
+    _provider_plan_anchor = str(unit.get("_canonical_floor_plan_id") or "").strip()
+    if _provider_plan_anchor:
+        floor_plan_id = _provider_plan_anchor
+    else:
+        try:
+            from ma_poc.pms.adapters._parsing import compute_floor_plan_id
 
-        floor_plan_id = compute_floor_plan_id(property_id, fp_name, norm_beds, norm_baths)
-    except Exception:
-        floor_plan_id = None
+            floor_plan_id = compute_floor_plan_id(property_id, fp_name, norm_beds, norm_baths)
+        except Exception:
+            floor_plan_id = None
 
     # Area + the reason it is absent. The numeric ``-1`` contract is
     # UNCHANGED; ``area_absence`` is an additive label that says which of the
@@ -1069,6 +1109,12 @@ def _format_v2_unit(
         supplied_value=sqft,
         property_publishes_area=property_has_area,
     )
+    (
+        area_pre_sanity_value,
+        area_sanity_decision,
+        area_sanity_reason,
+        area_sanity_source,
+    ) = area_sanity_provenance(unit)
 
     # Zero-inventory availability contract (2026-07-29). Resolved ONCE here so
     # the shipped ``availability_status`` and the ``available_date`` fallback
@@ -1118,6 +1164,7 @@ def _format_v2_unit(
         _availability_status,
         scrape_ts,
         has_rent=(_has_rent and uid not in (None, "", "null")),
+        raw_value=_available_date_raw,
     )
     _available_date_provenance = _classify_availability_date_provenance(
         _available_date_raw,
@@ -1130,10 +1177,15 @@ def _format_v2_unit(
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name if fp_name else None,
+        "floor_plan_description": _raw_str(unit.get("floor_plan_description")),
         "floor_plan_id": floor_plan_id,
         "area": area_out,
         "area_absence": area_absence,
         "area_absence_evidence": area_absence_evidence,
+        "area_pre_sanity_value": area_pre_sanity_value,
+        "area_sanity_decision": area_sanity_decision,
+        "area_sanity_reason": area_sanity_reason,
+        "area_sanity_source": area_sanity_source,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         # As-displayed operator label ("HOME 302", "APT PH14", an AppFolio
         # street address). Capture-only and frequently NULL — see
@@ -1325,8 +1377,11 @@ def _format_v2_floor_plan(plan: dict, scrape_ts: datetime, property_id: str = ""
     # manufactured by definition (``_resolve_available_date`` only invents one
     # when the parsed source date is falsy), so dropping it loses nothing the
     # source published.
-    if out.get("availability_status") == "UNAVAILABLE" and not out.get("_available_date_raw"):
+    if out.get("availability_status") != "AVAILABLE" and not out.get(
+        "_available_date_raw"
+    ):
         out["available_date"] = None
+        out["availability_date_provenance"] = "missing"
     flags = [part.strip() for part in str(out.get("data_quality_flag") or "").split("|") if part.strip()]
     if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
         flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
@@ -1730,7 +1785,7 @@ _EXPLICIT_AVAILABILITY_DATE_RE = re.compile(
     r"|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
     r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
     r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}"
-    r"(?:,?\s+\d{2,4})?\b"
+    r"(?:st|nd|rd|th)?(?:,?\s+\d{2,4})?\b"
     r")",
     re.IGNORECASE,
 )
@@ -1799,23 +1854,18 @@ def _resolve_available_date(
     scrape_ts: datetime,
     *,
     has_rent: bool = False,
+    raw_value: Any = None,
 ) -> str | None:
     """When the operator effectively says the unit IS rentable but
     ships no parseable move-in date, default the date to the scrape
     timestamp (i.e. "available today / now").
 
-    A unit is treated as rentable-now when EITHER:
-      * status explicitly says ``"AVAILABLE"``, OR
-      * ``has_rent`` — the unit has a positive rent value
-        published. The presence of a price is itself a strong
-        rentability signal: operators don't list rents on units
-        they can't rent. This catches the canary 1ef1060 regression
-        where the Knock adapter mis-flagged ~8,580 of 8,597
-        rent-published units as ``UNAVAILABLE`` because Knock's
-        ``available`` boolean is a separate signal that's often
-        False even when the unit IS being offered. The Knock adapter
-        was fixed in parallel, but ``has_rent`` is a defence-in-depth
-        for the next operator whose status field is similarly noisy.
+    A unit is treated as rentable-now when status explicitly says
+    ``"AVAILABLE"``.  A published rent is a fallback signal only when the
+    source status is absent or genuinely unknown.  It must never override an
+    explicit negative state such as ``UNAVAILABLE``, ``LEASED``, ``PENDING``,
+    or ``WAITLIST``: catalogue/full-roster sources commonly publish prices for
+    apartments that are not currently offered.
 
     2026-05-24 (user Q): "if it does not show availability date but
     says available, what do we do?". Prior behaviour was to ship
@@ -1827,14 +1877,20 @@ def _resolve_available_date(
     Behaviour:
       * parsed_date present                                  → parsed_date
       * parsed_date None + status == "AVAILABLE"             → scrape date
-      * parsed_date None + has_rent=True                     → scrape date
+      * parsed_date None + status absent/UNKNOWN + rent      → scrape date
+      * parsed_date None + explicit negative status          → None
       * parsed_date None + status none/unknown + no rent     → None (unchanged)
     """
     if parsed_date:
         return parsed_date
-    if status and status.upper() == "AVAILABLE":
+    # A date-shaped raw value is handled above.  A negative text token is an
+    # explicit source statement and must not fall through to either default.
+    if _availability_text_is_negative(raw_value):
+        return None
+    normalized_status = str(status or "").strip().upper()
+    if normalized_status == "AVAILABLE":
         return scrape_ts.strftime("%Y-%m-%d")
-    if has_rent:
+    if has_rent and normalized_status in ("", "UNKNOWN"):
         return scrape_ts.strftime("%Y-%m-%d")
     return parsed_date
 
@@ -1896,6 +1952,13 @@ def _format_date(
         return None
     s_orig = str(val).strip()
     s = s_orig
+    availability_prefix = bool(
+        re.match(
+            r"^\s*(?:available|avail\.?|move[- ]?in|ready|date available)\b",
+            s,
+            re.IGNORECASE,
+        )
+    )
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return _accept(s)
@@ -1919,6 +1982,15 @@ def _format_date(
         s,
         flags=re.IGNORECASE,
     ).strip()
+    # English ordinal day suffixes are display punctuation, not a relative
+    # availability signal. Normalize only a bounded month-name/day shape;
+    # the untouched source token remains in ``available_date_raw``.
+    s = re.sub(
+        r"^([A-Za-z]{3,9}\.?)\s+(\d{1,2})(?:st|nd|rd|th)(?=\s|,|$)",
+        r"\1 \2",
+        s,
+        flags=re.IGNORECASE,
+    )
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
         return _accept((reference_ts or datetime.now(UTC)).strftime("%Y-%m-%d"))
@@ -1962,14 +2034,24 @@ def _format_date(
     # the current (run) year. Strip a trailing '.' on an abbreviated month
     # ("Jun." -> "Jun"). Additive: only reached after all year-bearing
     # formats fail, so no existing input changes behavior.
+    def _no_year_iso(parsed: datetime) -> str | None:
+        reference = reference_ts or datetime.now(UTC)
+        candidate = parsed.replace(year=reference.year)
+        # A provider label such as ``Available January 5`` captured in
+        # December describes the next offering, not a date eleven months in
+        # the past. Roll forward only for an explicit availability prefix;
+        # bare historical labels retain the existing current-year behavior.
+        if availability_prefix and candidate.date() < reference.date():
+            try:
+                candidate = candidate.replace(year=reference.year + 1)
+            except ValueError:
+                return None
+        return _accept(candidate.strftime("%Y-%m-%d"))
+
     s_no_year = re.sub(r"^([A-Za-z]{3,9})\.", r"\1", s)
     for fmt in ("%b %d", "%B %d"):
         try:
-            return _accept(
-                datetime.strptime(s_no_year, fmt)
-                .replace(year=(reference_ts or datetime.now(UTC)).year)
-                .strftime("%Y-%m-%d")
-            )
+            return _no_year_iso(datetime.strptime(s_no_year, fmt))
         except ValueError:
             continue
     # Numeric no-year forms ("8/1", "9-03") are published by compact
@@ -1978,11 +2060,7 @@ def _format_date(
     # using the supplied capture timestamp keeps historical replays stable.
     for fmt in ("%m/%d", "%m-%d"):
         try:
-            return _accept(
-                datetime.strptime(s, fmt)
-                .replace(year=(reference_ts or datetime.now(UTC)).year)
-                .strftime("%Y-%m-%d")
-            )
+            return _no_year_iso(datetime.strptime(s, fmt))
         except ValueError:
             continue
     # 2026-05-24 (user follow-up): final fallback — run the AVAILABLE-NOW
@@ -2125,12 +2203,23 @@ _MAPPED_SRC = {
     "amenities",
     "bed_label",
     "floor_plan_id",
+    "floor_plan_description",
     "source_api_url",
     "extraction_tier",
     # Adapter-set evidence flag consumed by ``classify_area_absence``. Ends
     # in "sqft" so the attribute-token net would otherwise republish it into
     # ``_extra`` as if it were an unmapped square-footage column.
     "_area_surface_publishes_no_sqft",
+    # Internal source-confidence contract and its sanity decision. Both are
+    # surfaced through explicit area_sanity_* fields; never duplicate their
+    # dict payload into the catch-all ``_extra`` column.
+    "_trusted_typed_area",
+    "_sanity_preserved",
+    # Internal publish-ceiling proof consumed at the property boundary.
+    "_verified_plan_only_surface",
+    # Trusted, property-qualified plan grouping key already surfaced through
+    # the canonical floor_plan_id output column.
+    "_canonical_floor_plan_id",
 }
 
 

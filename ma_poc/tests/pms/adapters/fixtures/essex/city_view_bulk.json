@@ -1,0 +1,45 @@
+{
+  "result": {
+    "floorplans": [
+      {
+        "availableDisplayDate": "2026-08-07T00:00:00.000Z",
+        "available_units_count": 3,
+        "baths": 1,
+        "beds": 1,
+        "floorplan_id": 2224884,
+        "maximum_rent": 9129,
+        "maximum_sqft": 784,
+        "minimum_rent": 2187,
+        "minimum_sqft": 784,
+        "name": "Plan 1C",
+        "units": [
+          {
+            "amenities": [
+              "Remodeled unit interior",
+              "2nd floor",
+              "Corner/end location"
+            ],
+            "availability_date": "2026-08-07T05:00:00.000Z",
+            "baths": 1,
+            "beds": 1,
+            "floorplan_id": 2224884,
+            "floorplan_name": "Plan 1C",
+            "floorplate": {
+              "building_name": null,
+              "floor": null,
+              "floorplate_url": ""
+            },
+            "maximum_rent": 9129,
+            "minimum_rent": 2377,
+            "name": "206",
+            "specials": [],
+            "sqft": 784,
+            "unit_id": 6301828
+          }
+        ],
+        "waitlist_enabled": false
+      }
+    ]
+  },
+  "success": null
+}

@@ -301,6 +301,104 @@ def parse_squarespace_unit_blocks(body: str, base_url: str = "") -> list[dict[st
         return []
 
 
+# ── Surface 3: Squarespace apartment figures ────────────────────────────────
+#
+# The Landmark publishes one apartment per ``figure.sqs-block-image-figure``.
+# Its caption keeps the apartment label, dimensions, area, rent and visible
+# availability in separate paragraphs.  The outer-figure boundary is
+# load-bearing: combining tokens across neighbouring figures can manufacture a
+# unit that never existed.  Keep the grammar deliberately narrow until three
+# independent publishers establish a broader family.
+_SQSP_FIGURE_UNIT_RE = re.compile(
+    r"\bLandmark\s*#\s*([A-Za-z0-9][A-Za-z0-9-]*)\s*(?:[-\u2013\u2014]|$)",
+    re.IGNORECASE,
+)
+_SQSP_FIGURE_BEDS_RE = re.compile(r"\(\s*(\d+)\s*\)\s*bedrooms?\b", re.IGNORECASE)
+_SQSP_FIGURE_BATHS_RE = re.compile(r"\(\s*(\d+(?:\.\d+)?)\s*\)\s*(?:full\s+)?bathrooms?\b", re.IGNORECASE)
+_SQSP_FIGURE_AREA_RE = re.compile(r"\b([\d,]+)\s*sq\.?\s*ft\.?\b", re.IGNORECASE)
+_SQSP_FIGURE_RENT_RE = re.compile(
+    r"\bMonthly\s+Rent\s*:\s*\$\s*([\d,]+(?:\.\d{1,2})?)",
+    re.IGNORECASE,
+)
+_SQSP_FIGURE_DATE_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+
+
+def parse_squarespace_apartment_figures(
+    body: str,
+    base_url: str = "",
+) -> list[dict[str, Any]]:
+    """Parse strict Landmark-style Squarespace figures into apartments.
+
+    A row is emitted only when one figure contains all five independent
+    signals: a physical apartment label, bed/bath dimensions, square footage,
+    positive monthly rent, and either an explicit date or ``Immediate``.
+    Floor-plan name remains absent because the operator does not publish one.
+    """
+    try:
+        soup = BeautifulSoup(body, "lxml")
+        rows: list[dict[str, Any]] = []
+        for figure in soup.select("figure.sqs-block-image-figure"):
+            caption = figure.select_one("figcaption.image-caption-wrapper")
+            if caption is None:
+                continue
+            text = " ".join(caption.get_text(" ", strip=True).split())
+            unit_match = _SQSP_FIGURE_UNIT_RE.search(text)
+            beds_match = _SQSP_FIGURE_BEDS_RE.search(text)
+            baths_match = _SQSP_FIGURE_BATHS_RE.search(text)
+            area_match = _SQSP_FIGURE_AREA_RE.search(text)
+            rent_match = _SQSP_FIGURE_RENT_RE.search(text)
+            if not all((unit_match, beds_match, baths_match, area_match, rent_match)):
+                continue
+
+            availability = ""
+            for paragraph in caption.select("p"):
+                line = " ".join(paragraph.get_text(" ", strip=True).split())
+                if not re.match(r"^(?:Availability\s*:|Available\b)", line, re.I):
+                    continue
+                date_match = _SQSP_FIGURE_DATE_RE.search(line)
+                if date_match:
+                    # Pass only the source calendar token to the formatter.
+                    # Prefixes like "after" are presentation text; retaining
+                    # them in the date field would make the canonical parser
+                    # mistake a historical date for capture-day availability.
+                    availability = date_match.group(0)
+                elif re.search(r"\bImmediate(?:ly)?\b", line, re.I):
+                    availability = "Immediate"
+                break
+            if not availability:
+                continue
+
+            beds = int(beds_match.group(1))
+            baths_number = float(baths_match.group(1))
+            baths = str(int(baths_number)) if baths_number.is_integer() else str(baths_number)
+            rent = money_to_int(rent_match.group(1))
+            if rent is None or rent <= 0:
+                continue
+            unit_number = unit_match.group(1)
+            rows.append(
+                make_unit_dict(
+                    unit_number=unit_number,
+                    unit_name=f"Landmark # {unit_number}",
+                    floor_plan_name="",
+                    bed_label=bed_label_from(beds, ""),
+                    bedrooms=str(beds),
+                    bathrooms=baths,
+                    sqft=area_match.group(1).replace(",", ""),
+                    rent_low=rent,
+                    rent_high=rent,
+                    availability_status="AVAILABLE",
+                    availability_date=availability,
+                    source_api_url=base_url,
+                    extraction_tier="TIER_1_DOM_SQUARESPACE_APARTMENT_FIGURE",
+                    data_gaps=["floor_plan_name"],
+                    data_quality_flag="FLOOR_PLAN_NAME_NOT_PUBLISHED",
+                )
+            )
+        return rows
+    except Exception:  # noqa: BLE001 — recovery net must never raise
+        return []
+
+
 async def recover_avail_table(ctx: Any) -> list[dict[str, Any]]:
     """Code-only recovery of an own-site available-units roster.
 
@@ -330,6 +428,11 @@ async def recover_avail_table(ctx: Any) -> list[dict[str, Any]]:
 
         # Surface 2: Squarespace pre-wrap "Unit N / $rent" blocks (unit-level).
         units = parse_squarespace_unit_blocks(body, base_url)
+        if units:
+            return units
+
+        # Surface 3: one complete apartment per Squarespace image figure.
+        units = parse_squarespace_apartment_figures(body, base_url)
         if units:
             return units
 

@@ -620,6 +620,7 @@ async def recover_showmojo_public(ctx: AdapterContext) -> list[dict[str, Any]]:
     seen_uids: set[str] = set()
     parsed_rows: list[tuple[dict[str, Any], list[str]]] = []
     page_telemetry: list[dict[str, Any]] = []
+    roster_sources: list[tuple[str, str, int]] = []
     terminated = False
     for page_number in range(1, _MAX_PAGES + 1):
         page_url = f"{embed_url}?{urlencode({'page': page_number})}"
@@ -656,6 +657,7 @@ async def recover_showmojo_public(ctx: AdapterContext) -> list[dict[str, Any]]:
         if not cards:
             terminated = True
             break
+        roster_sources.append((final_page_url, roster_html, len(cards)))
         for card in cards:
             row, reasons = _parse_card(
                 card,
@@ -722,7 +724,10 @@ async def recover_showmojo_public(ctx: AdapterContext) -> list[dict[str, Any]]:
             rent_high=rent,
             availability_status="AVAILABLE",
             available_units="1",
-            availability_date="",
+            # Preserve the exact provider token. The shared formatter handles
+            # both relative ``Available now`` and bounded English month/day
+            # ordinals while retaining this untouched value in raw output.
+            availability_date=str(raw["availability_text"]),
             source_api_url=str(raw["source_url"]),
             extraction_tier="TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
             source_ids={
@@ -730,8 +735,8 @@ async def recover_showmojo_public(ctx: AdapterContext) -> list[dict[str, Any]]:
                 "showmojo_listing_uid": str(raw["provider_listing_uid"]),
                 "rhr_application_site_id": application_site_id,
             },
-            data_gaps=["floor_plan_name", "availability_date"],
-            data_quality_flag="SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            data_gaps=["floor_plan_name"],
+            data_quality_flag="SHOWMOJO_PLAN_NAME_NOT_PUBLISHED",
         )
         unit.update(
             {
@@ -771,6 +776,45 @@ async def recover_showmojo_public(ctx: AdapterContext) -> list[dict[str, Any]]:
         native_listing_ids=native_ids,
         failure_reason="",
     )
+    from collections import Counter
+
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        record_context_unit_source_provenance,
+    )
+
+    accepted_by_url = Counter(str(row["source_url"]) for row in accepted)
+    for source_url, response_body, source_count in roster_sources:
+        admitted_count = accepted_by_url.get(source_url, 0)
+        if admitted_count <= 0:
+            continue
+        record_context_unit_source_provenance(
+            ctx,
+            build_unit_source_provenance(
+                provider="showmojo",
+                source_url=source_url,
+                body=response_body,
+                unit_count=admitted_count,
+                identity={
+                    "status": "MATCH",
+                    "evidence": [
+                        "configured_property_identity",
+                        "reciprocal_manager_link",
+                        "named_showmojo_iframe",
+                        "name_city_state_zip_filter",
+                        "native_uid_cross_checks",
+                    ],
+                    "configured_property_id": str(ctx.property_id or ""),
+                    "showmojo_account": account,
+                    "application_site_id": application_site_id,
+                    "source_count": source_count,
+                    "admitted_count": admitted_count,
+                    "portfolio_count": len(parsed_rows),
+                    "rejected_count": len(rejected),
+                },
+                response_kind="mixed_account_roster_page",
+            ),
+        )
     return units
 
 

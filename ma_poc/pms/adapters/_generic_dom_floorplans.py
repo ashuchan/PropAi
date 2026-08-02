@@ -134,10 +134,48 @@ _RE_SQFT = SQFT_RE
 # Rent: $1,234 [- $1,500]. Permissive capture; the post-parse filter
 # (value >= 100) rejects "$1 deposit"-style noise.
 _RE_RENT = re.compile(r"\$(\d[\d,]*)(?:\s*[-–]\s*\$?(\d[\d,]*))?")
+# A dollar amount next to an explicit Deposit label is not rent.  This must be
+# checked on both sides because current plan cards use both ``DEPOSIT: $1,000``
+# (Riverbank) and ``$200 Deposit`` (Ellis Midtown).  Keep the expressions
+# anchored to the amount so an earlier deposit does not suppress a later
+# ``FROM: $1,420`` asking rent in the same card.
+_RE_DEPOSIT_BEFORE_AMOUNT = re.compile(
+    r"\b(?:min(?:imum)?\s+)?(?:refundable\s+)?(?:security\s+)?"
+    r"deposit(?:\s+(?:amount|of|required))?\s*:?\s*$",
+    re.IGNORECASE,
+)
+_RE_DEPOSIT_AFTER_AMOUNT = re.compile(
+    r"^\s*(?:refundable\s+)?(?:security\s+)?deposit\b",
+    re.IGNORECASE,
+)
 _RE_AVAIL_NOW = re.compile(r"available\s*now", re.IGNORECASE)
 _RE_WAITLIST = re.compile(r"waitlist|join\s*the\s*waitlist", re.IGNORECASE)
 _RE_UNITS_AVAIL = re.compile(r"(\d+)\s*units?\s*available", re.IGNORECASE)
 _RE_CALL = re.compile(r"call\s*(?:for|us)", re.IGNORECASE)
+
+
+def _rent_range_from_card_text(text: str) -> tuple[int | None, int | None]:
+    """Return the first plausible non-deposit dollar range in *text*.
+
+    The old parser stopped at the first ``$`` token, so a plan card containing
+    ``DEPOSIT: $1,000 FROM: $1,420`` emitted $1,000 as rent and never inspected
+    the labeled asking price.  Iterate all candidates, reject amounts whose
+    immediately-adjacent label says Deposit, and retain the existing $100 floor.
+    """
+    for match in _RE_RENT.finditer(text):
+        before = text[max(0, match.start() - 64) : match.start()]
+        after = text[match.end() : match.end() + 40]
+        if _RE_DEPOSIT_BEFORE_AMOUNT.search(before) or _RE_DEPOSIT_AFTER_AMOUNT.search(after):
+            continue
+
+        rent_lo = money_to_int(match.group(1))
+        rent_hi = money_to_int(match.group(2)) if match.group(2) else rent_lo
+        if rent_lo is None or rent_lo < 100:
+            continue
+        if rent_hi is None or rent_hi < 100:
+            continue
+        return rent_lo, rent_hi
+    return None, None
 
 # ── Scope guard (2026-07-29) ─────────────────────────────────────────────
 # Reject cards that describe a DIFFERENT property. See the module docstring
@@ -638,18 +676,8 @@ def _parse_card_to_unit(card: dict[str, Any], url: str) -> dict[str, str] | None
     # Sqft.
     m = _RE_SQFT.search(text)
     sqft = m.group(1).replace(",", "") if m else ""
-    # Rent (lo/hi).
-    m = _RE_RENT.search(text)
-    rent_lo: int | None = None
-    rent_hi: int | None = None
-    if m:
-        rent_lo = money_to_int(m.group(1))
-        rent_hi = money_to_int(m.group(2)) if m.group(2) else rent_lo
-        # Reject sub-$100 "rent" — it's a deposit/fee, not the asking rent.
-        if rent_lo is not None and rent_lo < 100:
-            rent_lo = None
-        if rent_hi is not None and rent_hi < 100:
-            rent_hi = None
+    # Rent (lo/hi). Explicit Deposit labels are never asking-rent evidence.
+    rent_lo, rent_hi = _rent_range_from_card_text(text)
     # Availability.
     avail_count = ""
     avail_count_m = _RE_UNITS_AVAIL.search(text)
@@ -960,7 +988,7 @@ def _scan_static_html_for_cards(html: str) -> list[dict[str, Any]]:
     # Multiple class strings can match — choose the one whose
     # containers yield the most qualifying cards.
     best_cards: list[dict[str, Any]] = []
-    for class_key, elements in by_class.items():
+    for _class_key, elements in by_class.items():
         if not (2 <= len(elements) <= 50):
             continue
         cards: list[dict[str, Any]] = []

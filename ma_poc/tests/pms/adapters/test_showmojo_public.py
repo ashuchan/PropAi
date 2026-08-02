@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -10,6 +11,8 @@ import pytest
 from ma_poc.pms.adapters._showmojo_public import recover_showmojo_public
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
+from ma_poc.pms.source_provenance import context_unit_source_provenance
+from ma_poc.scripts.runners.jugnu import _format_v2_unit
 
 CONFIGURED_URL = "https://www.parknorthsiderva.com/"
 MANAGER_URL = "https://dobrinpropertymanagement.com/"
@@ -201,7 +204,7 @@ async def test_exact_chain_accepts_property_and_rejects_three_same_roster_contro
     assert row["unit_number"] == "1617 Brookfield St"
     assert row["market_rent_low"] == 1295
     assert row["availability_text"] == "Available September 7th"
-    assert row["availability_date"] == ""
+    assert row["availability_date"] == "Available September 7th"
     assert row["floor_plan_name"] == ""
     assert row["source_ids"] == {
         "showmojo_account": "fea92db007",
@@ -211,6 +214,14 @@ async def test_exact_chain_accepts_property_and_rejects_three_same_roster_contro
     assert row["source_property_provenance"].startswith(
         "exact_configured_identity_managed_by_reciprocal_manager"
     )
+    formatted = _format_v2_unit(
+        row,
+        datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+        "38378",
+    )
+    assert formatted["available_date"] == "2026-09-07"
+    assert formatted["available_date_raw"] == "Available September 7th"
+    assert formatted["availability_date_provenance"] == "explicit_future"
     assert calls == [
         MANAGER_URL,
         LISTINGS_URL,
@@ -234,6 +245,14 @@ async def test_exact_chain_accepts_property_and_rejects_three_same_roster_contro
     assert rejected[blank_availability_uid] == [
         "no_explicit_provider_availability"
     ]
+    provenance = context_unit_source_provenance(ctx)
+    assert len(provenance) == 1
+    assert provenance[0]["provider"] == "showmojo"
+    assert provenance[0]["unit_count"] == 1
+    assert provenance[0]["identity"]["status"] == "MATCH"
+    assert provenance[0]["identity"]["source_count"] == 5
+    assert provenance[0]["identity"]["rejected_count"] == 4
+    assert len(provenance[0]["response_sha256"]) == 64
 
 
 @pytest.mark.asyncio
@@ -351,6 +370,10 @@ async def test_narrow_scraper_bridge_preserves_plan_catalogue(
     from ma_poc.pms import scraper as scraper_module
     from ma_poc.pms.adapters import _showmojo_public as module
     from ma_poc.pms.adapters._parsing import make_unit_dict
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        record_context_unit_source_provenance,
+    )
 
     async def fake_recovery(_ctx: AdapterContext):
         row = make_unit_dict(
@@ -367,6 +390,16 @@ async def test_narrow_scraper_bridge_preserves_plan_catalogue(
             source_ids={"showmojo_listing_uid": "e7c39f1061"},
         )
         row["source_portal_url"] = EMBED_URL
+        record_context_unit_source_provenance(
+            _ctx,
+            build_unit_source_provenance(
+                provider="showmojo",
+                source_url=f"{EMBED_URL}?page=1",
+                body="<one exact roster page>",
+                unit_count=1,
+                identity={"status": "MATCH"},
+            ),
+        )
         return [row]
 
     monkeypatch.setattr(module, "recover_showmojo_public", fake_recovery)
@@ -395,3 +428,5 @@ async def test_narrow_scraper_bridge_preserves_plan_catalogue(
     assert len(result.units) == 1
     assert result.units[0]["unit_number"] == "1617 Brookfield St"
     assert result.plan_summaries == [plan]
+    assert len(result.unit_source_provenance) == 1
+    assert result.unit_source_provenance[0]["provider"] == "showmojo"

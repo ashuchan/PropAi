@@ -8,6 +8,7 @@ the suite never contacts a property site (or any proxy/unlocker service).
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -24,13 +25,14 @@ from ma_poc.pms.adapters._universal_recovery import (
     recover_jonah_ssr,
     recover_universal_embed,
 )
+from ma_poc.scripts.runners.jugnu import (
+    _emit_v2_units_for_property,
+    _format_v2_unit,
+)
 
 
 def _unit_script(payload: dict[str, object], *, selector: str = "unit-data") -> str:
-    return (
-        '<script type="application/json" '
-        f'data-jd-fp-selector="{selector}">{json.dumps(payload)}</script>'
-    )
+    return f'<script type="application/json" data-jd-fp-selector="{selector}">{json.dumps(payload)}</script>'
 
 
 def _unit_payload(**overrides: object) -> dict[str, object]:
@@ -120,6 +122,8 @@ def test_parser_recovers_three_misrouted_labels(
     assert rows[0]["unit_number"] == unit_number
     assert rows[0]["market_rent_low"] == rent
     assert rows[0]["extraction_tier"] == JONAH_SSR_TIER
+    if unit_number == "05-A":
+        assert rows[0]["unit_name"] == "A"
 
 
 def test_parser_prefers_explicit_fee_free_base(luma_generic_html: str) -> None:
@@ -139,9 +143,7 @@ def test_parser_rejects_gross_price_only_unit() -> None:
             "priceDisplay": "$2,710 including mandatory fees",
         },
     )
-    assert parse_jonah_ssr_units(
-        _unit_script(gross_only), "https://example.test/a1/"
-    ) == []
+    assert parse_jonah_ssr_units(_unit_script(gross_only), "https://example.test/a1/") == []
 
 
 def test_parser_rejects_malformed_plan_and_anchorless_rows() -> None:
@@ -150,13 +152,90 @@ def test_parser_rejects_malformed_plan_and_anchorless_rows() -> None:
         _unit_payload(type="floorplan", apartment_number="A1"),
     )
     anchorless = _unit_script(_unit_payload(apartment_number=""))
-    wrong_selector = _unit_script(
-        _unit_payload(apartment_number="999"), selector="floorplan-data"
+    wrong_selector = _unit_script(_unit_payload(apartment_number="999"), selector="floorplan-data")
+    assert (
+        parse_jonah_ssr_units(
+            malformed + plan + anchorless + wrong_selector,
+            "https://example.test/floorplans/",
+        )
+        == []
     )
-    assert parse_jonah_ssr_units(
-        malformed + plan + anchorless + wrong_selector,
-        "https://example.test/floorplans/",
-    ) == []
+
+
+@pytest.mark.parametrize(
+    (
+        "property_id",
+        "id_value",
+        "record_id",
+        "slug",
+        "source_property_id",
+        "floorplan_id",
+        "apartment",
+        "building",
+    ),
+    [
+        ("253388", "1196234", 40688, "9dc697a3223a7166466e5dd7a547b1ae", "4467", 4, "716", "1"),
+        (
+            "274384",
+            "37586862",
+            262206,
+            "b7bfb54b9aedae4e201ccd9ffa8ffa04",
+            "p1680785",
+            34,
+            "1316",
+            "",
+        ),
+        (
+            "278113",
+            "10601550",
+            101601,
+            "ea40ccf9f686d86fd9529f7c990d4ffd",
+            "31617",
+            2,
+            "04-301",
+            "4",
+        ),
+    ],
+)
+def test_current_ssr_native_identity_survives_source_to_final(
+    property_id: str,
+    id_value: str,
+    record_id: int,
+    slug: str,
+    source_property_id: str,
+    floorplan_id: int,
+    apartment: str,
+    building: str,
+) -> None:
+    payload = _unit_payload(
+        id_value=id_value,
+        id=record_id,
+        slug=slug,
+        property_id=source_property_id,
+        floorplan_id=floorplan_id,
+        apartment_number=apartment,
+        building=building,
+        available_iso="2026-09-15",
+    )
+    parsed = parse_jonah_ssr_units(_unit_script(payload), f"https://source.test/{property_id}/floorplans/a1/")
+    final = _emit_v2_units_for_property(
+        [_format_v2_unit(parsed[0], datetime(2026, 8, 2, 12, 0), property_id)]
+    )
+
+    assert parsed[0]["unit_id"] == id_value
+    assert parsed[0]["unit_name"] == apartment
+    assert parsed[0]["building"] == building
+    assert parsed[0]["source_property_id"] == source_property_id
+    assert parsed[0]["source_ids"] == {
+        "jonah_id_value": id_value,
+        "jonah_record_id": str(record_id),
+        "jonah_unit_slug": slug,
+        "jonah_property_id": source_property_id,
+        "jonah_floorplan_id": str(floorplan_id),
+    }
+    assert final[0]["unit_id"] == id_value
+    assert final[0]["unit_name"] == apartment
+    assert final[0]["source_ids"] == parsed[0]["source_ids"]
 
 
 def test_strong_generator_excludes_chat_widget_only() -> None:
@@ -189,10 +268,7 @@ async def test_recovery_synthesizes_index_and_drills_details_without_network(
     luma_generic_html: str,
 ) -> None:
     root = '<meta name="generator" content="Jonah Digital">'
-    index = root + (
-        '<a href="/floorplans/aria/">Aria</a>'
-        '<a href="/floorplans/luna/">Luna</a>'
-    )
+    index = root + ('<a href="/floorplans/aria/">Aria</a><a href="/floorplans/luna/">Luna</a>')
     pages = {
         "https://luma.test/floorplans/": index,
         "https://luma.test/floorplans/aria/": luma_generic_html,
@@ -222,13 +298,8 @@ async def test_recovery_synthesizes_index_and_drills_details_without_network(
 
 @pytest.mark.asyncio
 async def test_recovery_zero_unit_pages_remain_empty() -> None:
-    root = (
-        '<meta name="generator" content="Jonah Systems">'
-        '<a href="/floorplans/waitlist/">Waitlist</a>'
-    )
-    plan_only = _unit_script(
-        _unit_payload(type="floorplan", apartment_number="A1")
-    )
+    root = '<meta name="generator" content="Jonah Systems"><a href="/floorplans/waitlist/">Waitlist</a>'
+    plan_only = _unit_script(_unit_payload(type="floorplan", apartment_number="A1"))
 
     async def fake_fetch(urls: list[str]) -> list[tuple[str, int, str, str]]:
         return [(url, 200, plan_only, url) for url in urls]
@@ -262,15 +333,19 @@ async def test_native_unit_wins_without_running_jonah_recovery() -> None:
         }
     ]
     ctx = SimpleNamespace()
-    with patch(
-        "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
-        new=AsyncMock(return_value=native),
-    ), patch(
-        "ma_poc.pms.adapters._universal_recovery.recover_jonah_ssr",
-        new_callable=AsyncMock,
-    ) as jonah:
+    with (
+        patch(
+            "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
+            new=AsyncMock(return_value=native),
+        ),
+        patch(
+            "ma_poc.pms.adapters._universal_recovery.recover_jonah_ssr",
+            new_callable=AsyncMock,
+        ) as jonah,
+    ):
         rows, _tier, winner = await recover_universal_embed(
-            SimpleNamespace(), ctx  # type: ignore[arg-type]
+            SimpleNamespace(),
+            ctx,  # type: ignore[arg-type]
         )
     assert rows == native
     assert winner == "appfolio_embed"

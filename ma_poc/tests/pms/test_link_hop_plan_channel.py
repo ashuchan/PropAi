@@ -204,6 +204,191 @@ class TestAttachHopPlans:
         ]
         assert "A1" in names
 
+    def test_rs365_dedicated_plan_replaces_generic_same_name_only(self) -> None:
+        generic = _plan(
+            "Greenwood",
+            market_rent_low=9999,
+            market_rent_high=9999,
+            extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
+        )
+        dedicated = _plan(
+            "Greenwood",
+            market_rent_low=1406,
+            market_rent_high=1512,
+            extraction_tier="TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL",
+            source_ids={
+                "rs365_floorplan_guid": "6f852f38-fad8-41dc-a594-dda77320fc32"
+            },
+        )
+        unrelated = _plan(
+            "Greenwood Plus",
+            extraction_tier="TIER_1_DOM_GENERIC_PLAN_TEXT",
+        )
+        result: dict[str, Any] = {"plan_summaries": [generic, unrelated]}
+
+        _attach_hop_plans(result, [dedicated])
+
+        assert result["plan_summaries"] == [unrelated, dedicated]
+
+    def test_exact_aspensquare_catalogue_suppresses_generic_hop_extras(self) -> None:
+        exact = [
+            _plan(
+                "The Duke",
+                bedrooms=1,
+                extraction_tier="TIER_1_DOM_ASPENSQUARE_NEXT",
+                source_ids={"aspensquare_floor_plan_id": "2"},
+            ),
+            _plan(
+                "The Essex",
+                bedrooms=2,
+                extraction_tier="TIER_1_DOM_ASPENSQUARE_NEXT",
+                source_ids={"aspensquare_floor_plan_id": "4"},
+            ),
+            _plan(
+                "The Monarch",
+                bedrooms=3,
+                extraction_tier="TIER_1_DOM_ASPENSQUARE_NEXT",
+                source_ids={"aspensquare_floor_plan_id": "6"},
+            ),
+        ]
+        generic = [
+            _plan("2 Bedroom", extraction_tier="TIER_2_JSONLD"),
+            _plan("3 Bedroom", extraction_tier="TIER_2_JSONLD"),
+        ]
+        result: dict[str, Any] = {"plan_summaries": exact}
+
+        _attach_hop_plans(result, generic)
+
+        assert [row["floor_plan_name"] for row in result["plan_summaries"]] == [
+            "The Duke",
+            "The Essex",
+            "The Monarch",
+        ]
+        assert result["_hop_plan_harvest_suppressed"] == 2
+
+    def test_exact_edifice_catalogue_suppresses_sibling_generic_shapes(self) -> None:
+        exact = _plan(
+            "S5",
+            bedrooms=0,
+            sqft=500,
+            extraction_tier="TIER_1_API_EDIFICECMS",
+            source_ids={"edifice_plan_id": "S5"},
+        )
+        turtle_i_duplicate = _plan(
+            "", sqft=500, extraction_tier="TIER_1_API_GENERIC"
+        )
+        turtle_ii_only = _plan(
+            "", sqft=650, extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL"
+        )
+        result: dict[str, Any] = {
+            "extraction_tier_used": "TIER_1_API_EDIFICECMS",
+            "plan_summaries": [exact],
+        }
+
+        _attach_hop_plans(result, [turtle_i_duplicate, turtle_ii_only])
+
+        assert result["plan_summaries"] == [exact]
+        assert result["_hop_plan_harvest_suppressed"] == 2
+
+    def test_marketapts_unit_winner_suppresses_generic_deposit_plans(self) -> None:
+        riverbank_generic = [
+            _plan(
+                "Plan1",
+                bedrooms="",
+                sqft="",
+                market_rent_low=1000,
+                market_rent_high=1000,
+                extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL",
+            ),
+            _plan(
+                "Plan2",
+                bedrooms="",
+                sqft="",
+                market_rent_low=1000,
+                market_rent_high=1000,
+                extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL",
+            ),
+        ]
+        result: dict[str, Any] = {
+            "extraction_tier_used": "TIER_1_DOM_MARKETAPTS_D_UNIT_LEVEL",
+            "units": [{"unit_number": "20-361", "floor_plan_name": "Plan2"}],
+            "plan_summaries": [],
+        }
+
+        _attach_hop_plans(result, riverbank_generic)
+
+        assert result["plan_summaries"] == []
+        assert result["_hop_plan_harvest_suppressed"] == 2
+
+    def test_marketapts_keeps_exact_no_unit_plans_only(self) -> None:
+        exact = _plan(
+            "1X1-CC",
+            extraction_tier="TIER_1_DOM_MARKETAPTS",
+            market_rent_low=None,
+            market_rent_high=None,
+        )
+        generic = _plan(
+            "1 Bedroom",
+            extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL",
+        )
+        result: dict[str, Any] = {
+            "extraction_tier_used": "TIER_1_DOM_MARKETAPTS_B_PLAN_LEVEL",
+            "plan_summaries": [exact],
+        }
+
+        _attach_hop_plans(result, [generic])
+
+        assert result["plan_summaries"] == [exact]
+        assert result["_hop_plan_harvest_suppressed"] == 1
+
+    def test_rentcafe_layout_tab_unit_winner_suppresses_generic_plans(self) -> None:
+        generic = [
+            _plan(
+                "1 Bedroom",
+                bedrooms=1,
+                market_rent_low=1800,
+                market_rent_high=1800,
+                extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL",
+            )
+        ]
+        result: dict[str, Any] = {
+            "extraction_tier_used": "TIER_1_DOM_RENTCAFE_LT",
+            "units": [
+                {
+                    "unit_number": "219H",
+                    "floor_plan_name": "1BR/1BA",
+                    "availability_date": "9/1/2026",
+                }
+            ],
+            "plan_summaries": [],
+        }
+
+        _attach_hop_plans(result, generic)
+
+        assert result["plan_summaries"] == []
+        assert result["_hop_plan_harvest_suppressed"] == 1
+
+    def test_rentcafe_layout_tab_keeps_exact_empty_plan_only(self) -> None:
+        exact = _plan(
+            "Penthouse",
+            extraction_tier="TIER_1_DOM_RENTCAFE_LT",
+            market_rent_low=5000,
+            market_rent_high=5000,
+        )
+        generic = _plan(
+            "3 Bedroom",
+            extraction_tier="TIER_3_DOM_GENERIC_PLAN_LEVEL",
+        )
+        result: dict[str, Any] = {
+            "extraction_tier_used": "TIER_1_DOM_RENTCAFE_LT",
+            "plan_summaries": [exact],
+        }
+
+        _attach_hop_plans(result, [generic])
+
+        assert result["plan_summaries"] == [exact]
+        assert result["_hop_plan_harvest_suppressed"] == 1
+
 
 class TestPromoteDoesNotCollapseDistinctOffers:
     """The plan-merge de-dup must not destroy a differently-priced offer.

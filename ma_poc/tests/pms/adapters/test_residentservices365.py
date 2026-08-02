@@ -14,7 +14,11 @@ from ma_poc.pms.adapters import get_adapter
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.adapters.residentservices365 import (
     Residentservices365Adapter,
+    RS365PlanTarget,
     parse_residentservices365_tiles,
+    parse_rs365_plan_targets,
+    parse_rs365_unit_blocks,
+    rs365_plan_rows,
 )
 from ma_poc.pms.detector import detect_pms
 
@@ -155,8 +159,58 @@ async def test_adapter_extract_rusticwoods(monkeypatch) -> None:
         staticmethod(_mock_empty),
     )
     result = await Residentservices365Adapter().extract(_FakePage(_RUSTICWOODS_TILES), _ctx())  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_DOM_365RESIDENTSERVICES"
-    assert len(result.units) == 2
+    assert result.tier_used == "TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL"
+    assert result.units == []
+    assert len(result.plan_summaries) == 2
+
+
+@pytest.mark.asyncio
+async def test_code_only_plan_fallback_uses_exact_dedicated_catalogue(
+    monkeypatch,
+) -> None:
+    guid = "6f852f38-fad8-41dc-a594-dda77320fc32"
+    fp_html = (
+        '<script src="https://cdn.365residentservices.com/site.js"></script>'
+        '<div class="floorplan-tile" data-name="Greenwood" data-beds="1" '
+        'data-baths="1" data-size="775" data-rent-min="1406" '
+        'data-rent-max="1512"><div class="title-row">Greenwood 1 Bed 1 Bath '
+        '775 sqft</div><ul class="list-divider"><li>1 Bed</li><li>1 Bath</li>'
+        '<li>775 sqft</li></ul><div class="availability">Only 2 Left</div>'
+        f'<a href="/floorplan/{guid}">View Units</a></div>'
+    )
+
+    async def _mock_fp(*_args, **_kwargs):
+        return fp_html
+
+    async def _mock_detail(*_args, **_kwargs):
+        return ""
+
+    monkeypatch.setattr(
+        Residentservices365Adapter,
+        "_fetch_floorplans_html",
+        staticmethod(_mock_fp),
+    )
+    monkeypatch.setattr(
+        Residentservices365Adapter,
+        "_fetch_detail_html",
+        staticmethod(_mock_detail),
+    )
+
+    result = await Residentservices365Adapter().extract(
+        None,  # type: ignore[arg-type]
+        _code_only_ctx("60939", "https://greenarch.example/"),
+    )
+
+    assert result.units == []
+    assert result.tier_used == "TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL"
+    assert len(result.plan_summaries) == 1
+    [plan] = result.plan_summaries
+    assert plan["floor_plan_name"] == "Greenwood"
+    assert plan["bedrooms"] == "1"
+    assert plan["market_rent_low"] == 1406
+    assert plan["available_units"] == "2"
+    assert plan["availability_status"] == "AVAILABLE"
+    assert plan["source_ids"] == {"rs365_floorplan_guid": guid}
     assert result.confidence > 0.0
 
 
@@ -290,6 +344,38 @@ def test_find_unit_detail_urls_empty_on_no_match() -> None:
 
     urls = find_unit_detail_urls("<html>nothing</html>", "https://example.com")
     assert urls == []
+
+
+def test_parse_rs365_plan_target_preserves_catalogue_semantics() -> None:
+    guid = "6f852f38-fad8-41dc-a594-dda77320fc32"
+    html = (
+        '<div class="floorplan-tile" data-name="Greenwood" data-beds="1" '
+        'data-baths="1" data-size="775" data-rent-min="1406" '
+        'data-rent-max="1512">'
+        '<div class="title-row">Greenwood 1 Bed 1 Bath 775 sqft</div>'
+        '<ul class="list-divider"><li>1 Bed</li><li>1 Bath</li>'
+        '<li>775 sqft</li></ul><div class="availability">Only 2 Left</div>'
+        f'<a href="/floorplan/{guid}">View Units</a></div>'
+    )
+
+    [target] = parse_rs365_plan_targets(html, "https://greenarch.example/floorplans")
+    assert target == RS365PlanTarget(
+        url=f"https://greenarch.example/floorplan/{guid}",
+        plan_id=guid,
+        name="Greenwood",
+        beds="1",
+        baths="1",
+        sqft="775",
+        rent_low=1406,
+        rent_high=1512,
+        availability_status="AVAILABLE",
+        available_units="2",
+    )
+    [row] = rs365_plan_rows([target])
+    assert row["floor_plan_name"] == "Greenwood"
+    assert row["source_ids"] == {"rs365_floorplan_guid": guid}
+    assert row["available_units"] == "2"
+    assert row["extraction_tier"].endswith("_PLAN_LEVEL")
 
 
 def test_parse_rs365_unit_blocks_village_square_first_plan() -> None:
@@ -456,6 +542,169 @@ def test_parse_rs365_unit_blocks_invalid_epoch_handled() -> None:
     assert units[0]["availability_date"] == ""  # rejected, not crashed
 
 
+def _semantic_unit_html(
+    *,
+    plan_name: str = "Greenwood",
+    availability: str = "September 8, 2026 / Available",
+) -> str:
+    return (
+        '<div class="unit-details" '
+        'data-unit-id="fb985cf9-16d5-46ea-a469-52ff580ec84b" '
+        'data-unit-code="S407" data-availabledate="1704067200000">'
+        '<h3 class="standard">Apartment S407</h3>'
+        '<ul class="list-divider"><li>1 Bed</li><li>1 Bath</li>'
+        '<li>775 Square Feet</li></ul>'
+        f'<ul><li><label>Floor Plan:</label> {plan_name}</li>'
+        '<li><label>Floor:</label> 4</li></ul>'
+        f'<p class="availability">{availability}</p>'
+        '<span data-rent-min="1406" data-rent-max="1406" data-term="12">'
+        '$1,406</span><button data-apply="true" data-building="South"></button>'
+        '</div>'
+    )
+
+
+def _greenwood_target() -> RS365PlanTarget:
+    return RS365PlanTarget(
+        url="https://greenarch.example/floorplan/6f852f38-fad8-41dc-a594-dda77320fc32",
+        plan_id="6f852f38-fad8-41dc-a594-dda77320fc32",
+        name="Greenwood",
+        beds="1",
+        baths="1",
+        sqft="775",
+        rent_low=1406,
+        rent_high=1406,
+        availability_status="AVAILABLE",
+        available_units="1",
+    )
+
+
+def test_rs365_unit_joins_parent_plan_floor_term_and_future_date() -> None:
+    [row] = parse_rs365_unit_blocks(
+        _semantic_unit_html(),
+        _greenwood_target().url,
+        _greenwood_target(),
+    )
+    assert row["floor_plan_name"] == "Greenwood"
+    assert row["floor"] == "4"
+    assert row["building"] == "South"
+    assert row["lease_term"] == "12"
+    assert row["availability_date"] == "2026-09-08"
+    assert row["move_in_date"] == "2026-09-08"
+    assert row["source_ids"] == {
+        "rs365_unit_guid": "fb985cf9-16d5-46ea-a469-52ff580ec84b",
+        "rs365_floorplan_guid": "6f852f38-fad8-41dc-a594-dda77320fc32",
+    }
+
+
+def test_rs365_visible_today_overrides_stale_epoch_in_both_v2_formatters() -> None:
+    from datetime import UTC, datetime
+
+    from ma_poc.core.schema_v2 import _format_v2_unit as core_formatter
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit as jugnu_formatter
+
+    [row] = parse_rs365_unit_blocks(
+        _semantic_unit_html(availability="Today / Available"),
+        _greenwood_target().url,
+        _greenwood_target(),
+    )
+    assert row["availability_date"] == "Available Now"
+    capture = datetime(2026, 8, 2, 12, tzinfo=UTC)
+    for formatter in (core_formatter, jugnu_formatter):
+        output = formatter(row, capture, "60939")
+        assert output["available_date"] == "2026-08-02"
+        assert output["availability_date_provenance"] == "available_now"
+
+
+def test_rs365_telfair_best_value_is_one_coherent_tuple() -> None:
+    html = (
+        '<div class="unit-details" data-unit-code="1114">'
+        '<h3 class="standard">Apartment 1114</h3>'
+        '<ul class="list-divider"><li>1 Bed</li><li>1 Bath</li>'
+        '<li>700 sqft</li></ul>'
+        '<ul><li><label>Floor Plan:</label> A1</li></ul>'
+        '<span data-rent-min="1558" data-rent-max="1558" data-term="12">'
+        '$1,558</span>'
+        '<a class="better-pricing" title="Best Value" '
+        'data-content="&lt;div&gt;Per Month: $1,406&lt;/div&gt;'
+        '&lt;div&gt;Lease Term: 13&lt;/div&gt;'
+        '&lt;div&gt;Move-In-Date: September 12, 2026&lt;/div&gt;'
+        '&lt;button data-moveInDate=\'9/12/2026 12:00:00 AM\' '
+        'data-term=\'13\'&gt;&lt;/button&gt;">Best Value</a></div>'
+    )
+    target = RS365PlanTarget(
+        url="https://telfair.example/floorplan/e061f8cd-4e76-43bc-8112-c99aed9301c0",
+        plan_id="e061f8cd-4e76-43bc-8112-c99aed9301c0",
+        name="A1",
+        beds="1",
+        baths="1",
+        sqft="700",
+        rent_low=1406,
+        rent_high=1558,
+        availability_status="AVAILABLE",
+        available_units="1",
+    )
+
+    [row] = parse_rs365_unit_blocks(html, target.url, target)
+    assert row["market_rent_low"] == 1406
+    assert row["market_rent_high"] == 1406
+    assert row["lease_term"] == "13"
+    assert row["availability_date"] == "2026-09-12"
+    assert row["_rs365_pricing_selection"] == "best_value"
+
+
+def test_rs365_best_value_move_in_does_not_erase_visible_now_semantics() -> None:
+    from datetime import UTC, datetime
+
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    html = (
+        '<div class="unit-details" data-unit-code="1114" '
+        'data-availabledate="1704067200000">'
+        '<h3 class="standard">Apartment 1114</h3>'
+        '<ul class="list-divider"><li>1 Bed</li><li>1 Bath</li>'
+        '<li>700 sqft</li></ul><ul><li><label>Floor Plan:</label> A1</li></ul>'
+        '<p class="availability">Now / Available</p>'
+        '<a class="better-pricing" title="Best Value" '
+        'data-content="&lt;div&gt;Per Month: $1,406&lt;/div&gt;'
+        '&lt;div&gt;Lease Term: 13&lt;/div&gt;'
+        '&lt;div&gt;Move-In-Date: August 2, 2026&lt;/div&gt;'
+        '&lt;button data-moveInDate=\'8/2/2026 12:00:00 AM\' '
+        'data-term=\'13\'&gt;&lt;/button&gt;">Best Value</a></div>'
+    )
+    target = RS365PlanTarget(
+        url="https://telfair.example/floorplan/e061f8cd-4e76-43bc-8112-c99aed9301c0",
+        plan_id="e061f8cd-4e76-43bc-8112-c99aed9301c0",
+        name="A1",
+        beds="1",
+        baths="1",
+        sqft="700",
+        rent_low=1406,
+        rent_high=1406,
+        availability_status="AVAILABLE",
+        available_units="1",
+    )
+
+    [row] = parse_rs365_unit_blocks(html, target.url, target)
+    assert row["availability_date"] == "Available Now"
+    assert row["move_in_date"] == "2026-08-02"
+    assert row["lease_term"] == "13"
+    output = _format_v2_unit(
+        row,
+        datetime(2026, 8, 2, 12, tzinfo=UTC),
+        "63462",
+    )
+    assert output["available_date"] == "2026-08-02"
+    assert output["availability_date_provenance"] == "available_now"
+
+
+def test_rs365_parent_and_visible_plan_mismatch_fails_closed() -> None:
+    assert parse_rs365_unit_blocks(
+        _semantic_unit_html(plan_name="Sibling Plan"),
+        _greenwood_target().url,
+        _greenwood_target(),
+    ) == []
+
+
 @pytest.mark.asyncio
 async def test_adapter_drill_end_to_end(monkeypatch) -> None:
     """End-to-end: plan tile → mocked /Marketing/FloorPlans returns HTML
@@ -558,8 +807,9 @@ async def test_adapter_drill_falls_back_to_plan_level_on_empty(monkeypatch) -> N
         _FakePage(_RUSTICWOODS_TILES), _ctx()  # type: ignore[arg-type]
     )
     # Drill returned 0 units → plan-level wins.
-    assert result.tier_used == "TIER_1_DOM_365RESIDENTSERVICES"
-    assert len(result.units) == 2  # plan-level Rusticwoods tiles
+    assert result.tier_used == "TIER_1_DOM_365RESIDENTSERVICES_PLAN_LEVEL"
+    assert result.units == []
+    assert len(result.plan_summaries) == 2
 
 
 @pytest.mark.parametrize(

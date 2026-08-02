@@ -272,7 +272,7 @@ def parse_jonah_ssr_units(html: str, source_url: str) -> list[dict[str, Any]]:
         return []
 
     units: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
     for match in _JONAH_UNIT_SCRIPT_RE.finditer(html):
         if not _JONAH_UNIT_SELECTOR_RE.search(match.group("attrs")):
             continue
@@ -288,7 +288,33 @@ def parse_jonah_ssr_units(html: str, source_url: str) -> list[dict[str, Any]]:
         if identity is None or rents is None:
             continue
         unit_number, building = identity
-        key = (building.casefold(), unit_number.casefold())
+        public_apartment = str(payload.get("apartment_number") or "").strip()
+        id_value = str(payload.get("id_value") or "").strip()
+        record_id = str(payload.get("id") or "").strip()
+        unit_slug = str(payload.get("slug") or "").strip()
+        property_id = str(payload.get("property_id") or "").strip()
+        floorplan_id = str(payload.get("floorplan_id") or "").strip()
+        native_unit_id = id_value or record_id or unit_slug
+        source_ids: dict[str, str] = {}
+        if id_value:
+            source_ids["jonah_id_value"] = id_value
+        if record_id:
+            source_ids["jonah_record_id"] = record_id
+        if unit_slug:
+            source_ids["jonah_unit_slug"] = unit_slug
+        if property_id:
+            source_ids["jonah_property_id"] = property_id
+        if floorplan_id:
+            source_ids["jonah_floorplan_id"] = floorplan_id
+
+        # Current SSR rows publish three exact native identifiers. Prefer the
+        # provider's id_value before any mutable visible/building composite;
+        # retain the prior display key only as a bounded legacy fallback.
+        key = (
+            f"native:{native_unit_id}"
+            if native_unit_id
+            else f"display:{building.casefold()}|{unit_number.casefold()}"
+        )
         if key in seen:
             continue
 
@@ -298,6 +324,7 @@ def parse_jonah_ssr_units(html: str, source_url: str) -> list[dict[str, Any]]:
             bathrooms=str(payload.get("bathrooms") or "").strip(),
             sqft=str(payload.get("square_feet") or "").strip(),
             unit_number=unit_number,
+            unit_name=public_apartment or unit_number,
             floor=str(payload.get("floor") or "").strip(),
             building=building,
             rent_low=rents[0],
@@ -306,7 +333,14 @@ def parse_jonah_ssr_units(html: str, source_url: str) -> list[dict[str, Any]]:
             availability_date=_jonah_availability_date(payload),
             source_api_url=source_url,
             extraction_tier=JONAH_SSR_TIER,
+            source_ids=source_ids or None,
         )
+        if native_unit_id:
+            row["unit_id"] = native_unit_id
+        if property_id:
+            row["source_property_id"] = property_id
+        if source_ids:
+            row["source_property_provenance"] = "jonah_ssr_unit_data"
         if not unit_has_real_anchor(row):
             continue
         seen.add(key)

@@ -10,6 +10,7 @@ correct plan-level rows.
 from __future__ import annotations
 
 from ma_poc.pms.adapters import get_adapter
+from ma_poc.pms.adapters.base import VERIFIED_PLAN_ONLY_SURFACE_KEY
 from ma_poc.pms.adapters.rentaladdress import (
     RentalAddressAdapter,
     parse_rentaladdress_floorplans,
@@ -91,6 +92,10 @@ def test_parse_cedar_ridge_two_plans() -> None:
     assert p1["bathrooms"] == "1"
     assert "1,475" in p1["rent_range"]
     assert p1["extraction_tier"] == "TIER_1_DOM_RENTALADDRESS_PLAN_LEVEL"
+    assert (
+        p1[VERIFIED_PLAN_ONLY_SURFACE_KEY]
+        == "rentaladdress.floor_plan_list"
+    )
 
     p2 = units[1]
     assert p2["floor_plan_name"] == "2 Bedroom/ 2 Bath"
@@ -98,6 +103,10 @@ def test_parse_cedar_ridge_two_plans() -> None:
     assert p2["bedrooms"] == "2"
     assert p2["bathrooms"] == "2"
     assert "1,750" in p2["rent_range"]
+    assert (
+        p2[VERIFIED_PLAN_ONLY_SURFACE_KEY]
+        == "rentaladdress.floor_plan_list"
+    )
 
 
 def test_sqft_never_leaks_into_plan_name() -> None:

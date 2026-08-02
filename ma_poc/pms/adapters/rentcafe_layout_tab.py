@@ -35,8 +35,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse, urlunparse
+from collections import Counter
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urljoin, urlparse, urlunparse
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -202,7 +203,12 @@ def _lt_unit_from_applyga(onclick: str, _element: object) -> str:
     return match.group(6).strip() if match else ""
 
 
-def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
+def parse_rentcafe_lt_applyga(
+    raw_html: str,
+    drill_url: str,
+    *,
+    bathrooms: str = "",
+) -> list[dict]:
     """Parse applyGAClick(plan,beds,sqft,rentLow,rentHigh,unit#) handlers from
     RAW drill HTML. Returns one row per handler (NO dedup — the caller applies
     a run-global dedup because a drill page can render the full roster)."""
@@ -226,7 +232,7 @@ def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
                 floor_plan_name=plan,
                 bed_label=beds_lbl or bed_label_from(None, plan),
                 bedrooms=beds,
-                bathrooms="",
+                bathrooms=bathrooms,
                 sqft=sqft,
                 unit_number=unit,
                 rent_low=rlo,
@@ -240,6 +246,107 @@ def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
             )
         )
     return out
+
+
+_LT_PRIORITY_SHORTCUT = 100
+_LT_PRIORITY_SECURECAFE = 200
+_LT_PRIORITY_EXACT_DRILL = 300
+
+
+def _mark_lt_source(rows: list[dict], priority: int) -> list[dict]:
+    """Stamp source authority used only during RentCafe LT reconciliation."""
+    for row in rows:
+        row["_rentcafe_lt_priority"] = priority
+    return rows
+
+
+def _lt_row_completeness(row: dict) -> tuple[int, int]:
+    """Tie-break same-authority duplicate rows without inventing data."""
+    fields = (
+        "floor_plan_name",
+        "bedrooms",
+        "bathrooms",
+        "sqft",
+        "market_rent_low",
+        "market_rent_high",
+        "availability_date",
+    )
+    populated = sum(row.get(field) not in (None, "") for field in fields)
+    source_ids = row.get("source_ids")
+    return populated, len(source_ids) if isinstance(source_ids, dict) else 0
+
+
+def _reconcile_lt_rows(rows: list[dict]) -> list[dict]:
+    """Union RentCafe surfaces by native apartment number.
+
+    Plan-specific drills are authoritative over SecureCafe and the vanity
+    ``/availableunits`` shortcut.  Lower-authority rows still add apartments
+    absent from the exact drill set, so this is a union rather than a replace.
+    Plan-level rows have no apartment identity and therefore remain separate.
+    """
+    physical: dict[str, tuple[int, tuple[int, int], int, dict]] = {}
+    plan_rows: list[dict] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        unit = str(row.get("unit_number") or "").strip().upper()
+        if not unit:
+            plan_rows.append(row)
+            continue
+        priority = int(row.get("_rentcafe_lt_priority") or 0)
+        candidate = (priority, _lt_row_completeness(row), -index, row)
+        incumbent = physical.get(unit)
+        if incumbent is None or candidate[:3] > incumbent[:3]:
+            physical[unit] = candidate
+
+    selected = [candidate[3] for candidate in physical.values()]
+    reconciled = [*selected, *plan_rows]
+    for row in reconciled:
+        row.pop("_rentcafe_lt_priority", None)
+    return reconciled
+
+
+def _rentcafe_lt_source_url(base_url: str, drill: str) -> str:
+    """Resolve an exact drill without duplicating the ``/floorplans`` path."""
+    return urljoin(base_url.rstrip("/") + "/", drill) if drill else base_url
+
+
+def _record_lt_provenance(
+    result: AdapterResult,
+    admitted: list[dict],
+    source_bodies: dict[str, tuple[Any, int, str]],
+    ctx: AdapterContext,
+) -> None:
+    """Hash only responses that contributed admitted physical apartments."""
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    counts = Counter(
+        str(row.get("source_api_url") or "")
+        for row in admitted
+        if str(row.get("unit_number") or "").strip()
+        and str(row.get("source_api_url") or "").strip()
+    )
+    identity = {
+        "property_id": str(getattr(ctx, "property_id", "") or ""),
+        "property_name": str(getattr(ctx, "property_name", "") or ""),
+        "marketing_url": str(getattr(ctx, "base_url", "") or ""),
+    }
+    for source_url, unit_count in counts.items():
+        source = source_bodies.get(source_url)
+        if source is None:
+            continue
+        body, status, response_kind = source
+        result.unit_source_provenance.append(
+            build_unit_source_provenance(
+                provider="rentcafe_layout_tab",
+                source_url=source_url,
+                body=body,
+                unit_count=unit_count,
+                identity=identity,
+                response_kind=response_kind,
+                status=status,
+            )
+        )
 
 _PLAN_SPECS_RE = re.compile(
     # Accept "Bed", "Beds", "Bedroom", "Bedrooms" without requiring a word
@@ -323,19 +430,23 @@ def parse_rentcafe_layout_tab(plans: list[dict], url: str) -> list[dict]:
         body = str(p.get("bodyText") or "")
         unit_html = str(p.get("unitHtml") or "")
         plan_name = h1 or anchor or slug or ""
+        beds, baths, sqft = _parse_plan_specs(body)
 
         # Browser extraction returns only the bounded per-unit snippets, not
         # a page-sized HTML blob.  Reuse the exact static applyGAClick parser
         # so browser and code-only paths preserve availability identically.
         if unit_html:
             applyga_rows = parse_rentcafe_lt_applyga(
-                unit_html, url + drill if drill else url
+                unit_html,
+                _rentcafe_lt_source_url(url, drill),
+                bathrooms=baths,
             )
             if applyga_rows:
-                out.extend(applyga_rows)
+                out.extend(
+                    _mark_lt_source(applyga_rows, _LT_PRIORITY_EXACT_DRILL)
+                )
                 continue
 
-        beds, baths, sqft = _parse_plan_specs(body)
         units_parsed = _parse_drill_units(body)
         avail_match = _AVAIL_COUNT_RE.search(body)
         avail_count = avail_match.group(1) if avail_match else ""
@@ -363,9 +474,12 @@ def parse_rentcafe_layout_tab(plans: list[dict], url: str) -> list[dict]:
                         rent_low=sp_rent,
                         rent_high=sp_rent,
                         rent_range=format_rent_range(sp_rent, sp_rent),
-                        availability_status="AVAILABLE" if sp_rent is not None else "UNAVAILABLE",
+                        # A starting rent proves a marketed plan, not a
+                        # currently available apartment.  Only an explicit
+                        # positive availability count supports AVAILABLE.
+                        availability_status="AVAILABLE" if avail_count else "UNKNOWN",
                         available_units=avail_count,
-                        source_api_url=url + drill if drill else url,
+                        source_api_url=_rentcafe_lt_source_url(url, drill),
                         extraction_tier="TIER_1_DOM_RENTCAFE_LT",
                     )
                 )
@@ -393,11 +507,11 @@ def parse_rentcafe_layout_tab(plans: list[dict], url: str) -> list[dict]:
                     rent_high=rent,
                     availability_status="AVAILABLE",
                     available_units="1",
-                    source_api_url=url + drill if drill else url,
+                    source_api_url=_rentcafe_lt_source_url(url, drill),
                     extraction_tier="TIER_1_DOM_RENTCAFE_LT",
                 )
             )
-    return out
+    return _reconcile_lt_rows(out)
 
 
 class RentCafeLayoutTabAdapter:
@@ -435,6 +549,19 @@ class RentCafeLayoutTabAdapter:
             result.errors.append("rentcafe_lt: zero plans in payload")
             return result
         winning = self._winning_url(page, ctx)
+        source_bodies: dict[str, tuple[Any, int, str]] = {}
+        for plan in plans:
+            if not isinstance(plan, dict):
+                continue
+            drill = str(plan.get("drillPath") or "")
+            source_url = _rentcafe_lt_source_url(winning, drill)
+            body = str(plan.get("unitHtml") or plan.get("bodyText") or "")
+            if source_url and body:
+                source_bodies[source_url] = (
+                    body,
+                    200,
+                    "rentcafe_plan_drill",
+                )
         rows = parse_rentcafe_layout_tab(plans, winning)
         if not rows:
             result.confidence = 0.0
@@ -448,8 +575,17 @@ class RentCafeLayoutTabAdapter:
         if pp.n_admitted > 0:
             result.units = pp.admitted
             result.plan_summaries = pp.plan_summaries
-            result.winning_url = winning
+            result.winning_url = next(
+                (
+                    str(row.get("source_api_url") or "")
+                    for row in pp.admitted
+                    if str(row.get("unit_number") or "").strip()
+                    and str(row.get("source_api_url") or "").strip()
+                ),
+                winning,
+            )
             result.confidence = min(0.92, 0.7 + 0.02 * pp.n_admitted)
+            _record_lt_provenance(result, pp.admitted, source_bodies, ctx)
             return result
         result.confidence = 0.0
         result.errors.append(
@@ -482,22 +618,13 @@ class RentCafeLayoutTabAdapter:
         base = str(getattr(ctx, "base_url", "") or "")
         p = urlparse(base)
         origin = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else base.rstrip("/")
+        source_bodies: dict[str, tuple[Any, int, str]] = {}
 
-        # 2026-07-25 — WHOLE-ROSTER SHORT-CIRCUIT. `{origin}/availableunits` is
-        # a standard RentCafe route that server-renders EVERY available
-        # apartment for the property in ONE response (tr.unit-container rows,
-        # each carrying the same applyGAClick handler the per-plan drills use).
-        #
-        # It is strictly better than the /floorplans → N-drill fan-out below:
-        # one request instead of 1+N, and the full roster rather than whatever
-        # subset the plan pages happen to link. It is also invisible to the
-        # anchor-drill discovery — live-probed 2026-07-25, the Oaks of
-        # Northgate homepage exposes NO href to it, so it must be tried by
-        # convention rather than found.
-        #
-        # This is the fix for the RENTCAFE_NO_RESPONSE_PLAN_LEVEL cohort (341
-        # properties in the 2026-07-25 run) which fell back to plan rows while
-        # the complete rent roll sat one well-known URL away.
+        # `{origin}/availableunits` is a useful one-request roster candidate,
+        # including on sites that do not link it. It is not authoritative:
+        # the 2026-08-02 complete layout-tab audit measured 89 shortcut rows
+        # versus 187 exact plan-drill rows, with 13 semantic conflicts. Keep
+        # it as a lower-priority union source and always inspect exact drills.
         # 2026-07-27 — every ``probe_get`` in this coroutine is OFF-LOADED to a
         # thread. ``_probe.probe_get`` is a blocking ``urllib.request.urlopen``
         # and this is an ``async def``, so a bare call parks the whole event
@@ -525,12 +652,18 @@ class RentCafeLayoutTabAdapter:
                     retries=1,
                 )
                 if getattr(ra, "status_code", 0) == 200:
-                    roster_units = parse_rentcafe_lt_applyga(
-                        getattr(ra, "text", "") or "", avail_url
+                    roster_html = getattr(ra, "text", "") or ""
+                    roster_units = _mark_lt_source(
+                        parse_rentcafe_lt_applyga(
+                            roster_html, avail_url
+                        ),
+                        _LT_PRIORITY_SHORTCUT,
                     )
                     if roster_units:
-                        return self._finish_code_only(
-                            ctx, result, roster_units, avail_url
+                        source_bodies[avail_url] = (
+                            roster_html,
+                            200,
+                            "rentcafe_vanity_shortcut",
                         )
             except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
                 result.errors.append(
@@ -546,12 +679,19 @@ class RentCafeLayoutTabAdapter:
             r = await asyncio.to_thread(probe_get, origin + "/floorplans", timeout=20)
             if getattr(r, "status_code", 0) == 200 and getattr(r, "text", ""):
                 listing = r.text
+                source_bodies[origin + "/floorplans"] = (
+                    listing,
+                    200,
+                    "rentcafe_floorplans_listing",
+                )
         except Exception as exc:  # noqa: BLE001 — best-effort
             result.errors.append(f"rentcafe_lt: /floorplans probe failed: {exc}")
 
-        # 2026-07-25 — SECURECAFE PORTAL FALLBACK. When the vanity
-        # ``{origin}/availableunits`` route is absent (404) or blocked (403),
-        # the same roster is usually mounted on the Yardi leasing portal at
+        # SecureCafe is another roster candidate. The same property can expose
+        # a smaller vanity roster and a larger portal roster (Black Hawk: 3
+        # versus 9), so discover it even when the vanity route succeeds. It is
+        # still lower authority than a property-bound plan drill.
+        # The Yardi leasing portal normally lives at
         # ``{sub}.securecafe.com/onlineleasing/{slug}/availableunits.aspx``.
         #
         # Measured on the 2026-07-25 plan-level cohort: 571 of 1,126 (51%)
@@ -564,71 +704,54 @@ class RentCafeLayoutTabAdapter:
         # the base and parse_securecafe_availableunits reads the page — but
         # nothing connected them on this path. Same "parser exists, discovery
         # missing" shape as the /availableunits lever itself.
-        # How many per-plan drill pages the roster walk below WOULD visit.
-        # Computed here, before the securecafe hop, because it is the only
-        # no-network measure of what an early return would preempt: it is a
-        # regex over a string already in memory.
         drills = sorted({m for m in _DRILL_ANCHOR_RE.findall(listing)})
-
-        # 2026-07-27 — ACCEPTANCE FLOOR on the securecafe early return.
-        # This hop returns straight out of the coroutine, BEFORE the roster
-        # work below (the inline applyGAClick parse plus the per-plan
-        # ``_DRILL_ANCHOR_RE`` fan-out). ``availableunits.aspx`` is an
-        # AVAILABILITY LIST, so a portal exposing only the currently-available
-        # apartments would short-circuit the full multi-drill roster walk and
-        # take whatever it got — the same replace-vs-merge hazard as
-        # ``rentcafe.py``'s plan-level drill, on the same cohort (this file's
-        # own comment sizes it: 571 of 1,126 properties carry a SecureCafe
-        # fingerprint). It had no flag, no count check and an ``except`` that
-        # appends only on failure, never on shrink.
-        #
-        # The floor: the portal may preempt the walk only when it returns at
-        # least one apartment per floor plan the walk would have visited. When
-        # it does not, its rows are KEPT (never discarded) and merged into the
-        # walk's output below, so the hop can only ever add data.
         _sc_carry: list[dict] = []
         _sc_src = ""
-        if not roster_units:
-            try:
-                from ma_poc.pms.adapters.rentcafe import (
-                    _find_all_securecafe_bases,
-                    parse_securecafe_availableunits,
-                )
+        try:
+            from ma_poc.pms.adapters.rentcafe import (
+                _find_all_securecafe_bases,
+                parse_securecafe_availableunits,
+            )
 
-                for _base in _find_all_securecafe_bases(listing, ctx)[:3]:
-                    _sc_url = _base.rstrip("/") + "/availableunits.aspx"
-                    try:
-                        _sr = await asyncio.to_thread(probe_get, _sc_url, timeout=20)
-                    except Exception:
-                        continue
-                    if getattr(_sr, "status_code", 0) != 200:
-                        continue
-                    _sc_rows = parse_securecafe_availableunits(
-                        getattr(_sr, "text", "") or "", _sc_url
-                    )
-                    if not _sc_rows:
-                        continue
-                    if len(_sc_rows) >= len(drills):
-                        return self._finish_code_only(
-                            ctx, result, _sc_rows, _sc_url,
-                            detail="securecafe availableunits.aspx",
-                        )
-                    # Short of the drill count: do NOT preempt the walk. Carry
-                    # the rows forward and say so.
-                    _sc_carry, _sc_src = _sc_rows, _sc_url
-                    result.errors.append(
-                        f"rentcafe_lt: securecafe portal returned {len(_sc_rows)} "
-                        f"rows for {len(drills)} floor plans — merging with the "
-                        f"drill walk instead of short-circuiting to it"
-                    )
-                    break
-            except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
-                result.errors.append(f"rentcafe_lt: securecafe hop failed: {exc}")
+            for _base in _find_all_securecafe_bases(listing, ctx)[:3]:
+                _sc_url = _base.rstrip("/") + "/availableunits.aspx"
+                try:
+                    _sr = await asyncio.to_thread(probe_get, _sc_url, timeout=20)
+                except Exception:
+                    continue
+                if getattr(_sr, "status_code", 0) != 200:
+                    continue
+                _sc_rows = parse_securecafe_availableunits(
+                    getattr(_sr, "text", "") or "", _sc_url
+                )
+                if not _sc_rows:
+                    continue
+                _sc_carry = _mark_lt_source(
+                    _sc_rows, _LT_PRIORITY_SECURECAFE
+                )
+                _sc_src = _sc_url
+                source_bodies[_sc_url] = (
+                    getattr(_sr, "text", "") or "",
+                    200,
+                    "securecafe_availableunits",
+                )
+                break
+        except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+            result.errors.append(f"rentcafe_lt: securecafe hop failed: {exc}")
 
         collected: list[dict] = []
+        # The vanity shortcut remains useful evidence, but it can no longer
+        # preempt exact plan drills.  Northview, Broadway, Franklin and Jasper
+        # all publish smaller, semantically wrong shortcut rosters today.
+        collected.extend(roster_units)
         # The rendered listing may already carry unit anchors inline — parse
         # them too (harmless; global dedup below removes any overlap).
-        collected.extend(parse_rentcafe_lt_applyga(listing, origin + "/floorplans"))
+        collected.extend(
+            _mark_lt_source(
+                parse_rentcafe_lt_applyga(listing, origin + "/floorplans"),
+                _LT_PRIORITY_SHORTCUT,
+            )
+        )
         # Portal rows that did not clear the floor still count — the global
         # dedup in _finish_code_only removes any overlap with the drill rows.
         collected.extend(_sc_carry)
@@ -647,14 +770,33 @@ class RentCafeLayoutTabAdapter:
             drill_html = getattr(rr, "text", "") or ""
             if not drill_html:
                 continue
-            rows = parse_rentcafe_lt_applyga(drill_html, origin + d)
+            # Preserve word boundaries and decode entities before parsing the
+            # exact plan header. A regex tag-strip loses values on several
+            # live themes (Northview, Franklin, Wildwood).
+            from bs4 import BeautifulSoup
+
+            drill_text = BeautifulSoup(
+                drill_html, "html.parser"
+            ).get_text(" ", strip=True)
+            _, drill_baths, _ = _parse_plan_specs(drill_text)
+            rows = parse_rentcafe_lt_applyga(
+                drill_html,
+                origin + d,
+                bathrooms=drill_baths,
+            )
             if not rows:
                 # Legacy tabular/text drills (Tudorplace/Campobasso) —
                 # reuse the existing text parser as a fallback.
                 rows = parse_rentcafe_layout_tab(
                     [{"drillPath": d, "bodyText": drill_html}], origin
                 )
-            collected.extend(rows)
+            if rows:
+                source_bodies[origin + d] = (
+                    drill_html,
+                    200,
+                    "rentcafe_plan_drill",
+                )
+            collected.extend(_mark_lt_source(rows, _LT_PRIORITY_EXACT_DRILL))
 
         return self._finish_code_only(
             ctx, result, collected, _sc_src or (origin + "/floorplans"),
@@ -663,6 +805,7 @@ class RentCafeLayoutTabAdapter:
                 if _sc_carry
                 else f"{len(drills)} drills"
             ),
+            source_bodies=source_bodies,
         )
 
     @staticmethod
@@ -673,6 +816,7 @@ class RentCafeLayoutTabAdapter:
         winning_url: str,
         *,
         detail: str = "/availableunits roster",
+        source_bodies: dict[str, tuple[Any, int, str]] | None = None,
     ) -> AdapterResult:
         """Dedup, post-process and score rows from the code-only path.
 
@@ -682,17 +826,10 @@ class RentCafeLayoutTabAdapter:
         how this file would drift, and drift between two copies of the same
         rule is already a recurring defect class in this repo.
         """
-        # RUN-GLOBAL dedup by unit_number (plan-level rows with no unit_number
-        # are kept as-is — they're not roster duplicates).
-        deduped: list[dict] = []
-        seen: set[str] = set()
-        for u in collected:
-            un = str(u.get("unit_number") or "").strip().upper()
-            if un:
-                if un in seen:
-                    continue
-                seen.add(un)
-            deduped.append(u)
+        # Run-global union by native apartment number. Exact plan drills win
+        # semantic conflicts; lower-authority surfaces can still contribute
+        # apartments that the drills do not publish.
+        deduped = _reconcile_lt_rows(collected)
 
         if not deduped:
             result.confidence = 0.0
@@ -701,14 +838,30 @@ class RentCafeLayoutTabAdapter:
             )
             return result
 
+        physical_source = next(
+            (
+                str(row.get("source_api_url") or "")
+                for row in deduped
+                if str(row.get("unit_number") or "").strip()
+                and str(row.get("source_api_url") or "").strip()
+            ),
+            "",
+        )
+
         from ma_poc.extraction.post_process import post_process
 
         pp = post_process(deduped, property_id=getattr(ctx, "property_id", None))
         if pp.n_admitted > 0:
             result.units = pp.admitted
             result.plan_summaries = pp.plan_summaries
-            result.winning_url = winning_url
+            result.winning_url = physical_source or winning_url
             result.confidence = min(0.92, 0.7 + 0.02 * pp.n_admitted)
+            _record_lt_provenance(
+                result,
+                pp.admitted,
+                source_bodies or {},
+                ctx,
+            )
             return result
         result.confidence = 0.0
         result.errors.append(

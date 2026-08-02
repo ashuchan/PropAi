@@ -103,8 +103,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -149,18 +150,19 @@ _DATE_NOW_RE = re.compile(r"^\s*now\s*$", re.IGNORECASE)
 
 
 def _norm_avail_date(raw: str) -> str:
-    """ThinkRESIDE ``data-date`` → ISO ``YYYY-MM-DD``.
+    """Preserve ThinkRESIDE availability semantics at the adapter boundary.
 
-    ``"Now"`` (vendor's "available immediately" sentinel) → today's
-    UTC date. ``"MM/DD/YYYY"`` → ISO; ``"YYYY-MM-DD"`` → passthrough.
-    Empty / unparseable → ``""`` (downstream treats as "no parsed
-    date" rather than fabricating one).
+    ``"Now"`` is a source token, not a calendar date.  Keep it verbatim so
+    the production formatter can resolve it against the run capture date and
+    record ``available_now`` provenance.  Explicit ``MM/DD/YYYY`` values are
+    normalized to ISO; already-ISO values pass through. Empty / unparseable
+    values remain absent rather than fabricating a date.
     """
     s = (raw or "").strip()
     if not s:
         return ""
     if _DATE_NOW_RE.match(s):
-        return datetime.now(tz=UTC).date().isoformat()
+        return s
     m = _DATE_MMDDYYYY_RE.match(s)
     if m:
         mm, dd, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -220,8 +222,9 @@ def _int_str(val: str | int | None) -> str:
 
 def parse_thinkreside_plan_index(html: str, base_url: str) -> list[dict[str, Any]]:
     """Walk the ``/floorplans`` index (Pattern A ``<li data-beds>``) or
-    the home page (Pattern B ``<div class="floorplan-item">``) and
-    return one plan-summary dict per card.
+    the home page (Pattern B ``<div class="floorplan-item">``), or the
+    current towncommunity theme (Pattern C ``<li class="floorplan">``),
+    and return one plan-summary dict per card.
 
     Output shape — what each emitted dict carries:
 
@@ -280,6 +283,22 @@ def parse_thinkreside_plan_index(html: str, base_url: str) -> list[dict[str, Any
             continue
         if link:
             seen_links.add(link)
+        out.append(rec)
+
+    # Pattern C — current towncommunity ``li.floorplan`` cards.  These do
+    # not carry any ``data-*`` dimensions, so bind the parse to the exact
+    # structured child classes and to one same-property /floorplans/ link.
+    # Pattern A cards cannot enter here because they do not carry the
+    # ``floorplan`` class; the seen-link guard also prevents mixed-theme
+    # pages from duplicating a plan.
+    for li in soup.select("li.floorplan"):
+        rec = _plan_card_from_towncommunity_li(li, base)
+        if rec is None:
+            continue
+        link = rec.get("detail_url") or ""
+        if link in seen_links:
+            continue
+        seen_links.add(link)
         out.append(rec)
 
     return out
@@ -347,6 +366,142 @@ def _plan_card_from_div(div: Any, base: str) -> dict[str, Any] | None:
         "price_raw": price_raw,
         "rent_low": _strip_dollars(price_raw),
         "detail_url": _abs_url(href, base),
+        "status_units": None,
+    }
+
+
+_TOWN_SQFT_RE = re.compile(
+    r"^\s*(\d[\d,]*)\s*(?:[-\N{EN DASH}\N{EM DASH}]\s*(\d[\d,]*))?\s*$"
+)
+
+
+def _town_value(details: Any, class_name: str) -> str:
+    """Return the value span from one structured towncommunity field."""
+    node = details.select_one(f"li.{class_name}")
+    if node is None:
+        return ""
+    span = node.find("span", recursive=False)
+    if span is None:
+        span = node.find("span")
+    return span.get_text(" ", strip=True) if span is not None else ""
+
+
+def _same_property_floorplan_url(href: str, base: str) -> str:
+    """Resolve one authored detail link, rejecting cross-property hops."""
+    resolved = _abs_url((href or "").strip(), base)
+    if not resolved or not base:
+        return ""
+    try:
+        target = urlsplit(resolved)
+        origin = urlsplit(base)
+    except ValueError:
+        return ""
+    target_host = (target.hostname or "").lower().removeprefix("www.")
+    origin_host = (origin.hostname or "").lower().removeprefix("www.")
+    path = re.sub(r"/+", "/", target.path or "")
+    if not target_host or target_host != origin_host:
+        return ""
+    segments = [segment for segment in path.split("/") if segment]
+    if len(segments) < 2 or segments[0].lower() != "floorplans":
+        return ""
+    return resolved
+
+
+def _plan_card_from_towncommunity_li(
+    li: Any, base: str
+) -> dict[str, Any] | None:
+    """Parse one current towncommunity ``li.floorplan`` catalogue card.
+
+    The narrow structural/host gate matters: generic recommendation cards
+    elsewhere on the page must never become this property's plans.
+    """
+    details = li.select_one("div.floorplan-details")
+    if details is None:
+        return None
+    name_node = details.select_one("h2.name")
+    name = name_node.get_text(" ", strip=True) if name_node is not None else ""
+    if not name:
+        return None
+
+    authored_links: list[str] = []
+    for anchor in li.select("a[href]"):
+        resolved = _same_property_floorplan_url(str(anchor.get("href") or ""), base)
+        if resolved and resolved not in authored_links:
+            authored_links.append(resolved)
+    if len(authored_links) != 1:
+        return None
+
+    beds_raw = _town_value(details, "beds")
+    baths_raw = _town_value(details, "baths")
+    sqft_raw = _town_value(details, "sqft")
+    beds = _int_str(beds_raw)
+    baths = _int_str(baths_raw)
+
+    sqft = ""
+    sqft_low: int | None = None
+    sqft_high: int | None = None
+    sqft_match = _TOWN_SQFT_RE.match(sqft_raw)
+    if sqft_match:
+        try:
+            sqft_low = int(sqft_match.group(1).replace(",", ""))
+            sqft_high = int(
+                (sqft_match.group(2) or sqft_match.group(1)).replace(",", "")
+            )
+        except ValueError:
+            sqft_low = sqft_high = None
+        if (
+            sqft_low is not None
+            and sqft_high is not None
+            and 150 <= sqft_low <= sqft_high <= 10_000
+        ):
+            sqft = re.sub(r"\s+", " ", sqft_raw).strip()
+        else:
+            sqft_low = sqft_high = None
+
+    price_node = details.select_one("li.price")
+    price_min_node = details.select_one("li.price .price-min")
+    price_max_node = details.select_one("li.price .price-max")
+    price_min_raw = (
+        price_min_node.get_text(" ", strip=True) if price_min_node is not None else ""
+    )
+    price_max_raw = (
+        price_max_node.get_text(" ", strip=True) if price_max_node is not None else ""
+    )
+    if price_min_raw and price_max_raw:
+        price_raw = (
+            price_min_raw
+            if price_min_raw == price_max_raw
+            else f"{price_min_raw} - {price_max_raw}"
+        )
+    else:
+        price_raw = (
+            price_node.get_text(" ", strip=True) if price_node is not None else ""
+        )
+    rent_low = _strip_dollars(price_min_raw or price_raw)
+    rent_high = _strip_dollars(price_max_raw) if price_max_raw else rent_low
+
+    # A structured catalogue card needs at least two independently labelled
+    # dimensions. Name/link alone is too weak and would admit decorative or
+    # recommendation content.
+    structured_count = sum(
+        bool(value) for value in (beds, baths, sqft, rent_low or rent_high)
+    )
+    if structured_count < 2:
+        return None
+
+    return {
+        "name": name,
+        "beds": beds,
+        "baths": baths,
+        # Keep the exact visible range in ``sqft``; the scalar V2 area field
+        # intentionally resolves it to the low bound at formatting time.
+        "sqft": sqft,
+        "sqft_low": sqft_low,
+        "sqft_high": sqft_high,
+        "price_raw": price_raw,
+        "rent_low": rent_low,
+        "rent_high": rent_high,
+        "detail_url": authored_links[0],
         "status_units": None,
     }
 
@@ -475,12 +630,11 @@ def thinkreside_plan_summary_row(
     """Emit a plan-level summary when the per-plan unit table is empty
     or absent (Pattern B ascent theme, Pattern C towncommunity theme).
 
-    Sets ``availability_status`` based on price signal:
+    Sets ``availability_status`` only from inventory evidence:
 
-      * ``"AVAILABLE"`` — ``rent_low`` parses to a positive int (the
-        plan has a published starting rent — operator has it listed)
-      * ``"UNKNOWN"`` — ``data-price`` is the ``"Call for pricing"``
-        sentinel or any non-numeric label
+      * ``"AVAILABLE"`` — ``status_units`` is explicitly positive
+      * ``"UNKNOWN"`` — no physical row or available-unit count exists;
+        a catalogue price alone is not proof of current availability
       * ``"UNAVAILABLE"`` — only when ``status_units`` is explicitly
         0 (Pattern A index reports 0 available, but no roster page
         was fetched for some reason)
@@ -492,10 +646,13 @@ def thinkreside_plan_summary_row(
     if not name and not (plan.get("beds") or plan.get("sqft")):
         return None
     rent = plan.get("rent_low")
+    rent_high = plan.get("rent_high")
+    if not isinstance(rent_high, int):
+        rent_high = rent if isinstance(rent, int) else None
     status_units = plan.get("status_units")
     if status_units == 0:
         status = "UNAVAILABLE"
-    elif isinstance(rent, int) and rent > 0:
+    elif isinstance(status_units, int) and status_units > 0:
         status = "AVAILABLE"
     else:
         status = "UNKNOWN"
@@ -512,9 +669,13 @@ def thinkreside_plan_summary_row(
         bathrooms=str(plan.get("baths") or ""),
         sqft=str(plan.get("sqft") or ""),
         unit_number="",
-        rent_range=format_rent_range(rent, rent) if rent else "",
+        rent_range=(
+            format_rent_range(rent, rent_high)
+            if isinstance(rent, int) or isinstance(rent_high, int)
+            else ""
+        ),
         rent_low=rent if isinstance(rent, int) else None,
-        rent_high=rent if isinstance(rent, int) else None,
+        rent_high=rent_high,
         availability_status=status,
         available_units=available_units,
         source_api_url=source_url,
@@ -536,7 +697,9 @@ def _fetch_text(url: str, timeout: int = 20) -> str:
     except ImportError:
         return ""
     try:
-        r = probe_get(url, timeout=timeout)
+        # ThinkRESIDE first-party pages are directly reachable.  Never spend
+        # or invoke Web Unlocker from this production adapter path.
+        r = probe_get(url, timeout=timeout, unlocker=False)
     except Exception as exc:
         log.debug("thinkreside fetch error url=%s err=%s", url, exc)
         return ""
@@ -635,7 +798,7 @@ class ThinkResideAdapter:
         if not plans:
             result.tier_used = f"{_TIER}_NO_PLANS"
             result.errors.append(
-                "THINKRESIDE: no <li data-beds> or .floorplan-item plan cards"
+                "THINKRESIDE: no supported structured plan cards"
             )
             return result
 
