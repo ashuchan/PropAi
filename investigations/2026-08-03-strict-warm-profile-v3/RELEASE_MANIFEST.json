@@ -6,14 +6,24 @@
       "sha256": "2fc456788e894205232393ba37a3fcb56653873ac9659aafd54b1a4015fd53bb"
     },
     {
-      "bytes": 6675,
-      "path": "README.md",
-      "sha256": "2816db0cf7999a7e95637cb192be73a0aacff9662b4502ca88b34d2e5da4293d"
+      "bytes": 583776,
+      "path": "GCS_RELEASE_MANIFEST.json",
+      "sha256": "9930cc60beed57786e76c4108c59d68fb6568bc767957c4fe7748eaa3f29e249"
     },
     {
-      "bytes": 5211,
+      "bytes": 7168,
+      "path": "README.md",
+      "sha256": "c468941e11028da3820ee7c1e9074757ed33faad3c29223d5d600a492bdfb231"
+    },
+    {
+      "bytes": 3107,
+      "path": "build_gcs_release_manifest.py",
+      "sha256": "8644f41444155beaa3c23e1fb60694cb9d90c6b7ea1a2a064d094cc2c1c829ea"
+    },
+    {
+      "bytes": 5322,
       "path": "build_release_manifest.py",
-      "sha256": "44f11dd2270c475b03174ad2031ee3706784df1a1934ca65fc7107a2ca6feedc"
+      "sha256": "8fbf3d5037397a44eed06c1c9379c9ad0c6240b9b555b8161a2f4a5f2c9fbacd"
     },
     {
       "bytes": 1347096,

@@ -22,6 +22,10 @@ are content-bound here by `RELEASE_MANIFEST.json` and the per-property ledger.
 
 The final profile-set digest is
 `76a8173802d3841924c9bc17112d8d0337d0de81bc812ae1263585d0a616f93b`.
+The immutable published seed is
+`gs://jugnu-canary/profiles/strict-v3-f27a88e8-76a81738/`; all 3,594 objects
+were created with generation-zero preconditions and then reconciled by object
+name and stored hash. The historical mixed shared root was not mutated.
 All 3,594 profile files passed Pydantic schema validation, canonical-ID and
 ledger-hash agreement, retained-route presence, and the public-HTTP URL gate.
 Re-materializing with every source and evidence input reversed produced
@@ -128,6 +132,10 @@ a second one.
 - `evidence/*hyperbrowser*`: the bounded 395-property access retry.
 - `build_release_manifest.py`: revalidates a local materialization and hashes
   every committed evidence artifact.
+- `GCS_RELEASE_MANIFEST.json`: URL-free per-object GCS generations and hashes
+  for the immutable seed.
+- `build_gcs_release_manifest.py`: validates and redacts the ignored reviewed
+  promotion result into the committed GCS manifest.
 
 Raw API/HTML bodies, public widget credentials inside profile JSON, and local
 GCP mirrors remain outside Git. The committed ledgers retain hashes and bounded

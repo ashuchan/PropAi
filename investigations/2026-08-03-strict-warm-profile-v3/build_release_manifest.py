@@ -79,14 +79,16 @@ def build(root: Path, profiles_dir: Path) -> dict[str, Any]:
     actionable_admitted = admitted & actionable_ids
 
     excluded = {root / "RELEASE_MANIFEST.json"}
+    excluded_roots = {"promotion-snapshot"}
     artifacts = []
     for path in sorted((path for path in root.rglob("*") if path.is_file()), key=str):
-        if path in excluded:
+        relative = path.relative_to(root)
+        if path in excluded or relative.parts[0] in excluded_roots:
             continue
         raw = path.read_bytes()
         artifacts.append(
             {
-                "path": path.relative_to(root).as_posix(),
+                "path": relative.as_posix(),
                 "bytes": len(raw),
                 "sha256": _sha256(raw),
             }
