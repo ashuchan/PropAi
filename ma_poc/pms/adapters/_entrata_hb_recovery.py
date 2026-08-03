@@ -162,6 +162,8 @@ class EntrataHbRecovery:
     complete: bool = False
     units: list[dict[str, Any]] = field(default_factory=list)
     plan_rows: list[dict[str, Any]] = field(default_factory=list)
+    html_responses: list[dict[str, Any]] = field(default_factory=list)
+    unit_source_provenance: list[dict[str, Any]] = field(default_factory=list)
     winning_url: str = ""
     failure_reason: str = ""
 
@@ -518,13 +520,60 @@ def _positive_numeric_rent(row: dict[str, Any]) -> bool:
 
 
 def _validated_units(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one coherent, priced Entrata apartment roster.
+
+    Eight properties in the Aug-02 stratified canary mixed the legacy
+    per-plan cards with Entrata's modern embedded ``unitsData`` roster.  The
+    two families described the same apartments but one carried a building
+    label and the other did not, so the old ``(building, unit_number)`` key
+    retained both.  Across all eight live outputs the two unit-number sets
+    were subset-comparable.  Select the strict superset; on equality prefer
+    the property-scoped per-plan family, which carries richer building/native
+    metadata.  Non-comparable families remain a union and therefore fail
+    conservatively rather than silently dropping distinct inventory.
+    """
     from ma_poc.core.identity import unit_has_real_anchor
+
+    eligible = [
+        row
+        for row in (rows or [])
+        if isinstance(row, dict)
+        and unit_has_real_anchor(row)
+        and _positive_numeric_rent(row)
+        and str(row.get("unit_number") or "").strip()
+    ]
+    modern = [
+        row
+        for row in eligible
+        if str(row.get("extraction_tier") or "").upper()
+        == "TIER_1_DOM_ENTRATA_MODERN"
+    ]
+    scoped = [
+        row
+        for row in eligible
+        if str(row.get("extraction_tier") or "").upper()
+        != "TIER_1_DOM_ENTRATA_MODERN"
+    ]
+    if modern and scoped:
+        modern_numbers = {
+            str(row.get("unit_number") or "").strip().casefold()
+            for row in modern
+        }
+        scoped_numbers = {
+            str(row.get("unit_number") or "").strip().casefold()
+            for row in scoped
+        }
+        if modern_numbers > scoped_numbers:
+            eligible = modern
+        elif scoped_numbers >= modern_numbers:
+            # Equal sets intentionally land here: per-plan rows retain
+            # building/native identity that the blank-building modern copy
+            # omits. A strict scoped superset also wins naturally.
+            eligible = scoped
 
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    for row in rows or []:
-        if not isinstance(row, dict) or not unit_has_real_anchor(row) or not _positive_numeric_rent(row):
-            continue
+    for row in eligible:
         building = str(row.get("building") or "").strip().casefold()
         unit_number = str(row.get("unit_number") or "").strip().casefold()
         key = (building, unit_number)
@@ -533,6 +582,84 @@ def _validated_units(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         seen.add(key)
         out.append(row)
     return out
+
+
+def _source_evidence(
+    *,
+    rows: list[dict[str, Any]],
+    url: str,
+    body: str,
+    via: str,
+    property_id: str,
+    response_kind: str = "unit_roster",
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Stamp rows and build an immutable-body archive/provenance pair."""
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        response_sha256,
+    )
+
+    digest = response_sha256(body)
+    for index, row in enumerate(rows):
+        row.setdefault("source_response_sha256", digest)
+        row.setdefault("source_response_url", url)
+        row.setdefault("source_record_locator", f"entrata-row:{index}")
+    identity = {
+        "status": "MATCH",
+        "configured_property_id": str(property_id or ""),
+        "boundary": "property_scoped_entrata_route",
+    }
+    response = {
+        "url": url,
+        "status": 200,
+        "body": body,
+        "response_sha256": digest,
+        "response_kind": response_kind,
+        "via": via,
+        "identity": identity,
+    }
+    provenance = build_unit_source_provenance(
+        provider="entrata",
+        source_url=url,
+        body=body,
+        unit_count=len(rows),
+        identity=identity,
+        response_kind=response_kind,
+        status=200,
+    )
+    return response, provenance
+
+
+def _selected_source_evidence(
+    units: list[dict[str, Any]],
+    responses: list[dict[str, Any]],
+    provenance: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Keep only response bodies referenced by the final coherent roster."""
+    selected_hashes = {
+        str(row.get("source_response_sha256") or "")
+        for row in units
+        if str(row.get("source_response_sha256") or "")
+    }
+    if not selected_hashes:
+        return [], []
+    return (
+        [
+            item
+            for item in responses
+            if str(item.get("response_sha256") or "") in selected_hashes
+            or any(
+                str(p.get("response_sha256") or "") in selected_hashes
+                and str(p.get("source_url") or "") == str(item.get("url") or "")
+                for p in provenance
+            )
+        ],
+        [
+            item
+            for item in provenance
+            if str(item.get("response_sha256") or "") in selected_hashes
+        ],
+    )
 
 
 def _same_origin_relative(candidate: str, origin_url: str) -> str:
@@ -741,6 +868,20 @@ async def recover_entrata_hb_conventional(
             parse_entrata_modern_units_data,
         ):
             parsed_units.extend(parser(index_html, final_url))
+        evidence_responses: list[dict[str, Any]] = []
+        evidence_provenance: list[dict[str, Any]] = []
+        index_evidence_rows = parsed_units if parsed_units else plan_rows
+        if index_evidence_rows:
+            _response, _provenance = _source_evidence(
+                rows=index_evidence_rows,
+                url=final_url,
+                body=index_html,
+                via="entrata_pp_hyperbrowser_index",
+                property_id=property_id,
+                response_kind=("unit_roster" if parsed_units else "floor_plan_catalog"),
+            )
+            evidence_responses.append(_response)
+            evidence_provenance.append(_provenance)
 
         raw_links = find_entrata_pp_plan_links(index_html, final_url)
         # Some current Entrata themes publish exact per-plan links on the
@@ -814,15 +955,33 @@ async def recover_entrata_hb_conventional(
             ):
                 vus_fetches_ok = False
                 continue
-            vus_rows.extend(parse_prospectportal_unit_spaces(detail_html, link))
+            _parsed_vus = parse_prospectportal_unit_spaces(detail_html, link)
+            if _parsed_vus:
+                _response, _provenance = _source_evidence(
+                    rows=_parsed_vus,
+                    url=link,
+                    body=detail_html,
+                    via="entrata_pp_hyperbrowser_view_unit_spaces",
+                    property_id=property_id,
+                )
+                evidence_responses.append(_response)
+                evidence_provenance.append(_provenance)
+                vus_rows.extend(_parsed_vus)
 
         validated_vus = _validated_units(vus_rows)
         if validated_vus:
+            selected_responses, selected_provenance = _selected_source_evidence(
+                validated_vus,
+                evidence_responses,
+                evidence_provenance,
+            )
             return EntrataHbRecovery(
                 attempted=attempted,
                 complete=bool(plan_rows and vus_fetches_ok),
                 units=validated_vus,
                 plan_rows=plan_rows,
+                html_responses=selected_responses,
+                unit_source_provenance=selected_provenance,
                 winning_url=final_url,
             )
 
@@ -865,6 +1024,16 @@ async def recover_entrata_hb_conventional(
             )
             detail_rows.extend(parse_entrata_pp_jd_fp_cards(detail_html, link))
             detail_rows.extend(parse_entrata_modern_units_data(detail_html, link))
+            if detail_rows:
+                _response, _provenance = _source_evidence(
+                    rows=detail_rows,
+                    url=link,
+                    body=detail_html,
+                    via="entrata_pp_hyperbrowser_plan_detail",
+                    property_id=property_id,
+                )
+                evidence_responses.append(_response)
+                evidence_provenance.append(_provenance)
             if snippet_target is not None:
                 for row in detail_rows:
                     row["source_property_id"] = snippet_target.property_id
@@ -891,11 +1060,23 @@ async def recover_entrata_hb_conventional(
         # incomplete so later tiers can investigate rather than certifying a
         # parser miss as a true no-inventory ceiling.
         complete = bool(plan_rows and plan_links and all_detail_fetches_ok and (units or not vus_links))
+        selected_responses, selected_provenance = _selected_source_evidence(
+            units,
+            evidence_responses,
+            evidence_provenance,
+        )
+        if not units and plan_rows:
+            # Plan-only is still a successful extraction surface. Preserve the
+            # exact index body that produced the catalogue for offline replay.
+            selected_responses = evidence_responses[:1]
+            selected_provenance = evidence_provenance[:1]
         return EntrataHbRecovery(
             attempted=attempted,
             complete=complete,
             units=units,
             plan_rows=plan_rows,
+            html_responses=selected_responses,
+            unit_source_provenance=selected_provenance,
             winning_url=final_url,
             failure_reason="" if units else "NO_NATIVE_UNIT_ROSTER",
         )

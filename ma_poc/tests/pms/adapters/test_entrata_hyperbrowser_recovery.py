@@ -11,6 +11,7 @@ import pytest
 from ma_poc.fetch.hyperbrowser_backend import reset_hyperbrowser_property_counts
 from ma_poc.pms.adapters._entrata_hb_recovery import (
     EntrataHbRecovery,
+    _validated_units,
     recover_entrata_hb_conventional,
     strict_conventional_url,
 )
@@ -59,6 +60,67 @@ def _ctx() -> AdapterContext:
     )
     setattr(ctx, "_api_responses", [])
     return ctx
+
+
+def _roster_row(
+    number: str,
+    tier: str,
+    *,
+    building: str = "",
+    rent: int = 1800,
+) -> dict[str, Any]:
+    return {
+        "unit_number": number,
+        "building": building,
+        "market_rent_low": rent,
+        "extraction_tier": tier,
+    }
+
+
+def test_coherent_roster_equal_sets_prefer_scoped_detail_rows() -> None:
+    rows = [
+        _roster_row("101", "TIER_1_DOM_ENTRATA_MODERN"),
+        _roster_row("102", "TIER_1_DOM_ENTRATA_MODERN"),
+        _roster_row("101", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="A"),
+        _roster_row("102", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="A"),
+    ]
+
+    selected = _validated_units(rows)
+
+    assert [(row["building"], row["unit_number"]) for row in selected] == [
+        ("A", "101"),
+        ("A", "102"),
+    ]
+
+
+def test_coherent_roster_modern_strict_superset_wins() -> None:
+    rows = [
+        _roster_row("101", "TIER_1_DOM_ENTRATA_MODERN"),
+        _roster_row("102", "TIER_1_DOM_ENTRATA_MODERN"),
+        _roster_row("101", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="A"),
+    ]
+
+    selected = _validated_units(rows)
+
+    assert [row["unit_number"] for row in selected] == ["101", "102"]
+    assert all(row["extraction_tier"] == "TIER_1_DOM_ENTRATA_MODERN" for row in selected)
+
+
+def test_coherent_roster_detail_superset_keeps_same_number_across_buildings() -> None:
+    rows = [
+        _roster_row("101", "TIER_1_DOM_ENTRATA_MODERN"),
+        _roster_row("101", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="A"),
+        _roster_row("101", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="B"),
+        _roster_row("102", "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL", building="B"),
+    ]
+
+    selected = _validated_units(rows)
+
+    assert [(row["building"], row["unit_number"]) for row in selected] == [
+        ("A", "101"),
+        ("B", "101"),
+        ("B", "102"),
+    ]
 
 
 class _FakePage:
@@ -315,6 +377,14 @@ async def test_single_session_walk_recovers_real_priced_units(monkeypatch) -> No
     ]
     assert all(float(row["market_rent_low"]) > 0 for row in outcome.units)
     assert len(outcome.plan_rows) == 7
+    assert outcome.html_responses
+    assert all(response.get("body") for response in outcome.html_responses)
+    assert outcome.unit_source_provenance
+    assert {
+        row["source_response_sha256"] for row in outcome.units
+    } <= {
+        record["response_sha256"] for record in outcome.unit_source_provenance
+    }
     assert page.goto_calls == [_GRID_URL]
     assert sum("view_unit_spaces" in path for path in page.fetch_paths) == 7
     assert sum("/floorplans/" in path for path in page.fetch_paths) == 7
@@ -468,6 +538,15 @@ async def test_adapter_returns_hb_unit_win_before_static_retry(monkeypatch) -> N
             attempted=True,
             complete=True,
             units=rows,
+            html_responses=[{"url": _DETAIL_URL, "status": 200, "body": _detail_html()}],
+            unit_source_provenance=[
+                {
+                    "provider": "entrata",
+                    "source_url": _DETAIL_URL,
+                    "response_sha256": "a" * 64,
+                    "unit_count": len(rows),
+                }
+            ],
             winning_url=_GRID_URL,
         )
 
@@ -487,6 +566,8 @@ async def test_adapter_returns_hb_unit_win_before_static_retry(monkeypatch) -> N
         "8989",
     ]
     assert result.winning_url == _GRID_URL
+    assert result.html_responses[0]["url"] == _DETAIL_URL
+    assert result.unit_source_provenance[0]["provider"] == "entrata"
 
 
 @pytest.mark.asyncio

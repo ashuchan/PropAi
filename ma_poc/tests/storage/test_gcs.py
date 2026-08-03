@@ -101,6 +101,25 @@ def test_download_prefix_tolerates_empty(tmp_path: Path) -> None:
     assert gcs.download_prefix("gs://b/missing/", tmp_path, client=client) == 0
 
 
+def test_download_prefix_retries_latest_when_listed_generation_is_replaced(
+    tmp_path: Path,
+) -> None:
+    """Parallel profile writes can invalidate the generation returned by list."""
+    client = MagicMock()
+    stale = MagicMock()
+    stale.name = "profiles/1783.json"
+    stale.download_to_filename.side_effect = RuntimeError("404 generation not found")
+    client.list_blobs.return_value = [stale]
+    latest = _mock_blob(b'{"maturity":"WARM"}')
+    client.bucket.return_value.blob.return_value = latest
+
+    count = gcs.download_prefix("gs://b/profiles/", tmp_path, client=client)
+
+    assert count == 1
+    assert (tmp_path / "1783.json").read_bytes() == b'{"maturity":"WARM"}'
+    client.bucket.return_value.blob.assert_called_once_with("profiles/1783.json")
+
+
 def test_upload_prefix_walks_local_dir(tmp_path: Path) -> None:
     src = tmp_path / "src"
     (src / "nested").mkdir(parents=True)

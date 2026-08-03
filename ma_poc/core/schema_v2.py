@@ -1369,8 +1369,12 @@ def _format_v2_unit(
     )
     sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet", "square_feet", "size", "sq_ft")
 
-    # unit_id alias (adapters emit unit_number / camelCase / uid)
-    uid = _first(
+    # Prefer a natural apartment number over an ``inferred_*`` id minted by an
+    # earlier merge pass. The latter is only a fallback plan phenotype and
+    # must not erase stronger identity that remains on the same raw row.
+    from ma_poc.core.identity import preferred_existing_unit_id
+
+    uid = preferred_existing_unit_id(unit) or _first(
         unit, "unit_id", "unit_number", "_unit_number", "unitNumber", "unitId", "uid", "apartment_number"
     )
     # #3-tail: scrub a unit_id that is a scraped field label ("856c8776-Baths: 1")
@@ -1555,18 +1559,10 @@ def _format_v2_unit(
     )
 
     _building_id, _building_id_source = source_building_identity(unit)
-    _source_unit_id = _raw_str(
-        _first(
-            unit,
-            "unit_id",
-            "unit_number",
-            "_unit_number",
-            "unitNumber",
-            "unitId",
-            "uid",
-            "apartment_number",
-        )
-    )
+    # Preserve the strongest source/display identity selected above. Reading
+    # ``unit_id`` first here would re-introduce the very synthetic-over-natural
+    # loss the formatter just corrected.
+    _source_unit_id = _raw_str(uid)
     _area_low, _area_high, _area_range, _area_value_type = output_area_range(
         unit,
         area_out,
@@ -2275,6 +2271,13 @@ def _classify_availability_date_provenance(
                 return "explicit_capture_date"
             return "historical_embedded"
         if _availability_text_is_available_now(raw_text):
+            # A relative "Available Now" string can contradict a structured
+            # negative status on a stale card. The resolver deliberately
+            # suppresses the manufactured capture date in that case; preserve
+            # that decision as explicit provenance rather than relabelling the
+            # row as a successful available-now normalization.
+            if resolved_date is None:
+                return "negative_status_override"
             return "available_now"
         if parsed_date:
             if parsed_date > capture_date:
@@ -2324,13 +2327,36 @@ def _resolve_available_date(
       * parsed_date None + explicit negative status          → None
       * parsed_date None + status none/unknown + no rent     → None (unchanged)
     """
+    # Relative text is parsed to the capture date by ``_format_date`` before
+    # this function runs. A negative structured status must be consulted
+    # first for that one manufactured-date shape. Explicit dates remain
+    # source facts and continue through unchanged even with a negative current
+    # status (for example a leased unit offered again next month).
+    normalized_status = str(status or "").strip().upper()
+    negative_status = normalized_status in {
+        "UNAVAILABLE",
+        "LEASED",
+        "PENDING",
+        "WAITLIST",
+        "WAITLISTED",
+        "WAIT_LIST",
+        "OCCUPIED",
+        "RENTED",
+        "OFF_MARKET",
+        "NOT_AVAILABLE",
+    }
+    if (
+        parsed_date
+        and negative_status
+        and _availability_text_is_available_now(raw_value)
+    ):
+        return None
     if parsed_date:
         return parsed_date
     # A date-shaped raw value is handled above.  A negative text token is an
     # explicit source statement and must not fall through to either default.
     if _availability_text_is_negative(raw_value):
         return None
-    normalized_status = str(status or "").strip().upper()
     if normalized_status == "AVAILABLE":
         return scrape_ts.strftime("%Y-%m-%d")
     if has_rent and normalized_status in ("", "UNKNOWN"):

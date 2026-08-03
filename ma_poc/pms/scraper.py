@@ -681,6 +681,12 @@ def checkpoint_partial(
     tier_used: str | None = None,
     winning_page_url: str | None = None,
     plan_summaries: list[Any] | None = None,
+    raw_api_responses: list[dict[str, Any]] | None = None,
+    raw_html_responses: list[dict[str, Any]] | None = None,
+    raw_asset_responses: list[dict[str, Any]] | None = None,
+    unit_source_provenance: list[dict[str, Any]] | None = None,
+    adapter_used: str | None = None,
+    detected_pms: dict[str, Any] | None = None,
 ) -> None:
     """Checkpoint salvageable progress so a per-property TIMEOUT is not a total loss.
 
@@ -714,6 +720,17 @@ def checkpoint_partial(
             a property that timed out after producing ONLY plan-level rows
             salvaged nothing and was stamped FAILED_NO_DATA; the timeout handler
             reads this back to credit SUCCESS_PLAN_LEVEL (#81).
+        raw_api_responses: API response records already retained by the
+            adapter. Copied into the caller-owned checkpoint for timeout
+            diagnostics and immutable offline replay.
+        raw_html_responses: HTML response records already retained by the
+            adapter.
+        raw_asset_responses: Binary/asset response records already retained by
+            the adapter.
+        unit_source_provenance: Compact pointers describing the exact
+            unit-producing responses.
+        adapter_used: Adapter that produced the checkpoint.
+        detected_pms: Serializable PMS detection metadata.
 
     Never raises: a checkpoint failure must never break a live scrape.
     """
@@ -740,8 +757,85 @@ def checkpoint_partial(
                 hints = {}
                 ext_ref["profile_hints"] = hints
             hints["winning_page_url"] = winning_page_url
+        for key, values in (
+            ("raw_api_responses", raw_api_responses),
+            ("raw_html_responses", raw_html_responses),
+            ("raw_asset_responses", raw_asset_responses),
+            ("unit_source_provenance", unit_source_provenance),
+        ):
+            if values is not None:
+                prior_values = ext_ref.get(key)
+                if not isinstance(prior_values, list) or len(values) >= len(prior_values):
+                    ext_ref[key] = list(values)
+        if adapter_used:
+            ext_ref["adapter_used"] = adapter_used
+        if isinstance(detected_pms, dict):
+            ext_ref["detected_pms"] = dict(detected_pms)
     except Exception:  # pragma: no cover — defensive only
         pass
+
+
+def _merge_context_recovery_diagnostics(
+    ctx: AdapterContext,
+    adapter_result: AdapterResult,
+) -> None:
+    """Merge bare-list recovery evidence into the final adapter result.
+
+    Universal recovery helpers predate :class:`AdapterResult` and communicate
+    through context attributes. Syndication adapters did not consistently copy
+    those attributes, which made a row's response hash impossible to resolve
+    from the offline archive. Centralizing the merge means every adapter path
+    receives the same capture contract.
+    """
+    from ma_poc.pms.source_provenance import response_sha256
+
+    response_channels = (
+        ("_embed_recovery_api_responses", adapter_result.api_responses),
+        ("_embed_recovery_html_responses", adapter_result.html_responses),
+        ("_embed_recovery_asset_responses", adapter_result.asset_responses),
+    )
+    for attr, destination in response_channels:
+        candidates = getattr(ctx, attr, None)
+        if not isinstance(candidates, list):
+            continue
+        seen = {
+            (
+                str(item.get("url") or ""),
+                response_sha256(item.get("body")),
+            )
+            for item in destination
+            if isinstance(item, dict) and item.get("body") is not None
+        }
+        for item in candidates:
+            if not isinstance(item, dict) or item.get("body") is None:
+                continue
+            key = (str(item.get("url") or ""), response_sha256(item.get("body")))
+            if key not in seen:
+                destination.append(dict(item))
+                seen.add(key)
+
+    candidates = getattr(ctx, "_embed_recovery_unit_source_provenance", None)
+    if isinstance(candidates, list):
+        seen_provenance = {
+            (
+                str(item.get("source_url") or ""),
+                str(item.get("response_sha256") or ""),
+                str(item.get("response_kind") or ""),
+            )
+            for item in adapter_result.unit_source_provenance
+            if isinstance(item, dict)
+        }
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            key = (
+                str(item.get("source_url") or ""),
+                str(item.get("response_sha256") or ""),
+                str(item.get("response_kind") or ""),
+            )
+            if key not in seen_provenance:
+                adapter_result.unit_source_provenance.append(dict(item))
+                seen_provenance.add(key)
 
 
 def _try_page_local_static_recovery(
@@ -4348,6 +4442,30 @@ async def scrape(
         result.pop("_verdict_quality", None)
         result.pop("_plan_level_reason", None)
 
+    # Checkpoint the completed adapter result BEFORE optional area enrichment.
+    # The enrichment probe runs off-thread but remains inside the global
+    # per-property timeout; cancelling it used to discard an already-complete
+    # roster and all source evidence because the only single-page checkpoint
+    # sat below this block.
+    _merge_context_recovery_diagnostics(ctx, adapter_result)
+    checkpoint_partial(
+        shared_budget,
+        adapter_result.units,
+        tier_used=adapter_result.tier_used or None,
+        winning_page_url=adapter_result.winning_url or None,
+        plan_summaries=adapter_result.plan_summaries,
+        raw_api_responses=adapter_result.api_responses,
+        raw_html_responses=adapter_result.html_responses,
+        raw_asset_responses=adapter_result.asset_responses,
+        unit_source_provenance=adapter_result.unit_source_provenance,
+        adapter_used=str(result.get("_adapter_used") or "") or None,
+        detected_pms=(
+            result.get("_detected_pms")
+            if isinstance(result.get("_detected_pms"), dict)
+            else None
+        ),
+    )
+
     # A small audited cohort publishes exact unit area on a property-authored
     # floor-plan/availability surface while its primary PMS API omits area.
     # The enrichment is fail-closed: >=3 exact labels or a complete unique
@@ -4374,6 +4492,12 @@ async def scrape(
             f"published-area-enrichment-error: {type(exc).__name__}"
         )
 
+    # Bare-list universal recoveries attach their exact source bodies to the
+    # shared context. Merge them centrally before checkpointing/copying the
+    # adapter result so Squarespace/Wix and any future wrapper cannot forget
+    # the diagnostic evidence.
+    _merge_context_recovery_diagnostics(ctx, adapter_result)
+
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
     # ``plan_summaries`` are deliberately separate: Jugnu emits them under
@@ -4390,6 +4514,16 @@ async def scrape(
         tier_used=adapter_result.tier_used or None,
         winning_page_url=adapter_result.winning_url or None,
         plan_summaries=adapter_result.plan_summaries,
+        raw_api_responses=adapter_result.api_responses,
+        raw_html_responses=adapter_result.html_responses,
+        raw_asset_responses=adapter_result.asset_responses,
+        unit_source_provenance=adapter_result.unit_source_provenance,
+        adapter_used=str(result.get("_adapter_used") or "") or None,
+        detected_pms=(
+            result.get("_detected_pms")
+            if isinstance(result.get("_detected_pms"), dict)
+            else None
+        ),
     )
     result["errors"].extend(adapter_result.errors)
     result["api_calls_intercepted"] = [r.get("url", "") for r in adapter_result.api_responses]

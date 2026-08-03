@@ -3873,13 +3873,12 @@ class EntrataAdapter:
                     0.94,
                     0.76 + 0.03 * len(_hb_units_pp.units),
                 )
-                result.api_responses.append(
-                    {
-                        "url": _hb_pp.winning_url,
-                        "status": 200,
-                        "body": "<entrata-pp-hyperbrowser-unit-drill>",
-                        "via": "entrata_pp_hyperbrowser_unit_drill",
-                    }
+                # Preserve the actual body/bodies that produced the coherent
+                # roster. The old sentinel proved only that the route ran and
+                # made offline parser/identity debugging impossible.
+                result.html_responses.extend(_hb_pp.html_responses)
+                result.unit_source_provenance.extend(
+                    _hb_pp.unit_source_provenance
                 )
                 return result
 
@@ -3983,13 +3982,9 @@ class EntrataAdapter:
                     0.94,
                     0.76 + 0.03 * len(_hb_units_pp.units),
                 )
-                result.api_responses.append(
-                    {
-                        "url": _hb_pp.winning_url,
-                        "status": 200,
-                        "body": "<entrata-pp-hyperbrowser-unit-drill>",
-                        "via": "entrata_pp_hyperbrowser_unit_drill",
-                    }
+                result.html_responses.extend(_hb_pp.html_responses)
+                result.unit_source_provenance.extend(
+                    _hb_pp.unit_source_provenance
                 )
                 return result
 

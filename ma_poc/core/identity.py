@@ -515,30 +515,91 @@ def unit_has_real_anchor(unit: dict[str, Any]) -> bool:
     return _has_per_unit_evidence(unit)
 
 
+def _usable_unit_number(unit: dict[str, Any]) -> str | None:
+    """Return a real operator unit number, or ``None``.
+
+    A pre-format row can already carry an ``inferred_*`` ``unit_id`` from an
+    earlier merge pass while still retaining the apartment's real
+    ``unit_number``.  Keeping the synthetic value in that situation destroys
+    the stronger natural identity.  This helper is deliberately narrow: it
+    rejects sentinels, plan surrogates, synthetic values and the shared junk
+    vocabulary before allowing the number to outrank a fallback id.
+    """
+    raw = (
+        unit.get("unit_number")
+        or unit.get("_unit_number")
+        or unit.get("unitNumber")
+        or unit.get("apartment_number")
+    )
+    value = str(raw or "").strip()
+    if (
+        not value
+        or value.casefold() in {"null", "none"}
+        or value.startswith(SYNTHETIC_ID_PREFIXES)
+        or _is_floorplan_surrogate(unit, value)
+    ):
+        return None
+    try:
+        from ma_poc.pms.adapters._parsing import is_junk_unit_number
+
+        if is_junk_unit_number(value):
+            return None
+    except Exception:
+        pass
+    return value
+
+
+def preferred_existing_unit_id(unit: dict[str, Any]) -> str | None:
+    """Choose the strongest already-present unit identity.
+
+    A real explicit ``unit_id`` remains first choice.  A natural
+    ``unit_number`` outranks a synthetic/plan-surrogate ``unit_id``.  A lone
+    synthetic id is returned only as an idempotent last choice; callers that
+    can derive a provider-native anchor should still use
+    :func:`assign_fallback_unit_id`.
+    """
+    raw_id = unit.get("unit_id") or unit.get("unitId") or unit.get("uid")
+    explicit = str(raw_id or "").strip()
+    explicit_is_real = bool(
+        explicit
+        and explicit.casefold() not in {"null", "none"}
+        and not explicit.startswith(SYNTHETIC_ID_PREFIXES)
+        and not _is_floorplan_surrogate(unit, explicit)
+    )
+    if explicit_is_real:
+        return explicit
+    natural = _usable_unit_number(unit)
+    if natural:
+        return natural
+    if (
+        explicit
+        and explicit.casefold() not in {"null", "none"}
+        and not _is_floorplan_surrogate(unit, explicit)
+    ):
+        return explicit
+    return None
+
+
 def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | None:
     """Mutate ``unit['unit_id']`` in place with a stable fallback id.
 
     Resolution order:
 
-      1. Existing non-empty ``unit_id`` / ``unit_number`` — keep it.
-      2. A stable per-unit id from ``source_ids`` (captured-but-ignored) —
+      1. Existing real ``unit_id`` — keep it.
+      2. Natural ``unit_number`` — prefer it over a synthetic/plan id.
+      3. A stable per-unit id from ``source_ids`` (captured-but-ignored) —
          e.g. ``appfolio_listing_id``. Real, unique, rent-stable.
-      3. ``compute_fallback_unit_id`` — SHA256 of physical attrs.
-      4. ``_last_resort_key`` — SHA256 of just floor_plan.
-      5. None — unit has no identifying anchor at all.
+      4. Existing synthetic id — preserve it when no stronger anchor exists.
+      5. ``compute_fallback_unit_id`` — SHA256 of physical attrs.
+      6. ``_last_resort_key`` — SHA256 of just floor_plan.
+      7. None — unit has no identifying anchor at all.
 
     Returns the assigned id, or ``None`` when nothing identifiable could be
     derived. Callers that must persist every record (no-drop contract)
     should chain :func:`synthesize_unkeyable_id` for the None case.
     """
-    existing = str(
-        unit.get("unit_id") or unit.get("unit_number") or ""
-    ).strip()
-    if (
-        existing
-        and existing.lower() not in {"null", "none"}
-        and not _is_floorplan_surrogate(unit, existing)
-    ):
+    existing = preferred_existing_unit_id(unit)
+    if existing and not existing.startswith(SYNTHETIC_ID_PREFIXES):
         unit["unit_id"] = existing
         return existing
 
@@ -549,6 +610,10 @@ def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | Non
     if anchor:
         unit["unit_id"] = anchor
         return anchor
+
+    if existing:
+        unit["unit_id"] = existing
+        return existing
 
     derived = compute_fallback_unit_id(unit, property_id) or _last_resort_key(unit, property_id)
     if derived:

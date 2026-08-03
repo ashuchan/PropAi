@@ -347,6 +347,101 @@ def _archive_raw_source_responses(
     }
 
 
+def _finalize_timeout_diagnostics(
+    failed: dict[str, Any],
+    partial_state: dict[str, Any],
+    *,
+    property_id: str,
+    csv_row: dict[str, Any] | None,
+    run_dir: Path | None,
+) -> dict[str, Any]:
+    """Apply the normal provenance/archive contract to a timeout record.
+
+    The timeout handler returns from outside :func:`_process_property`, so it
+    historically bypassed the provenance block and immutable extraction
+    snapshot. This helper reconstructs the internal diagnostic shape from the
+    caller-owned checkpoint without changing the salvage verdict or rows.
+    It always attempts a snapshot, including for a zero-row timeout.
+    """
+    fetch_result = partial_state.get("fetch_result")
+    raw_html = list(partial_state.get("raw_html_responses") or [])
+    primary_body = getattr(fetch_result, "body", None) if fetch_result is not None else None
+    if primary_body is not None:
+        from ma_poc.pms.source_provenance import response_sha256
+
+        primary_hash = response_sha256(primary_body)
+        if not any(
+            isinstance(item, dict)
+            and item.get("body") is not None
+            and response_sha256(item.get("body")) == primary_hash
+            for item in raw_html
+        ):
+            headers = getattr(fetch_result, "headers", {}) or {}
+            raw_html.insert(
+                0,
+                {
+                    "url": (
+                        getattr(fetch_result, "final_url", None)
+                        or getattr(fetch_result, "url", None)
+                        or failed.get("website")
+                        or ""
+                    ),
+                    "status": getattr(fetch_result, "status", None),
+                    "body": primary_body,
+                    "content_type": headers.get("content-type"),
+                    "response_kind": "primary_fetch_body",
+                    "via": str(getattr(fetch_result, "render_mode", "") or ""),
+                    "identity": {
+                        "status": "CONFIGURED_URL",
+                        "configured_property_id": str(property_id),
+                    },
+                },
+            )
+
+    diagnostic_result: dict[str, Any] = {
+        "units": list(partial_state.get("units") or []),
+        "plan_summaries": list(partial_state.get("plan_summaries") or []),
+        "extraction_tier_used": partial_state.get("tier_used"),
+        "_adapter_used": partial_state.get("adapter_used") or "",
+        "_detected_pms": dict(partial_state.get("detected_pms") or {}),
+        "_raw_api_responses": list(partial_state.get("raw_api_responses") or []),
+        "_raw_html_responses": raw_html,
+        "_raw_asset_responses": list(partial_state.get("raw_asset_responses") or []),
+        "_unit_source_provenance": list(
+            partial_state.get("unit_source_provenance") or []
+        ),
+        "_v2_formatted": failed,
+        "_meta": failed.setdefault("_meta", {}),
+    }
+    raw_outcome = getattr(fetch_result, "outcome", None)
+    outcome_value = getattr(raw_outcome, "value", raw_outcome)
+    try:
+        diagnostic_result["_meta"]["provenance"] = _provenance_block(
+            diagnostic_result,
+            csv_row or {},
+            fetch_result,
+            str(outcome_value or "") or None,
+        )
+    except Exception as exc:  # diagnostics must never sink timeout salvage
+        log.warning("timeout provenance failed for %s: %s", property_id, exc)
+
+    try:
+        archive = _archive_raw_source_responses(
+            diagnostic_result,
+            run_dir,
+            property_id,
+            str(partial_state.get("tier_used") or "FAILED_TIMEOUT"),
+        )
+        if archive:
+            failed["_raw_source_archive"] = archive
+            prov = diagnostic_result["_meta"].get("provenance")
+            if isinstance(prov, dict):
+                prov["raw_source_archive"] = archive
+    except Exception as exc:  # diagnostics must never sink timeout salvage
+        log.warning("timeout raw-source archive failed for %s: %s", property_id, exc)
+    return failed
+
+
 # 2026-05-19 JSON-on-GCS profile persistence (interim, no database).
 # config/profiles/ is .dockerignored AND Cloud Run task FS is ephemeral, so
 # the FS ProfileStore otherwise bootstraps COLD every run (documented bug).
@@ -1219,7 +1314,13 @@ async def run_jugnu(
                     task.property_id,
                     _vexc,
                 )
-            return failed
+            return _finalize_timeout_diagnostics(
+                failed,
+                _partial_state,
+                property_id=task.property_id,
+                csv_row=csv_row,
+                run_dir=run_dir,
+            )
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
             return _make_failed_record(
@@ -1874,6 +1975,11 @@ async def _process_property(
                 )
         # L1: Fetch with escalation when profile is available.
         fetch_result = await jugnu_fetch(task, profile=profile_for_dispatch)
+    # The per-property guard cancels this coroutine on timeout. Retain the
+    # fetch object in caller-owned state immediately so a zero-row timeout can
+    # still archive and explain the exact entry response offline.
+    if isinstance(partial_state, dict):
+        partial_state["fetch_result"] = fetch_result
     frontier.mark_attempt(task.url, fetch_result.outcome)
 
     # Check carry-forward need
@@ -3776,8 +3882,15 @@ def _format_v2_unit(
         pass
     sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
 
-    # unit_id alias: prefer an explicit unit_id but fall back to unit_number
-    uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+    # A merge pass can have minted an ``inferred_*`` plan phenotype while the
+    # source's real apartment number remains in ``unit_number``. Prefer that
+    # natural identity; keeping the earlier fallback would make a real unit
+    # synthetic and unstable across daily history.
+    from ma_poc.core.identity import preferred_existing_unit_id
+
+    uid = preferred_existing_unit_id(unit) or (
+        unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+    )
 
     # Phase 5 junk filter: belt-and-braces with the adapter-level filter.
     # If an adapter outside GenericAdapter emitted a CMS-module plan name
@@ -4045,7 +4158,7 @@ def _format_v2_unit(
     _raw_src.update(
         {
             "floor_plan_name_provenance": unit.get("_floor_plan_name_provenance"),
-            "source_unit_id": _raw_src["unit_id"],
+            "source_unit_id": uid,
             "building_id": _building_id,
             "area_sqft": _raw_src["area"],
         }
@@ -4086,7 +4199,9 @@ def _format_v2_unit(
         "area_sanity_source": area_sanity_source,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         "source_unit_id": (
-            str(_raw_src["unit_id"]).strip() if _raw_src["unit_id"] not in (None, "", "null") else None
+            str(_raw_src["source_unit_id"]).strip()
+            if _raw_src["source_unit_id"] not in (None, "", "null")
+            else None
         ),
         # As-displayed operator label. Kept in lock-step with
         # core/schema_v2.py — this fork is the one production actually runs,

@@ -128,11 +128,82 @@ def test_synthetic_id_with_native_source_id_is_avoidable() -> None:
     assert any(issue.code == "SYNTHETIC_ID_WITH_NATIVE_ID" for issue in issues)
 
 
+def test_snapshot_natural_number_can_rescue_synthetic_output() -> None:
+    output = _unit()
+    output.update(
+        {
+            "unit_id": "inferred_deadbeef",
+            "canonical_unit_id": "inferred_deadbeef",
+            "source_response_sha256": "c" * 64,
+            "floor_plan_name": "A1",
+            "beds": 1,
+            "baths": 1,
+            "area": 750,
+            "rent_low": 1650,
+            "available_date": "2026-08-15",
+        }
+    )
+    preformat = {
+        "unit_id": "inferred_deadbeef",
+        "unit_number": "1001",
+        "source_response_sha256": "c" * 64,
+        "floor_plan_name": "A1",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "sqft": 750,
+        "market_rent_low": 1650,
+        "availability_date": "2026-08-15",
+    }
+
+    assert AUDIT.preformat_natural_identity_matches(output, [preformat]) == ["1001"]
+
+
+def test_legacy_area_sentinel_with_published_range_is_not_unresolved() -> None:
+    row = _unit()
+    row.update(
+        {
+            "area": -1,
+            "area_sqft": None,
+            "area_low": 700,
+            "area_high": 850,
+            "area_value_type": "range",
+            "area_absence": None,
+        }
+    )
+    issues: list = []
+
+    metrics = AUDIT.audit_unit(_property(), row, issues, date(2026, 8, 2), set())
+
+    assert metrics.get("unresolved_area_units", 0) == 0
+    assert metrics["area_range_units"] == 1
+    assert not any(issue.code == "AREA_ABSENCE_UNEXPLAINED" for issue in issues)
+
+
+def test_negative_status_available_now_override_is_valid_provenance() -> None:
+    row = _unit()
+    row.update(
+        {
+            "available_date": None,
+            "available_date_raw": "Available Now",
+            "availability_date_provenance": "negative_status_override",
+            "availability_status": "PENDING",
+        }
+    )
+    issues: list = []
+
+    AUDIT.audit_unit(_property(), row, issues, date(2026, 8, 2), set())
+
+    assert not any("AVAIL" in issue.code for issue in issues)
+
+
 def test_runtime_route_aliases_match_output_adapter_names() -> None:
     prop = _property()
+    prop["_meta"]["provenance"]["winning_tier"] = (
+        "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT"
+    )
 
     assert AUDIT.target_route_exercised(prop, "rentcafe_applicant") is True
-    assert AUDIT.target_route_exercised(prop, "rentcafe_layout_tab") is True
+    assert AUDIT.target_route_exercised(prop, "rentcafe_layout_tab") is False
     assert AUDIT.target_route_exercised(prop, "avalonbay") is False
 
 

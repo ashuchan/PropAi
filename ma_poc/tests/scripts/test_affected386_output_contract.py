@@ -6,6 +6,9 @@ import gzip
 import json
 from datetime import UTC, datetime
 
+import pytest
+
+from ma_poc.core.schema_v2 import _format_v2_unit as _core_format_v2_unit
 from ma_poc.scripts.runners.jugnu import (
     _archive_raw_api_responses,
     _archive_raw_source_responses,
@@ -15,6 +18,26 @@ from ma_poc.scripts.runners.jugnu import (
 )
 
 _TS = datetime(2026, 8, 2, 12, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("formatter", [_core_format_v2_unit, _format_v2_unit])
+def test_formatter_prefers_natural_number_over_prior_synthetic_id(formatter) -> None:
+    row = formatter(
+        {
+            "unit_id": "inferred_deadbeefdeadbeef",
+            "unit_number": "1001",
+            "floor_plan_name": "A1",
+            "bedrooms": 1,
+            "bathrooms": 1,
+            "sqft": 750,
+            "market_rent_low": 1650,
+        },
+        _TS,
+        "241798",
+    )
+
+    assert row["unit_id"] == "1001"
+    assert row["source_unit_id"] == "1001"
 
 
 def test_explicit_provider_plan_names_survive_without_weakening_generic_hygiene() -> None:

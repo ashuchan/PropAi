@@ -27,6 +27,9 @@ they now drive the real ``_try_link_hop`` / ``_hop_fetch_allowance`` instead.
 from __future__ import annotations
 
 import contextlib
+import gzip
+import json
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -55,6 +58,74 @@ def test_checkpoint_writes_units_tier_and_route() -> None:
     assert ext["profile_hints"]["winning_page_url"] == "https://x.com/floorplans"
     # in-process mirror stays in sync for non-cancelled readers
     assert len(budget["_partial_units"]) == 2
+
+
+def test_checkpoint_retains_adapter_source_diagnostics() -> None:
+    budget, ext = _budget_with_ref()
+    checkpoint_partial(
+        budget,
+        [{"unit_number": "101"}],
+        tier_used="TIER_1_API_TEST",
+        raw_api_responses=[{"url": "https://x/api", "body": {"units": [1]}}],
+        raw_html_responses=[{"url": "https://x/fp", "body": "<unit>"}],
+        raw_asset_responses=[{"url": "https://x/plan.png", "body": b"png"}],
+        unit_source_provenance=[
+            {"source_url": "https://x/api", "response_sha256": "a" * 64}
+        ],
+        adapter_used="test_adapter",
+        detected_pms={"pms": "test_adapter", "confidence": 0.9},
+    )
+
+    assert ext["adapter_used"] == "test_adapter"
+    assert ext["detected_pms"]["pms"] == "test_adapter"
+    assert ext["raw_api_responses"][0]["url"] == "https://x/api"
+    assert ext["raw_html_responses"][0]["body"] == "<unit>"
+    assert ext["raw_asset_responses"][0]["body"] == b"png"
+    assert ext["unit_source_provenance"][0]["response_sha256"] == "a" * 64
+
+
+def test_timeout_diagnostics_always_write_provenance_and_snapshot(tmp_path) -> None:
+    from ma_poc.scripts.runners.jugnu import _finalize_timeout_diagnostics
+
+    failed = {
+        "apartment_id": 27165,
+        "website": "https://example.com",
+        "units": [],
+        "floor_plans": [],
+        "_meta": {"verdict": "FAILED_NO_DATA", "verdict_reason": "timeout"},
+    }
+    partial = {
+        "fetch_result": SimpleNamespace(
+            body=b"<html><body>entry response</body></html>",
+            final_url="https://example.com",
+            url="https://example.com",
+            status=200,
+            headers={"content-type": "text/html"},
+            outcome=SimpleNamespace(value="OK"),
+            render_mode="RENDER",
+        ),
+        "tier_used": "FAILED_TIMEOUT",
+        "adapter_used": "generic",
+        "detected_pms": {"pms": "unknown"},
+    }
+
+    emitted = _finalize_timeout_diagnostics(
+        failed,
+        partial,
+        property_id="27165",
+        csv_row={},
+        run_dir=tmp_path,
+    )
+
+    provenance = emitted["_meta"]["provenance"]
+    archive = provenance["raw_source_archive"]
+    assert provenance["final_admitted_count"] == 0
+    assert archive["source_count"] == 1
+    manifest_path = tmp_path / archive["manifest_path"]
+    with gzip.open(manifest_path, "rt", encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    snapshot_path = tmp_path / manifest["extraction_snapshot"]["path"]
+    assert snapshot_path.is_file()
 
 
 def test_checkpoint_never_shrinks_a_richer_earlier_view() -> None:

@@ -15,7 +15,7 @@ from ma_poc.pms.adapters._managebuilding_recovery import (
     discover_managebuilding_route,
     recover_managebuilding,
 )
-from ma_poc.pms.adapters.base import AdapterContext
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.detector import DetectedPMS
 
 
@@ -209,6 +209,55 @@ def test_town_center_exact_account_and_location_recovers_seventeen(
     assert len(rows) == 17
     assert {row["unit_number"] for row in rows}.issuperset({"1001", "1105-ADA"})
     assert all(unit_has_real_anchor(row) for row in rows)
+    html_responses = ctx._embed_recovery_html_responses  # type: ignore[attr-defined]
+    provenance = ctx._embed_recovery_unit_source_provenance  # type: ignore[attr-defined]
+    assert html_responses == [
+        {
+            "url": (
+                "https://mhtowncenter.managebuilding.com/Resident/public/rentals"
+            ),
+            "status": 200,
+            "body": html,
+            "response_kind": "unit_roster",
+            "via": "operator_authored_managebuilding_index",
+            "identity": html_responses[0]["identity"],
+        }
+    ]
+    assert provenance[0]["provider"] == "managebuilding"
+    assert provenance[0]["unit_count"] == 17
+    assert provenance[0]["response_sha256"] == rows[0]["source_response_sha256"]
+
+
+def test_context_evidence_merges_into_any_wrapper_adapter() -> None:
+    """Squarespace-style wrappers cannot drop a universal winner's body."""
+    from ma_poc.pms.scraper import _merge_context_recovery_diagnostics
+
+    ctx = _ctx(
+        "<html></html>",
+        property_id="280355",
+        property_name="Town Center Apartments",
+        address="4653 S Amherst Hwy",
+        city="Madison Heights",
+        state="VA",
+        zip_code="24572",
+    )
+    ctx._embed_recovery_html_responses = [  # type: ignore[attr-defined]
+        {"url": "https://tenant/manage", "status": 200, "body": "<roster>"}
+    ]
+    ctx._embed_recovery_unit_source_provenance = [  # type: ignore[attr-defined]
+        {
+            "source_url": "https://tenant/manage",
+            "response_sha256": "b" * 64,
+            "response_kind": "unit_roster",
+        }
+    ]
+    result = AdapterResult()
+
+    _merge_context_recovery_diagnostics(ctx, result)
+    _merge_context_recovery_diagnostics(ctx, result)
+
+    assert len(result.html_responses) == 1
+    assert len(result.unit_source_provenance) == 1
 
 
 def test_grand_oaks_rejects_wrong_city_portfolio_inventory(monkeypatch) -> None:

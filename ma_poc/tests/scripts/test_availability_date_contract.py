@@ -516,6 +516,27 @@ def test_negative_status_with_rent_never_receives_capture_date_default(
     assert output["availability_date_provenance"] == "missing"
 
 
+@pytest.mark.parametrize("status", ["PENDING", "LEASED", "UNAVAILABLE"])
+def test_negative_status_overrides_relative_available_now_only(
+    formatter: Formatter,
+    status: str,
+) -> None:
+    """Beechwood canary shape: stale relative text cannot beat current status."""
+    output = formatter(
+        {
+            "unit_id": f"stale-now-{status.lower()}",
+            "market_rent_low": 1750,
+            "availability_status": status,
+            "availability_date": "Available Now",
+        },
+        CAPTURE_TS,
+        "negative-relative-property",
+    )
+
+    assert output["available_date"] is None
+    assert output["availability_date_provenance"] == "negative_status_override"
+
+
 def test_negative_raw_token_blocks_available_status_and_rent_defaults(
     formatter: Formatter,
 ) -> None:

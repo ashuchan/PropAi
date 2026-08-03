@@ -15,11 +15,9 @@ this fix was designed to fix.
 
 from __future__ import annotations
 
-import json
+from datetime import UTC, datetime
 
 import pytest
-
-from datetime import UTC, datetime
 
 from ma_poc.core.identity import (
     _normalize_token,
@@ -29,7 +27,6 @@ from ma_poc.core.identity import (
     seen_at_iso,
     synthesize_unkeyable_id,
 )
-
 
 # ── _normalize_token ────────────────────────────────────────────────────────
 
@@ -137,6 +134,18 @@ def test_assign_promotes_unit_number_to_unit_id() -> None:
     res = assign_fallback_unit_id(u, "P1")
     assert res == "B-203"
     assert u["unit_id"] == "B-203"
+
+
+def test_assign_natural_unit_number_replaces_prior_synthetic_id() -> None:
+    """Waterford/Mercer canary shape: merge fallback must not erase a real id."""
+    u = {
+        "unit_id": "inferred_deadbeefdeadbeef",
+        "unit_number": "1001",
+        "floor_plan_name": "A1",
+    }
+
+    assert assign_fallback_unit_id(u, "P1") == "1001"
+    assert u["unit_id"] == "1001"
 
 
 @pytest.mark.parametrize("sentinel", ["null", "None", "NULL"])

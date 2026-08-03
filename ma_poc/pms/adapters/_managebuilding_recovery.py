@@ -158,7 +158,7 @@ async def recover_managebuilding(ctx: AdapterContext) -> list[dict[str, Any]]:
     if fetched is None:
         return []
     index_body, final_url = fetched
-    return extract_managebuilding_rentals_index(
+    rows = extract_managebuilding_rentals_index(
         index_body,
         final_url,
         property_name=str(getattr(ctx, "property_name", "") or ""),
@@ -167,3 +167,53 @@ async def recover_managebuilding(ctx: AdapterContext) -> list[dict[str, Any]]:
         zip_code=str(getattr(ctx, "zip_code", "") or ""),
         listing_id_whitelist=set(route.listing_ids),
     )
+    if not rows:
+        return []
+
+    # The row parser already stamps each listing with this exact response hash
+    # and locator. Retain the body once at the adapter boundary so those
+    # pointers are usable offline; the Aug-02 Town Center canary exposed 17
+    # rows whose hash referred to a body the run never archived.
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    identity = {
+        "status": "MATCH",
+        "configured_property_id": str(getattr(ctx, "property_id", "") or ""),
+        "scope": (
+            "operator_authored_listing_whitelist"
+            if route.listing_ids
+            else "exact_account_label_and_location"
+        ),
+        "listing_ids": sorted(route.listing_ids),
+    }
+    response = {
+        "url": final_url,
+        "status": 200,
+        "body": index_body,
+        "response_kind": "unit_roster",
+        "via": "operator_authored_managebuilding_index",
+        "identity": identity,
+    }
+    provenance = build_unit_source_provenance(
+        provider="managebuilding",
+        source_url=final_url,
+        body=index_body,
+        unit_count=len(rows),
+        identity=identity,
+        response_kind="unit_roster",
+        status=200,
+    )
+    try:
+        html_records = list(
+            getattr(ctx, "_embed_recovery_html_responses", []) or []
+        )
+        html_records.append(response)
+        ctx._embed_recovery_html_responses = html_records  # type: ignore[attr-defined]
+        provenance_records = list(
+            getattr(ctx, "_embed_recovery_unit_source_provenance", []) or []
+        )
+        provenance_records.append(provenance)
+        ctx._embed_recovery_unit_source_provenance = provenance_records  # type: ignore[attr-defined]
+    except Exception:  # pragma: no cover - defensive context variants
+        pass
+    return rows

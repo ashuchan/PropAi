@@ -100,6 +100,14 @@ TARGET_ADAPTER_ALIASES: dict[str, set[str]] = {
     "wix_floor_plans": {"wix", "wix_floor_plans"},
     "wix_nopms": {"wix", "wix_nopms"},
 }
+TARGET_TIER_MARKERS: dict[str, tuple[str, ...]] = {
+    "rentcafe_applicant": ("rentcafe_applicant",),
+    "rentcafe_layout_tab": ("rentcafe_lt", "rentcafe_layout_tab"),
+    "onesite_workflow": ("onesite_workflow",),
+    "generic_spherexx": ("spherexx",),
+    "rentmanager_iloveleasing": ("iloveleasing",),
+    "realpage_getunits": ("getunits",),
+}
 
 
 def text(value: Any) -> str:
@@ -214,10 +222,15 @@ def target_route_exercised(prop: dict[str, Any], target: str) -> bool:
         return bool(prop.get("units") or prop.get("floor_plans"))
     observed = adapter(prop).lower()
     aliases = TARGET_ADAPTER_ALIASES.get(target, {target})
-    if observed in aliases:
+    if observed == target:
         return True
     winning_tier = text(provenance(prop).get("winning_tier")).lower()
     normalized_tier = re.sub(r"[^a-z0-9]+", "_", winning_tier)
+    markers = TARGET_TIER_MARKERS.get(target)
+    if markers:
+        return observed in aliases and any(marker in normalized_tier for marker in markers)
+    if observed in aliases:
+        return True
     return any(alias in normalized_tier for alias in aliases)
 
 
@@ -412,6 +425,83 @@ def find_unit_match(prior: dict[str, Any], current: list[dict[str, Any]]) -> dic
     return matches[0] if len(matches) == 1 else None
 
 
+def natural_unit_number(row: dict[str, Any]) -> str:
+    """Return a non-synthetic source apartment number from a pre-format row."""
+    value = text(
+        row.get("unit_number")
+        or row.get("_unit_number")
+        or row.get("unitNumber")
+        or row.get("apartment_number")
+    )
+    if not value or value.casefold() in {"null", "none"}:
+        return ""
+    if value.casefold().startswith(SYNTHETIC_PREFIXES):
+        return ""
+    return value
+
+
+def identity_rescue_signature(row: dict[str, Any]) -> tuple[str, ...]:
+    """Physical/value signature used only to link snapshot rows for QA.
+
+    It is not a production identity key. Requiring the response hash plus
+    plan/phenotype/value fields keeps this audit comparison narrow while still
+    exposing formatter loss when an output synthetic row came from a raw row
+    carrying a real apartment number.
+    """
+    source_hash = text(row.get("source_response_sha256")).casefold()
+    floor_plan = text(
+        row.get("floor_plan_name")
+        or row.get("_floor_plan")
+        or row.get("floorplan_name")
+    ).casefold()
+    beds = text(row.get("beds") or row.get("bedrooms") or row.get("_bedrooms"))
+    baths = text(row.get("baths") or row.get("bathrooms") or row.get("_bathrooms"))
+    area = text(
+        row.get("area")
+        or row.get("sqft")
+        or row.get("_sqft")
+        or row.get("area_low")
+    )
+    rent = text(
+        row.get("rent_low")
+        or row.get("market_rent_low")
+        or row.get("asking_rent")
+        or row.get("rent")
+    )
+    available = text(
+        row.get("available_date")
+        or row.get("availability_date")
+        or row.get("available_date_raw")
+        or row.get("_available_date_raw")
+    )[:10]
+    return source_hash, floor_plan, beds, baths, area, rent, available
+
+
+def preformat_natural_identity_matches(
+    output_unit: dict[str, Any],
+    preformat_rows: list[dict[str, Any]],
+) -> list[str]:
+    """Natural numbers on raw rows matching one synthetic formatted row."""
+    wanted = identity_rescue_signature(output_unit)
+    candidates: list[str] = []
+    for row in preformat_rows:
+        natural = natural_unit_number(row)
+        if not natural:
+            continue
+        observed = identity_rescue_signature(row)
+        # Hash equality is strong when retained. Otherwise require at least
+        # four equal populated phenotype/value components.
+        hash_match = bool(wanted[0] and observed[0] and wanted[0] == observed[0])
+        comparable = [
+            left == right
+            for left, right in zip(wanted[1:], observed[1:], strict=True)
+            if left and right
+        ]
+        if (hash_match and sum(comparable) >= 2) or sum(comparable) >= 4:
+            candidates.append(natural)
+    return sorted(set(candidates))
+
+
 def audit_unit(
     prop: dict[str, Any],
     unit: dict[str, Any],
@@ -558,8 +648,15 @@ def audit_unit(
     area_low = number(unit.get("area_low"))
     area_high = number(unit.get("area_high"))
     area_type = text(unit.get("area_value_type"))
+    valid_area_range = bool(
+        area_low is not None
+        and area_high is not None
+        and area_low > 0
+        and area_high >= area_low
+    )
     if area == -1:
-        metrics["unresolved_area_units"] += 1
+        if not valid_area_range:
+            metrics["unresolved_area_units"] += 1
         if area_sqft is not None:
             add_issue(
                 issues,
@@ -571,7 +668,7 @@ def audit_unit(
                 observed=area_sqft,
                 expected="null when legacy area is -1",
             )
-        if not text(unit.get("area_absence")):
+        if not valid_area_range and not text(unit.get("area_absence")):
             add_issue(
                 issues,
                 prop,
@@ -729,17 +826,23 @@ def audit_unit(
         r"\s*(?:available\s+)?(?:now|today|immediate(?:ly)?)\s*",
         available_date_raw,
         flags=re.IGNORECASE,
-    ) and availability_prov != "available_now":
-        add_issue(
-            issues,
-            prop,
-            "high",
-            "AVAILABLE_NOW_PROVENANCE_LOST",
-            unit=unit,
-            field="availability_date_provenance",
-            observed=availability_prov,
-            expected="available_now",
+    ):
+        expected_now_provenance = (
+            "negative_status_override"
+            if status in NEGATIVE_STATUSES
+            else "available_now"
         )
+        if availability_prov != expected_now_provenance:
+            add_issue(
+                issues,
+                prop,
+                "high",
+                "AVAILABLE_NOW_PROVENANCE_LOST",
+                unit=unit,
+                field="availability_date_provenance",
+                observed=availability_prov,
+                expected=expected_now_provenance,
+            )
     if availability_prov in {"available_now", "capture_date_default"} and available_date != capture:
         add_issue(
             issues,
@@ -853,17 +956,32 @@ def audit_property(
             observed="SUCCESS,0",
             expected="unit-level success has at least one physical unit",
         )
+    verdict_reason = text(meta(prop).get("verdict_reason"))
+    plan_units_have_rent = any(
+        number(row.get("rent_low")) is not None
+        or number(row.get("rent_high")) is not None
+        for row in units
+    )
+    valid_no_rent_plan_rows = bool(
+        current_verdict == "SUCCESS_PLAN_LEVEL"
+        and units
+        and verdict_reason.startswith("no_rent_signal")
+        and not plan_units_have_rent
+    )
     if current_verdict == "SUCCESS_PLAN_LEVEL" and units:
-        add_issue(
-            issues,
-            prop,
-            "critical",
-            "PLAN_SUCCESS_WITH_PHYSICAL_UNITS",
-            field="_meta.verdict,units",
-            observed=f"SUCCESS_PLAN_LEVEL,{len(units)}",
-            expected="physical rows produce SUCCESS; plans remain in floor_plans[]",
-        )
-    if current_verdict == "SUCCESS_PLAN_LEVEL" and not plans:
+        if valid_no_rent_plan_rows:
+            result["plan_verdict_physical_no_rent_rows"] += len(units)
+        else:
+            add_issue(
+                issues,
+                prop,
+                "critical",
+                "PLAN_SUCCESS_WITH_PHYSICAL_UNITS",
+                field="_meta.verdict,units",
+                observed=f"SUCCESS_PLAN_LEVEL,{len(units)},{verdict_reason}",
+                expected="only explicit no_rent_signal physical rows may remain plan success",
+            )
+    if current_verdict == "SUCCESS_PLAN_LEVEL" and not plans and not units:
         add_issue(
             issues,
             prop,
@@ -972,6 +1090,28 @@ def audit_property(
                     field=required,
                     expected="field retained in offline replay snapshot",
                 )
+        preformat_rows = [
+            row
+            for row in (snapshot.get("units_pre_format") or [])
+            if isinstance(row, dict)
+        ]
+        for unit in units:
+            if not is_synthetic(unit):
+                continue
+            natural_matches = preformat_natural_identity_matches(unit, preformat_rows)
+            if natural_matches:
+                result["avoidable_synthetic_id_units"] += 1
+                add_issue(
+                    issues,
+                    prop,
+                    "high",
+                    "SYNTHETIC_OUTPUT_WITH_PREFORMAT_NATURAL_ID",
+                    unit=unit,
+                    field="unit_id,units_pre_format[].unit_number",
+                    observed=f"{unit.get('unit_id')} <- {natural_matches[:8]}",
+                    expected="natural pre-format apartment number selected before fallback identity",
+                    evidence="immutable extraction snapshot links the synthetic output to a raw natural number",
+                )
 
     canonical_ids = [text(unit.get("unit_id")) for unit in units]
     if len(canonical_ids) != len(set(canonical_ids)):
@@ -998,6 +1138,41 @@ def audit_property(
             observed=str(len(populated_history) - len(set(populated_history))),
             expected="zero duplicates per property",
         )
+
+    # Entrata's modern embedded roster and per-plan roster can publish the
+    # same apartment simultaneously. A blank-building modern copy beside a
+    # scoped per-plan copy is not a legitimate cross-building collision.
+    entrata_by_source_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for unit in units:
+        source_id = text(unit.get("source_unit_id")).casefold()
+        if source_id:
+            entrata_by_source_id[source_id].append(unit)
+    entrata_parallel_duplicates = 0
+    for source_id, rows in entrata_by_source_id.items():
+        tiers = {text(row.get("extraction_tier")).upper() for row in rows}
+        has_modern = "TIER_1_DOM_ENTRATA_MODERN" in tiers
+        has_scoped = any(
+            tier.startswith("TIER_1_DOM_ENTRATA_PP_") and tier != "TIER_1_DOM_ENTRATA_MODERN"
+            for tier in tiers
+        )
+        has_blank_modern = any(
+            text(row.get("extraction_tier")).upper() == "TIER_1_DOM_ENTRATA_MODERN"
+            and not text(row.get("building_id") or row.get("building"))
+            for row in rows
+        )
+        if len(rows) > 1 and has_modern and has_scoped and has_blank_modern:
+            entrata_parallel_duplicates += len(rows) - 1
+            add_issue(
+                issues,
+                prop,
+                "critical",
+                "ENTRATA_PARALLEL_ROSTER_DUPLICATE",
+                unit=rows[0],
+                field="source_unit_id,extraction_tier,building_id",
+                observed=f"{source_id}:{sorted(tiers)}",
+                expected="one coherent Entrata source family per apartment roster",
+            )
+    result["entrata_parallel_duplicate_rows"] = entrata_parallel_duplicates
 
     for unit in units:
         result.update(audit_unit(prop, unit, issues, capture, manifest_hashes))
@@ -1137,7 +1312,12 @@ def audit_property(
 def write_csv(path: Path, rows: Iterable[dict[str, Any]], fields: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fields,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -1366,8 +1546,19 @@ def main() -> int:
         affected_outputs = [current[pid] for pid in affected if pid in current]
         target = text(finding.get("adapter"))
         exercised = [prop for prop in affected_outputs if target_route_exercised(prop, target)]
-        scoped_issues = [item for pid in pids for item in issue_by_property.get(pid, [])]
-        blocking = [item for item in scoped_issues if SEVERITY_RANK[item.severity] >= SEVERITY_RANK["high"]]
+        affected_issues = [
+            item for pid in affected for item in issue_by_property.get(pid, [])
+        ]
+        control_issues = [
+            item
+            for pid in (pids - affected)
+            for item in issue_by_property.get(pid, [])
+        ]
+        blocking = [
+            item
+            for item in affected_issues
+            if SEVERITY_RANK[item.severity] >= SEVERITY_RANK["high"]
+        ]
         if blocking:
             runtime_status = "FAIL_OUTPUT_CONTRACT"
         elif exercised:
@@ -1402,8 +1593,14 @@ def main() -> int:
                     verdict(prop) not in {"SUCCESS", "SUCCESS_PLAN_LEVEL"}
                     for prop in affected_outputs
                 ),
-                "critical_issues": sum(item.severity == "critical" for item in scoped_issues),
-                "high_issues": sum(item.severity == "high" for item in scoped_issues),
+                "critical_issues": sum(item.severity == "critical" for item in affected_issues),
+                "high_issues": sum(item.severity == "high" for item in affected_issues),
+                "control_critical_issues": sum(
+                    item.severity == "critical" for item in control_issues
+                ),
+                "control_high_issues": sum(
+                    item.severity == "high" for item in control_issues
+                ),
                 "runtime_status": runtime_status,
                 "observed_winners": json.dumps(
                     dict(sorted(Counter(adapter(prop) for prop in affected_outputs).items())),
@@ -1517,7 +1714,7 @@ def main() -> int:
     report = [
         "# Stratified 1,000-property canary audit",
         "",
-        f"Capture date: `{args.capture_date}`  ",
+        f"Capture date: `{args.capture_date}`",
         f"Offline run mirror: `{args.run_dir.resolve()}`",
         "",
         "## Release conclusion",
