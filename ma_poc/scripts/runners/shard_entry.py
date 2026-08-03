@@ -50,11 +50,13 @@ runner exited non-zero (that is the whole reason we're here).
 from __future__ import annotations
 
 import csv
+import json
 import os
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 # Ensure ma_poc is importable when invoked as /app/ma_poc/scripts/runners/shard_entry.py
 _script_dir = Path(__file__).resolve().parent
@@ -111,6 +113,145 @@ def _slice_csv(src: Path, task_idx: int, task_count: int, limit: int | None) -> 
         writer.writerows(shard_rows)
 
     return dest, len(shard_rows)
+
+
+def _materialize_supervisor_timeout_records(
+    *,
+    run_dir: Path,
+    schema_version: str,
+    shard_csv: Path | None,
+    canonical_ids: list[str],
+    property_timeout_seconds: float,
+    runner_timeout_seconds: float,
+) -> int:
+    """Write terminal diagnostics after the shard supervisor kills Jugnu.
+
+    ``asyncio.wait_for`` cannot enforce a hard deadline when browser/driver
+    work blocks the child's event loop. The 2026-08-02 PID 52697 verification
+    reproduced that shape twice: Jugnu crossed both its 600s and forced 120s
+    property deadlines without reaching the in-process timeout handler. The
+    parent process *can* kill that wedged child via ``subprocess.run(timeout=)``
+    and still owns the artifact-upload ``finally`` block.
+
+    Materialize only properties that do not already have a terminal row. Each
+    fallback carries the normal immutable extraction snapshot (zero rows is
+    still diagnostic evidence) and explicitly distinguishes the intended
+    property timeout from the outer supervisor kill. Existing child output is
+    merged, never overwritten.
+    """
+    from ma_poc.scripts.runners.jugnu import (
+        _finalize_timeout_diagnostics,
+        _make_failed_record,
+        _merge_with_existing_properties,
+        _write_properties_incremental,
+    )
+
+    source_rows: list[dict[str, str]] = []
+    if shard_csv is not None and shard_csv.is_file():
+        try:
+            with shard_csv.open(newline="", encoding="utf-8") as handle:
+                source_rows = [dict(row) for row in csv.DictReader(handle)]
+        except Exception as exc:  # noqa: BLE001 — timeout evidence is best-effort
+            print(
+                f"[shard_entry] could not read timeout cohort {shard_csv}: {exc}",
+                file=sys.stderr,
+            )
+    if not source_rows:
+        source_rows = [{"property_id": cid} for cid in canonical_ids]
+
+    def _first(row: dict[str, str], *keys: str) -> str:
+        for key in keys:
+            value = str(row.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    existing_path = run_dir / "properties.json"
+    existing_ids: set[str] = set()
+    if existing_path.is_file():
+        try:
+            loaded = json.loads(existing_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                for record in loaded:
+                    if not isinstance(record, dict):
+                        continue
+                    meta = record.get("_meta") or {}
+                    pid = meta.get("canonical_id") or record.get("apartment_id")
+                    if pid not in (None, ""):
+                        existing_ids.add(str(pid))
+        except (OSError, json.JSONDecodeError):
+            # The incremental writer below is atomic, but tolerate an older or
+            # hand-built malformed artifact and let its own fallback decide.
+            pass
+
+    fallback_records: list[dict[str, object]] = []
+    for row in source_rows:
+        property_id = _first(
+            row,
+            "property_id",
+            "canonical_id",
+            "Unique ID",
+            "Property ID",
+            "apartmentid",
+        )
+        if not property_id or property_id in existing_ids:
+            continue
+        website = _first(row, "website", "Website", "url", "URL", "marketing_url")
+        failed = _make_failed_record(
+            property_id,
+            website,
+            f"per_property_timeout:{int(property_timeout_seconds)}s "
+            "(shard_supervisor_fallback)",
+            schema_version,
+        )
+        meta = failed.setdefault("_meta", {})
+        meta["scrape_errors"] = [
+            f"per_property_timeout:{int(property_timeout_seconds)}s "
+            "(shard_supervisor_fallback)",
+            f"shard_runner_timeout:{int(runner_timeout_seconds)}s",
+        ]
+        meta["verdict"] = "FAILED_UNREACHABLE"
+        meta["verdict_reason"] = "runner event loop exceeded the supervisor wall-clock cap"
+        meta["partial_recovery"] = False
+        if schema_version == "v2":
+            failed.update(
+                {
+                    "proj_name": _first(row, "name", "Name", "Property Name"),
+                    "address": _first(row, "address", "Address"),
+                    "city": _first(row, "city", "City"),
+                    "state": _first(row, "state", "State"),
+                    "zip_code": _first(row, "zip", "Zip", "zip_code", "ZIP Code"),
+                    "website": website,
+                    "floor_plans": [],
+                }
+            )
+        failed = _finalize_timeout_diagnostics(
+            failed,
+            {"tier_used": "FAILED_SHARD_SUPERVISOR_TIMEOUT"},
+            property_id=property_id,
+            csv_row=row,
+            run_dir=run_dir,
+        )
+        provenance = (failed.get("_meta") or {}).get("provenance")
+        if isinstance(provenance, dict):
+            provenance["supervisor_timeout"] = {
+                "fallback_materialized": True,
+                "property_timeout_seconds": property_timeout_seconds,
+                "runner_timeout_seconds": runner_timeout_seconds,
+            }
+        fallback_records.append(failed)
+
+    if not fallback_records:
+        return 0
+    merged = _merge_with_existing_properties(existing_path, fallback_records)
+    _write_properties_incremental(existing_path, merged)
+    print(
+        f"[shard_entry] materialized {len(fallback_records)} supervisor-timeout "
+        f"terminal record(s) at {existing_path}",
+        file=sys.stderr,
+    )
+    return len(fallback_records)
 
 
 def _resolve_run_dir(schema_version: str, run_date: str) -> Path:
@@ -210,7 +351,7 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_ver
 
 def _resolve_shard_canonical_ids_db(
     task_idx: int, task_count: int, limit: int | None
-) -> tuple[list[str], "Any"]:
+) -> tuple[list[str], Any]:
     """Return (canonical_ids, engine) for this shard's properties (DB mode).
 
     Mirrors the exact shard-slicing logic the jugnu runner uses
@@ -227,8 +368,8 @@ def _resolve_shard_canonical_ids_db(
     if not os.environ.get("DATABASE_URL"):
         return [], None
     try:
-        from ma_poc.data_provider.factory import get_data_provider
         from ma_poc.data_provider.dtos import CatalogFilters
+        from ma_poc.data_provider.factory import get_data_provider
 
         dp = get_data_provider()
         filters = CatalogFilters(shard_index=task_idx, shard_count=task_count)
@@ -274,7 +415,7 @@ def _resolve_shard_canonical_ids_csv(shard_csv: Path) -> list[str]:
 
 
 def _warmup_delete_today_units(
-    canonical_ids: list[str], run_date: str, engine: "Any" = None
+    canonical_ids: list[str], run_date: str, engine: Any = None
 ) -> int:
     """Delete unit rows written today for this shard's properties.
 
@@ -301,9 +442,10 @@ def _warmup_delete_today_units(
         return 0
     own_engine = engine is None
     try:
+        from sqlalchemy import delete
+
         from ma_poc.data_provider.sql.engine import make_engine
         from ma_poc.data_provider.sql.models import UnitRow
-        from sqlalchemy import delete
 
         if own_engine:
             engine = make_engine()
@@ -516,6 +658,16 @@ def main() -> None:
                 file=sys.stderr,
             )
             runner_exit = 124  # convention: 124 = timeout (matches GNU coreutils `timeout`)
+            _materialize_supervisor_timeout_records(
+                run_dir=_resolve_run_dir(schema_version, run_date),
+                schema_version=schema_version,
+                shard_csv=shard_csv,
+                canonical_ids=_warmup_cids,
+                property_timeout_seconds=float(
+                    os.environ.get("PER_PROPERTY_TIMEOUT_SECONDS", "600")
+                ),
+                runner_timeout_seconds=runner_subprocess_timeout,
+            )
         # Always attempt PG sync when the runner finished — partial runs
         # (e.g. 140/499 succeeded) still have useful data that MUST land
         # in Postgres. The runner returns 1 whenever any property fails,

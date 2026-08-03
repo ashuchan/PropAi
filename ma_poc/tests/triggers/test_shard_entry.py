@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import csv
+import gzip
+import hashlib
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -16,7 +19,11 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts.runners.shard_entry import _slice_csv, _upload_artifacts  # noqa: E402
+from scripts.runners.shard_entry import (  # noqa: E402
+    _materialize_supervisor_timeout_records,
+    _slice_csv,
+    _upload_artifacts,
+)
 
 # ── CSV slicing ──────────────────────────────────────────────────────────────
 
@@ -85,6 +92,102 @@ class TestSliceCsv:
         _, count = _slice_csv(src, task_idx=2, task_count=3, limit=None)
         # 7 rows, 3 tasks: task 2 gets rows 6..6 (1 row, not 3)
         assert count >= 1
+
+
+class TestSupervisorTimeoutArtifacts:
+    def test_writes_terminal_row_and_replayable_zero_row_snapshot(
+        self, tmp_path: Path
+    ) -> None:
+        shard_csv = tmp_path / "shard.csv"
+        with shard_csv.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["apartmentid", "name", "address", "city", "state", "zip", "website"])
+            writer.writerow(
+                [
+                    "52697",
+                    "Clearview",
+                    "12100 Clearview Ln",
+                    "Holland",
+                    "MI",
+                    "49424",
+                    "https://www.liveatclearview.com/",
+                ]
+            )
+        run_dir = tmp_path / "run"
+
+        count = _materialize_supervisor_timeout_records(
+            run_dir=run_dir,
+            schema_version="v2",
+            shard_csv=shard_csv,
+            canonical_ids=["52697"],
+            property_timeout_seconds=120,
+            runner_timeout_seconds=150,
+        )
+
+        assert count == 1
+        rows = json.loads((run_dir / "properties.json").read_text(encoding="utf-8"))
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["apartment_id"] == 52697
+        assert row["proj_name"] == "Clearview"
+        assert row["_meta"]["verdict"] == "FAILED_UNREACHABLE"
+        assert row["_meta"]["scrape_errors"] == [
+            "per_property_timeout:120s (shard_supervisor_fallback)",
+            "shard_runner_timeout:150s",
+        ]
+        provenance = row["_meta"]["provenance"]
+        assert provenance["supervisor_timeout"]["fallback_materialized"] is True
+        archive = provenance["raw_source_archive"]
+        assert archive["source_count"] == 0
+        manifest_path = run_dir / archive["manifest_path"]
+        with gzip.open(manifest_path, "rb") as handle:
+            manifest_payload = handle.read()
+        assert hashlib.sha256(manifest_payload).hexdigest() == archive["manifest_sha256"]
+        manifest = json.loads(manifest_payload)
+        snapshot_path = run_dir / manifest["extraction_snapshot"]["path"]
+        with gzip.open(snapshot_path, "rb") as handle:
+            snapshot_payload = handle.read()
+        assert hashlib.sha256(snapshot_payload).hexdigest() == (
+            manifest["extraction_snapshot"]["payload_sha256"]
+        )
+        snapshot = json.loads(snapshot_payload)
+        assert snapshot["units_pre_format"] == []
+        assert snapshot["formatted_property"]["apartment_id"] == 52697
+
+    def test_preserves_existing_terminal_rows_and_materializes_only_missing(
+        self, tmp_path: Path
+    ) -> None:
+        shard_csv = tmp_path / "shard.csv"
+        with shard_csv.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["apartmentid", "name", "website"])
+            writer.writerow(["1", "Already Done", "https://one.example/"])
+            writer.writerow(["2", "Still Wedged", "https://two.example/"])
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        existing = {
+            "apartment_id": 1,
+            "units": [],
+            "_meta": {"canonical_id": "1", "verdict": "SUCCESS_NO_DATA_PUBLISHED"},
+        }
+        (run_dir / "properties.json").write_text(
+            json.dumps([existing]), encoding="utf-8"
+        )
+
+        count = _materialize_supervisor_timeout_records(
+            run_dir=run_dir,
+            schema_version="v2",
+            shard_csv=shard_csv,
+            canonical_ids=["1", "2"],
+            property_timeout_seconds=600,
+            runner_timeout_seconds=13500,
+        )
+
+        rows = json.loads((run_dir / "properties.json").read_text(encoding="utf-8"))
+        assert count == 1
+        assert [row["apartment_id"] for row in rows] == [1, 2]
+        assert rows[0] == existing
+        assert rows[1]["_meta"]["verdict"] == "FAILED_UNREACHABLE"
 
 
 # ── artifact upload ──────────────────────────────────────────────────────────
