@@ -3107,14 +3107,14 @@
       "sha256": "3cca51a1056970bc2523be2482befb7561652286fd296d9e3306a5dcf876ce59"
     },
     {
-      "bytes": 26755,
+      "bytes": 27039,
       "path": "investigations/2026-08-02-stratified-1000/CONSOLIDATED_RELEASE_README.md",
-      "sha256": "cf3d9d57931a3cb332bbe52d622ea5878e113b4d9ccd257b46102c4507295e97"
+      "sha256": "efc60b6e78fe86badeaea04f0235c6112ff5ac06dcfc68738aa0826771b18b8a"
     },
     {
-      "bytes": 2129,
+      "bytes": 2805,
       "path": "investigations/2026-08-02-stratified-1000/FINAL_REGRESSION_GATE.json",
-      "sha256": "6a6f1a29b24239f9ab581d45abb53a167c43cbb139d0a68ba45c5b007f57a8b7"
+      "sha256": "ffb795d5587cbb3b28f3e9c706769e475aef74564fbdef373e66ec0606a0b28d"
     },
     {
       "bytes": 3138,
@@ -3342,9 +3342,9 @@
       "sha256": "26d074a211e1150678760dfe2f071240541d1cf379dc2bec4b6951fd95823a32"
     },
     {
-      "bytes": 1719,
+      "bytes": 1970,
       "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/README.md",
-      "sha256": "d0899292880cef0e1450ece8d9abbcd8840a174e98bbf7e77738294a8e156a0d"
+      "sha256": "9e9f9c172b7ed1dff70fc041f808c1b1e9ce50c206f34a35ea4659ffcc319d53"
     },
     {
       "bytes": 1751,
@@ -3416,6 +3416,6 @@
       "investigations/2026-08-01-failed-no-data": 19,
       "investigations/2026-08-02-stratified-1000": 60
     },
-    "total_bytes": 35600550
+    "total_bytes": 35601761
   }
 }

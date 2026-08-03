@@ -18,6 +18,11 @@ reached the in-process cancellation handler. The retry was cancelled at
 `2026-08-03T01:19:59.968748Z` and completed as cancelled at
 `2026-08-03T01:20:23.388533Z`, with no terminal property artifact.
 
+That behavioral change and its synthetic test were subsequently removed from
+the final tree. They remain visible in commit history and in this evidence
+package, but are not shipped merely because the successful supervisor fix was
+stacked after them.
+
 This directory preserves that deterministic, disproven one-property retry. It
 inherits the
 same runtime policy as the 29-property verification, uses a new isolated warm

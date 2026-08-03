@@ -259,31 +259,6 @@ class _HbSession:
         """Close the browser/Playwright and ALWAYS stop the HB session. Each
         step is time-bounded and best-effort so a wedged local CDP transport
         never blocks the paid-session stop call."""
-        # ``asyncio.wait_for`` is not a hard deadline when the awaitable being
-        # cancelled suppresses ``CancelledError``: it waits for that awaitable
-        # to acknowledge cancellation.  The 2026-08-02 verification canary
-        # proved this is not theoretical.  PID 52697 entered the property-
-        # bound Entrata HB route, crossed the 600s property deadline, and then
-        # remained alive beyond both 5s local-close allowances without a
-        # terminal artifact.  A cancellation-resistant fake reproduces the
-        # same shape in ``test_cancelled_session_skips_wedged_local_teardown``.
-        #
-        # During outer property cancellation the remote browser session is
-        # the resource that must be stopped.  Do that directly and leave the
-        # local CDP/Playwright objects to process teardown; awaiting either
-        # here can prevent the cancelled property task from ever returning to
-        # the timeout finalizer.  Normal success/error exits still perform the
-        # orderly local closes below.
-        current = asyncio.current_task()
-        if current is not None and current.cancelling():
-            log.warning(
-                "hb.cancel_cleanup_skip_local id=%s cancelling=%d",
-                self.session_id,
-                current.cancelling(),
-            )
-            await self._stop_remote_session()
-            return
-
         try:
             if self._browser is not None:
                 await asyncio.wait_for(
@@ -312,11 +287,6 @@ class _HbSession:
             )
         except Exception as exc:
             log.debug("hb.playwright_stop_error: %s", exc)
-
-        await self._stop_remote_session()
-
-    async def _stop_remote_session(self) -> None:
-        """Best-effort paid-session stop independent of local CDP teardown."""
         if self.session_id:
             try:
                 import httpx
