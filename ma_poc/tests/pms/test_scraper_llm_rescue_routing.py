@@ -189,6 +189,47 @@ async def test_scraper_skips_rescue_when_no_api_responses() -> None:
 
 
 @pytest.mark.asyncio
+async def test_scraper_skips_shared_rescue_when_tier4_llm_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The run-wide LLM-off flag must gate the orchestrator rescue too."""
+    from ma_poc.pms import scraper as scraper_mod
+
+    monkeypatch.setenv("ENABLE_TIER4_LLM", "false")
+    empty_result = AdapterResult(units=[], tier_used="TIER_1_API")
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses"
+        ) as mock_rescue,
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        result = await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    mock_rescue.assert_not_called()
+    assert result.get("_rescue_skipped_reason") == "ENABLE_TIER4_LLM=false"
+
+
+@pytest.mark.asyncio
 async def test_scraper_skips_rescue_when_pms_is_rentcafe() -> None:
     from ma_poc.pms import scraper as scraper_mod
 

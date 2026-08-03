@@ -1,0 +1,1043 @@
+{
+  "results": [
+    {
+      "configured_pipeline": {
+        "adapter": "entrata",
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_configured_scrape_jugnu_e2e.json",
+        "artifact_sha256": "d39994100b7e3279c754889bb56d252f70178b09ac09dc786dc4fcfaebd491f6",
+        "detected_pms": "entrata",
+        "hyperbrowser_sessions": 1,
+        "tier": "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_UNIT_LEVEL",
+        "winning_page_url": "https://hamiltonhall.scullycompany.com/norristown/hamilton-hall/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=05/30/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&host_domain=www.scullycompany.com"
+      },
+      "contamination_verdict": "pass_exact_configured_property_owned_entrata_iframe_single_provider_property_id_full_pipeline_native_priced_units",
+      "identity_evidence": {
+        "canonical_address": "449 Hamilton St",
+        "canonical_city": "Norristown",
+        "canonical_name": "Hamilton Hall",
+        "canonical_zip": "19401",
+        "configured_scrape_jugnu_unit_level": true,
+        "current_parent_name_street_city_zip_match": true,
+        "current_parent_published_exact_inventory_iframe": true,
+        "distinct_entrata_uids": 6,
+        "distinct_unit_numbers": 6,
+        "rows_with_native_identity": 6,
+        "rows_with_native_identity_and_positive_rent": 6,
+        "sole_provider_property_id": "100003046",
+        "source_urls": [
+          "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_rows": [
+        {
+          "address": "",
+          "floor_plan_name": "Studio | 350 sqft",
+          "market_rent_high": 1253,
+          "market_rent_low": 1253,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2003",
+            "entrata_uid": "4945"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "350",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "213"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio | 350 sqft",
+          "market_rent_high": 1268,
+          "market_rent_low": 1268,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2003",
+            "entrata_uid": "4988"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "350",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "505"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 670 sqft",
+          "market_rent_high": 1356,
+          "market_rent_low": 1356,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2000",
+            "entrata_uid": "4948"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "670",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "216"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 670 sqft",
+          "market_rent_high": 1301,
+          "market_rent_low": 1301,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2000",
+            "entrata_uid": "5017"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "670",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "617"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "2-Bedroom 1-Bathroom | 815 sqft",
+          "market_rent_high": 1509,
+          "market_rent_low": 1509,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2002",
+            "entrata_uid": "4972"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "815",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "406"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "2-Bedroom 1-Bathroom | 815 sqft",
+          "market_rent_high": 1519,
+          "market_rent_low": 1519,
+          "native_unit_id": "",
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2002",
+            "entrata_uid": "5006"
+          },
+          "source_property_id": "100003046",
+          "source_property_name": "Hamilton Hall",
+          "sqft": "815",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "606"
+        }
+      ],
+      "native_samples": [
+        {
+          "identity": {
+            "entrata_fpid": "2003",
+            "entrata_uid": "4945",
+            "unit_number": "213"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1253,
+            "market_rent_low": 1253
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2003",
+            "entrata_uid": "4988",
+            "unit_number": "505"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1268,
+            "market_rent_low": 1268
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2000",
+            "entrata_uid": "4948",
+            "unit_number": "216"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1356,
+            "market_rent_low": 1356
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2000",
+            "entrata_uid": "5017",
+            "unit_number": "617"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1301,
+            "market_rent_low": 1301
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2002",
+            "entrata_uid": "4972",
+            "unit_number": "406"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1509,
+            "market_rent_low": 1509
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2002",
+            "entrata_uid": "5006",
+            "unit_number": "606"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1519,
+            "market_rent_low": 1519
+          },
+          "source_api_url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100003046"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_boundary": {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_parent_boundaries.json",
+        "artifact_sha256": "7876ed5412f5baecb1c2f0aa71d43dbeab1d9936fde0b6d5450867ed64af3dec",
+        "published_iframe_url": "https://hamiltonhall.scullycompany.com/norristown/hamilton-hall/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=05/30/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&",
+        "raw_parent_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/43995_current_parent.html.gz",
+        "raw_parent_artifact_sha256": "abef38abf47443d4786235b630cc89fb816b6098a0f5f01cd2173fc3df08b41b"
+      },
+      "property_id": 43995,
+      "property_identity_match": true,
+      "property_name": "Hamilton Hall",
+      "raw_provider_crosscheck": {
+        "detail_artifacts": [
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/43995_plan_2003.html.gz",
+            "artifact_sha256": "a1c148aeaa10c3230efae6f81594693fe3419cd9fd67c9ff5f3ef5daee6a3fa7",
+            "plan_id": "2003",
+            "url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2003/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/43995_plan_2000.html.gz",
+            "artifact_sha256": "b88c791b94d3c667706e47af45c411a15c1113ca2e94b0bb85decde20490e054",
+            "plan_id": "2000",
+            "url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2000/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/43995_plan_2002.html.gz",
+            "artifact_sha256": "145599aa0dc59764685f61213223b64c96f6707b96f1d22dee0cc42518443557",
+            "plan_id": "2002",
+            "url": "https://hamiltonhall.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100003046/property_floorplan[id]/2002/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          }
+        ],
+        "exact_match_to_configured_pipeline": true,
+        "native_priced_rows": 6,
+        "probe_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/summary.json",
+        "probe_artifact_sha256": "d34851ee3ab660c8ac6d1bb9d7153b73c27ea4f58cddf259c2d4a5179955c2f2"
+      },
+      "units": 6,
+      "website": "http://www.scullycompany.com/hamilton-hall-18.html"
+    },
+    {
+      "configured_pipeline": {
+        "adapter": "entrata",
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_configured_scrape_jugnu_e2e.json",
+        "artifact_sha256": "d39994100b7e3279c754889bb56d252f70178b09ac09dc786dc4fcfaebd491f6",
+        "detected_pms": "entrata",
+        "hyperbrowser_sessions": 1,
+        "tier": "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_UNIT_LEVEL",
+        "winning_page_url": "https://bridgeview.scullycompany.com/allentown/bridgeview/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=06/24/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&host_domain=www.scullycompany.com"
+      },
+      "contamination_verdict": "pass_exact_configured_property_owned_entrata_iframe_single_provider_property_id_full_pipeline_native_priced_units",
+      "identity_evidence": {
+        "canonical_address": "701 Harrison St",
+        "canonical_city": "Allentown",
+        "canonical_name": "Bridgeview",
+        "canonical_zip": "18103",
+        "configured_scrape_jugnu_unit_level": true,
+        "current_parent_name_street_city_zip_match": true,
+        "current_parent_published_exact_inventory_iframe": true,
+        "distinct_entrata_uids": 8,
+        "distinct_unit_numbers": 8,
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "sole_provider_property_id": "100002842",
+        "source_urls": [
+          "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_rows": [
+        {
+          "address": "",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 1490,
+          "market_rent_low": 1490,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6377"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "460",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "132"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 1605,
+          "market_rent_low": 1605,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6468"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "460",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "415"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 1625,
+          "market_rent_low": 1625,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6394"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "460",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "215"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom",
+          "market_rent_high": 1460,
+          "market_rent_low": 1460,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6344"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "625",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "013"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom",
+          "market_rent_high": 1530,
+          "market_rent_low": 1530,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6476"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "625",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "423"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom",
+          "market_rent_high": 1505,
+          "market_rent_low": 1505,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6403"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "625",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "224"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom",
+          "market_rent_high": 1530,
+          "market_rent_low": 1530,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6408"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "625",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "229"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom",
+          "market_rent_high": 1490,
+          "market_rent_low": 1490,
+          "native_unit_id": "",
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6336"
+          },
+          "source_property_id": "100002842",
+          "source_property_name": "Bridgeview",
+          "sqft": "625",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "005"
+        }
+      ],
+      "native_samples": [
+        {
+          "identity": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6377",
+            "unit_number": "132"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1490,
+            "market_rent_low": 1490
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6468",
+            "unit_number": "415"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1605,
+            "market_rent_low": 1605
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2528",
+            "entrata_uid": "6394",
+            "unit_number": "215"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1625,
+            "market_rent_low": 1625
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6344",
+            "unit_number": "013"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1460,
+            "market_rent_low": 1460
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6476",
+            "unit_number": "423"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1530,
+            "market_rent_low": 1530
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6403",
+            "unit_number": "224"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1505,
+            "market_rent_low": 1505
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6408",
+            "unit_number": "229"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1530,
+            "market_rent_low": 1530
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2529",
+            "entrata_uid": "6336",
+            "unit_number": "005"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1490,
+            "market_rent_low": 1490
+          },
+          "source_api_url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002842"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_boundary": {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_parent_boundaries.json",
+        "artifact_sha256": "7876ed5412f5baecb1c2f0aa71d43dbeab1d9936fde0b6d5450867ed64af3dec",
+        "published_iframe_url": "http://bridgeview.scullycompany.com/allentown/bridgeview/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=06/24/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&",
+        "raw_parent_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/60141_current_parent.html.gz",
+        "raw_parent_artifact_sha256": "47472adef34c2003394b40ab398831345de32071df18ef62f882df978bab554e"
+      },
+      "property_id": 60141,
+      "property_identity_match": true,
+      "property_name": "Bridgeview",
+      "raw_provider_crosscheck": {
+        "detail_artifacts": [
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/60141_plan_2528.html.gz",
+            "artifact_sha256": "e70849b2a756b154f97db132410e6eb0587aa6669635706e57b0b9dad542be53",
+            "plan_id": "2528",
+            "url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2528/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/60141_plan_2529.html.gz",
+            "artifact_sha256": "114a6805ae98dc779b5edef488dc7799f786287cc77bd7e7175d9caf0109167b",
+            "plan_id": "2529",
+            "url": "https://bridgeview.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002842/property_floorplan[id]/2529/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          }
+        ],
+        "exact_match_to_configured_pipeline": true,
+        "native_priced_rows": 8,
+        "probe_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/summary.json",
+        "probe_artifact_sha256": "d34851ee3ab660c8ac6d1bb9d7153b73c27ea4f58cddf259c2d4a5179955c2f2"
+      },
+      "units": 8,
+      "website": "http://www.scullycompany.com/bridgeview-14.html"
+    },
+    {
+      "configured_pipeline": {
+        "adapter": "entrata",
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_configured_scrape_jugnu_e2e.json",
+        "artifact_sha256": "d39994100b7e3279c754889bb56d252f70178b09ac09dc786dc4fcfaebd491f6",
+        "detected_pms": "entrata",
+        "hyperbrowser_sessions": 1,
+        "tier": "TIER_1_DOM_ENTRATA_PP_HYPERBROWSER_UNIT_LEVEL",
+        "winning_page_url": "https://avenir.scullycompany.com/philadelphia/avenir/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=05/30/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&host_domain=www.scullycompany.com"
+      },
+      "contamination_verdict": "pass_exact_configured_property_owned_entrata_iframe_single_provider_property_id_full_pipeline_native_priced_units",
+      "identity_evidence": {
+        "canonical_address": "42 S 15th St",
+        "canonical_city": "Philadelphia",
+        "canonical_name": "Avenir on Fifteenth",
+        "canonical_zip": "19102",
+        "configured_scrape_jugnu_unit_level": true,
+        "current_parent_name_street_city_zip_match": true,
+        "current_parent_published_exact_inventory_iframe": true,
+        "distinct_entrata_uids": 11,
+        "distinct_unit_numbers": 11,
+        "rows_with_native_identity": 11,
+        "rows_with_native_identity_and_positive_rent": 11,
+        "sole_provider_property_id": "100002834",
+        "source_urls": [
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2038/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2043/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2045/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2051/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2052/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+        ]
+      },
+      "native_rows": [
+        {
+          "address": "",
+          "floor_plan_name": "Studio 1 B | 314",
+          "market_rent_high": 1785,
+          "market_rent_low": 1785,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2051/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2051",
+            "entrata_uid": "5223"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "314",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1611"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio 1 B | 321",
+          "market_rent_high": 1865,
+          "market_rent_low": 1865,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5222"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "321",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1610"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio 1 B | 321",
+          "market_rent_high": 1882,
+          "market_rent_low": 1882,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5228"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "321",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1710"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Studio 1 B | 321",
+          "market_rent_high": 1644,
+          "market_rent_low": 1644,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5066"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "321",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "0310"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 523",
+          "market_rent_high": 2115,
+          "market_rent_low": 2115,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5156"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "523",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1104"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 523",
+          "market_rent_high": 2013,
+          "market_rent_low": 2013,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5084"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "523",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "0504"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 523",
+          "market_rent_high": 2179,
+          "market_rent_low": 2179,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5179"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "523",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1303"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 592",
+          "market_rent_high": 2303,
+          "market_rent_low": 2303,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2045/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2045",
+            "entrata_uid": "5217"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "592",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1605"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bathroom | 619",
+          "market_rent_high": 2295,
+          "market_rent_low": 2295,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2038/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2038",
+            "entrata_uid": "5190"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "619",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1402"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "1-Bedroom 1-Bath w/ Den | 1031",
+          "market_rent_high": 2837,
+          "market_rent_low": 2837,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2043/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2043",
+            "entrata_uid": "5056"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "1031",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "0207"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "2-Bedroom 1-Bathroom | 835",
+          "market_rent_high": 2744,
+          "market_rent_low": 2744,
+          "native_unit_id": "",
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2052/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_ids": {
+            "entrata_fpid": "2052",
+            "entrata_uid": "5184"
+          },
+          "source_property_id": "100002834",
+          "source_property_name": "Avenir on Fifteenth",
+          "sqft": "835",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1308"
+        }
+      ],
+      "native_samples": [
+        {
+          "identity": {
+            "entrata_fpid": "2051",
+            "entrata_uid": "5223",
+            "unit_number": "1611"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1785,
+            "market_rent_low": 1785
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2051/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5222",
+            "unit_number": "1610"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1865,
+            "market_rent_low": 1865
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5228",
+            "unit_number": "1710"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1882,
+            "market_rent_low": 1882
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2050",
+            "entrata_uid": "5066",
+            "unit_number": "0310"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1644,
+            "market_rent_low": 1644
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5156",
+            "unit_number": "1104"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2115,
+            "market_rent_low": 2115
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5084",
+            "unit_number": "0504"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2013,
+            "market_rent_low": 2013
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2044",
+            "entrata_uid": "5179",
+            "unit_number": "1303"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2179,
+            "market_rent_low": 2179
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2045",
+            "entrata_uid": "5217",
+            "unit_number": "1605"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2303,
+            "market_rent_low": 2303
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2045/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2038",
+            "entrata_uid": "5190",
+            "unit_number": "1402"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2295,
+            "market_rent_low": 2295
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2038/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2043",
+            "entrata_uid": "5056",
+            "unit_number": "0207"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2837,
+            "market_rent_low": 2837
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2043/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        },
+        {
+          "identity": {
+            "entrata_fpid": "2052",
+            "entrata_uid": "5184",
+            "unit_number": "1308"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2744,
+            "market_rent_low": 2744
+          },
+          "source_api_url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2052/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/",
+          "source_property_id": "100002834"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_boundary": {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/current_parent_boundaries.json",
+        "artifact_sha256": "7876ed5412f5baecb1c2f0aa71d43dbeab1d9936fde0b6d5450867ed64af3dec",
+        "published_iframe_url": "https://avenir.scullycompany.com/philadelphia/avenir/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=05/30/2024&locale_code=&is_collapsed=0&include_paragraph_content=1&",
+        "raw_parent_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_current_parent.html.gz",
+        "raw_parent_artifact_sha256": "d87feba543749462a3acc4d53eecfc644da01063c4aab492dc852cd29a784ba4"
+      },
+      "property_id": 63191,
+      "property_identity_match": true,
+      "property_name": "Avenir on Fifteenth",
+      "raw_provider_crosscheck": {
+        "detail_artifacts": [
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2051.html.gz",
+            "artifact_sha256": "32f90fdfa040a014b86e6ce90768cc531132aeaa6331a21c2625a57aacbd181a",
+            "plan_id": "2051",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2051/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2050.html.gz",
+            "artifact_sha256": "2129748c14d3985db1758918aa7ddefaa5434128cd38aa22950d164ca1f3d9ca",
+            "plan_id": "2050",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2050/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2044.html.gz",
+            "artifact_sha256": "e049dff6ace042b74ee202425a507061789594812c4ae9c253e8d4137279de27",
+            "plan_id": "2044",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2044/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2045.html.gz",
+            "artifact_sha256": "a3cef1e855b226ee7c60c0469b6ce14ead0fdb29a220491e018148f78b209185",
+            "plan_id": "2045",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2045/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2038.html.gz",
+            "artifact_sha256": "0c714afcd38d932804a6dc3524f56f7599bfcfb0e247c2acc97f6d5e189aa208",
+            "plan_id": "2038",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2038/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2043.html.gz",
+            "artifact_sha256": "201a7930538951e48a96a8493109e9c3aafe0cfefd81c224644c6bafa6659a55",
+            "plan_id": "2043",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2043/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          },
+          {
+            "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/63191_plan_2052.html.gz",
+            "artifact_sha256": "b527edd47cc47c84016fc726f01a64cd76028625c1c3eb48fa6d5c22bd2076f0",
+            "plan_id": "2052",
+            "url": "https://avenir.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002834/property_floorplan[id]/2052/is_premium_view/1/is_responsive_snippet/1/occupancy_type/conventional/is_collapsed/0/snippet_type/website/"
+          }
+        ],
+        "exact_match_to_configured_pipeline": true,
+        "native_priced_rows": 11,
+        "probe_artifact": "/private/tmp/propai-fnd-vBkmT9/hb_scully_residual3_detail_probe/summary.json",
+        "probe_artifact_sha256": "d34851ee3ab660c8ac6d1bb9d7153b73c27ea4f58cddf259c2d4a5179955c2f2"
+      },
+      "units": 11,
+      "website": "http://avenirphilly.com/"
+    }
+  ],
+  "summary": {
+    "captcha_solving": false,
+    "capture_timestamp_utc": "2026-08-01T13:43:26.522900+00:00",
+    "critical_source_sha256": {
+      "ma_poc/pms/adapters/_entrata_hb_recovery.py": "f5af4bda0fbd24cfde702c9aa345dfde55e5ce1a5cb4ffcc1375b7c9372d9d92",
+      "ma_poc/pms/adapters/entrata.py": "4411f671a76877ff2257ee2a93540ffd11d71a0318d4877b877b457b097e61d6",
+      "ma_poc/pms/detector.py": "fdc8dc840b11030ab2bfcdc539847754b35f5673aa161605b02fb0395a4064ca"
+    },
+    "fingerprint_rotation": false,
+    "llm_used": false,
+    "native_positive_rent_rows": 25,
+    "paid_canary_run": false,
+    "result_type": "strict_current_scully_property_owned_entrata_configured_e2e",
+    "strict_unit_qualified_properties": 3,
+    "strict_unit_qualified_property_ids": [
+      43995,
+      60141,
+      63191
+    ],
+    "web_unlocker": false
+  }
+}

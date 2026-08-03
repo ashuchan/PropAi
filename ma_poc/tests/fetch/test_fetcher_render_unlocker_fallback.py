@@ -115,9 +115,7 @@ def _BLOCKED() -> FetchResult:
 
 
 def _UNLOCKED_OK() -> FetchResult:
-    return _result(
-        FetchOutcome.OK, b"<html><div class='fp-card'>$1,500</div></html>", 200
-    )
+    return _result(FetchOutcome.OK, b"<html><div class='fp-card'>$1,500</div></html>", 200)
 
 
 def _mock_unlocker(fetch_result: FetchResult) -> MagicMock:
@@ -141,9 +139,7 @@ async def test_render_bot_blocked_falls_back_to_unlocker() -> None:
             _mock_unlocker(_UNLOCKED_OK()),
         ),
     ):
-        result = await fetcher._do_request(
-            _render_task(), _IDENTITY, None, None, None, 1, 0
-        )
+        result = await fetcher._do_request(_render_task(), _IDENTITY, None, None, None, 1, 0)
     assert result.outcome == FetchOutcome.OK
     assert result.body and b"fp-card" in result.body
 
@@ -157,25 +153,48 @@ async def test_render_bot_blocked_no_fallback_when_flag_off() -> None:
     with (
         patch("ma_poc.fetch.fetcher.ENABLE_TIER_ESCALATION", True),
         patch("ma_poc.fetch.fetcher.ENABLE_UNLOCKER_TIER", False),
+        patch("ma_poc.config.feature_flags.hb_enabled", return_value=False),
         patch(
             "ma_poc.fetch.providers.unlocker.UnlockerProvider",
             _mock_unlocker(_UNLOCKED_OK()),
         ) as cls,
     ):
-        result = await fetcher._do_request(
-            _render_task(), _IDENTITY, None, None, None, 1, 0
-        )
+        result = await fetcher._do_request(_render_task(), _IDENTITY, None, None, None, 1, 0)
     assert result.outcome == FetchOutcome.BOT_BLOCKED
     cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_render_bot_blocked_uses_hyperbrowser_when_unlocker_flag_off() -> None:
+    """Hyperbrowser is a distinct production-approved fallback provider."""
+    fetcher = _make_fetcher()
+    fetcher._do_render = AsyncMock(return_value=_BLOCKED())
+    provider = MagicMock()
+    provider.fetch = AsyncMock(return_value=_UNLOCKED_OK())
+    with (
+        patch("ma_poc.fetch.fetcher.ENABLE_TIER_ESCALATION", True),
+        patch("ma_poc.fetch.fetcher.ENABLE_UNLOCKER_TIER", False),
+        patch("ma_poc.config.feature_flags.hb_enabled", return_value=True),
+        patch(
+            "ma_poc.fetch.hyperbrowser_backend.HyperbrowserProvider",
+            return_value=provider,
+        ) as cls,
+    ):
+        result = await fetcher._do_request(_render_task(), _IDENTITY, None, None, None, 1, 0)
+    assert result.outcome == FetchOutcome.OK
+    cls.assert_called_once_with(
+        mode="unlock",
+        priority=True,
+        reservation_reason="blocked_requested_route",
+    )
+    provider.fetch.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_render_ok_does_not_invoke_unlocker() -> None:
     """A successful RENDER never touches the Unlocker (no needless cost)."""
     fetcher = _make_fetcher()
-    fetcher._do_render = AsyncMock(
-        return_value=_result(FetchOutcome.OK, b"<html>ok</html>", 200)
-    )
+    fetcher._do_render = AsyncMock(return_value=_result(FetchOutcome.OK, b"<html>ok</html>", 200))
     with (
         patch("ma_poc.fetch.fetcher.ENABLE_TIER_ESCALATION", True),
         patch("ma_poc.fetch.fetcher.ENABLE_UNLOCKER_TIER", True),
@@ -184,9 +203,7 @@ async def test_render_ok_does_not_invoke_unlocker() -> None:
             _mock_unlocker(_UNLOCKED_OK()),
         ) as cls,
     ):
-        result = await fetcher._do_request(
-            _render_task(), _IDENTITY, None, None, None, 1, 0
-        )
+        result = await fetcher._do_request(_render_task(), _IDENTITY, None, None, None, 1, 0)
     assert result.outcome == FetchOutcome.OK
     cls.assert_not_called()
 
@@ -204,9 +221,7 @@ async def test_render_bot_blocked_failed_unlock_keeps_blocked() -> None:
             _mock_unlocker(_result(FetchOutcome.BOT_BLOCKED, b"", None)),
         ),
     ):
-        result = await fetcher._do_request(
-            _render_task(), _IDENTITY, None, None, None, 1, 0
-        )
+        result = await fetcher._do_request(_render_task(), _IDENTITY, None, None, None, 1, 0)
     assert result.outcome == FetchOutcome.BOT_BLOCKED
 
 

@@ -1,0 +1,201 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:44:06.487945+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      26736
+    ],
+    "native_positive_rent_rows": 3,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 26736,
+      "property_name": "The Boro - Phipps",
+      "website": "https://www.theboroapartments.com/?switch_cls%5Bid%5D=64893&utm_source=gmb&utm_medium=organic&oll_switch_cls%5Bid%5D=64893&oll_utm_source=gmb&oll_utm_medium=organic",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 3,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_unique_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "The Boro - Phipps",
+        "canonical_address": "3460 Kingsboro Rd NE",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "1140727",
+        "current_listing_property_floorplan_binding": "772398",
+        "rows_with_native_identity": 3,
+        "rows_with_native_identity_and_positive_rent": 3,
+        "source_urls": [
+          "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "542"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1944,
+            "market_rent_high": 1944
+          },
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2"
+        },
+        {
+          "identity": {
+            "unit_number": "106"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1958,
+            "market_rent_high": 1958
+          },
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2"
+        },
+        {
+          "identity": {
+            "unit_number": "837"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 2164,
+            "market_rent_high": 2164
+          },
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "One Bedroom One Bath with Den (1049 SF)",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1,049",
+          "unit_number": "542",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,944",
+          "market_rent_low": 1944,
+          "market_rent_high": 1944,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "One Bedroom One Bath with Den (1049 SF)",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1,049",
+          "unit_number": "106",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,958",
+          "market_rent_low": 1958,
+          "market_rent_high": 1958,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "One Bedroom One Bath with Den (1049 SF)",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1,049",
+          "unit_number": "837",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,164",
+          "market_rent_low": 2164,
+          "market_rent_high": 2164,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-23",
+          "available_date": "2026-09-23",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:41:49.600087+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_26736_current.json",
+        "capture_artifact_sha256": "21422ca90c4e7024fc9a08c550f82332c32d0d69cc310eed8a616a76680a5549",
+        "listing_html_sha256": "16c070a57859826ed542fe1e0803820006aa32bf9c3b35a0de7984899820994e",
+        "page_html_sha256": "47bff39eaa4e84bf33428e613ba35065e431c56a2c742d2c773d581e21b5a611",
+        "endpoint_html_sha256": "0ace77312ad3e0dcd1e5ccc1077842056b15c285c347408b317d3574f7bd5bd0",
+        "published_endpoint": "https://www.theboroapartments.com/?module=check_availability&is_secure=1&property[id]=1140727&action=view_unit_spaces&property_floorplan[id]=772398&cached_rate_available=1&min_rent=$1,944&max_rent=$6,763&min_advertised_base_rent=1867&max_advertised_base_rent=6686&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": false,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

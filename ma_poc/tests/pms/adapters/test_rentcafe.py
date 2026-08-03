@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +13,7 @@ from ma_poc.pms.adapters.rentcafe import (
     RentCafeAdapter,
     _classify_rentcafe_failure,
     _is_rentcafe_response,
+    _try_rentcafe_layout_tab_handoff,
     _unwrap_rentcafe_list,
     parse_rentcafe_floorplans,
 )
@@ -225,6 +227,94 @@ def test_rentcafe_real_apartment_number_remains_an_identity() -> None:
     assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "shared-plan-71"}
 
 
+def test_yardi_apartment_availabilities_are_native_available_units() -> None:
+    """The public Yardi proxy roster must not be mistaken for plan rows."""
+    source_url = (
+        "https://arthaus.mov/api-proxy.php?yardi_endpoint="
+        "/data/PJDUP/availability/p2109661"
+    )
+    body = {
+        "apartmentAvailabilities": [
+            {
+                "propertyId": 2142454,
+                "floorplanId": 6104327,
+                "floorplanName": "Floor Plan A Studio 1BA",
+                "apartmentId": 46285742,
+                "apartmentName": "329",
+                "beds": 0,
+                "baths": 1,
+                "sqft": 290,
+                "minimumRent": 2048,
+                "maximumRent": 2048,
+                "deposit": 0,
+                "availableDate": "07/05/2026",
+                "unitStatus": "Vacant Unrented Ready",
+                "applyOnlineURL": (
+                    "https://arthaus.securecafe.com/onlineleasing/"
+                    "233-broadway-oakland-ca-94607/rentaloptions.aspx?"
+                    "UnitID=46285742&FloorPlanID=6104327&myOlePropertyid=2142454"
+                ),
+            },
+            {
+                "propertyId": 2142454,
+                "floorplanId": 6104327,
+                "floorplanName": "Floor Plan A Studio 1BA",
+                "apartmentId": 45926784,
+                "apartmentName": "103",
+                "beds": 0,
+                "baths": 1,
+                "sqft": 296,
+                "minimumRent": 1798,
+                "maximumRent": 1798,
+                "availableDate": "08/05/2026",
+            },
+        ]
+    }
+
+    items = _unwrap_rentcafe_list(body)
+    assert items is not None
+    assert _is_rentcafe_response(body) is True
+
+    units = parse_rentcafe_floorplans(items, source_url)
+
+    assert len(units) == 2
+    assert {u["unit_number"] for u in units} == {"329", "103"}
+    assert {u["source_ids"]["securecafe_apartment_id"] for u in units} == {
+        "46285742",
+        "45926784",
+    }
+    assert {u["source_ids"]["rentcafe_floorplan_id"] for u in units} == {
+        "6104327"
+    }
+    assert all(u["source_property_id"] == "2142454" for u in units)
+    assert all(u["availability_status"] == "AVAILABLE" for u in units)
+    assert all(u["available_units"] == "1" for u in units)
+    assert [u["availability_date"] for u in units] == ["07/05/2026", "08/05/2026"]
+    assert [u["market_rent_low"] for u in units] == [2048, 1798]
+
+
+def test_floorplan_wrapper_without_apartment_id_stays_plan_level() -> None:
+    """Adding the apartment roster must not promote ordinary plan catalogues."""
+    units = parse_rentcafe_floorplans(
+        [
+            {
+                "propertyId": 2142454,
+                "floorplanId": 6104328,
+                "floorplanName": "Floor Plan B 1BR 1BA",
+                "minimumRent": 2450,
+                "maximumRent": 2450,
+            }
+        ],
+        "https://arthaus.mov/api-proxy.php?yardi_endpoint=/floorplans",
+    )
+
+    assert len(units) == 1
+    assert units[0]["unit_number"] == ""
+    assert units[0]["availability_status"] == "UNAVAILABLE"
+    assert units[0]["available_units"] == ""
+    assert units[0]["source_ids"] == {"rentcafe_floorplan_id": "6104328"}
+
+
 def test_nameless_plan_gets_a_stable_id_across_rent_changes() -> None:
     """A nameless plan must not fall through to the rent-hashing id path.
 
@@ -310,6 +400,189 @@ def test_rent_within_sanity_range() -> None:
                     for n in nums:
                         val = int(n.replace(",", ""))
                         assert 200 <= val <= 50000
+
+
+_LAYOUT_TAB_MARKER = (
+    b'<main class="page-content-floorplans floorplans-layout-tab">units</main>'
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("property_id", "unit_number", "rent"),
+    [
+        pytest.param("61963", "B-201", 1765, id="grand-oak"),
+        pytest.param("72086", "14-304", 1425, id="maple-lane"),
+        pytest.param("20943", "A105", 1899, id="bremerton"),
+    ],
+)
+async def test_layout_tab_handoff_accepts_strict_units_for_proven_cluster(
+    monkeypatch: pytest.MonkeyPatch,
+    property_id: str,
+    unit_number: str,
+    rent: int,
+) -> None:
+    """The exact theme seam accepts the three live-probed cluster members."""
+    candidate = AdapterResult(
+        units=[
+            {
+                "unit_number": unit_number,
+                "floor_plan_name": "A1",
+                "bedrooms": "1",
+                "bathrooms": "1",
+                "sqft": "700",
+                "market_rent_low": rent,
+                "market_rent_high": rent,
+            }
+        ],
+        tier_used="TIER_1_DOM_RENTCAFE_LT",
+        confidence=0.9,
+    )
+
+    async def _fake_extract(
+        _self: object, _page: object, _ctx: AdapterContext
+    ) -> AdapterResult:
+        return candidate
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe_layout_tab.RentCafeLayoutTabAdapter.extract",
+        _fake_extract,
+    )
+    ctx = _make_ctx([])
+    ctx.property_id = property_id
+    ctx.fetch_result = SimpleNamespace(body=_LAYOUT_TAB_MARKER)
+
+    result = await _try_rentcafe_layout_tab_handoff(_DummyPage(), ctx)  # type: ignore[arg-type]
+
+    assert result is candidate
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "units",
+    [
+        [{"unit_number": "A-101", "market_rent_low": 0}],
+        [{"unit_number": "", "market_rent_low": 1450}],
+    ],
+    ids=["zero-rent", "plan-only"],
+)
+async def test_layout_tab_handoff_rejects_non_strict_results(
+    monkeypatch: pytest.MonkeyPatch,
+    units: list[dict],
+) -> None:
+    async def _fake_extract(
+        _self: object, _page: object, _ctx: AdapterContext
+    ) -> AdapterResult:
+        return AdapterResult(units=units)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe_layout_tab.RentCafeLayoutTabAdapter.extract",
+        _fake_extract,
+    )
+    ctx = _make_ctx([])
+    ctx.fetch_result = SimpleNamespace(body=_LAYOUT_TAB_MARKER)
+
+    result = await _try_rentcafe_layout_tab_handoff(_DummyPage(), ctx)  # type: ignore[arg-type]
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_layout_tab_handoff_ignores_one_token_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _unexpected_extract(*_args: object, **_kwargs: object) -> AdapterResult:
+        raise AssertionError("layout adapter must not run without the exact marker")
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe_layout_tab.RentCafeLayoutTabAdapter.extract",
+        _unexpected_extract,
+    )
+    ctx = _make_ctx([])
+    ctx.fetch_result = SimpleNamespace(
+        body=b'<main class="page-content-floorplans">plans</main>'
+    )
+
+    result = await _try_rentcafe_layout_tab_handoff(_DummyPage(), ctx)  # type: ignore[arg-type]
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_plan_catalogue_hands_off_and_is_preserved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native_plan = {
+        "floorplanName": "A1",
+        "floorplanId": "FP-A1",
+        "api": "rentcafe",
+        "beds": "1",
+        "baths": "1",
+        "minimumRent": "1500",
+        "maximumRent": "1600",
+        "availableUnitsCount": "2",
+    }
+    recovered = AdapterResult(
+        units=[
+            {
+                "unit_number": "A-201",
+                "floor_plan_name": "A1",
+                "market_rent_low": 1550,
+            }
+        ],
+        tier_used="TIER_1_DOM_RENTCAFE_LT",
+    )
+
+    async def _fake_handoff(
+        _page: object, _ctx: AdapterContext
+    ) -> AdapterResult:
+        return recovered
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe._try_rentcafe_layout_tab_handoff",
+        _fake_handoff,
+    )
+    ctx = _make_ctx([{"url": "https://example.test/floorplans", "body": [native_plan]}])
+    ctx.fetch_result = SimpleNamespace(body=_LAYOUT_TAB_MARKER)
+
+    result = await RentCafeAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+
+    assert result is recovered
+    assert result.units[0]["unit_number"] == "A-201"
+    assert any(
+        plan.get("floor_plan_name") == "A1" for plan in result.plan_summaries
+    )
+
+
+@pytest.mark.asyncio
+async def test_native_unit_roster_wins_before_layout_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native_unit = {
+        "floorplanName": "A1",
+        "floorplanId": "FP-A1",
+        "apartmentName": "B-203",
+        "api": "rentcafe",
+        "beds": "1",
+        "baths": "1",
+        "minimumRent": "1700",
+        "maximumRent": "1700",
+        "availableUnitsCount": "1",
+    }
+
+    async def _unexpected_handoff(*_args: object, **_kwargs: object) -> AdapterResult:
+        raise AssertionError("native RentCafe unit roster must win")
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.rentcafe._try_rentcafe_layout_tab_handoff",
+        _unexpected_handoff,
+    )
+    ctx = _make_ctx([{"url": "https://example.test/units", "body": [native_unit]}])
+    ctx.fetch_result = SimpleNamespace(body=_LAYOUT_TAB_MARKER)
+
+    result = await RentCafeAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+
+    assert result.units[0]["unit_number"] == "B-203"
 
 
 # --- 2026-04-19 fix tests (RC_T01 – RC_T10) ---------------------------------
@@ -1070,3 +1343,39 @@ def test_securecafe_applicant_plan_range_does_not_become_unit_sqft() -> None:
     assert units[0]["unit_number"] == "A1-101"
     assert units[0]["market_rent_low"] == 1225
     assert units[0]["sqft"] == ""
+
+
+def test_securecafe_applicant_cross_plan_constant_unitcode_is_plan_level() -> None:
+    """The same UnitCode under three plans cannot identify three apartments."""
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_applicant_floorplans
+
+    payload = {
+        "status": True,
+        "floorPlanList": [
+            {
+                "floorPlan": {
+                    "FloorPlanName": plan,
+                    "Beds": beds,
+                    "Baths": baths,
+                    "MinimumRent": rent,
+                    "MinimumArea": area,
+                },
+                "UnitAvailability": [
+                    {"unitcode": "1", "DisplayMinRent": rent}
+                ],
+            }
+            for plan, beds, baths, rent, area in (
+                ("A1", 1, 1, 1200, 700),
+                ("B1", 2, 2, 1500, 950),
+                ("C1", 3, 2, 1800, 1200),
+            )
+        ],
+    }
+    rows = parse_securecafe_applicant_floorplans(
+        payload,
+        "https://x.securecafeapplicant.com/onlineleasing/api/floorplan/"
+        "getfloorplanandavailableunits",
+    )
+    assert len(rows) == 3
+    assert all(row["unit_number"] == "" for row in rows)
+    assert all("PLAN_LEVEL_AMBIGUOUS_UNIT_CODE" in row["extraction_tier"] for row in rows)

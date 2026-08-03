@@ -1,0 +1,41 @@
+{
+  "build": {
+    "cloud_build_id": "9f5c3eb4-ea28-4eea-abc0-88d54afe5c68",
+    "commit": "7f800ca",
+    "image_digest": "sha256:ae62e4ec3235d303530bb680b0c8e15d3d753c14b5d81397bfc72b0a28648ea0",
+    "image_uri": "us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:ae62e4ec3235d303530bb680b0c8e15d3d753c14b5d81397bfc72b0a28648ea0"
+  },
+  "execution": {
+    "execution": "jugnu-verify-7f800ca-thfcv",
+    "fetch_backend": "hyperbrowser",
+    "job": "jugnu-verify-7f800ca",
+    "llm_enabled": false,
+    "parallelism": 29,
+    "project": "jugnu-494013",
+    "region": "us-central1",
+    "run_output": "gs://jugnu-canary/runs/2026-08-02-verify-7f800ca/",
+    "task_count": 29
+  },
+  "input": {
+    "properties_csv": "gs://jugnu-canary/property-list/verify-7f800ca.csv",
+    "properties_csv_generation": "1785717713013573",
+    "properties_sha256": "26d074a211e1150678760dfe2f071240541d1cf379dc2bec4b6951fd95823a32",
+    "property_count": 29,
+    "verification_case_count": 31
+  },
+  "runtime_policy": {
+    "captcha_solver_enabled": false,
+    "dc_proxy_enabled": false,
+    "fingerprint_rotation_enabled": false,
+    "flaresolverr_enabled": false,
+    "hyperbrowser_proxy_enabled": true,
+    "web_unlocker_enabled": false
+  },
+  "warm_profiles": {
+    "bootstrap_profiles": 2,
+    "destination": "gs://jugnu-canary/profiles/verify-7f800ca/",
+    "profiles_copied": 27,
+    "shared_store_mutated": false,
+    "source": "gs://jugnu-canary/profiles/strat1000-ff7b377/"
+  }
+}

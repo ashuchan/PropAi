@@ -20,9 +20,12 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from ma_poc.services.llm_prompt import (
-    UNIT_SIGNAL_KEYS as _UNIT_SIGNAL_KEYS,
     normalize_units as _normalize_units,
+)
+from ma_poc.services.llm_prompt import (
     parse_llm_response as _parse_llm_response,
+)
+from ma_poc.services.llm_prompt import (
     rank_api_responses as _rank_api_responses,
 )
 
@@ -874,6 +877,39 @@ def apply_saved_mapping(api_response_body: Any, mapping: dict) -> list[dict]:
         uid_path = json_paths.get("unit_id", "")
         if uid_path:
             unit["unit_id"] = _get_nested(item, uid_path)
+
+        # ``unit_number`` is a first-class canonical apartment anchor, but
+        # deterministic replay historically ignored its saved mapping.  The
+        # API-analysis prompt has always emitted this key (for example the
+        # Prometheus ``unitNumber`` roster), so replay parsed the rent and
+        # physical fields and then post-processing correctly demoted every row
+        # to plan level for lack of identity.  Preserve the learned field just
+        # like ``unit_id``; the downstream identity registry remains the
+        # authority that rejects junk or plan-shaped values.
+        unit_number_path = json_paths.get("unit_number", "")
+        # A learned mapping can be wrong.  In particular, older Entrata
+        # profiles mapped a floor-plan catalogue's generic ``id`` field onto
+        # ``unit_number`` and thereby recorded one fake "unit" per plan.  Only
+        # replay a path whose source field itself explicitly says unit/apartment
+        # number; a bare ``id``/``name`` remains untrusted plan evidence.
+        _unit_number_token = re.sub(
+            r"[^a-z0-9]", "", str(unit_number_path).lower()
+        )
+        _explicit_unit_number_path = _unit_number_token.endswith(
+            (
+                "unitnumber",
+                "unitnum",
+                "unitno",
+                "apartmentnumber",
+                "apartmentnum",
+                "apartmentno",
+                "homenumber",
+                "homenum",
+                "homeno",
+            )
+        )
+        if unit_number_path and _explicit_unit_number_path:
+            unit["unit_number"] = _get_nested(item, unit_number_path)
 
         fp_path = json_paths.get("floor_plan_name", "")
         if fp_path:

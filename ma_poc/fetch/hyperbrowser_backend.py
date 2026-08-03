@@ -25,6 +25,8 @@ Design notes (see the integration map, task #46):
     clearance-reuse runs on the GCP worker IP, so HB cookies are inert-to-
     counterproductive across the egress boundary. Emit {} deliberately.
   * **Per-property cost cap** (``HYPERBROWSER_MAX_CALLS_PER_PROPERTY``),
+    with an optional slot reserved for exact/profile routes
+    (``HYPERBROWSER_RESERVED_PRIORITY_CALLS``),
     mirroring the Web-Unlocker cap — the link-hop crawl fires multiple
     fetches/property and HB is billed per session.
 
@@ -40,6 +42,7 @@ import re
 import threading
 import time
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urljoin, urlsplit
 
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
 from ma_poc.fetch.response_classifier import exception_signature
@@ -63,10 +66,15 @@ _CAPTURE_CT_RE = re.compile(r"json|xml|html|text", re.IGNORECASE)
 _MAX_CAPTURED = 40
 _MAX_JSON_BYTES = 512_000
 _CF_TITLE_RE = re.compile(r"just a moment|verify you are human|checking your browser", re.IGNORECASE)
+_RENTMANAGER_INVENTORY_PATH_RE = re.compile(
+    r"/(?:unit-availability|available-units?)/?$",
+    re.IGNORECASE,
+)
 
 _NAV_TIMEOUT_MS = int(os.environ.get("HB_NAV_TIMEOUT_MS", "40000"))
 _SETTLE_MS = int(os.environ.get("HB_SETTLE_MS", "5000"))
 _CONNECT_TIMEOUT_MS = int(os.environ.get("HB_CONNECT_TIMEOUT_MS", "60000"))
+_LOCAL_CLOSE_TIMEOUT_SECONDS = float(os.environ.get("HB_LOCAL_CLOSE_TIMEOUT_SECONDS", "5"))
 
 
 # ── per-property call cap (mirrors unlocker._wu_* cost guard) ────────────────
@@ -86,17 +94,71 @@ def _hb_prop_cap() -> int:
         return 0
 
 
-def _hb_try_reserve_property(property_id: str) -> bool:
+def _hb_reserved_priority_calls(cap: int) -> int:
+    """Slots unavailable to exploratory calls but usable by priority routes.
+
+    The default is zero, so existing production jobs are unchanged. A canary
+    can reserve one of its already-budgeted sessions without increasing cost.
+    """
+    raw = os.getenv("HYPERBROWSER_RESERVED_PRIORITY_CALLS", "").strip()
+    if not raw or cap <= 0:
+        return 0
+    try:
+        return min(cap, max(0, int(raw)))
+    except ValueError:
+        return 0
+
+
+def _hb_try_reserve_property(
+    property_id: str,
+    *,
+    cap_override: int | None = None,
+    priority: bool = False,
+    reason: str = "unspecified",
+) -> bool:
     """Reserve one HB session for *property_id*. False when the per-property
-    cap is exhausted. Atomic; empty property_id is never capped."""
-    cap = _hb_prop_cap()
+    cap is exhausted. Atomic; empty property_id is never capped.
+
+    ``cap_override`` lets a stricter call site enforce its own ceiling without
+    weakening the process-wide environment cap for ordinary callers. When
+    ``HYPERBROWSER_RESERVED_PRIORITY_CALLS`` is positive, ordinary discovery
+    cannot consume those final slots; a caller must explicitly set
+    ``priority=True``. The total cap never increases.
+    """
+    configured_cap = _hb_prop_cap()
+    if cap_override is None:
+        cap = configured_cap
+    elif configured_cap:
+        cap = min(configured_cap, max(0, int(cap_override)))
+    else:
+        cap = max(0, int(cap_override))
     if not cap or not property_id:
         return True
+    reserved = _hb_reserved_priority_calls(cap)
+    ordinary_cap = max(0, cap - reserved)
     with _HB_PROP_LOCK:
         n = _hb_prop_counts.get(property_id, 0)
-        if n >= cap:
+        if n >= cap or (not priority and n >= ordinary_cap):
+            log.info(
+                "hb.session_reservation_denied property=%s count=%d cap=%d reserved=%d priority=%s reason=%s",
+                property_id,
+                n,
+                cap,
+                reserved,
+                priority,
+                reason,
+            )
             return False
         _hb_prop_counts[property_id] = n + 1
+        log.info(
+            "hb.session_reserved property=%s count=%d cap=%d reserved=%d priority=%s reason=%s",
+            property_id,
+            n + 1,
+            cap,
+            reserved,
+            priority,
+            reason,
+        )
         return True
 
 
@@ -140,9 +202,14 @@ def _session_options(mode: str) -> dict[str, bool]:
     stealth. Proxy defaults on (residential is a legally-available product);
     ``HB_USE_PROXY`` can turn it off for non-walled render tasks.
     """
+    # Compliance runs also force HB's optional stealth layer off even if a
+    # stale process environment requests it. CAPTCHA solving is independently
+    # hard-disabled below and has no enable path.
+    from ma_poc.config.feature_flags import compliance_mode
+
     return {
         "solveCaptchas": False,  # compliance: hard no-go, never enable
-        "useStealth": _bool_env("HB_USE_STEALTH", True),
+        "useStealth": False if compliance_mode() else _bool_env("HB_USE_STEALTH", True),
         "useProxy": _bool_env("HB_USE_PROXY", True),
         "adblock": _bool_env("HB_ADBLOCK", True),
     }
@@ -190,15 +257,34 @@ class _HbSession:
 
     async def close(self) -> None:
         """Close the browser/Playwright and ALWAYS stop the HB session. Each
-        step best-effort so one failure never blocks the paid-session stop."""
+        step is time-bounded and best-effort so a wedged local CDP transport
+        never blocks the paid-session stop call."""
         try:
             if self._browser is not None:
-                await self._browser.close()
+                await asyncio.wait_for(
+                    self._browser.close(),
+                    timeout=_LOCAL_CLOSE_TIMEOUT_SECONDS,
+                )
+        except TimeoutError:
+            log.warning(
+                "hb.browser_close_timeout id=%s timeout_seconds=%s",
+                self.session_id,
+                _LOCAL_CLOSE_TIMEOUT_SECONDS,
+            )
         except Exception as exc:
             log.debug("hb.browser_close_error: %s", exc)
         try:
             if self._pw is not None:
-                await self._pw.stop()
+                await asyncio.wait_for(
+                    self._pw.stop(),
+                    timeout=_LOCAL_CLOSE_TIMEOUT_SECONDS,
+                )
+        except TimeoutError:
+            log.warning(
+                "hb.playwright_stop_timeout id=%s timeout_seconds=%s",
+                self.session_id,
+                _LOCAL_CLOSE_TIMEOUT_SECONDS,
+            )
         except Exception as exc:
             log.debug("hb.playwright_stop_error: %s", exc)
         if self.session_id:
@@ -229,8 +315,12 @@ class HyperbrowserProvider:
         *,
         mode: str = "unlock",
         session_factory: Any = None,
+        priority: bool = False,
+        reservation_reason: str = "provider_fetch",
     ) -> None:
         self.mode = mode
+        self.priority = priority
+        self.reservation_reason = reservation_reason
         # Default: a real HB session. Tests inject a fake with open()/close().
         self._session_factory = session_factory or (lambda: _HbSession(mode))
 
@@ -242,7 +332,11 @@ class HyperbrowserProvider:
         # profile may be None (the _try_unlocker_fallback seam passes None).
         start_ms = _now_ms()
         # Per-property cost cap: skip without opening a (paid) session.
-        if not _hb_try_reserve_property(getattr(task, "property_id", "")):
+        if not _hb_try_reserve_property(
+            getattr(task, "property_id", ""),
+            priority=self.priority,
+            reason=self.reservation_reason,
+        ):
             log.info("hb.prop_cap_exhausted property=%s", getattr(task, "property_id", ""))
             return _stamp(_capped_result(task, start_ms))
 
@@ -265,6 +359,29 @@ class HyperbrowserProvider:
                 title = ""
             final_url = _safe_url(page, task.url)
 
+            # RentManager sites behind a JS challenge often expose the exact
+            # unit roster one published nav-hop from the homepage.  A normal
+            # link-hop would need a *second* paid HB session and is correctly
+            # denied by the per-property cap.  Reuse the already-open browser
+            # instead: only follow an explicit same-origin
+            # ``/unit-availability`` anchor on a page that also publishes a
+            # RentManager fingerprint, and adopt the response only when it
+            # contains the native-card shape.  No URL guessing, no extra
+            # session, no CAPTCHA solver.
+            inventory_url = _published_rentmanager_inventory_url(
+                body_text or "",
+                final_url,
+            )
+            if inventory_url:
+                follow_status, follow_body = await _same_origin_raw_get(
+                    page,
+                    inventory_url,
+                    final_url,
+                )
+                if 200 <= follow_status < 300 and _has_rentmanager_native_cards(follow_body):
+                    body_text = follow_body
+                    final_url = inventory_url
+
             body = (body_text or "").encode("utf-8", "replace")
             _emit_session_event(task, session, self.mode)
 
@@ -278,7 +395,10 @@ class HyperbrowserProvider:
             outcome = FetchOutcome.TRANSIENT if _is_transient(exc) else FetchOutcome.HARD_FAIL
             log.warning(
                 "hb.error property=%s url=%s %s: %s",
-                getattr(task, "property_id", ""), task.url, type(exc).__name__, exc,
+                getattr(task, "property_id", ""),
+                task.url,
+                type(exc).__name__,
+                exc,
             )
             return _stamp(_error_result(task, outcome, exc, start_ms))
         finally:
@@ -291,9 +411,79 @@ class HyperbrowserProvider:
 # ── page instrumentation ────────────────────────────────────────────────────
 
 
+def _published_rentmanager_inventory_url(html: str, current_url: str) -> str:
+    """Exact same-origin RentManager unit-roster anchor from rendered HTML."""
+    if not html or not current_url:
+        return ""
+    lower = html.casefold()
+    if "rentmanager.com" not in lower and "rmwb_" not in lower:
+        return ""
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        current = urlsplit(current_url)
+    except Exception:
+        return ""
+    if current.scheme not in {"http", "https"} or not current.netloc:
+        return ""
+    expected_host = (current.hostname or "").casefold().removeprefix("www.")
+    for anchor in soup.find_all("a", href=True):
+        candidate = urljoin(current_url, str(anchor.get("href") or "").strip())
+        try:
+            parsed = urlsplit(candidate)
+        except Exception:
+            continue
+        observed_host = (parsed.hostname or "").casefold().removeprefix("www.")
+        if observed_host != expected_host:
+            continue
+        if not _RENTMANAGER_INVENTORY_PATH_RE.search(parsed.path or ""):
+            continue
+        return candidate.split("#", 1)[0]
+    return ""
+
+
+def _has_rentmanager_native_cards(html: str) -> bool:
+    """Strong native-card shape required before replacing the fetched page."""
+    lower = (html or "").casefold()
+    return bool(
+        "rmwb_listing-wrapper" in lower
+        and re.search(r"[?&]uid=\d+", lower)
+        and "rmwb_info-title" in lower
+        and "rent" in lower
+    )
+
+
+async def _same_origin_raw_get(
+    page: Any,
+    target_url: str,
+    current_url: str,
+) -> tuple[int, str]:
+    """In-page raw GET after enforcing exact scheme+authority equality."""
+    try:
+        target = urlsplit(target_url)
+        current = urlsplit(current_url)
+    except Exception:
+        return 0, ""
+    if (target.scheme, target.netloc) != (current.scheme, current.netloc):
+        return 0, ""
+    evaluate = getattr(page, "evaluate", None)
+    if not callable(evaluate):
+        return 0, ""
+    relative = target.path + (("?" + target.query) if target.query else "")
+    try:
+        response = await evaluate(_INPAGE_FETCH_JS, relative)
+        status = int((response or {}).get("status") or 0)
+        body = str((response or {}).get("body") or "")
+        return status, body
+    except Exception:
+        return 0, ""
+
+
 def _install_block(page: Any) -> None:
     """Abort image/media/font/stylesheet in the remote browser (pre-proxy, so
     the bytes are never billed). Never blocks document/xhr/fetch/JSON."""
+
     async def _router(route: Any) -> None:
         try:
             if getattr(route.request, "resource_type", "") in _BLOCK_TYPES:
@@ -504,22 +694,62 @@ _INPAGE_FETCH_JS = """async (p) => {
 
 
 async def hb_raw_get(
-    url: str, property_id: str = "?", *, session_factory: Any = None
+    url: str,
+    property_id: str = "?",
+    *,
+    session_factory: Any = None,
+    max_calls_per_property: int | None = None,
+    priority: bool = False,
+    reservation_reason: str = "raw_get",
 ) -> tuple[int, str]:
     """Fetch *url* as a RAW response through HB's residential proxy via an
     in-page same-origin fetch (see _INPAGE_FETCH_JS). Returns ``(status, body)``
     — ``(0, "")`` on any failure. Never raises; always stops the HB session.
 
     ``session_factory`` lets tests inject a fake _HbSession-shaped object.
+
+    The raw shortcut shares the same per-property paid-session cap as
+    :class:`HyperbrowserProvider`.  Before this guard, every direct shortcut
+    (SecureCafe, SightMap, RealPage) bypassed
+    ``HYPERBROWSER_MAX_CALLS_PER_PROPERTY`` entirely even though each call
+    opens the same billable session.  A capped call returns ``(0, "")`` so all
+    callers take their existing fail-open render path without spending.
     """
     from urllib.parse import urlsplit
 
-    parts = urlsplit(url)
-    rel = parts.path + (("?" + parts.query) if parts.query else "")
+    # ``?`` is the historical unknown-property sentinel.  Do not make every
+    # unknown diagnostic share one global cap bucket; real runner calls always
+    # supply a canonical property id and are bounded together with provider
+    # calls through the module-level counter.
+    cap_pid = str(property_id or "")
+    if cap_pid == "?":
+        cap_pid = ""
+    if not _hb_try_reserve_property(
+        cap_pid,
+        cap_override=max_calls_per_property,
+        priority=priority,
+        reason=reservation_reason,
+    ):
+        log.info("hb.raw_get_prop_cap_exhausted property=%s", property_id)
+        return 0, ""
+
+    original_parts = urlsplit(url)
+    original_rel = original_parts.path + (("?" + original_parts.query) if original_parts.query else "")
     sess = (session_factory or (lambda: _HbSession(mode="render")))()
     try:
         page = await sess.open()
         await page.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT_MS)
+        # ``goto`` may redirect across origins (for example a legacy vanity
+        # domain to the operator's exact property page).  The browser is now
+        # on the landing origin, so fetching the *original* relative path can
+        # silently return that origin's homepage/404.  Rebuild the same-origin
+        # path from the actual landing URL, retaining the original path only
+        # when the page does not expose a valid HTTP(S) URL.
+        landing_parts = urlsplit(_safe_url(page, url))
+        if landing_parts.scheme in {"http", "https"} and landing_parts.netloc:
+            rel = landing_parts.path + (("?" + landing_parts.query) if landing_parts.query else "")
+        else:
+            rel = original_rel
         res = await page.evaluate(_INPAGE_FETCH_JS, rel)
         status = int((res or {}).get("status") or 0)
         body = (res or {}).get("body") or ""
@@ -532,3 +762,94 @@ async def hb_raw_get(
             await sess.close()
         except Exception as exc:
             log.debug("hb_raw_get session close failed: %s", exc)
+
+
+async def hb_raw_get_then(
+    url: str,
+    property_id: str,
+    followup_url_from_body: Any,
+    *,
+    session_factory: Any = None,
+    priority: bool = False,
+    reservation_reason: str = "raw_get_then",
+) -> tuple[tuple[int, str], tuple[str, int, str] | None]:
+    """Fetch *url* and one body-derived same-origin follow-up in one session.
+
+    This is the bounded two-hop counterpart to :func:`hb_raw_get`.  It exists
+    for public pages where an index must be read before the exact detail URL is
+    known (for example, RentCafe ``/floorplans`` ->
+    ``/floorplans/<plan-slug>``).  The caller supplies a synchronous selector
+    that receives the first raw body and returns the follow-up URL, or a falsey
+    value to stop after the first response.
+
+    One invocation reserves exactly one paid session against the shared
+    per-property cap.  The follow-up is rejected unless its scheme + authority
+    exactly match the first URL, so a page cannot turn this helper into an
+    arbitrary cross-origin fetch.  CAPTCHA solving remains hard-disabled by
+    :class:`_HbSession`; the session is always stopped.  Failures are returned
+    as empty status/body values and never raised.
+    """
+    from urllib.parse import urljoin, urlsplit
+
+    cap_pid = str(property_id or "")
+    if cap_pid == "?":
+        cap_pid = ""
+    if not _hb_try_reserve_property(
+        cap_pid,
+        priority=priority,
+        reason=reservation_reason,
+    ):
+        log.info("hb.raw_get_then_prop_cap_exhausted property=%s", property_id)
+        return (0, ""), None
+
+    first_parts = urlsplit(url)
+    if first_parts.scheme not in {"http", "https"} or not first_parts.netloc:
+        return (0, ""), None
+
+    async def _raw_get(page: Any, target: str) -> tuple[int, str]:
+        parts = urlsplit(target)
+        if (parts.scheme, parts.netloc) != (first_parts.scheme, first_parts.netloc):
+            return 0, ""
+        rel = parts.path + (("?" + parts.query) if parts.query else "")
+        response = await page.evaluate(_INPAGE_FETCH_JS, rel)
+        status = int((response or {}).get("status") or 0)
+        body = str((response or {}).get("body") or "")
+        return (status, body) if status > 0 else (0, "")
+
+    sess = (session_factory or (lambda: _HbSession(mode="render")))()
+    try:
+        page = await sess.open()
+        await page.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT_MS)
+        first = await _raw_get(page, url)
+        if first[0] <= 0 or not first[1]:
+            return first, None
+        try:
+            selected = str(followup_url_from_body(first[1]) or "").strip()
+        except Exception as exc:
+            log.debug("hb_raw_get_then selector failed for %s: %s", url, exc)
+            return first, None
+        if not selected:
+            return first, None
+        followup_url = urljoin(url, selected)
+        followup_parts = urlsplit(followup_url)
+        if (followup_parts.scheme, followup_parts.netloc) != (
+            first_parts.scheme,
+            first_parts.netloc,
+        ):
+            log.info(
+                "hb.raw_get_then_cross_origin_rejected property=%s start=%s followup=%s",
+                property_id,
+                first_parts.netloc,
+                followup_parts.netloc,
+            )
+            return first, None
+        followup = await _raw_get(page, followup_url)
+        return first, (followup_url, followup[0], followup[1])
+    except Exception as exc:
+        log.debug("hb_raw_get_then failed for %s (%s): %s", url, property_id, exc)
+        return (0, ""), None
+    finally:
+        try:
+            await sess.close()
+        except Exception as exc:
+            log.debug("hb_raw_get_then session close failed: %s", exc)

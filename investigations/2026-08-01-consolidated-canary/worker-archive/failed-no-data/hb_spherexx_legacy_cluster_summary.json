@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "property_id": 259386,
+      "property_name": "Fairmount Towers",
+      "url": "https://www.fairmount-towers.com/floor-plans",
+      "status": 200,
+      "bytes": 69706,
+      "title": "FLOOR PLANS - Fairmount Towers Apartments for rent in Elizabeth, NJ",
+      "published_spherexx_availability_urls": [
+        "https://clients.spherexx.com/kamson_availability/availability.asp?id=qmtolmid"
+      ],
+      "captcha_or_challenge": false
+    },
+    {
+      "property_id": 70255,
+      "property_name": "Coventry Square",
+      "url": "https://coventrysquareapartments.com/floor-plans/",
+      "status": 200,
+      "bytes": 79091,
+      "title": "FLOOR PLANS - Conventy Square Apartments",
+      "published_spherexx_availability_urls": [
+        "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd"
+      ],
+      "captcha_or_challenge": false
+    }
+  ]
+}

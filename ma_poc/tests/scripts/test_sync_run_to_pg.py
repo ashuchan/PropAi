@@ -15,6 +15,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+
+# Tests that exercise ``sync_run_to_postgres()`` end-to-end must use a
+# recent run_date — the orchestrator now invokes ``_apply_retention()``
+# at the end of every sync, which deletes anything older than 3 days.
+# A hard-coded fixed date would be silently swept after the calendar
+# moves past it, leaving the tests asserting against empty tables.
+from datetime import date as _date
 from pathlib import Path
 from typing import Any
 
@@ -35,16 +42,7 @@ from models.extraction_result import (
 )
 from models.scrape_event import ScrapeEvent, ScrapeOutcome
 from models.scrape_profile import ScrapeProfile
-
 from scripts.sync import run_to_pg as sync_run_to_pg
-
-
-# Tests that exercise ``sync_run_to_postgres()`` end-to-end must use a
-# recent run_date — the orchestrator now invokes ``_apply_retention()``
-# at the end of every sync, which deletes anything older than 3 days.
-# A hard-coded fixed date would be silently swept after the calendar
-# moves past it, leaving the tests asserting against empty tables.
-from datetime import date as _date
 
 RUN_DATE = _date.today().isoformat()
 
@@ -69,7 +67,29 @@ def _seed_fs_provider(tmp_path: Path) -> tuple[FileSystemDataProvider, Path, Pat
     src.unit_state.upsert_units(
         "P-1",
         [
-            {"unit_id": "101", "rent_low": 1500, "rent_high": 1500, "beds": 1, "baths": 1.0},
+            {
+                "unit_id": "B1::101",
+                "source_unit_id": "101",
+                "canonical_unit_id": "B1::101",
+                "building_id": "B1",
+                "building_id_source": "source_ids.vendor_building_id",
+                "rent_low": 1500,
+                "rent_high": 1750,
+                "rent_range": "$1,500 - $1,750",
+                "rent_range_raw": "$1,500 - $1,750",
+                "rent_is_range": True,
+                "rent_provenance": "numeric_fields_confirmed_by_published_range",
+                "beds": 1,
+                "baths": 1.0,
+                "available_date": "2026-09-01",
+                "_available_date_raw": "9/1/2026",
+                "availability_date_provenance": "explicit_future",
+                "source_ids": {"vendor_unit_id": "native-101", "vendor_building_id": "B1"},
+                "unit_history_key": "unitsha_" + "b" * 64,
+                "unit_history_key_basis": "property:P-1|building:B1|unit:101",
+                "unit_history_key_quality": "building_scoped_source_id",
+                "unit_history_key_version": "v1",
+            },
             {"unit_id": "102", "rent_low": 1800, "rent_high": 1800, "beds": 2, "baths": 2.0},
         ],
         RUN_DATE,
@@ -140,9 +160,7 @@ def _seed_fs_provider(tmp_path: Path) -> tuple[FileSystemDataProvider, Path, Pat
     (property_reports_dir / "P-1.md").write_text("# P-1\nreport body", encoding="utf-8")
     (property_reports_dir / "P-2.md").write_text("# P-2\nreport body", encoding="utf-8")
 
-    (run_dir / "llm_report.json").write_text(
-        '{"calls": 3, "total_cost_usd": 0.019}', encoding="utf-8"
-    )
+    (run_dir / "llm_report.json").write_text('{"calls": 3, "total_cost_usd": 0.019}', encoding="utf-8")
 
     llm_details_dir = run_dir / "llm_report"
     llm_details_dir.mkdir(parents=True, exist_ok=True)
@@ -191,6 +209,16 @@ def test_sync_round_trip_populates_every_artifact(tmp_path: Path) -> None:
         assert run_out["properties"] == 2
         assert run_out["issues"] == 1
         assert run_out["ledger"] == 1
+        synced_units = target.unit_state.get_units("P-1")
+        synced = synced_units["B1::101"]
+        assert synced.source_unit_id == "101"
+        assert synced.building_id == "B1"
+        assert synced.available_date_raw == "9/1/2026"
+        assert synced.availability_date_provenance == "explicit_future"
+        assert synced.rent_range == "$1,500 - $1,750"
+        assert synced.rent_is_range is True
+        assert synced.rent_provenance == ("numeric_fields_confirmed_by_published_range")
+        assert synced.unit_history_key == "unitsha_" + "b" * 64
         # Drive the report write via the store contract (legacy
         # replace semantics — backfill_pg.py uses this path).
         report = src2.runs.read_report(RUN_DATE)
@@ -250,6 +278,7 @@ def test_sync_is_idempotent(tmp_path: Path) -> None:
         engine = target.engine
         from sqlalchemy import select
         from sqlalchemy.orm import Session
+
         from data_provider.sql.models import (
             LlmReportRow,
             PropertyReportRow,
@@ -258,21 +287,31 @@ def test_sync_is_idempotent(tmp_path: Path) -> None:
 
         with Session(engine) as session:
             assert (
-                len(list(session.execute(
-                    select(RunReportRow).where(RunReportRow.run_date == RUN_DATE)
-                ).scalars()))
+                len(
+                    list(
+                        session.execute(
+                            select(RunReportRow).where(RunReportRow.run_date == RUN_DATE)
+                        ).scalars()
+                    )
+                )
                 == 1
             )
             assert (
-                len(list(session.execute(
-                    select(LlmReportRow).where(LlmReportRow.run_date == RUN_DATE)
-                ).scalars()))
+                len(
+                    list(
+                        session.execute(
+                            select(LlmReportRow).where(LlmReportRow.run_date == RUN_DATE)
+                        ).scalars()
+                    )
+                )
                 == 1
             )
             # property_reports is keyed by (run_date, cid) → 2 rows, not 4.
-            rows = list(session.execute(
-                select(PropertyReportRow).where(PropertyReportRow.run_date == RUN_DATE)
-            ).scalars())
+            rows = list(
+                session.execute(
+                    select(PropertyReportRow).where(PropertyReportRow.run_date == RUN_DATE)
+                ).scalars()
+            )
             assert len(rows) == 2
     finally:
         target.close()
@@ -303,7 +342,7 @@ def test_sync_llm_diagnostics_skips_unparseable_filenames(tmp_path: Path) -> Non
     run_dir = data_dir / "runs" / RUN_DATE
     diag_dir = run_dir / "llm_diagnostics"
     diag_dir.mkdir(parents=True, exist_ok=True)
-    (diag_dir / "bad.json").write_text("{}", encoding="utf-8")       # no underscore
+    (diag_dir / "bad.json").write_text("{}", encoding="utf-8")  # no underscore
     (diag_dir / "P-1_valid.json").write_text("{}", encoding="utf-8")  # good
 
     target = SqliteDataProvider(url=_sqlite_url(tmp_path))
@@ -340,6 +379,7 @@ def test_sync_handles_empty_artifact_dirs(tmp_path: Path) -> None:
 
 def _dlq_count(engine) -> int:
     from sqlalchemy import select
+
     from data_provider.sql.models import DlqEntryRow
 
     with engine.connect() as conn:
@@ -348,6 +388,7 @@ def _dlq_count(engine) -> int:
 
 def _dlq_row(engine, pid: str):
     from sqlalchemy import select
+
     from data_provider.sql.models import DlqEntryRow
 
     with engine.connect() as conn:
@@ -362,13 +403,16 @@ def test_dlq_load_live_entries_honors_tombstones(tmp_path: Path) -> None:
     """
     path = tmp_path / "dlq.jsonl"
     path.write_text(
-        '\n'.join([
-            '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-            '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-            '{"property_id":"P-1","parked_at":"t0","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
-            '{"property_id":"P-1","parked_at":"t2","reason":"timeout","last_error_signature":"sig2","retry_at":"t3","unparked":false}',
-            '{"property_id":"P-3","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
-        ]) + "\n",
+        "\n".join(
+            [
+                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-1","parked_at":"t0","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+                '{"property_id":"P-1","parked_at":"t2","reason":"timeout","last_error_signature":"sig2","retry_at":"t3","unparked":false}',
+                '{"property_id":"P-3","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+            ]
+        )
+        + "\n",
         encoding="utf-8",
     )
     live = sync_run_to_pg._load_dlq_live_entries(path)
@@ -389,10 +433,13 @@ def test_dlq_sync_upserts_parked_and_deletes_unparked(tmp_path: Path) -> None:
     try:
         # Round 1: two properties parked.
         dlq_path.write_text(
-            '\n'.join([
-                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-            ]) + "\n",
+            "\n".join(
+                [
+                    '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                    '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                ]
+            )
+            + "\n",
             encoding="utf-8",
         )
         summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
@@ -401,11 +448,14 @@ def test_dlq_sync_upserts_parked_and_deletes_unparked(tmp_path: Path) -> None:
 
         # Round 2: P-1 unparked. DB must drop it.
         dlq_path.write_text(
-            '\n'.join([
-                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-                '{"property_id":"P-1","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
-            ]) + "\n",
+            "\n".join(
+                [
+                    '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                    '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                    '{"property_id":"P-1","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+                ]
+            )
+            + "\n",
             encoding="utf-8",
         )
         summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
@@ -416,10 +466,13 @@ def test_dlq_sync_upserts_parked_and_deletes_unparked(tmp_path: Path) -> None:
 
         # Round 3: re-parking P-1 with new reason overwrites in-place.
         dlq_path.write_text(
-            '\n'.join([
-                '{"property_id":"P-1","parked_at":"t5","reason":"blocked","last_error_signature":"newsig","retry_at":"t6","unparked":false}',
-                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-            ]) + "\n",
+            "\n".join(
+                [
+                    '{"property_id":"P-1","parked_at":"t5","reason":"blocked","last_error_signature":"newsig","retry_at":"t6","unparked":false}',
+                    '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                ]
+            )
+            + "\n",
             encoding="utf-8",
         )
         summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
@@ -460,10 +513,13 @@ def test_load_dlq_from_db_to_file_writes_compacted_jsonl(tmp_path: Path) -> None
     dlq_path_dst = tmp_path / "dst.jsonl"
     try:
         dlq_path_src.write_text(
-            '\n'.join([
-                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
-            ]) + "\n",
+            "\n".join(
+                [
+                    '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                    '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                ]
+            )
+            + "\n",
             encoding="utf-8",
         )
         sync_run_to_pg._sync_dlq(target.engine, dlq_path_src)
@@ -480,8 +536,12 @@ def test_load_dlq_from_db_to_file_writes_compacted_jsonl(tmp_path: Path) -> None
         for raw in dlq_path_dst.read_text(encoding="utf-8").splitlines():
             entry = json.loads(raw)
             assert set(entry.keys()) == {
-                "property_id", "parked_at", "reason",
-                "last_error_signature", "retry_at", "unparked",
+                "property_id",
+                "parked_at",
+                "reason",
+                "last_error_signature",
+                "retry_at",
+                "unparked",
             }
             assert entry["unparked"] is False
     finally:
@@ -571,6 +631,7 @@ def test_sync_run_to_postgres_includes_dlq(tmp_path: Path) -> None:
     assert summary["dlq"] == {"upserted": 1, "deleted": 0}
 
     from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
     verify = _Sqlite(url=url)
     try:
         assert _dlq_count(verify.engine) == 1
@@ -643,9 +704,7 @@ def _seed_shard_fs(
     # a single final write is functionally equivalent for the sync layer).
     import json as _json
 
-    (data_dir / "runs" / RUN_DATE / "properties.json").write_text(
-        _json.dumps(properties), encoding="utf-8"
-    )
+    (data_dir / "runs" / RUN_DATE / "properties.json").write_text(_json.dumps(properties), encoding="utf-8")
     # Minimal report.json so _copy_run's report path fires.
     (data_dir / "runs" / RUN_DATE / "report.json").write_text(
         _json.dumps(
@@ -666,8 +725,7 @@ def _seed_shard_fs(
                     "success_rate_pct": 0.0,
                 },
                 "tier_distribution": {
-                    str((p.get("_meta") or {}).get("scrape_tier_used") or "UNKNOWN"): 1
-                    for p in properties
+                    str((p.get("_meta") or {}).get("scrape_tier_used") or "UNKNOWN"): 1 for p in properties
                 },
                 "cost": {"openrouter": 0.001 * len(properties)},
                 "slo_violations": [],
@@ -684,8 +742,7 @@ def _seed_shard_fs(
                 "total_tokens_in": 100 * len(properties),
                 "total_tokens_out": 50 * len(properties),
                 "by_property": {
-                    (p.get("_meta") or {}).get("canonical_id", "?"): {"calls": 1}
-                    for p in properties
+                    (p.get("_meta") or {}).get("canonical_id", "?"): {"calls": 1} for p in properties
                 },
             }
         ),
@@ -704,24 +761,28 @@ def test_multi_shard_sync_does_not_clobber_other_shards_snapshots(tmp_path: Path
     scoped to THIS batch's canonical_ids, leaving other shards alone.
     """
     shard_a_props = [
-        _jugnu_v2_property(f"A-{i}", units=[{"unit_id": f"a{i}", "rent_low": 1000 + i}])
-        for i in range(3)
+        _jugnu_v2_property(f"A-{i}", units=[{"unit_id": f"a{i}", "rent_low": 1000 + i}]) for i in range(3)
     ]
     shard_b_props = [
-        _jugnu_v2_property(f"B-{i}", units=[{"unit_id": f"b{i}", "rent_low": 2000 + i}])
-        for i in range(3)
+        _jugnu_v2_property(f"B-{i}", units=[{"unit_id": f"b{i}", "rent_low": 2000 + i}]) for i in range(3)
     ]
     data_a, config_a = _seed_shard_fs(tmp_path, "shard_a", shard_a_props)
     data_b, config_b = _seed_shard_fs(tmp_path, "shard_b", shard_b_props)
 
     url = _sqlite_url(tmp_path)
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_a, config_dir=config_a,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_a,
+        config_dir=config_a,
+        database_url=url,
+        shard_id="0",
     )
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_b, config_dir=config_b,
-        database_url=url, shard_id="1",
+        run_date=RUN_DATE,
+        data_dir=data_b,
+        config_dir=config_b,
+        database_url=url,
+        shard_id="1",
     )
 
     from sqlalchemy import select
@@ -743,10 +804,7 @@ def test_multi_shard_sync_does_not_clobber_other_shards_snapshots(tmp_path: Path
             assert snap_cids == {f"A-{i}" for i in range(3)} | {f"B-{i}" for i in range(3)}
 
             # Current-state tables (the TS frontend reads these).
-            prop_cids = {
-                r.canonical_id
-                for r in session.execute(select(PropertyRow)).scalars()
-            }
+            prop_cids = {r.canonical_id for r in session.execute(select(PropertyRow)).scalars()}
             assert prop_cids == snap_cids
 
             # Units populated too — previously ``state: 0`` in the summary
@@ -773,12 +831,18 @@ def test_multi_shard_sync_merges_report_totals(tmp_path: Path) -> None:
 
     url = _sqlite_url(tmp_path)
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_a, config_dir=config_a,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_a,
+        config_dir=config_a,
+        database_url=url,
+        shard_id="0",
     )
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_b, config_dir=config_b,
-        database_url=url, shard_id="1",
+        run_date=RUN_DATE,
+        data_dir=data_b,
+        config_dir=config_b,
+        database_url=url,
+        shard_id="1",
     )
 
     from sqlalchemy.orm import Session
@@ -827,12 +891,18 @@ def test_shard_retry_is_idempotent_on_report_merge(tmp_path: Path) -> None:
 
     # Fire the same shard's sync twice.
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_dir,
+        config_dir=config_dir,
+        database_url=url,
+        shard_id="0",
     )
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_dir,
+        config_dir=config_dir,
+        database_url=url,
+        shard_id="0",
     )
 
     from sqlalchemy import select
@@ -892,8 +962,11 @@ def test_derived_state_populates_previously_empty_tables(tmp_path: Path) -> None
     url = _sqlite_url(tmp_path)
 
     summary = sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_dir,
+        config_dir=config_dir,
+        database_url=url,
+        shard_id="0",
     )
 
     # Every derive-from-snapshots counter must have work to show.
@@ -921,9 +994,10 @@ def test_derived_state_populates_previously_empty_tables(tmp_path: Path) -> None
     try:
         with Session(verify.engine) as session:
             # properties: both.
-            assert {
-                r.canonical_id for r in session.execute(select(PropertyRow)).scalars()
-            } == {"P-ok", "P-fail"}
+            assert {r.canonical_id for r in session.execute(select(PropertyRow)).scalars()} == {
+                "P-ok",
+                "P-fail",
+            }
             # units: two units for P-ok.
             unit_rows = list(session.execute(select(UnitRow)).scalars())
             assert {(r.canonical_id, r.unit_id) for r in unit_rows} == {
@@ -964,9 +1038,7 @@ def test_derived_state_populates_previously_empty_tables(tmp_path: Path) -> None
 
             # run_issues: at least the synthetic failure for P-fail.
             issue_rows = list(
-                session.execute(
-                    select(RunIssueRow).where(RunIssueRow.run_date == RUN_DATE)
-                ).scalars()
+                session.execute(select(RunIssueRow).where(RunIssueRow.run_date == RUN_DATE)).scalars()
             )
             assert any(i.canonical_id == "P-fail" and i.severity == "ERROR" for i in issue_rows)
     finally:
@@ -1001,8 +1073,11 @@ def test_crashed_property_record_is_still_persisted_everywhere(tmp_path: Path) -
     url = _sqlite_url(tmp_path)
 
     sync_run_to_pg.sync_run_to_postgres(
-        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
-        database_url=url, shard_id="0",
+        run_date=RUN_DATE,
+        data_dir=data_dir,
+        config_dir=config_dir,
+        database_url=url,
+        shard_id="0",
     )
 
     from sqlalchemy import select
@@ -1036,9 +1111,7 @@ def test_crashed_property_record_is_still_persisted_everywhere(tmp_path: Path) -
 
             # Ledger entry marked scrape_failed=True.
             lrow = next(
-                s.execute(
-                    select(RunLedgerRow).where(RunLedgerRow.canonical_id == "P-crash")
-                ).scalars()
+                s.execute(select(RunLedgerRow).where(RunLedgerRow.canonical_id == "P-crash")).scalars()
             )
             assert lrow.scrape_failed is True
             assert lrow.error_count == 1
@@ -1047,17 +1120,13 @@ def test_crashed_property_record_is_still_persisted_everywhere(tmp_path: Path) -
             # at ``_meta.verdict`` and silently skipped crash-path
             # records that had no verdict).
             issues = list(
-                s.execute(
-                    select(RunIssueRow).where(RunIssueRow.canonical_id == "P-crash")
-                ).scalars()
+                s.execute(select(RunIssueRow).where(RunIssueRow.canonical_id == "P-crash")).scalars()
             )
             assert any(i.severity == "ERROR" for i in issues)
 
             # scrape_events.outcome == FAILED.
             ev = next(
-                s.execute(
-                    select(ScrapeEventRow).where(ScrapeEventRow.property_id == "P-crash")
-                ).scalars()
+                s.execute(select(ScrapeEventRow).where(ScrapeEventRow.property_id == "P-crash")).scalars()
             )
             assert ev.scrape_outcome == "FAILED"
 
@@ -1151,14 +1220,10 @@ def test_oversize_floor_plan_does_not_drop_other_properties(tmp_path: Path) -> N
             for i in range(5)
         ]
         with target.transaction():
-            count = sync_run_to_pg._sync_current_state_from_snapshots(
-                target, "2026-05-02", properties
-            )
+            count = sync_run_to_pg._sync_current_state_from_snapshots(target, "2026-05-02", properties)
         # All five properties land — none is silently dropped.
         assert count == 5, "the shard-0 incident regressed: a bad row killed the batch"
-        assert target.property_state.all_canonical_ids() == {
-            "PROP-0", "PROP-1", "PROP-2", "PROP-3", "PROP-4"
-        }
+        assert target.property_state.all_canonical_ids() == {"PROP-0", "PROP-1", "PROP-2", "PROP-3", "PROP-4"}
         # The bad row is stored with a clipped floor_plan_name — the
         # rest of its data (rent, beds, etc.) is intact.
         bad_units = target.unit_state.get_units("PROP-2")
@@ -1169,9 +1234,7 @@ def test_oversize_floor_plan_does_not_drop_other_properties(tmp_path: Path) -> N
         target.close()
 
 
-def test_per_property_failure_is_logged_as_run_issue(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_per_property_failure_is_logged_as_run_issue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When a property's writes do fail (e.g. an integrity violation
     that the clip can't help with), the failure must show up in
     ``run_issues`` so it's visible in the daily report — not silently
@@ -1186,6 +1249,7 @@ def test_per_property_failure_is_logged_as_run_issue(
         def maybe_fail(cid: str, units: list[dict[str, Any]], rd: str) -> Any:
             if cid == "PROP-BAD":
                 from sqlalchemy.exc import IntegrityError as _IE
+
                 raise _IE("INSERT", {}, Exception("simulated FK violation"))
             return original(cid, units, rd)
 
@@ -1197,9 +1261,7 @@ def test_per_property_failure_is_logged_as_run_issue(
             _make_property_payload("PROP-OK2"),
         ]
         with target.transaction():
-            count = sync_run_to_pg._sync_current_state_from_snapshots(
-                target, "2026-05-02", properties
-            )
+            count = sync_run_to_pg._sync_current_state_from_snapshots(target, "2026-05-02", properties)
         assert count == 2, "good rows must commit even when one row fails"
         assert "PROP-OK1" in target.property_state.all_canonical_ids()
         assert "PROP-OK2" in target.property_state.all_canonical_ids()
@@ -1224,9 +1286,7 @@ def test_fallback_path_used_when_no_active_session(tmp_path: Path) -> None:
     fs_target = FileSystemDataProvider(base_dir=tmp_path / "data", config_dir=tmp_path / "config")
     try:
         properties = [_make_property_payload("PROP-A"), _make_property_payload("PROP-B")]
-        count = sync_run_to_pg._sync_current_state_from_snapshots(
-            fs_target, "2026-05-02", properties
-        )
+        count = sync_run_to_pg._sync_current_state_from_snapshots(fs_target, "2026-05-02", properties)
         assert count == 2
         assert fs_target.property_state.exists("PROP-A")
         assert fs_target.property_state.exists("PROP-B")
@@ -1275,40 +1335,73 @@ def test_apply_retention_drops_aged_rows_and_keeps_recent(tmp_path: Path) -> Non
             for rd in (today, old_date):
                 s.add(LlmReportRow(run_date=rd, payload={"calls": 1}, written_at=now))
                 s.add(LlmPropertyDetailRow(run_date=rd, property_id="P1", payload={}, written_at=now))
-                s.add(LlmDiagnosticRow(run_date=rd, property_id="P1", kind="trace", payload={}, written_at=now))
+                s.add(
+                    LlmDiagnosticRow(run_date=rd, property_id="P1", kind="trace", payload={}, written_at=now)
+                )
                 s.add(PropertySnapshotRow(run_date=rd, canonical_id="P1", ordinal=0, payload={}))
-                s.add(RunIssueRow(run_date=rd, seq=0, severity="INFO", code="OK", message="m", canonical_id="P1"))
+                s.add(
+                    RunIssueRow(
+                        run_date=rd, seq=0, severity="INFO", code="OK", message="m", canonical_id="P1"
+                    )
+                )
                 s.add(RunLedgerRow(run_date=rd, seq=0, canonical_id="P1", status="SUCCESS"))
 
             # scrape_events keyed by scrape_timestamp
-            s.add(ScrapeEventRow(
-                event_id="ev-new", property_id="P1", scrape_timestamp=now,
-                scrape_outcome="SUCCESS",
-            ))
-            s.add(ScrapeEventRow(
-                event_id="ev-old", property_id="P1", scrape_timestamp=old_ts,
-                scrape_outcome="SUCCESS",
-            ))
+            s.add(
+                ScrapeEventRow(
+                    event_id="ev-new",
+                    property_id="P1",
+                    scrape_timestamp=now,
+                    scrape_outcome="SUCCESS",
+                )
+            )
+            s.add(
+                ScrapeEventRow(
+                    event_id="ev-old",
+                    property_id="P1",
+                    scrape_timestamp=old_ts,
+                    scrape_outcome="SUCCESS",
+                )
+            )
 
             # dlq_entries keyed by parked_at (ISO string)
-            s.add(DlqEntryRow(
-                property_id="P-NEW", parked_at=now_iso, reason="r",
-                last_error_signature="", retry_at="", last_synced_at=now,
-            ))
-            s.add(DlqEntryRow(
-                property_id="P-OLD", parked_at=old_iso, reason="r",
-                last_error_signature="", retry_at="", last_synced_at=now,
-            ))
+            s.add(
+                DlqEntryRow(
+                    property_id="P-NEW",
+                    parked_at=now_iso,
+                    reason="r",
+                    last_error_signature="",
+                    retry_at="",
+                    last_synced_at=now,
+                )
+            )
+            s.add(
+                DlqEntryRow(
+                    property_id="P-OLD",
+                    parked_at=old_iso,
+                    reason="r",
+                    last_error_signature="",
+                    retry_at="",
+                    last_synced_at=now,
+                )
+            )
 
             # Upsert-only tables — must survive untouched even though
             # the rows have no run_date / parked_at concept of recency.
             s.add(PropertyRow(canonical_id="P1", proj_name="Recent"))
             s.add(PropertyRow(canonical_id="P-OLD-PROP", proj_name="Long lived"))
             s.add(UnitRow(canonical_id="P1", unit_id="U1", rent_low=1000))
-            s.add(ScrapeProfileRow(
-                canonical_id="P1", version=1, schema_version="2",
-                created_at=now, updated_at=now, updated_by="TEST", payload={},
-            ))
+            s.add(
+                ScrapeProfileRow(
+                    canonical_id="P1",
+                    version=1,
+                    schema_version="2",
+                    created_at=now,
+                    updated_at=now,
+                    updated_by="TEST",
+                    payload={},
+                )
+            )
             s.commit()
 
         deleted = sync_run_to_pg._apply_retention(target.engine)
@@ -1325,8 +1418,14 @@ def test_apply_retention_drops_aged_rows_and_keeps_recent(tmp_path: Path) -> Non
 
         with Session(target.engine) as s:
             # run_date tables: only today's row survives.
-            for cls in (LlmReportRow, LlmPropertyDetailRow, LlmDiagnosticRow,
-                        PropertySnapshotRow, RunIssueRow, RunLedgerRow):
+            for cls in (
+                LlmReportRow,
+                LlmPropertyDetailRow,
+                LlmDiagnosticRow,
+                PropertySnapshotRow,
+                RunIssueRow,
+                RunLedgerRow,
+            ):
                 rows = list(s.execute(select(cls)).scalars())
                 assert len(rows) == 1, f"{cls.__name__}: expected 1 row, got {len(rows)}"
                 assert rows[0].run_date == today
@@ -1365,11 +1464,13 @@ def test_apply_retention_is_idempotent(tmp_path: Path) -> None:
         from data_provider.sql.models import LlmReportRow
 
         with Session(target.engine) as s:
-            s.add(LlmReportRow(
-                run_date=date.today().isoformat(),
-                payload={},
-                written_at=datetime.now(UTC).replace(tzinfo=None),
-            ))
+            s.add(
+                LlmReportRow(
+                    run_date=date.today().isoformat(),
+                    payload={},
+                    written_at=datetime.now(UTC).replace(tzinfo=None),
+                )
+            )
             s.commit()
 
         second = sync_run_to_pg._apply_retention(target.engine)

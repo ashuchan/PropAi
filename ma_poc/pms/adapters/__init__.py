@@ -32,6 +32,7 @@ from ma_poc.pms.adapters.irvine import IrvineAdapter
 from ma_poc.pms.adapters.knock import KnockAdapter
 from ma_poc.pms.adapters.maac import MaacAdapter
 from ma_poc.pms.adapters.marketapts import MarketAptsAdapter
+from ma_poc.pms.adapters.mri_prospectconnect import MriProspectConnectAdapter
 from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.onsite_apply import OnSiteApplyAdapter
 from ma_poc.pms.adapters.realpage_cws import RealPageCwsAdapter
@@ -55,6 +56,7 @@ from ma_poc.pms.adapters.touchtour import TouchTourAdapter
 from ma_poc.pms.adapters.venterra import VenterraAdapter
 from ma_poc.pms.adapters.wix_floor_plans import WixFloorPlansAdapter
 from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
+from ma_poc.pms.adapters.yotta import YottaAdapter
 
 __all__ = [
     "AdapterContext",
@@ -105,6 +107,7 @@ def _bootstrap_registry() -> None:
         G5Adapter,
         EncoreSkylineTemplateAdapter,
         MarketAptsAdapter,
+        MriProspectConnectAdapter,
         RentCafeUnitRosterAdapter,
         ImtSpacesAdapter,
         RealPageCwsAdapter,
@@ -117,6 +120,7 @@ def _bootstrap_registry() -> None:
         SquarespaceNoPmsAdapter,
         ThinkResideAdapter,
         WixNoPmsAdapter,
+        YottaAdapter,
         GenericAdapter,
     ):
         instance = cls()

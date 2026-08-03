@@ -1,0 +1,220 @@
+apartment_id	property_name	provider	projection_verdict	winning_tier	floor_plan_count	positive_available_units	publish_ceiling	conventional_links	seed_plan_links	seed_vus_links	prior_hb_audited	opportunity_class	website
+98	Bent Oak Apartments	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_DOM	7	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.dbcliving.com/apartment/bent-oak-apartments/
+446	Cottages @ Sanford	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	4	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.cottagesatsanford.com/
+994	Magnolia Ridge	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.liveatmagnoliaridgeapartments.com/
+1259	Ashton Parc	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.ashtonparc.com/
+1589	The Hills at North Mesa	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	3	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	http://www.thehillsatnorthmesa.com/
+2382	Quincy Ridge	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	9	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://quincyridgeapts.com/
+3902	Pelham Apartments	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_PLAN_LEVEL	11	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://pelhamgreenville.com/home
+4785	Autumn Creek Apartments	entrata	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	http://www.autumncreekapts.com
+4868	Oakstone	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	10	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.sylispm.com/oakstone-apartment-homes/
+7837	Cedar Shores	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	6	0	NEEDS_RENDER	1	4	0	true	entrata_hb_audited_no_win	http://www.cedarshoresapts.com/
+8079	Aspen Lakes	entrata	SUCCESS_PLAN_LEVEL	TIER_3_DOM	15	0	UNCERTAIN	0	0	0	true	entrata_hb_audited_no_win	https://www.ampresidential.com/aspen-lakes-grand-rapids-mi/contact?utm_source=GoogleMyBusiness&utm_medium=organic&utm_campaign=website_link
+8923	Chisholm Trail Townhomes	<blank>	SUCCESS_PLAN_LEVEL		2	0	<none>	0	0	0	false	uncertain_residual	https://npmainc.com/listing/chisholm-trail-townhomes/
+12967	Luxor Gardens	apts247	SUCCESS_PLAN_LEVEL	TIER_MERGED_CROSS_PAGE	0	0	<none>	0	0	0	false	apts247_plan_ids_no_physical_roster	https://www.luxorgardens.com/
+12991	Preserve at Westchase	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.thepreserveatwestchase.com/
+13189	Briar Glen Village	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	10	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.onmarkliving.com/briar-glen-village/
+13341	Heritage Ridge Apartments	equity	SUCCESS_PLAN_LEVEL	TIER_3_DOM	5	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.equityapartments.com/washington/seattle-apartments/lynnwood/heritage-ridge-apartments.aspx
+13379	Verde Apartments	equity	SUCCESS_PLAN_LEVEL	TIER_3_DOM	1	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.equityapartments.com/california/san-francisco-bay-apartments/san-jose/verde-apartments.aspx
+14198	The Heights by Marston Lake	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_API	6	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	https://heightsbymarstonlakeapts.com/
+14325	The Berkley	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.theberkleyatx.com/
+14522	The Charles at Bexley	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	5	0	NEEDS_RENDER	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.thecharlesatbexley.com/
+14943	Estates at Eagle's Pointe	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	12	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://eaglepointestates.com/#floor-plans
+14956	Mill Creek	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.millcreektx.com/
+15776	LaSalle Park	rentmanager	FAILED_NO_DATA	TIER_1_API_RENTMANAGER	0	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://jalexrentals.com/property-detail/?propID=61&rmwebsvc_id=61&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=jalex&rmwebsvc_location=1&rmwebsvc_mode=javaScript&rmwebsvc_AvailabilityDate=11/18/2019&rmwebsvc_template=default
+16377	Westshore	residentservices365	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	4	4	EXTRACTION_MISS	0	0	0	true	rs365_detail_plan_placeholder_no_physical_id	www.westshoretampabay.com/
+16540	The Grammercy	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://livegrammercy.com/
+16579	Zura Bay	<blank>	SUCCESS_PLAN_LEVEL		0	0	<none>	0	0	0	false	uncertain_residual	https://www.zurabay.com/
+16982	Pleasant View Gardens	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.pleasantviewgardensnj.com/
+18158	Madrid	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	5	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://anchorpacifica.com/residential-properties/madrid-apartments
+18187	KRC Reserve	encoreskyline_template	SUCCESS_PLAN_LEVEL	ENCORESKYLINE_NO_PLAN_LINKS	10	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.krcreserveapts.com/
+18288	Chestnut Lake	<blank>	SUCCESS_PLAN_LEVEL		0	0	<none>	0	0	0	false	uncertain_residual	https://www.chestnutlakeapartments.com/
+18701	The Marq at 1600	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE	2	2	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.themarqat1600.vegas/
+18738	Grayton on Dean	apts247	SUCCESS	TIER_1_API	6	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://graytonondean.com/
+19171	Sunbay	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.sunbayapts-wp.com
+19540	Chopaka	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	4	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	www.chopakaapartments.com
+19715	Trailside	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.trailside.graninc.com/
+19914	Rustic Oaks Apts.	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	4	0	NEEDS_RENDER	1	4	0	true	entrata_hb_audited_no_win	https://www.rusticoaksapartments.com/
+20683	Alister Parx	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	18	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.alisterparx.com/
+21553	Chase on Monroe	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.chaseonmonroeapts.com/
+21976	Century Square Townhomes	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	1	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://princetonmanagement.com/communities/century-square-townhomes/
+22155	Woodway Apartments	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	7	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.sylispm.com/woodway-apartments/
+22459	Colonial Court	generic_plan_text	FAILED_NO_DATA	TIER_1_DOM_GENERIC_PLAN_TEXT	0	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.colonialcourtapts.com
+22763	Summerset at International Crossing	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	11	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.jfmanagementgroup.com/summerset/
+23145	Shadow Glen	realpage_cws	SUCCESS_PLAN_LEVEL	TIER_3_DOM	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.liveatshadowglen.com/
+23396	6151 Winthrop Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.6151winthrop.com/
+23963	Luna Bear Arcos	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	2	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	http://www.arcosphx.com/
+24360	Wildwood Manor Apartments	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	3	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	https://www.wildwoodmanorapts.com/
+25392	Chappell Creek Village	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	6	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	http://www.chappellcreekapts.com/
+25734	Los Feliz Summit	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL	5	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://anchorpacifica.com/residential-properties/los-feliz-summit-apartments
+26339	Cedar Pointe Townhomes	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	10	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	www.cedarpointetownhomes.com
+27360	Aspen Court	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	www.aspencourtapartmenthomes.com
+27986	Center Park	apts247	SUCCESS	TIER_3_DOM	6	0	<none>	0	0	0	false	known_false_positive_do_not_count	www.centerparkapartments.com
+28951	Sonoma Valley	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	true	deterministic_detail_discovery	https://www.sonomavalleyapartments.com/
+29597	The Life at Jackson Square	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_DOM	15	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	https://www.thelifeatjacksonsquare.com/
+29993	La Vida Buena	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	4	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	http://www.lavidabuenaapartments.com/
+30350	Stargate West Apartments	generic_plan_text	FAILED_NO_DATA	TIER_1_DOM_GENERIC_PLAN_TEXT	0	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	www.stargatewest.com/
+30387	Parkwood	rentcafe	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	5	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.theparkwoodapthomes.com/
+31565	Oak Grove	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_PLAN_LEVEL	8	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.spearheadproperties.com/property/oak-i/
+32065	Carlisle Park Apartments	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	2	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	http://www.rentcarlislepark.com/
+34523	Constellation Ranch	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	9	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.constellationranchtx.com/
+36094	MetroPointe	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE	15	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	http://www.metropointeapts.com/
+36268	Stoney Creek	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX	10	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	http://www.stoneycreekapthomes.com/
+36536	Icon at Park	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://prometheusapartments.com/ca/emeryville-apartments/icon-at-park
+36855	Olentangy Village	knock	SUCCESS_PLAN_LEVEL	TIER_3_DOM	13	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.olentangyvillage.com/
+37317	Vestavia Place	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_SHAPE_REJECTED_PLAN_LEVEL	5	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://vestaviaplace.com/
+37375	Fox Hunt	generic_plan_text	FAILED_NO_DATA	TIER_1_API	0	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://princetonmanagement.com/communities/fox-hunt-apartments/
+37538	Amalie Apartment Homes	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE	3	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.liveamalie.com/
+37805	The Gentry's Landing	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX	5	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	http://www.gentryslanding.com/
+37819	Modena at Mallard	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	4	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.modenaatmallard.com/
+37930	Autumn Oaks	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	www.autumnoaksapt.com
+38298	Courtyard	unknown	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://courtyardgretna.com/
+38381	Meridian Parkside	knock	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	18	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	www.meridianparkside.com
+38532	Glenbrook at Rocky Hill	rentmanager	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTMANAGER_NO_ENDPOINT	3	0	UNCERTAIN	0	0	0	false	rentmanager_residual_after_endpoint_sweep	www.glenbrook-apts.com
+38843	Park Court	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE_PLAN_LEVEL	6	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	https://www.rentparkcourtapts.com/
+39093	Mark I Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://hattiesburgmarkapartments.com/mark1/
+40335	Oak Hill	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	5	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://brandywinecommunities.com/properties/oak-hill-apartments/
+40514	Club Pacifica	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	3	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	http://www.clubpacificabenicia.com/
+40515	Forge Homestead	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	33	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.deanzaproperties.com/south-bay-area/forge-homestead-apartments
+41777	Bristle Pointe Apartments	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_DOM	5	0	<none>	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.kromerinvestments.com/apartments/bristle-pointe-apartment/
+41935	Island Homestead	rentcafe	FAILED_NO_DATA	TIER_1_API_RENTCAFE_NO_RESPONSE	0	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	http://www.islandhomestead.com/
+42167	Westcreek	onsite_apply	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	3	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.westcreekapartmentsreno.com/
+42345	SouthRidge	knock	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	8	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.southridgekc.com/
+42818	Westbury Apartments	entrata	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	http://www.westburyapartments.net/
+43403	Great Northern Village	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	4	0	NEEDS_RENDER	0	0	0	true	entrata_hb_audited_no_win	http://www.burtoncarol.com/ohio/great-northern-village
+43488	Brandywine Manor	unknown	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://brandywinemanorapts.com/
+44036	Ascot Place	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE	9	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	www.elandisascot.com
+44154	Wyncroft Hill	realpage_cws	SUCCESS_PLAN_LEVEL	TIER_3_DOM	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	www.wyncrofthill.com
+44163	Wycliff West	rentvision	SUCCESS_PLAN_LEVEL	TIER_3_DOM	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.rentwycliffwest.com/
+44766	Montecito	rentcafe	FAILED_NO_DATA	TIER_1_API_RENTCAFE_NO_RESPONSE	0	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.montecitoapartments.com/
+45986	Aaron Lake Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.pedcorhomes.com/Apartments/Home/419
+46267	The Ridge	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_NO_RESPONSE	0	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.theridgeokc.com/
+46336	Westbury Square	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.westburyportlandtx.com/
+47369	Pleasant Ridge	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	4	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.residencesatpleasantridge.com/
+48708	Windpoint Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	5	2	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://karademas.org/properties/windpoint
+49102	Parkview Apartments	rentmanager	FAILED_NO_DATA	TIER_1_API_RENTMANAGER	0	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://pmsi.biz/details/?pid=30
+50160	Costa Azul	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	12	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.costaazulapts.net/
+50379	Millbrook Pointe	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.millbrookpointeapartments.com/
+50501	Round Barn Manor	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.pedcormanagement.com/Apartments/Home/295
+50912	Indigo Apartment Homes	knock	FAILED_NO_DATA	TIER_1_API_RENTCAFE_NO_RESPONSE	0	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.indigobremerton.com/
+51775		<blank>	FAILED_NO_DATA		0	0	<none>	0	0	0	false	uncertain_residual	https://www.aspenmeadowky.com/
+51921	Deer Run	thinkreside	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	4	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.liveatdeerrunapts.com/
+52725	North Pointe	<blank>	SUCCESS_PLAN_LEVEL		21	0	<none>	0	0	0	false	uncertain_residual	https://www.landcoapartments.com/north-pointe-apartments/
+52761	The Westmoor	generic_plan_text	FAILED_NO_DATA	TIER_1_DOM_GENERIC_PLAN_TEXT	0	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	www.thewestmoor.com
+52922	Shadetree North	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	2	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	www.shadetreenorth.com
+52934	Davis Creek	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	8	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://daviscreekapartments.com/
+53599		<blank>	FAILED_NO_DATA		0	0	<none>	0	0	0	false	uncertain_residual	https://www.countryglenapts.com/
+53773	Mallard Cove	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://mallardcove.org/
+55012	Gallery Park	entrata	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	4	0	UNCERTAIN	0	0	0	false	entrata_no_published_route	www.galleryparkpdx.com
+55317	Woods at Latimer	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	9	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://abodes.com/community/the-woods-at-latimer/
+56687	Cottonwood Westside	entrata	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	www.cottonwoodwestside.com
+58319	Fountainview Townhomes	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_API	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.shaoolmgt.com/property/fountainview-townhomes/
+58697	Vargos On The Lake	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	29	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	www.vargosonthelake.com
+60124	Crystal Lake	rentcafe	FAILED_NO_DATA	TIER_1_API_RENTCAFE_NO_RESPONSE	0	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	www.livecrystallakeapartments.com
+61495	The Cosmopolitan	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	7	0	UNCERTAIN	0	0	0	false	uncertain_residual	http://thecosmopolitanapts.com/
+62475	Skyline Vista	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE	1	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.skylinevistapacifica.com/
+65677	The Vue at Creve Coeur	residentservices365	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	10	11	EXTRACTION_MISS	0	0	0	true	rs365_detail_plan_placeholder_no_physical_id	http://www.cthevue.com/
+67150	Harbor Vista at Crawford Street	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	10	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.liveharborvista.com/
+67546	223 E Town	marketapts	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	3	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://223etown.com/
+67734	1213 Walnut	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE_PLAN_LEVEL	9	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	https://www.1213walnut.com/
+69203	The Marq	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	6	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.livemarqvb.com/
+69511	Eden Roc	<blank>	SUCCESS_PLAN_LEVEL		2	0	<none>	0	0	0	false	uncertain_residual	https://www.spearheadproperties.com/property/elm/
+70238	Grace Apartments	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	7	1	NEEDS_RENDER	1	7	2	true	entrata_hb_audited_no_win	http://www.graceapartmentscr.com/
+72446	Chesapeake Village	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	3	0	UNCERTAIN	0	0	0	false	entrata_no_published_route	https://www.rentchesapeakevillage.com/
+73923	The Vineyards Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_API	5	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	http://www.vineyardsapt.com/
+74067	The Huntington	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	4	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://sites.google.com/site/huntingtonapartments
+74528	Grand Oaks	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://grandoaks-apartments.com/
+74711	Countryside Village Apartments	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_NO_RESPONSE	1	1	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	www.reeseroadtn.com
+75076	Greystone at Creekwood	rentcafe	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	7	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.greystonecreekwood.com/
+75936	Keystone	entrata	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.livekeystone.com/
+76849	St Phillip Villas	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	7	0	NEEDS_RENDER	1	7	0	true	entrata_hb_audited_no_win	https://www.liveatstphillipvillas.com/
+77558	Arriv√© Seattle	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://arriveseattle.com/
+77725	Red Oak Ranch	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.redoakranch.net/pricing.html
+77782	Atlantico at Miramar	rentmanager	SUCCESS_PLAN_LEVEL	TIER_1_API	10	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	http://www.atlanticomiramarfl.com/miramar-fl-apartments.asp
+78093	Highland at Spring Hill	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_SHAPE_REJECTED	0	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	http://highlandatspringhill.com/
+78134	The 24	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://uncommondevelopers.com/apartments/the-24/
+78508	Westpark Townhomes	rentmanager	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	6	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://westparklife.com/
+97506	Roebling Lofts I	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://roeblinglofts.com/
+98288	980 Central	<blank>	SUCCESS_PLAN_LEVEL		1	0	<none>	0	0	0	false	uncertain_residual	https://www.980central.com/
+118780		<blank>	FAILED_NO_DATA		0	0	<none>	0	0	0	false	uncertain_residual	https://www.loftsatlittlecreek.com/
+119119	Electric City	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	23	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.primeelectriccity.com/
+217343	Eagle Harbor II	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	6	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.liveeagleharbor.com/
+217564	Altitude	apts247	SUCCESS_PLAN_LEVEL	TIER_1_PROFILE_MAPPING	11	0	UNCERTAIN	0	0	0	false	apts247_plan_ids_no_physical_roster	https://www.altitudeglenwoodsprings.com/
+217578	Acadia Court	rentmanager	FAILED_NO_DATA	TIER_1_API_RENTMANAGER	0	0	UNCERTAIN	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.acadiacourtapts.com/
+217960	Villa Adrian Apartments	generic_plan_text	FAILED_NO_DATA	TIER_1_API	0	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://villaadrian.schattenproperties.com/overview
+218172	Alister Uptown	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_EMPTY	0	0	EXTRACTION_MISS	1	0	0	true	entrata_hb_audited_no_win	https://www.alisteruptowncharlotte.com/
+218187	Lafayette Townhomes	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	1	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://apartmentsniagara.com/property-detail/?ID=46
+218586	Cedar Ridge	rentaladdress	SUCCESS_PLAN_LEVEL	TIER_1_DOM_RENTALADDRESS_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://cedarridgeapts.rentaladdress.com/
+220043	Gardens at Briarwood	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_NO_RESPONSE	0	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://gardensatbriarwood.prospectportal.com/
+220345	Vestawood Apartments	wix_floor_plans	FAILED_NO_DATA	TIER_1_DOM_WIX_FLOOR_PLANS	0	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.vestawood.com/
+220593	Eagle Creek Court	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	12	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.eaglecreekcourtapts.com/
+221113	Coopers Pond	rentcafe	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	5	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.toftreesapartments.com/coopers-pond/
+222122	Lincoln Meadows	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://princetonmanagement.com/communities/lincoln-meadows-apartments/
+225313	La Collina Townhomes	<blank>	FAILED_UNREACHABLE	generic:no_body_short_circuit	0	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.triplecrowncorp.com/company/locations/la-collina/
+225952	Seranado Fountain	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	3	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	http://www.seranadofountainapartments.com/
+226174	Lakeview Townhomes and Villas	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	7	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://npmainc.com/listing/lakeview-townhomes/
+227941	Spring River I	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	10	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	http://www.springriverapartments.com/
+231117	Monroe Village Apartments	rentmanager	SUCCESS_PLAN_LEVEL	TIER_3_DOM	8	0	EXTRACTION_MISS	0	0	0	false	rentmanager_residual_after_endpoint_sweep	https://www.dbcliving.com/apartment/monroe-village-apartments/
+232870	Sorrento Apartments	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	7	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	www.SorrentoApartmentsfl.com
+232972	The Dayton	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.gardencommunities.com/Properties/NJ/Bergen/The-Dayton.aspx#overview
+233289	Elevation 1659	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	12	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://elevation1659apts.com/
+233581	Riverside North Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.riversidenorth-in.com/
+234133	Grand View	knock	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	11	0	UNCERTAIN	0	0	0	false	uncertain_residual	http://www.grandviewluxuryapts.com/
+234582	Villa Vita	unknown	SUCCESS	TIER_1_5_EMBEDDED	7	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://livevillavita.com/
+238708	Stratford Place	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.gldmanagement.com/stratford-place-apartments/
+238775	Vine Gate	appfolio	SUCCESS_PLAN_LEVEL	TIER_1_API_APPFOLIO_EMPTY	3	0	NEEDS_RENDER	0	0	0	false	appfolio_residual_non_low_zip	www.vinegateaptsut.com
+239312	Eland Downe Townhouses	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_EMPTY	0	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.liveeland.com/
+239341	The Union	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://theunionapts.com/
+239679	3681 Pavillion Pointe	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	http://www.3681pavilionpointe.com/
+240745	The Allure at Jefferson I	wix_nopms	SUCCESS_PLAN_LEVEL	SYNDICATION_ONLY_WIX_PLAN_LEVEL	9	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://www.liveallureva.com/
+243194	Fox Hill Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	7	0	UNCERTAIN	0	0	0	false	uncertain_residual	http://www.foxhillapthomes.com/
+243379	Brookwood	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://bjbtally.com/brookwood-apartments/
+244274	Cornerstone	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_PLAN_LEVEL	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	http://www.cornerstoneaptsharlingen.com/
+244533	Lynn Hill	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	3	1	EXTRACTION_MISS	0	0	0	false	entrata_positive_availability_no_route	https://www.marylandmanagement.com/linthicum/lynn-hill-apartments
+245398	Bellevue Towers	generic_plan_text	SUCCESS	TIER_3_DOM	13	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.sspropertiesinvestment.com/vacancies/
+246614	French Mill I	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	28	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	http://www.frenchmill.com
+251190	The Carlaw	unknown	SUCCESS_PLAN_LEVEL	TIER_1_API	5	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	https://liveatthecarlaw.com/
+252560	The Boardwalk Luxury	apts247	SUCCESS	TIER_1_API	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.boardwalklux.com/
+253035	The Court Yard	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	7	0	NEEDS_RENDER	1	7	0	true	entrata_hb_audited_no_win	http://www.thecourtyardsalem.com/
+253126	Conklin Townhomes	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://conklintowns.com/
+253140	National Rose Co	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_NO_RESPONSE_PLAN_LEVEL	29	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.nationalroseco.com/
+253393	The Lindley	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	21	0	EXTRACTION_MISS	0	0	0	false	entrata_no_published_route	https://www.livethelindley.com/
+253788	Legacy Cool Springs	<blank>	SUCCESS	TIER_1_RENTCAFE_SECURECAFE_DIRECT	0	0	<none>	0	0	0	false	known_false_positive_do_not_count	https://www.goldbergcompanies.com/legacy-cool-springs-franklin-tn/
+254168	X at Sloans	entrata	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	3	0	EXTRACTION_MISS	0	0	0	true	entrata_hb_audited_no_win	http://www.xatsloans.com/
+256584	The Station at Millrace	funnel	SUCCESS_PLAN_LEVEL	TIER_1_API_FUNNEL_SHAPE_REJECTED_PLAN_LEVEL	3	0	UNCERTAIN	0	0	0	false	uncertain_residual	https://thestationatmillrace.com/
+257324	Rosewood Commons	rentcafe	FAILED_NO_DATA	TIER_1_API_RENTCAFE_SHAPE_REJECTED	0	0	EXTRACTION_MISS	0	0	0	false	rentcafe_residual_after_direct_sweep	https://rosewoodcommonsapartments.com/
+258497	Casa Blanca I	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.grandviewmanagementaz.com/casa-blanca-coolidge-az/
+259386	Fairmount	generic_plan_text	FAILED_NO_DATA	TIER_1_API	0	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.fairmount-towers.com/
+261342	Elevate at 604 West	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.pedcorhomes.com/Apartments/Home/460
+261781	One University Drive South	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://oneuds.com/
+264935	REVA	encoreskyline_template	SUCCESS_PLAN_LEVEL	TIER_2_JSONLD	8	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://revaftmyers.com/
+266934	Liberty Grand	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	10	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.libertygrandapts.com/
+266940	Riverfront Lofts I	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT	21	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://riverfrontloftsallentown.com/
+267147	Flats at Dublin Commons	rentcafe	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	4	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://www.crldublinflats.com/
+267933	78 West	appfolio	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	3	0	EXTRACTION_MISS	0	0	0	false	appfolio_residual_non_low_zip	https://www.78westca.com/
+269659	Avery Creek	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://communities.ah4r.com/communities/avery-creek
+269664	The Pinnacle at Stone Creek Falls	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_NO_RESPONSE	0	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	https://www.stonecreekfalls.com/apartments/mo/brookline/the-pinnacle#/
+269721	Skyview Lofts	appfolio	SUCCESS_PLAN_LEVEL	TIER_1_API_APPFOLIO_EMPTY_PLAN_LEVEL	2	0	NEEDS_RENDER	0	0	0	false	appfolio_residual_non_low_zip	https://skyview-lofts.com/
+270484	The Casco	rentcafe	SUCCESS_PLAN_LEVEL	TIER_1_API_RENTCAFE_SHAPE_REJECTED	6	0	UNCERTAIN	0	0	0	false	rentcafe_residual_after_direct_sweep	https://liveredfern.com/buildings/aucocisco/
+270768	The Centaur	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	51	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://livecentaur.com/
+271066	KC Lofts	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://kcloftsrc.com/
+272063	Westridge	realpage_cws	FAILED_NO_DATA	TIER_1_API_REALPAGE_OLL	0	0	NEEDS_RENDER	0	0	0	false	render_endpoint_discovery	https://www.westridgeaptstarga.com/
+274954	Hurston	spherexx	SUCCESS_PLAN_LEVEL	TIER_1_API_SPHEREXX_NO_RESPONSE_PLAN_LEVEL	6	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.hurstonjacksonville.com/
+274983	6375 Broadway	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_3_PLAN_TEXT	4	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://drsrents.com/6375-broadway-bronx/
+275900	Aria	unknown	SUCCESS_PLAN_LEVEL	TIER_3_DOM_GENERIC	3	0	CONFIRMED_NO_DATA	0	0	0	false	confirmed_no_data	https://www.liveatthearia.com/
+277582	Frontera at Pioneer Meadows	appfolio	SUCCESS_PLAN_LEVEL	TIER_1_API_APPFOLIO_EMPTY_PLAN_LEVEL	6	0	UNCERTAIN	0	0	0	false	appfolio_residual_non_low_zip	https://leasefrontera.com/
+277708	LC New Albany - Exchange	entrata	FAILED_NO_DATA	TIER_1_API_ENTRATA_EMPTY	0	0	NEEDS_RENDER	0	0	0	false	entrata_no_published_route	https://lcnewalbany.prospectportal.com/
+277728	Residences at Lancaster Ridge	resman	SUCCESS_PLAN_LEVEL	TIER_3_DOM	2	0	<none>	0	0	0	false	uncertain_residual	https://www.lancasterridge.com/
+280355	Town Center Apartments	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.mhtowncenter.com/
+281911	Laurel Glen	rentvision	SUCCESS_PLAN_LEVEL	TIER_3_DOM	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.liveatlaurelglen.com/
+282258	Mystic Point	entrata	SUCCESS_PLAN_LEVEL	TIER_1_API_ENTRATA_SHAPE_REJECTED_PLAN_LEVEL	40	0	EXTRACTION_MISS	0	0	0	false	entrata_no_published_route	https://www.frginc.com/apartment/mystic-point/
+282754	The 24 III	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.the24.com/
+282934	Aston Pointe	repli360	SUCCESS_PLAN_LEVEL	TIER_1_API_REPLI360_NO_FLOORPLANS	8	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.liveastonpointe.com/
+284663	Quail Creek	knock	SUCCESS_PLAN_LEVEL	TIER_1_KNOCK_API	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.quailcreekliving.com/
+284757		<blank>	FAILED_NO_DATA		0	0	<none>	0	0	0	false	uncertain_residual	https://www.liveglenattaylorsquare.com/
+290028	Orchard at Mountain View	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://communities.amh.com/communities/the-orchard-at-mountain-view
+292317	Alders Grove	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	3	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://aldersgroveliving.com/
+293667	Grand Lake Towers	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	5	0	EXTRACTION_MISS	0	0	0	true	entrata_hb_audited_no_win	https://www.lakemerrittapartments.com/oakland/grand-lake-towers/conventional/
+296794	Willow Creek	generic_plan_text	SUCCESS_PLAN_LEVEL	TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL	1	0	EXTRACTION_MISS	0	0	0	false	deterministic_detail_discovery	https://www.homesteadpropertiestn.com/directory/willow-creek/
+297381	Rainier View	appfolio	SUCCESS_PLAN_LEVEL	TIER_1_API_APPFOLIO_EMPTY_PLAN_LEVEL	2	0	EXTRACTION_MISS	0	0	0	false	appfolio_residual_non_low_zip	https://rainierviewsumner.com/
+300768	Tabor View Lofts	entrata	SUCCESS_PLAN_LEVEL	TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL	14	0	NEEDS_RENDER	1	0	0	true	entrata_hb_audited_no_win	https://www.livetaborview.com/

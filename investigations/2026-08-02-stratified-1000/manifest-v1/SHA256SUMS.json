@@ -1,0 +1,8 @@
+{
+  "adapter_coverage.csv": "f27b6d29e571b19fdbbf0d98409bbd57583cbe0d1278aa3198bcc24b72f94bef",
+  "properties.csv": "41ce82615ba1f03492fe6056267ca1f8b7446f26c2ba6c670cd6362c8ab9dd27",
+  "property_type_coverage.csv": "9032713092457bb16cef658eb5787aec1273bfb3d11a077cf5d3f92d9e8993b2",
+  "sample_ledger.csv": "a7ce389d6d06861187235193c349296ce5c7672965c385042e0eb2e510026618",
+  "state_coverage.csv": "3f27e64366e28ba4db621b72d95783f85707eef66e711871f49deff7f634a0c6",
+  "summary.json": "e12726a1e4f30b8b345299f92b59bb78dfbabf05ae783db41f8e2693d614ebc6"
+}

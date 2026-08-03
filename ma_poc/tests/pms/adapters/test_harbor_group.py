@@ -9,6 +9,9 @@ Coverage:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
 import pytest
 
 from ma_poc.pms.adapters._harbor_group import (
@@ -17,6 +20,9 @@ from ma_poc.pms.adapters._harbor_group import (
     parse_harbor_floor_plans,
     parse_harbor_units_page,
 )
+from ma_poc.pms.adapters.base import AdapterContext
+from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.detector import detect_pms
 
 # ── detect_harbor_group ──────────────────────────────────────────────────────
 
@@ -111,6 +117,88 @@ def test_parse_harbor_floor_plans_no_listing_links():
     assert parse_harbor_floor_plans(html) == []
 
 
+def test_parse_harbor_floor_plans_accepts_property_seed_page() -> None:
+    """Landing pages remain a valid slug source when /floor-plans is empty."""
+    seed_html = """
+    <nav><a href="/apartments/MA/Bridgewater/Waterford-Village/berkley/listing">
+      Berkley
+    </a></nav>
+    <a href="/apartments/MA/Bridgewater/Waterford-Village/plymouth/listing">
+      Plymouth
+    </a>
+    """
+    assert parse_harbor_floor_plans(seed_html) == ["berkley", "plymouth"]
+
+
+@pytest.mark.asyncio
+async def test_generic_harbor_recovers_when_floorplans_shell_has_no_anchors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Riverworks shape: only the fetched landing page lists plan routes."""
+    base_url = (
+        "https://www.hgliving.com/apartments/pa/phoenixville/riverworks"
+    )
+    landing_html = f"""
+        <html><body>
+          <a href="{base_url}/a1a/listing">A1A</a>
+        </body></html>
+    """
+    calls: list[str] = []
+
+    def fake_probe_get(
+        url: str,
+        *,
+        timeout: int,
+        unlocker: bool,
+        **_kwargs: object,
+    ) -> SimpleNamespace:
+        calls.append(url)
+        assert timeout == 15
+        assert unlocker is False
+        if url.endswith("/floor-plans"):
+            return SimpleNamespace(status_code=200, text="<html>marketing shell</html>")
+        assert url.endswith("/a1a/units")
+        return SimpleNamespace(status_code=200, text=_UNITS_HTML)
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        fake_probe_get,
+    )
+    ctx = AdapterContext(
+        base_url=base_url,
+        detected=detect_pms(base_url),
+        profile=None,
+        expected_total_units=None,
+        property_id="67524",
+        property_name="Riverworks",
+        address="45 N Main St",
+        city="Phoenixville",
+        state="PA",
+        fetch_result=SimpleNamespace(
+            body=landing_html.encode(),
+            final_url=base_url,
+        ),
+        budget={
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+        },
+    )
+
+    result = await GenericAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert result.tier_used == "TIER_3_DOM"
+    assert {unit["unit_number"] for unit in result.units} == {
+        "H-201A4",
+        "H-312B",
+    }
+    assert calls == [
+        f"{base_url}/floor-plans",
+        f"{base_url}/a1a/units",
+    ]
+
+
 # ── parse_harbor_units_page ──────────────────────────────────────────────────
 
 _UNITS_HTML = """
@@ -181,14 +269,29 @@ def test_parse_harbor_units_page_available_now():
     u0 = units[0]
     assert u0["availability_status"] == "AVAILABLE"
     # "Available Now" → no ISO date but move_in_date from apply link
-    assert u0["available_date_post_fix"] == "2026-05-19"
+    assert u0["available_date"] == "2026-05-19"
 
 
 def test_parse_harbor_units_page_future_date():
     units = parse_harbor_units_page(_UNITS_HTML, plan_slug="the-azalea")
     u1 = units[1]
     assert u1["availability_status"] == "AVAILABLE"
-    assert u1["available_date_post_fix"] == "2026-06-11"
+    assert u1["available_date"] == "2026-06-11"
+
+
+def test_harbor_future_date_survives_production_formatter() -> None:
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    units = parse_harbor_units_page(_UNITS_HTML, plan_slug="the-azalea")
+    output = _format_v2_unit(
+        units[1],
+        datetime(2026, 5, 20, 12, tzinfo=UTC),
+        "riverworks",
+    )
+
+    assert output["available_date"] == "2026-06-11"
+    assert output["available_date_raw"] == "2026-06-11"
+    assert output["availability_date_provenance"] == "explicit_future"
 
 
 def test_parse_harbor_units_page_plan_slug_as_fp_id():

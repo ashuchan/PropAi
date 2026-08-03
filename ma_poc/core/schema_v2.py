@@ -15,6 +15,7 @@ No scraping logic, no profile logic, no state tracking lives here.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from datetime import UTC, datetime
@@ -54,6 +55,205 @@ V2_CITY_KEYS = ("city", "City")
 V2_STATE_KEYS = ("state", "State")
 V2_ZIP_KEYS = ("zip", "Zip", "zip_code")
 V2_WEBSITE_KEYS = ("website", "Website")
+
+
+def _identity_text(value: Any) -> str | None:
+    """Trim an identity component and reject empty/sentinel spellings."""
+
+    if value in (None, "", -1, "-1"):
+        return None
+    text = str(value).strip()
+    return text if text and text.casefold() not in {"none", "null"} else None
+
+
+def is_catalogue_plan_marker(unit: Any) -> bool:
+    """Whether a row is explicit catalogue evidence, not an apartment."""
+
+    if not isinstance(unit, dict):
+        return False
+    return any(
+        token.strip().upper() == "SIGHTMAP_PLAN_PRESENCE"
+        for token in str(unit.get("data_quality_flag") or "").split("|")
+    )
+
+
+def source_building_identity(unit: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Return an explicit provider building id, with its source path.
+
+    ``building`` remains the operator-facing label. This helper promotes a
+    provider-native ``*_building_id`` from ``source_ids`` when available and
+    falls back to that label only when the adapter did not publish a separate
+    id. Composite ``*_building_unit_id`` keys are deliberately excluded.
+    """
+
+    source_ids = unit.get("source_ids")
+    if isinstance(source_ids, dict):
+        for key, value in source_ids.items():
+            normalized = str(key).casefold().replace("-", "_")
+            if normalized.endswith("building_unit_id"):
+                continue
+            if normalized.endswith("building_id"):
+                building_id = _identity_text(value)
+                if building_id:
+                    return building_id, f"source_ids.{key}"
+    for key in ("building_id", "building", "_building", "building_name", "buildingName"):
+        building_id = _identity_text(unit.get(key))
+        if building_id:
+            return building_id, key
+    return None, None
+
+
+def finalize_output_unit_identities(
+    units: list[dict[str, Any]],
+    property_id: str,
+) -> list[dict[str, Any]]:
+    """Stamp non-destructive daily-history identity on formatted unit rows.
+
+    The legacy ``unit_id`` is retained as the collision-safe canonical id.
+    ``source_unit_id`` preserves the provider/display id before building or
+    plan disambiguation. ``unit_history_key`` is a property-scoped SHA-256
+    over the strongest stable basis available; synthetic plan phenotypes are
+    explicitly unjoinable instead of masquerading as physical apartments.
+    """
+
+    from ma_poc.core.identity import SYNTHETIC_ID_PREFIXES
+    from ma_poc.core.source_ids import PER_UNIT_IDENTITY_KEYS
+
+    canonical_property = _identity_text(property_id) or ""
+    for unit in units:
+        if not isinstance(unit, dict):
+            continue
+        canonical_id = _identity_text(unit.get("unit_id"))
+        unit["canonical_unit_id"] = canonical_id
+
+        source_ids = unit.get("source_ids")
+        stable_source: tuple[str, str] | None = None
+        if isinstance(source_ids, dict):
+            for key in PER_UNIT_IDENTITY_KEYS:
+                value = _identity_text(source_ids.get(key))
+                if value:
+                    stable_source = (key, value)
+                    break
+
+        source_unit_id = _identity_text(unit.get("source_unit_id"))
+        building_id = _identity_text(unit.get("building_id"))
+        floor_plan_id = _identity_text(unit.get("floor_plan_id"))
+        canonical_is_physical = bool(canonical_id and not canonical_id.startswith(SYNTHETIC_ID_PREFIXES))
+        quality: str
+        basis: str | None
+        if stable_source is not None:
+            key, value = stable_source
+            basis = f"property:{canonical_property}|provider:{key}:{value}"
+            quality = "provider_native_stable"
+        elif source_unit_id and canonical_is_physical:
+            parts = [f"property:{canonical_property}"]
+            if building_id:
+                parts.append(f"building:{building_id}")
+            if floor_plan_id:
+                parts.append(f"floor_plan:{floor_plan_id}")
+            if building_id and floor_plan_id:
+                quality = "building_and_floor_plan_scoped_source_id"
+            elif building_id:
+                quality = "building_scoped_source_id"
+            elif floor_plan_id:
+                quality = "floor_plan_scoped_source_id"
+            else:
+                quality = "property_scoped_source_id"
+            parts.append(f"unit:{source_unit_id}")
+            basis = "|".join(parts)
+        elif canonical_is_physical:
+            basis = f"property:{canonical_property}|canonical:{canonical_id}"
+            quality = "canonical_only"
+        else:
+            basis = None
+            quality = "unjoinable_synthetic_or_missing"
+
+        unit["unit_history_key"] = (
+            f"unitsha_{hashlib.sha256(basis.encode('utf-8')).hexdigest()}" if basis else None
+        )
+        unit["unit_history_key_basis"] = basis
+        unit["unit_history_key_quality"] = quality
+        unit["unit_history_key_version"] = "v1"
+    return units
+
+
+_NUMERIC_ALIAS_FINGERPRINT_FIELDS: tuple[str, ...] = (
+    "beds",
+    "baths",
+    "floor_plan_name",
+    "floor_plan_id",
+    "area",
+    "area_low",
+    "area_high",
+    "rent_low",
+    "rent_high",
+    "available_date",
+    "availability_status",
+    "floor",
+    "building",
+    "building_id",
+    "lease_term",
+    "move_in_date",
+    "is_floor_plan_level",
+    "concession_text",
+)
+
+
+def collapse_numeric_unit_id_aliases(units: list[dict[str, Any]]) -> int:
+    """Collapse only proven leading-zero aliases of the same apartment.
+
+    The rule is intentionally much narrower than generic deduplication: both
+    ids must be wholly numeric, differ textually but normalize to the same
+    integer, and every substantive output field in the audited fingerprint
+    must agree. The most explicit zero-padded label is retained and all source
+    spellings plus source-id/provenance snapshots remain attached for replay.
+    """
+
+    from collections import defaultdict
+
+    groups: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
+    for index, unit in enumerate(units):
+        raw = str(unit.get("unit_id") or "").strip()
+        if not raw.isdigit():
+            continue
+        groups[str(int(raw))].append((index, unit))
+
+    drop: list[int] = []
+    for members in groups.values():
+        ids = {str(unit.get("unit_id") or "").strip() for _, unit in members}
+        if len(members) < 2 or len(ids) < 2:
+            continue
+        fingerprints = {
+            tuple(unit.get(field) for field in _NUMERIC_ALIAS_FINGERPRINT_FIELDS) for _, unit in members
+        }
+        if len(fingerprints) != 1:
+            continue
+        # Prefer the longest spelling (the operator-visible zero padding),
+        # then the earliest row so the choice is deterministic.
+        keep_index, keeper = sorted(
+            members,
+            key=lambda item: (-len(str(item[1].get("unit_id") or "")), item[0]),
+        )[0]
+        aliases = sorted(ids, key=lambda value: (len(value), value))
+        keeper["unit_id_aliases"] = aliases
+        keeper["identity_quality"] = "verified_leading_zero_alias"
+        alias_sources: list[dict[str, Any]] = []
+        for index, unit in members:
+            alias_sources.append(
+                {
+                    "unit_id": unit.get("unit_id"),
+                    "source_ids": dict(unit.get("source_ids") or {}),
+                    "source_response_sha256": unit.get("source_response_sha256"),
+                    "source_response_url": unit.get("source_response_url"),
+                    "source_record_locator": unit.get("source_record_locator"),
+                }
+            )
+            if index != keep_index:
+                drop.append(index)
+        keeper["unit_id_alias_sources"] = alias_sources
+    for index in sorted(set(drop), reverse=True):
+        del units[index]
+    return len(set(drop))
 
 
 def get_schema_version(args: Any = None) -> str:
@@ -165,6 +365,9 @@ def build_v2_property(
     # ``scripts/runners/jugnu.py::_format_v2``.
     from ma_poc.extraction.sanity import clamp_tier_context
 
+    _catalogue_plan_markers = [unit for unit in target_units if is_catalogue_plan_marker(unit)]
+    _physical_target_units = [unit for unit in target_units if not is_catalogue_plan_marker(unit)]
+
     with clamp_tier_context(v2_tier_used(scrape_result)):
         _v2_units = [
             _format_v2_unit(
@@ -175,10 +378,15 @@ def build_v2_property(
                 # Whether THIS property published a real square footage to us
                 # anywhere in this scrape — the sibling evidence that makes a
                 # missing area our failure rather than the operator's silence.
-                property_has_area=property_publishes_area(target_units),
+                property_has_area=property_publishes_area(_physical_target_units),
             )
-            for u in target_units
+            for u in _physical_target_units
         ]
+    collapse_numeric_unit_id_aliases(_v2_units)
+    finalize_output_unit_identities(
+        _v2_units,
+        str(_safe_int(csv_id) or ""),
+    )
 
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
@@ -203,10 +411,7 @@ def build_v2_property(
         "website": csv_website or scrape_result.get("base_url") or None,
         # Separate, additive URL provenance (capture-first; do not feed
         # identity/dedup off these — they vary run-to-run).
-        "winning_url": _raw_str(
-            scrape_result.get("_winning_page_url")
-            or scrape_result.get("_winning_url")
-        ),
+        "winning_url": _raw_str(scrape_result.get("_winning_page_url") or scrape_result.get("_winning_url")),
         "resolved_url": _raw_str(
             (scrape_result.get("_resolved_target") or {}).get("resolved_url")
             if isinstance(scrape_result.get("_resolved_target"), dict)
@@ -230,7 +435,10 @@ def build_v2_property(
         # A plan may advertise rent and area but must never ship as a unit.
         "floor_plans": [
             _format_v2_floor_plan(plan, scrape_ts, str(_safe_int(csv_id) or ""))
-            for plan in (scrape_result.get("plan_summaries") or [])
+            for plan in [
+                *(scrape_result.get("plan_summaries") or []),
+                *_catalogue_plan_markers,
+            ]
             if isinstance(plan, dict)
         ],
     }
@@ -293,9 +501,7 @@ def property_is_plan_level(scrape_result: Any) -> bool:
     return str(getter("_verdict_quality") or "").upper() == "SUCCESS_PLAN_LEVEL"
 
 
-def _is_floor_plan_level(
-    unit: dict[str, Any], *, property_plan_level: bool = False
-) -> bool:
+def _is_floor_plan_level(unit: dict[str, Any], *, property_plan_level: bool = False) -> bool:
     """True if the unit is a plan-LEVEL placeholder, not a real individual unit.
 
     Stamped explicitly on the output so downstream (and our own audits) can
@@ -411,9 +617,7 @@ AREA_SURFACE_NO_SQFT_KEY = "_area_surface_publishes_no_sqft"
 
 #: Field-labels ``extraction.sanity._sanitize_field`` records when it nulls a
 #: square footage for being out of bounds.
-_SANITY_AREA_LABELS: frozenset[str] = frozenset(
-    {"area", "area_implausible_for_beds"}
-)
+_SANITY_AREA_LABELS: frozenset[str] = frozenset({"area", "area_implausible_for_beds"})
 
 
 def _sanity_nulled_area(unit: dict[str, Any]) -> bool:
@@ -463,11 +667,200 @@ def property_publishes_area(units: Any) -> bool:
     for u in units:
         if not isinstance(u, dict):
             continue
-        val = _first(u, "_sqft", "sqft", "area", "squareFeet",
-                     "square_feet", "size", "sq_ft")
+        val = _first(u, "_sqft", "sqft", "area", "squareFeet", "square_feet", "size", "sq_ft")
         if _format_area(val) > 0:
             return True
+        area_low, area_high = published_area_bounds(u)
+        if area_low is not None and area_high is not None:
+            return True
     return False
+
+
+def published_area_bounds(unit: dict[str, Any]) -> tuple[int | None, int | None]:
+    """Return validated published area bounds without inventing a midpoint.
+
+    A scalar is represented by equal bounds. A range is accepted only when
+    both endpoints are independently within the normal V2 area bounds; a
+    one-sided or reversed value is rejected rather than repaired silently.
+    """
+
+    low_raw = _first(unit, "area_low", "sqft_low", "min_sqft", "minSqft")
+    high_raw = _first(unit, "area_high", "sqft_high", "max_sqft", "maxSqft")
+    if low_raw in (None, "") and high_raw in (None, ""):
+        raw_range = _first(unit, "area_range", "area_range_raw", "sqft_range")
+        if raw_range not in (None, ""):
+            try:
+                from ma_poc.pms.adapters._parsing import parse_published_area_pair
+
+                low_raw, high_raw = parse_published_area_pair(raw_range)
+            except Exception:
+                return None, None
+    if low_raw in (None, "") or high_raw in (None, ""):
+        return None, None
+    low = _format_area(low_raw)
+    high = _format_area(high_raw)
+    if low <= 0 or high <= 0 or low > high:
+        return None, None
+    return low, high
+
+
+def output_area_range(
+    unit: dict[str, Any],
+    formatted_area: int,
+) -> tuple[int | None, int | None, str | None, str | None]:
+    """Return public low/high/range/type fields for one formatted row."""
+
+    low, high = published_area_bounds(unit)
+    if low is None or high is None:
+        if formatted_area <= 0:
+            return None, None, None, None
+        low = high = formatted_area
+    return low, high, str(low) if low == high else f"{low}-{high}", ("exact" if low == high else "range")
+
+
+def output_rent_range(
+    rent_low: int | float | None,
+    rent_high: int | float | None,
+) -> tuple[str | None, bool | None]:
+    """Format canonical rent display and whether the source spans a range."""
+
+    if rent_low is None and rent_high is None:
+        return None, None
+    low = rent_low if rent_low is not None else rent_high
+    high = rent_high if rent_high is not None else rent_low
+    if low is None or high is None:
+        return None, None
+
+    def money(value: int | float) -> str:
+        numeric = float(value)
+        return f"${numeric:,.2f}" if not numeric.is_integer() else f"${int(numeric):,}"
+
+    if float(low) > float(high):
+        low, high = high, low
+    is_range = float(low) != float(high)
+    return (f"{money(low)} - {money(high)}" if is_range else money(low)), is_range
+
+
+def _rent_number_for_comparison(value: Any) -> float | None:
+    """Parse one bounded rent scalar without mutating its source value."""
+
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    match = re.search(r"-?\d[\d,]*(?:\.\d+)?", str(value))
+    if match is None:
+        return None
+    try:
+        parsed = float(match.group(0).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+    return parsed if 200 <= parsed <= 100_000 else None
+
+
+def resolve_published_rent_bounds(
+    unit: dict[str, Any],
+) -> tuple[Any, Any, str | None, str]:
+    """Resolve numeric rent bounds while preserving a published source range.
+
+    Explicit low/high fields remain authoritative. A range string fills a
+    missing endpoint, and it repairs the common lossy shape where both numeric
+    endpoints were collapsed to one value that sits inside the published
+    interval. A genuinely conflicting numeric interval is not widened; the raw
+    range and ``numeric_fields_conflict_with_published_range`` provenance make
+    that disagreement auditable.
+    """
+
+    rent_low = _first(
+        unit,
+        "market_rent_low",
+        "rent_low",
+        "asking_rent",
+        "minRent",
+        "min_rent",
+        "rent",
+        "totalRent",
+        "price",
+    )
+    rent_high = _first(
+        unit,
+        "market_rent_high",
+        "rent_high",
+        "asking_rent",
+        "maxRent",
+        "max_rent",
+        "rent",
+        "totalRent",
+        "price",
+    )
+    raw_value = _first(
+        unit,
+        "rent_range",
+        "_rent_range",
+        "rentRange",
+        "priceRange",
+        "price_range",
+    )
+    raw_range = str(raw_value).strip() if raw_value not in (None, "") else None
+    parsed_low: int | None = None
+    parsed_high: int | None = None
+    if raw_range:
+        try:
+            from ma_poc.pms.adapters._parsing import parse_rent_range
+
+            parsed_low, parsed_high = parse_rent_range(raw_range)
+        except Exception:
+            parsed_low, parsed_high = None, None
+
+    explicit_low = _rent_number_for_comparison(rent_low)
+    explicit_high = _rent_number_for_comparison(rent_high)
+    parsed_is_range = (
+        parsed_low is not None
+        and parsed_high is not None
+        and parsed_low != parsed_high
+        and bool(re.search(r"(?:-|–|—|\bto\b)", raw_range or "", re.IGNORECASE))
+    )
+
+    if rent_low is None and parsed_low is not None:
+        rent_low = parsed_low
+    if rent_high is None and parsed_high is not None:
+        rent_high = parsed_high
+
+    if explicit_low is None and explicit_high is None:
+        provenance = (
+            "published_range_only"
+            if parsed_is_range
+            else "published_scalar_only"
+            if parsed_low is not None
+            else "missing"
+        )
+    elif parsed_low is None or parsed_high is None:
+        provenance = "numeric_fields"
+    elif not parsed_is_range:
+        provenance = (
+            "numeric_fields_confirmed_by_published_range"
+            if explicit_low == parsed_low and explicit_high in {None, float(parsed_high)}
+            else "numeric_fields"
+        )
+    else:
+        numeric_values = [value for value in (explicit_low, explicit_high) if value is not None]
+        numeric_inside = bool(numeric_values) and all(
+            float(parsed_low) <= value <= float(parsed_high) for value in numeric_values
+        )
+        collapsed_numeric = (
+            explicit_low is not None and explicit_high is not None and explicit_low == explicit_high
+        )
+        if numeric_inside and (collapsed_numeric or explicit_low is None or explicit_high is None):
+            rent_low, rent_high = parsed_low, parsed_high
+            provenance = "published_range_reconciled_with_numeric"
+        elif explicit_low == float(parsed_low) and explicit_high == float(parsed_high):
+            provenance = "numeric_fields_confirmed_by_published_range"
+        else:
+            provenance = "numeric_fields_conflict_with_published_range"
+
+    final_low = _rent_number_for_comparison(rent_low)
+    final_high = _rent_number_for_comparison(rent_high)
+    if final_low is not None and final_high is not None and final_low > final_high:
+        rent_low, rent_high = rent_high, rent_low
+    return rent_low, rent_high, raw_range, provenance
 
 
 def classify_area_absence(
@@ -499,6 +892,8 @@ def classify_area_absence(
     """
     if formatted_area != -1:
         return (None, None)
+    if published_area_bounds(unit) != (None, None):
+        return (None, None)
 
     # (a) There is no apartment behind this row, so there is no apartment to
     #     have a square footage. Checked first: it is the only branch that is
@@ -527,6 +922,36 @@ def classify_area_absence(
 
     # (d) We could not tell. Say so.
     return (AREA_ABSENCE_UNKNOWN, "no_evidence")
+
+
+def area_sanity_provenance(
+    unit: dict[str, Any],
+) -> tuple[Any, str | None, str | None, str | None]:
+    """Return emitted evidence for a source-qualified area preservation.
+
+    The sanity stage normally destroys a rejected value.  A narrowly trusted
+    typed-source exception instead records one ``_sanity_preserved`` entry.
+    Both V2 formatter implementations delegate here so the raw pre-sanity
+    value, decision, reason, and source field remain visible in final output.
+    """
+    records = unit.get("_sanity_preserved")
+    if not isinstance(records, (list, tuple)):
+        return (None, None, None, None)
+    for record in reversed(records):
+        if not isinstance(record, dict) or record.get("field") != "area":
+            continue
+        provider = str(record.get("provider") or "").strip()
+        source_field = str(record.get("source_field") or "").strip()
+        source = ".".join(part for part in (provider, source_field) if part) or None
+        return (
+            record.get("raw_value", record.get("value")),
+            str(record.get("decision") or "").strip() or None,
+            str(record.get("reason") or "").strip() or None,
+            source,
+        )
+    return (None, None, None, None)
+
+
 def resolve_plan_row_availability(
     status: str | None,
     *,
@@ -578,11 +1003,37 @@ def resolve_plan_row_availability(
     """
     if not plan_level:
         return status
+    # Preserve a source's more specific explicit negative state. A WAITLIST,
+    # LEASED, or PENDING plan is zero current inventory, but flattening it to
+    # generic UNAVAILABLE discards useful operator semantics.
+    if status in {"UNAVAILABLE", "WAITLIST", "WAITLISTED", "LEASED", "PENDING"}:
+        return status
     if not has_rent and not has_anchor:
         return "UNAVAILABLE"
     if status is None:
         return "UNKNOWN"
     return status
+
+
+AVAILABILITY_DATE_KEYS = (
+    "available_date",
+    "availability_date",
+    "internalAvailableDate",
+    "availableDate",
+    "date_available",
+    "dateAvailable",
+)
+
+
+def _availability_date_value(unit: dict[str, Any]) -> Any:
+    """Return the first populated availability-date alias.
+
+    ``available_date`` is the output-schema spelling, while several direct
+    adapter paths (notably Knock, G5, and the generic API walker) emit
+    ``availability_date`` or a vendor camelCase spelling. Keeping the alias
+    order here prevents the production formatter from drifting again.
+    """
+    return _first(unit, *AVAILABILITY_DATE_KEYS)
 
 
 def _row_has_availability_date(unit: dict[str, Any]) -> bool:
@@ -593,20 +1044,7 @@ def _row_has_availability_date(unit: dict[str, Any]) -> bool:
     spellings the ``available_date`` formatter reads (see ``_format_v2_unit``)
     so the two never disagree about whether a date exists.
     """
-    return (
-        _format_date(
-            _first(
-                unit,
-                "available_date",
-                "availability_date",
-                "internalAvailableDate",
-                "availableDate",
-                "date_available",
-                "dateAvailable",
-            )
-        )
-        is not None
-    )
+    return _format_date(_availability_date_value(unit)) is not None
 
 
 def withdraw_unsupported_available(
@@ -740,14 +1178,8 @@ def enforce_zero_inventory_contract(units: Any) -> int:
         # one the coercion still stands.
         if row.get("rent_low") is None and row.get("rent_high") is None:
             continue
-        source = (
-            _norm_status(row["availability_status_raw"])
-            if "availability_status_raw" in row
-            else current
-        )
-        resolved = resolve_plan_row_availability(
-            source, plan_level=True, has_rent=True, has_anchor=False
-        )
+        source = _norm_status(row["availability_status_raw"]) if "availability_status_raw" in row else current
+        resolved = resolve_plan_row_availability(source, plan_level=True, has_rent=True, has_anchor=False)
         if resolved != current:
             row["availability_status"] = resolved
             changed += 1
@@ -907,25 +1339,44 @@ def _format_v2_unit(
     # ``or``-chains missed → silent loss of beds/baths/sqft/unit_id/
     # floor-plan for those FORMATS even though the value was surfaced.
     # _first() = alias-tolerant, additive, zero-risk when absent.
-    beds_raw = _first(unit, "_bedrooms", "bedrooms", "beds",
-                      "numberOfBeds", "bedroom", "bed", "num_beds")
-    baths_raw = _first(unit, "_bathrooms", "bathrooms", "baths",
-                       "numberOfBaths", "bathroom", "bath", "num_baths")
-    fp_name = _first(unit, "_floor_plan", "floor_plan_name",
-                     "floorplan_name", "floorPlanName", "floorplanName",
-                     "fp_name", "floorplan", "plan_name")
+    beds_raw = _first(unit, "_bedrooms", "bedrooms", "beds", "numberOfBeds", "bedroom", "bed", "num_beds")
+    baths_raw = _first(
+        unit, "_bathrooms", "bathrooms", "baths", "numberOfBaths", "bathroom", "bath", "num_baths"
+    )
+    fp_name = _first(
+        unit,
+        "_floor_plan",
+        "floor_plan_name",
+        "floorplan_name",
+        "floorPlanName",
+        "floorplanName",
+        "fp_name",
+        "floorplan",
+        "plan_name",
+    )
     # Name hygiene (2026-07-31 data-audit #4/#5): strip a trailing concession %
     # ("A1 80%" -> "A1") and null a bare-number name (a leaked sqft / code).
     # Applied before inference + floor_plan_id so both use the clean value.
-    from ma_poc.pms.adapters._parsing import clean_floor_plan_name
+    from ma_poc.pms.adapters._parsing import (
+        clean_floor_plan_name,
+        has_trusted_floor_plan_name_provenance,
+    )
 
-    fp_name = clean_floor_plan_name(fp_name)
-    sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet",
-                  "square_feet", "size", "sq_ft")
+    _explicit_provider_plan = has_trusted_floor_plan_name_provenance(unit)
+    fp_name = clean_floor_plan_name(
+        fp_name,
+        allow_numeric_provider_code=_explicit_provider_plan,
+    )
+    sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet", "square_feet", "size", "sq_ft")
 
-    # unit_id alias (adapters emit unit_number / camelCase / uid)
-    uid = _first(unit, "unit_id", "unit_number", "_unit_number",
-                 "unitNumber", "unitId", "uid", "apartment_number")
+    # Prefer a natural apartment number over an ``inferred_*`` id minted by an
+    # earlier merge pass. The latter is only a fallback plan phenotype and
+    # must not erase stronger identity that remains on the same raw row.
+    from ma_poc.core.identity import preferred_existing_unit_id
+
+    uid = preferred_existing_unit_id(unit) or _first(
+        unit, "unit_id", "unit_number", "_unit_number", "unitNumber", "unitId", "uid", "apartment_number"
+    )
     # #3-tail: scrub a unit_id that is a scraped field label ("856c8776-Baths: 1")
     # — a generic-DOM mis-parse. None lets identity synthesise an honest
     # inferred_ id rather than shipping a corrupt "real" anchor.
@@ -948,22 +1399,10 @@ def _format_v2_unit(
         except Exception:
             pass
 
-    # rent: numeric fields first (alias-tolerant — generic/_merge emit
-    # rent/minRent/totalRent/price camelCase), then parse rent_range.
-    rent_lo = _first(unit, "market_rent_low", "rent_low", "asking_rent",
-                     "minRent", "min_rent", "rent", "totalRent", "price")
-    rent_hi = _first(unit, "market_rent_high", "rent_high", "asking_rent",
-                     "maxRent", "max_rent", "rent", "totalRent", "price")
-    if rent_lo is None and rent_hi is None:
-        rent_range = _first(unit, "rent_range", "_rent_range", "rentRange",
-                            "priceRange", "price_range")
-        if rent_range:
-            try:
-                from ma_poc.pms.adapters._parsing import parse_rent_range
-
-                rent_lo, rent_hi = parse_rent_range(str(rent_range))
-            except Exception:
-                pass
+    # Preserve a published interval even when an adapter collapsed its numeric
+    # companions to one endpoint; contradictory sources remain explicitly
+    # labelled rather than silently widened.
+    rent_lo, rent_hi, _rent_range_raw, _rent_provenance = resolve_published_rent_bounds(unit)
 
     # F10: pass-through unit-level concessions, amenities, and validation flags.
     # Schema stability — keys are always present (None when unset) so downstream
@@ -984,10 +1423,24 @@ def _format_v2_unit(
         # any string variant into the canonical field; dicts/lists fall
         # through to _extra (capture-everything net) so nothing is lost.
         legacy = _first(
-            unit, "concession", "concessions", "specials_description",
-            "special", "specials", "promotion", "promo", "offer",
-            "offers", "incentive", "incentives", "deal", "savings",
-            "discount", "free_rent", "look_and_lease", "move_in_special",
+            unit,
+            "concession",
+            "concessions",
+            "specials_description",
+            "special",
+            "specials",
+            "promotion",
+            "promo",
+            "offer",
+            "offers",
+            "incentive",
+            "incentives",
+            "deal",
+            "savings",
+            "discount",
+            "free_rent",
+            "look_and_lease",
+            "move_in_special",
         )
         if isinstance(legacy, str) and legacy.strip():
             concession_text = legacy
@@ -1004,21 +1457,21 @@ def _format_v2_unit(
     # to ``None`` (honest "missing") instead of emitting an impossible number.
     # ``> beds + 2`` never clamps a legitimate N-bed/N-bath layout; the ``>= 4``
     # floor protects a small unit's real 2–2.5-bath count.
-    if (
-        norm_baths is not None
-        and norm_beds is not None
-        and norm_baths >= 4
-        and norm_baths > norm_beds + 2
-    ):
+    if norm_baths is not None and norm_beds is not None and norm_baths >= 4 and norm_baths > norm_beds + 2:
         norm_baths = None
-    try:
-        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+    # A bounded adapter may provide a property-qualified canonical plan anchor
+    # after validating its source property.  Prefer that trusted internal
+    # value; ordinary adapters retain the existing display-name/bed/bath hash.
+    _provider_plan_anchor = str(unit.get("_canonical_floor_plan_id") or "").strip()
+    if _provider_plan_anchor:
+        floor_plan_id = _provider_plan_anchor
+    else:
+        try:
+            from ma_poc.pms.adapters._parsing import compute_floor_plan_id
 
-        floor_plan_id = compute_floor_plan_id(
-            property_id, fp_name, norm_beds, norm_baths
-        )
-    except Exception:
-        floor_plan_id = None
+            floor_plan_id = compute_floor_plan_id(property_id, fp_name, norm_beds, norm_baths)
+        except Exception:
+            floor_plan_id = None
 
     # Area + the reason it is absent. The numeric ``-1`` contract is
     # UNCHANGED; ``area_absence`` is an additive label that says which of the
@@ -1041,6 +1494,12 @@ def _format_v2_unit(
         supplied_value=sqft,
         property_publishes_area=property_has_area,
     )
+    (
+        area_pre_sanity_value,
+        area_sanity_decision,
+        area_sanity_reason,
+        area_sanity_source,
+    ) = area_sanity_provenance(unit)
 
     # Zero-inventory availability contract (2026-07-29). Resolved ONCE here so
     # the shipped ``availability_status`` and the ``available_date`` fallback
@@ -1066,9 +1525,7 @@ def _format_v2_unit(
     _has_rent = _rent_lo_fmt is not None or _rent_hi_fmt is not None
     _has_anchor = unit_has_real_anchor(unit)
     _availability_status = resolve_plan_row_availability(
-        _norm_status(
-            unit.get("availability_status") or unit.get("_availability_status")
-        ),
+        _norm_status(unit.get("availability_status") or unit.get("_availability_status")),
         plan_level=_plan_level,
         has_rent=_has_rent,
         has_anchor=_has_anchor,
@@ -1085,15 +1542,65 @@ def _format_v2_unit(
         has_date=_row_has_availability_date(unit),
     )
 
+    _available_date_raw = _availability_date_value(unit)
+    _available_date_parsed = _format_date(_available_date_raw, scrape_ts)
+    _available_date_resolved = _resolve_available_date(
+        _available_date_parsed,
+        _availability_status,
+        scrape_ts,
+        has_rent=(_has_rent and uid not in (None, "", "null")),
+        raw_value=_available_date_raw,
+    )
+    _available_date_provenance = _classify_availability_date_provenance(
+        _available_date_raw,
+        _available_date_parsed,
+        _available_date_resolved,
+        scrape_ts,
+    )
+
+    _building_id, _building_id_source = source_building_identity(unit)
+    # Preserve the strongest source/display identity selected above. Reading
+    # ``unit_id`` first here would re-introduce the very synthetic-over-natural
+    # loss the formatter just corrected.
+    _source_unit_id = _raw_str(uid)
+    _area_low, _area_high, _area_range, _area_value_type = output_area_range(
+        unit,
+        area_out,
+    )
+    _rent_range, _rent_is_range = output_rent_range(
+        _rent_lo_fmt,
+        _rent_hi_fmt,
+    )
+    _rent_range_raw = _raw_str(_rent_range_raw)
+
     return {
         "beds": norm_beds,
         "baths": norm_baths,
         "floor_plan_name": fp_name if fp_name else None,
+        "floor_plan_name_provenance": (
+            unit.get("_floor_plan_name_provenance") if _explicit_provider_plan else None
+        ),
+        "floor_plan_description": _raw_str(unit.get("floor_plan_description")),
         "floor_plan_id": floor_plan_id,
         "area": area_out,
+        "area_low": _area_low,
+        "area_high": _area_high,
+        "area_range": _area_range,
+        "area_range_raw": _raw_str(_first(unit, "area_range_raw", "area_range", "sqft_range")),
+        "area_value_type": _area_value_type,
+        "area_provenance": _raw_str(unit.get("area_provenance")),
+        "area_source_url": _raw_str(unit.get("area_source_url")),
         "area_absence": area_absence,
         "area_absence_evidence": area_absence_evidence,
+        "area_pre_sanity_value": area_pre_sanity_value,
+        "area_sanity_decision": area_sanity_decision,
+        "area_sanity_reason": area_sanity_reason,
+        "area_sanity_source": area_sanity_source,
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        # Capture the operator/provider id before any collision-safe rewrite.
+        # ``canonical_unit_id`` and ``unit_history_key`` are stamped after the
+        # property-level disambiguation pass by finalize_output_unit_identities.
+        "source_unit_id": _source_unit_id,
         # As-displayed operator label ("HOME 302", "APT PH14", an AppFolio
         # street address). Capture-only and frequently NULL — see
         # _parsing.make_unit_dict for why it is never composed. MUST stay in
@@ -1111,11 +1618,16 @@ def _format_v2_unit(
         # consumer can trust/filter (a Tier-1 API row vs an LLM guess vs a
         # plan-level placeholder). Captured on the internal unit dict but was
         # dropped by this transform until now.
-        "extraction_tier": (
-            unit.get("extraction_tier") or unit.get("_extraction_tier") or None
-        ),
+        "extraction_tier": (unit.get("extraction_tier") or unit.get("_extraction_tier") or None),
         "rent_low": _rent_lo_fmt,
         "rent_high": _rent_hi_fmt,
+        # Retain the published interval even on a physical unit. A unit's rent
+        # can legitimately vary by lease term or move-in date; collapsing it
+        # to one endpoint destroys source information.
+        "rent_range": _rent_range,
+        "rent_range_raw": _rent_range_raw,
+        "rent_is_range": _rent_is_range,
+        "rent_provenance": _rent_provenance,
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         # Bug 2026-05-13: most adapters emit the long-form key
         # ``availability_date`` (via ``make_unit_dict`` in
@@ -1160,28 +1672,17 @@ def _format_v2_unit(
         # categories (TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL,
         # TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL, etc.) from getting
         # a fabricated scrape-date stamp.
-        "available_date": _resolve_available_date(
-            _format_date(_first(
-                unit, "available_date", "availability_date",
-                "internalAvailableDate", "availableDate",
-                "date_available", "dateAvailable")),
-            # 2026-07-29: the RESOLVED status, not a second independent
-            # _norm_status() call. A zero-inventory plan row now reads
-            # UNAVAILABLE here, so the AVAILABLE branch below cannot stamp
-            # today's scrape date onto a plan with no inventory and no price.
-            _availability_status,
-            scrape_ts,
-            has_rent=(_has_rent and uid not in (None, "", "null")),
-        ),
+        "available_date": _available_date_resolved,
+        # First-class lineage: source-backed future dates and manufactured
+        # capture-date defaults must never look equivalent downstream.
+        "availability_date_provenance": _available_date_provenance,
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
         # Data has value; cleaning can be done later off the raw. Clean
         # consumers keep using ``available_date`` (ISO-or-None) unchanged;
         # this never drops a value. Underscore = private passthrough
         # (same convention as _inferred_id / _date_placeholder).
-        "_available_date_raw": _raw_str(_first(
-            unit, "available_date", "availability_date", "internalAvailableDate",
-            "availableDate", "date_available", "dateAvailable")),
+        "_available_date_raw": _raw_str(_available_date_raw),
         # 2026-05-18: availability_status is emitted by many parsers
         # ("AVAILABLE"/"UNAVAILABLE") via make_unit_dict but the v2
         # transform never mapped it -> 99.7% missing in output. Capture
@@ -1198,17 +1699,30 @@ def _format_v2_unit(
         # name them differently); raw passthrough, clean later. Additive,
         # None when unset (F10/underscore precedent; validation is
         # required-field-based, no unknown-key rejection).
-        "floor": _raw_str(_first(unit, "floor", "_floor", "floor_number",
-                                 "floorNumber", "floor_no")),
-        "building": _raw_str(_first(unit, "building", "_building",
-                                    "building_name", "buildingName",
-                                    "building_id", "bldg")),
-        "available_units": _raw_str(_first(
-            unit, "available_units", "_available_units", "availableUnits",
-            "units_available", "available_unit_count", "numberOfUnits",
-            "availableUnitsCount", "availableunitscount")),
-        "_rent_range_raw": _raw_str(_first(unit, "rent_range",
-                                           "_rent_range", "rentRange")),
+        "floor": _raw_str(_first(unit, "floor", "_floor", "floor_number", "floorNumber", "floor_no")),
+        "building": _raw_str(
+            _first(unit, "building", "_building", "building_name", "buildingName", "building_id", "bldg")
+        ),
+        "building_id": _building_id,
+        "building_id_source": _building_id_source,
+        # Null-native companion for consumers that should not ingest the V2
+        # ``area=-1`` compatibility sentinel.
+        "area_sqft": (_area_low if _area_low is not None and _area_low == _area_high else None),
+        "area_is_published": _area_low is not None and _area_high is not None,
+        "available_units": _raw_str(
+            _first(
+                unit,
+                "available_units",
+                "_available_units",
+                "availableUnits",
+                "units_available",
+                "available_unit_count",
+                "numberOfUnits",
+                "availableUnitsCount",
+                "availableunitscount",
+            )
+        ),
+        "_rent_range_raw": _rent_range_raw,
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
@@ -1219,12 +1733,8 @@ def _format_v2_unit(
         # ``concession_text`` field above; consumers that prefer a
         # display-ready version can read ``concession_text_clean``.
         # See ma_poc/core/concession_clean.py for the classifier.
-        "concession_text_clean": (
-            _concession_clean(concession_text) if concession_text else None
-        ),
-        "_concession_quality": (
-            _concession_quality(concession_text) if concession_text else None
-        ),
+        "concession_text_clean": (_concession_clean(concession_text) if concession_text else None),
+        "_concession_quality": (_concession_quality(concession_text) if concession_text else None),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
         # 2026-05-24 offer-taxonomy fields (xlsx reference schema parity).
@@ -1249,6 +1759,20 @@ def _format_v2_unit(
         # Empty {} when the adapter hasn't wired it yet (additive,
         # non-breaking).
         "source_ids": dict(unit.get("source_ids") or {}),
+        # Unit-level diagnostic pointer. Bodies are archived once per source,
+        # never repeated on every row; these fields locate and verify the
+        # exact record that supplied the recovered value.
+        "source_response_sha256": _raw_str(unit.get("source_response_sha256")),
+        "source_response_url": _raw_str(unit.get("source_response_url")),
+        "source_record_locator": _raw_str(unit.get("source_record_locator")),
+        "source_asset_url": _raw_str(unit.get("source_asset_url")),
+        "source_asset_sha256": _raw_str(unit.get("source_asset_sha256")),
+        "identity_quality": _raw_str(unit.get("identity_quality")),
+        "unit_id_aliases": (
+            list(unit.get("unit_id_aliases"))
+            if isinstance(unit.get("unit_id_aliases"), (list, tuple))
+            else []
+        ),
         "amenities": norm_amenities,
         # Validation provenance flags (surfaced from schema_gate).
         "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,
@@ -1260,9 +1784,7 @@ def _format_v2_unit(
     }
 
 
-def _format_v2_floor_plan(
-    plan: dict, scrape_ts: datetime, property_id: str = ""
-) -> dict:
+def _format_v2_floor_plan(plan: dict, scrape_ts: datetime, property_id: str = "") -> dict:
     """Format public plan evidence without publishing a synthetic unit ID.
 
     The shared unit formatter gives the plan the normal schema shape, then
@@ -1296,15 +1818,10 @@ def _format_v2_floor_plan(
     # manufactured by definition (``_resolve_available_date`` only invents one
     # when the parsed source date is falsy), so dropping it loses nothing the
     # source published.
-    if out.get("availability_status") == "UNAVAILABLE" and not out.get(
-        "_available_date_raw"
-    ):
+    if out.get("availability_status") != "AVAILABLE" and not out.get("_available_date_raw"):
         out["available_date"] = None
-    flags = [
-        part.strip()
-        for part in str(out.get("data_quality_flag") or "").split("|")
-        if part.strip()
-    ]
+        out["availability_date_provenance"] = "missing"
+    flags = [part.strip() for part in str(out.get("data_quality_flag") or "").split("|") if part.strip()]
     if not any("PLAN" in flag.upper() or "UNVERIFIED" in flag.upper() for flag in flags):
         flags.append("PLAN_LEVEL_NO_UNIT_ANCHOR")
     out["data_quality_flag"] = "|".join(flags)
@@ -1665,21 +2182,116 @@ def field_is_absent(field: str, value: Any) -> bool:
 # authoritative signal anyway; the date-text recognizer just rescues
 # rows where the operator wrote a phrase instead of a date.
 _AVAILABLE_NOW_RE = re.compile(
-    r"\bavail"                                   # available / availability / availabilities
-    r"|\bapply\s+(?:now|today|by)\b"             # CTAs in date field
+    r"\bavail"  # available / availability / availabilities
+    r"|\bapply\s+(?:now|today|by)\b"  # CTAs in date field
     r"|\blease\s+(?:now|today|by)\b"
-    r"|\bmove[\s-]?in"                           # Move-in / Move In / Movein
-    r"|\bmoves?[\s-]?in\b"                       # Move In Now / Moves In
+    r"|\bmove[\s-]?in"  # Move-in / Move In / Movein
+    r"|\bmoves?[\s-]?in\b"  # Move In Now / Moves In
     r"|\bready\b"
     r"|\bvacant\b"
-    r"|\bcurrently\b"                            # "Currently Vacant" / "Currently Leasing"
+    r"|\bcurrently\b"  # "Currently Vacant" / "Currently Leasing"
     r"|\b(?:now|today|immediate|immediately)\b"  # standalone time tokens
-    r"|\bcall\s+(?:for|us|today|now)\b"          # "Call For Details" — operator-gated
-    r"|\b(?:tba|tbd)\b"                          # to be announced / determined
+    r"|\bcall\s+(?:for|us|today|now)\b"  # "Call For Details" — operator-gated
+    r"|\b(?:tba|tbd)\b"  # to be announced / determined
     r"|\bto\s+be\s+(?:announced|determined|set)\b"
-    r"|\binquire\b",                             # "Inquire For Details" — operator-gated
+    r"|\binquire\b",  # "Inquire For Details" — operator-gated
     re.IGNORECASE,
 )
+
+_NEGATIVE_AVAILABILITY_TOKENS = (
+    "not available",
+    "not avail",
+    "unavailable",
+    "leased",
+    "occupied",
+    "rented",
+    "off market",
+    "off-market",
+    "no availability",
+    "call for avail",
+    "contact for avail",
+    "inquire for avail",
+    "call about avail",
+    "email for avail",
+)
+
+_EXPLICIT_AVAILABILITY_DATE_RE = re.compile(
+    r"(?:"
+    r"\b\d{8}\b"
+    r"|\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b"
+    r"|\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b"
+    r"|\b(?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\d|3[01])\b"
+    r"|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+    r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+    r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}"
+    r"(?:st|nd|rd|th)?(?:,?\s+\d{2,4})?\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _availability_text_is_negative(raw_value: Any) -> bool:
+    text = str(raw_value or "").strip().lower()
+    return bool(text) and any(token in text for token in _NEGATIVE_AVAILABILITY_TOKENS)
+
+
+def _availability_text_is_available_now(raw_value: Any) -> bool:
+    """True only for relative availability text, never an explicit date."""
+    text = str(raw_value or "").strip()
+    if not text or _availability_text_is_negative(text):
+        return False
+    if _EXPLICIT_AVAILABILITY_DATE_RE.search(text):
+        return False
+    return bool(_AVAILABLE_NOW_RE.search(text))
+
+
+def _classify_availability_date_provenance(
+    raw_value: Any,
+    parsed_date: str | None,
+    resolved_date: str | None,
+    scrape_ts: datetime,
+) -> str:
+    """Classify where an emitted availability date came from.
+
+    Names mirror the July 31 fleet audit so a post-fix canary can be compared
+    directly with that baseline.
+    """
+    raw_text = _raw_str(raw_value)
+    capture_date = scrape_ts.strftime("%Y-%m-%d")
+
+    if raw_text:
+        if _availability_text_is_negative(raw_text):
+            return "negative_or_unpublished"
+        if _EXPLICIT_AVAILABILITY_DATE_RE.search(raw_text):
+            if not parsed_date:
+                return "sentinel_clamped"
+            if parsed_date > capture_date:
+                return "explicit_future"
+            if parsed_date == capture_date:
+                return "explicit_capture_date"
+            return "historical_embedded"
+        if _availability_text_is_available_now(raw_text):
+            # A relative "Available Now" string can contradict a structured
+            # negative status on a stale card. The resolver deliberately
+            # suppresses the manufactured capture date in that case; preserve
+            # that decision as explicit provenance rather than relabelling the
+            # row as a successful available-now normalization.
+            if resolved_date is None:
+                return "negative_status_override"
+            return "available_now"
+        if parsed_date:
+            if parsed_date > capture_date:
+                return "explicit_future"
+            if parsed_date == capture_date:
+                return "explicit_capture_date"
+            return "historical_embedded"
+        if resolved_date == capture_date:
+            return "capture_date_default"
+        return "unparsed_raw"
+
+    if resolved_date == capture_date:
+        return "capture_date_default"
+    return "missing"
 
 
 def _resolve_available_date(
@@ -1688,23 +2300,18 @@ def _resolve_available_date(
     scrape_ts: datetime,
     *,
     has_rent: bool = False,
+    raw_value: Any = None,
 ) -> str | None:
     """When the operator effectively says the unit IS rentable but
     ships no parseable move-in date, default the date to the scrape
     timestamp (i.e. "available today / now").
 
-    A unit is treated as rentable-now when EITHER:
-      * status explicitly says ``"AVAILABLE"``, OR
-      * ``has_rent`` — the unit has a positive rent value
-        published. The presence of a price is itself a strong
-        rentability signal: operators don't list rents on units
-        they can't rent. This catches the canary 1ef1060 regression
-        where the Knock adapter mis-flagged ~8,580 of 8,597
-        rent-published units as ``UNAVAILABLE`` because Knock's
-        ``available`` boolean is a separate signal that's often
-        False even when the unit IS being offered. The Knock adapter
-        was fixed in parallel, but ``has_rent`` is a defence-in-depth
-        for the next operator whose status field is similarly noisy.
+    A unit is treated as rentable-now when status explicitly says
+    ``"AVAILABLE"``.  A published rent is a fallback signal only when the
+    source status is absent or genuinely unknown.  It must never override an
+    explicit negative state such as ``UNAVAILABLE``, ``LEASED``, ``PENDING``,
+    or ``WAITLIST``: catalogue/full-roster sources commonly publish prices for
+    apartments that are not currently offered.
 
     2026-05-24 (user Q): "if it does not show availability date but
     says available, what do we do?". Prior behaviour was to ship
@@ -1716,14 +2323,43 @@ def _resolve_available_date(
     Behaviour:
       * parsed_date present                                  → parsed_date
       * parsed_date None + status == "AVAILABLE"             → scrape date
-      * parsed_date None + has_rent=True                     → scrape date
+      * parsed_date None + status absent/UNKNOWN + rent      → scrape date
+      * parsed_date None + explicit negative status          → None
       * parsed_date None + status none/unknown + no rent     → None (unchanged)
     """
+    # Relative text is parsed to the capture date by ``_format_date`` before
+    # this function runs. A negative structured status must be consulted
+    # first for that one manufactured-date shape. Explicit dates remain
+    # source facts and continue through unchanged even with a negative current
+    # status (for example a leased unit offered again next month).
+    normalized_status = str(status or "").strip().upper()
+    negative_status = normalized_status in {
+        "UNAVAILABLE",
+        "LEASED",
+        "PENDING",
+        "WAITLIST",
+        "WAITLISTED",
+        "WAIT_LIST",
+        "OCCUPIED",
+        "RENTED",
+        "OFF_MARKET",
+        "NOT_AVAILABLE",
+    }
+    if (
+        parsed_date
+        and negative_status
+        and _availability_text_is_available_now(raw_value)
+    ):
+        return None
     if parsed_date:
         return parsed_date
-    if status and status.upper() == "AVAILABLE":
+    # A date-shaped raw value is handled above.  A negative text token is an
+    # explicit source statement and must not fall through to either default.
+    if _availability_text_is_negative(raw_value):
+        return None
+    if normalized_status == "AVAILABLE":
         return scrape_ts.strftime("%Y-%m-%d")
-    if has_rent:
+    if has_rent and normalized_status in ("", "UNKNOWN"):
         return scrape_ts.strftime("%Y-%m-%d")
     return parsed_date
 
@@ -1731,7 +2367,10 @@ def _resolve_available_date(
 _DATE_SANITY_YEARS = 5  # ±5 years from today is the acceptance window
 
 
-def _is_date_in_sane_range(iso_date: str) -> bool:
+def _is_date_in_sane_range(
+    iso_date: str,
+    reference_ts: datetime | None = None,
+) -> bool:
     """True when the ISO date is within ±_DATE_SANITY_YEARS of today.
 
     Operators sometimes leave decade-old ``available_date`` values on
@@ -1744,12 +2383,15 @@ def _is_date_in_sane_range(iso_date: str) -> bool:
         d = datetime.strptime(iso_date, "%Y-%m-%d").date()
     except (ValueError, TypeError):
         return False
-    today = datetime.now(UTC).date()
+    today = (reference_ts or datetime.now(UTC)).date()
     delta_days = (d - today).days
     return -_DATE_SANITY_YEARS * 365 <= delta_days <= _DATE_SANITY_YEARS * 365
 
 
-def _format_date(val: Any) -> str | None:
+def _format_date(
+    val: Any,
+    reference_ts: datetime | None = None,
+) -> str | None:
     """Normalize date to YYYY-MM-DD. Returns None if unparseable.
 
     2026-05-18: widened. The prior version accepted only ISO and
@@ -1766,18 +2408,26 @@ def _format_date(val: Any) -> str | None:
     through _is_date_in_sane_range — operator-emitted garbage like
     "2009-07-08" returns None.
     """
+
     def _accept(iso: str | None) -> str | None:
         """Inner-helper: apply the ±5yr sanity bound to every parsed
         output. Calls that return today's date for relative tokens
         (Available Now / etc.) are safe — today is within range."""
         if iso is None:
             return None
-        return iso if _is_date_in_sane_range(iso) else None
+        return iso if _is_date_in_sane_range(iso, reference_ts) else None
 
     if val is None or val == "":
         return None
     s_orig = str(val).strip()
     s = s_orig
+    availability_prefix = bool(
+        re.match(
+            r"^\s*(?:available|avail\.?|move[- ]?in|ready|date available)\b",
+            s,
+            re.IGNORECASE,
+        )
+    )
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return _accept(s)
@@ -1791,24 +2441,7 @@ def _format_date(val: Any) -> str | None:
     # today (wrong: implies the unit IS available now). 14 cases in
     # 87b837b's canary output.
     _s_low = s.lower()
-    _NEGATIVE_TOKENS = (
-        "not available", "not avail", "unavailable",
-        "leased", "occupied", "rented", "off market", "off-market",
-        "no availability",
-        # 2026-07-12: "Call/Contact/Inquire FOR availability" means the
-        # operator does NOT publish a date — letting it reach the CTA
-        # fallback below fabricates an "available now" stamp. Distinct
-        # from "Call For Details"/"Call Now" CTAs, which stay
-        # available-now per the 2026-05-24 rule. Prefix forms cover the
-        # full words ("call for avail" ⊂ "call for availability").
-        # 0 units in the 2026-07-11 canary carry these in the date
-        # field — this closes the path (and the long-failing
-        # "call for availability"→None test) before an operator
-        # exercises it.
-        "call for avail", "contact for avail", "inquire for avail",
-        "call about avail", "email for avail",
-    )
-    if any(tok in _s_low for tok in _NEGATIVE_TOKENS):
+    if any(tok in _s_low for tok in _NEGATIVE_AVAILABILITY_TOKENS):
         return None
     # Strip a leading availability label, e.g. "Available 6/25/26",
     # "Avail. 6/25/26", "Move-in 6/25/26", "Ready 6/25/26".
@@ -1818,9 +2451,18 @@ def _format_date(val: Any) -> str | None:
         s,
         flags=re.IGNORECASE,
     ).strip()
+    # English ordinal day suffixes are display punctuation, not a relative
+    # availability signal. Normalize only a bounded month-name/day shape;
+    # the untouched source token remains in ``available_date_raw``.
+    s = re.sub(
+        r"^([A-Za-z]{3,9}\.?)\s+(\d{1,2})(?:st|nd|rd|th)(?=\s|,|$)",
+        r"\1 \2",
+        s,
+        flags=re.IGNORECASE,
+    )
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
-        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
+        return _accept((reference_ts or datetime.now(UTC)).strftime("%Y-%m-%d"))
     # 2026-05-26: YYYYMMDD numeric (no separator). 268 cases in 87b837b
     # — common from RentManager / older RealPage XMLs that emit dates
     # as packed 8-digit ints. Checked BEFORE the strptime cascade so
@@ -1833,31 +2475,62 @@ def _format_date(val: Any) -> str | None:
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
     for fmt in (
-        "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y",
-        "%m/%d/%y", "%m-%d-%y",
-        "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y",
-        "%b %d, %y", "%b %d %y",
+        "%m/%d/%Y",
+        "%d/%m/%Y",
+        "%Y/%m/%d",
+        "%m-%d-%Y",
+        "%d-%m-%Y",
+        "%m/%d/%y",
+        "%m-%d-%y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+        "%b %d %Y",
+        "%B %d %Y",
+        "%b %d, %y",
+        "%b %d %y",
     ):
         try:
             return _accept(datetime.strptime(s, fmt).strftime("%Y-%m-%d"))
         except ValueError:
             continue
-    # If it's a datetime string, take just the date part (unchanged)
+    # Preserve the source calendar-date prefix. Deliberately do not convert
+    # timezone-bearing timestamps to UTC: that can shift a visible operator
+    # move-in date forward or backward by one day.
     if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
         return _accept(s[:10])
+
     # 2026-05-19: no-year month-name forms ("May 19", "Jun. 7", "Jul. 18")
     # — Razz/Spherexx embedded portals omit the year. Product rule: assume
     # the current (run) year. Strip a trailing '.' on an abbreviated month
     # ("Jun." -> "Jun"). Additive: only reached after all year-bearing
     # formats fail, so no existing input changes behavior.
+    def _no_year_iso(parsed: datetime) -> str | None:
+        reference = reference_ts or datetime.now(UTC)
+        candidate = parsed.replace(year=reference.year)
+        # A provider label such as ``Available January 5`` captured in
+        # December describes the next offering, not a date eleven months in
+        # the past. Roll forward only for an explicit availability prefix;
+        # bare historical labels retain the existing current-year behavior.
+        if availability_prefix and candidate.date() < reference.date():
+            try:
+                candidate = candidate.replace(year=reference.year + 1)
+            except ValueError:
+                return None
+        return _accept(candidate.strftime("%Y-%m-%d"))
+
     s_no_year = re.sub(r"^([A-Za-z]{3,9})\.", r"\1", s)
     for fmt in ("%b %d", "%B %d"):
         try:
-            return _accept(
-                datetime.strptime(s_no_year, fmt)
-                .replace(year=datetime.now(UTC).year)
-                .strftime("%Y-%m-%d")
-            )
+            return _no_year_iso(datetime.strptime(s_no_year, fmt))
+        except ValueError:
+            continue
+    # Numeric no-year forms ("8/1", "9-03") are published by compact
+    # per-unit availability tables such as Cricket Flats.  Resolve them
+    # against the capture year, just like the month-name no-year forms above;
+    # using the supplied capture timestamp keeps historical replays stable.
+    for fmt in ("%m/%d", "%m-%d"):
+        try:
+            return _no_year_iso(datetime.strptime(s, fmt))
         except ValueError:
             continue
     # 2026-05-24 (user follow-up): final fallback — run the AVAILABLE-NOW
@@ -1871,7 +2544,7 @@ def _format_date(val: Any) -> str | None:
     # date strings always win (e.g. "Available 6/25/26" parses 6/25/26
     # via earlier date-format pass, never reaches here).
     if _AVAILABLE_NOW_RE.search(s_orig.lower()):
-        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
+        return _accept((reference_ts or datetime.now(UTC)).strftime("%Y-%m-%d"))
     return None
 
 
@@ -1908,32 +2581,115 @@ _NOISE_TOKEN_RE = re.compile(
 )
 # Primary names already pulled by the transform — don't duplicate them.
 _MAPPED_SRC = {
-    "_bedrooms", "bedrooms", "beds", "numberofbeds", "bedroom", "bed",
-    "num_beds", "_bathrooms", "bathrooms", "baths", "numberofbaths",
-    "bathroom", "bath", "num_baths", "_floor_plan", "floor_plan_name",
-    "floorplan_name", "floorplanname", "fp_name", "floorplan",
-    "plan_name", "_sqft", "sqft", "area", "squarefeet", "square_feet",
-    "size", "sq_ft", "unit_id", "unit_number", "_unit_number",
-    "unitnumber", "unitid", "uid", "apartment_number",
-    "market_rent_low", "market_rent_high", "rent_low", "rent_high",
-    "asking_rent", "minrent", "min_rent", "rent", "totalrent", "price",
-    "maxrent", "max_rent", "rent_range", "_rent_range", "rentrange",
-    "pricerange", "price_range", "available_date", "availability_date",
-    "internalavailabledate", "availabledate", "date_available",
-    "dateavailable", "lease_term", "_lease_term", "move_in_date",
-    "_move_in_date", "availability_status", "_availability_status",
-    "deposit", "_deposit", "floor", "_floor", "floor_number",
-    "floornumber", "floor_no", "building", "_building", "building_name",
-    "buildingname", "building_id", "bldg", "available_units",
-    "_available_units", "availableunits", "units_available",
-    "available_unit_count", "numberofunits", "availableunitscount",
-    "concession", "concession_text", "concession_value",
-    "concession_source", "specials_description", "amenities",
-    "bed_label", "floor_plan_id", "source_api_url", "extraction_tier",
+    "_bedrooms",
+    "bedrooms",
+    "beds",
+    "numberofbeds",
+    "bedroom",
+    "bed",
+    "num_beds",
+    "_bathrooms",
+    "bathrooms",
+    "baths",
+    "numberofbaths",
+    "bathroom",
+    "bath",
+    "num_baths",
+    "_floor_plan",
+    "floor_plan_name",
+    "floorplan_name",
+    "floorplanname",
+    "fp_name",
+    "floorplan",
+    "plan_name",
+    "_sqft",
+    "sqft",
+    "area",
+    "squarefeet",
+    "square_feet",
+    "size",
+    "sq_ft",
+    "unit_id",
+    "unit_number",
+    "_unit_number",
+    "unitnumber",
+    "unitid",
+    "uid",
+    "apartment_number",
+    "market_rent_low",
+    "market_rent_high",
+    "rent_low",
+    "rent_high",
+    "asking_rent",
+    "minrent",
+    "min_rent",
+    "rent",
+    "totalrent",
+    "price",
+    "maxrent",
+    "max_rent",
+    "rent_range",
+    "_rent_range",
+    "rentrange",
+    "pricerange",
+    "price_range",
+    "available_date",
+    "availability_date",
+    "internalavailabledate",
+    "availabledate",
+    "date_available",
+    "dateavailable",
+    "lease_term",
+    "_lease_term",
+    "move_in_date",
+    "_move_in_date",
+    "availability_status",
+    "_availability_status",
+    "deposit",
+    "_deposit",
+    "floor",
+    "_floor",
+    "floor_number",
+    "floornumber",
+    "floor_no",
+    "building",
+    "_building",
+    "building_name",
+    "buildingname",
+    "building_id",
+    "bldg",
+    "available_units",
+    "_available_units",
+    "availableunits",
+    "units_available",
+    "available_unit_count",
+    "numberofunits",
+    "availableunitscount",
+    "concession",
+    "concession_text",
+    "concession_value",
+    "concession_source",
+    "specials_description",
+    "amenities",
+    "bed_label",
+    "floor_plan_id",
+    "floor_plan_description",
+    "source_api_url",
+    "extraction_tier",
     # Adapter-set evidence flag consumed by ``classify_area_absence``. Ends
     # in "sqft" so the attribute-token net would otherwise republish it into
     # ``_extra`` as if it were an unmapped square-footage column.
     "_area_surface_publishes_no_sqft",
+    # Internal source-confidence contract and its sanity decision. Both are
+    # surfaced through explicit area_sanity_* fields; never duplicate their
+    # dict payload into the catch-all ``_extra`` column.
+    "_trusted_typed_area",
+    "_sanity_preserved",
+    # Internal publish-ceiling proof consumed at the property boundary.
+    "_verified_plan_only_surface",
+    # Trusted, property-qualified plan grouping key already surfaced through
+    # the canonical floor_plan_id output column.
+    "_canonical_floor_plan_id",
 }
 
 
@@ -1983,19 +2739,13 @@ def _norm_status(val: Any) -> str | None:
     if not s:
         return None
     u = s.upper()
-    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
-             "LEASED", "PENDING", "UNKNOWN"):
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED", "LEASED", "PENDING", "UNKNOWN"):
         return u
     if "PENDING" in u or "APPLICATION" in u:
         return "PENDING"
     if "WAITLIST" in u or "WAIT LIST" in u or "WAIT-LIST" in u:
         return "WAITLIST"
-    if (
-        "NOT AVAILABLE" in u
-        or "UNAVAILABLE" in u
-        or "SOLD OUT" in u
-        or "LEASED OUT" in u
-    ):
+    if "NOT AVAILABLE" in u or "UNAVAILABLE" in u or "SOLD OUT" in u or "LEASED OUT" in u:
         return "UNAVAILABLE"
     if "LEASED" in u or "OCCUPIED" in u:
         return "LEASED"

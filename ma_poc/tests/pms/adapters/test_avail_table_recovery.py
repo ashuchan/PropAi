@@ -15,15 +15,18 @@ The 6 rows are ground truth from the saved fixture: real apartment numbers
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from ma_poc.pms.adapters._avail_table_recovery import (
     parse_mits_ils_fp_data,
+    parse_squarespace_apartment_figures,
     parse_squarespace_unit_blocks,
     recover_avail_table,
 )
+from ma_poc.scripts.runners.jugnu import _format_v2_unit
 
 _FIXDIR = Path(__file__).resolve().parents[2] / "fixtures" / "avail_table"
 
@@ -36,6 +39,11 @@ def jcm_html() -> str:
 @pytest.fixture(scope="module")
 def cricket_html() -> str:
     return (_FIXDIR / "cricket_flats.html").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def landmark_html() -> str:
+    return (_FIXDIR / "squarespace_landmark_figures.html").read_text(encoding="utf-8")
 
 
 class _Ctx:
@@ -136,6 +144,11 @@ class TestSquarespaceUnitBlocks:
         by = {r["unit_number"]: r for r in parse_squarespace_unit_blocks(cricket_html)}
         assert str(by["303"].get("bedrooms")) == "1"  # "One Bedroom plus Den" -> 1
 
+    def test_preserves_visible_availability_tokens(self, cricket_html: str) -> None:
+        by = {r["unit_number"]: r for r in parse_squarespace_unit_blocks(cricket_html)}
+        assert by["303"]["availability_date"] == "Available 9/1"
+        assert by["406"]["availability_date"] == "Available Now"
+
     def test_footer_and_contact_blocks_are_excluded(self, cricket_html: str) -> None:
         # 13 pre-wrap <p> exist; only the 8 that START "Unit N" + carry $rent
         # are units — the address / phone / CTA blocks must not become rows.
@@ -148,3 +161,72 @@ class TestSquarespaceUnitBlocks:
     def test_recover_dispatches_to_squarespace(self, cricket_html: str) -> None:
         rows = asyncio.run(recover_avail_table(_Ctx(cricket_html)))
         assert len(rows) == 8
+
+
+class TestSquarespaceApartmentFigures:
+    """The Landmark: five complete apartments, each bound to one figure."""
+
+    def test_recovers_all_five_figures(self, landmark_html: str) -> None:
+        rows = parse_squarespace_apartment_figures(
+            landmark_html,
+            "https://www.fxmessina.com/the-landmark",
+        )
+        assert {row["unit_number"] for row in rows} == {
+            "203",
+            "212",
+            "218",
+            "304",
+            "317",
+        }
+
+    def test_exact_dimensions_rents_and_no_invented_plan(self, landmark_html: str) -> None:
+        rows = parse_squarespace_apartment_figures(landmark_html)
+        by_unit = {row["unit_number"]: row for row in rows}
+        assert by_unit["203"]["sqft"] == "860"
+        assert by_unit["203"]["market_rent_low"] == 2600
+        assert by_unit["304"]["market_rent_low"] == 2626
+        assert by_unit["317"]["unit_name"] == "Landmark # 317"
+        assert all(row["bedrooms"] == "1" for row in rows)
+        assert all(row["bathrooms"] == "1" for row in rows)
+        assert all(row["floor_plan_name"] == "" for row in rows)
+        assert all("floor_plan_name" in row["data_gaps"] for row in rows)
+
+    def test_visible_date_semantics_survive_to_production_formatter(
+        self,
+        landmark_html: str,
+    ) -> None:
+        capture = datetime(2026, 8, 1, 12, tzinfo=UTC)
+        by_unit = {
+            row["unit_number"]: row
+            for row in parse_squarespace_apartment_figures(landmark_html)
+        }
+        immediate = _format_v2_unit(by_unit["203"], capture, "56903")
+        historical = _format_v2_unit(by_unit["218"], capture, "56903")
+        assert immediate["available_date"] == "2026-08-01"
+        assert immediate["availability_date_provenance"] == "available_now"
+        assert historical["available_date"] == "2026-06-15"
+        assert historical["availability_date_provenance"] == "historical_embedded"
+
+    def test_never_combines_signals_across_figures(self) -> None:
+        html = """
+        <figure class="sqs-block-image-figure">
+          <figcaption class="image-caption-wrapper">
+            <p>Landmark # 999 - One (1) bedroom and one (1) full bathroom.</p>
+            <p>Availability: Immediate</p>
+          </figcaption>
+        </figure>
+        <figure class="sqs-block-image-figure">
+          <figcaption class="image-caption-wrapper">
+            <p>Approx. 900 sq. ft.</p><p>Monthly Rent: $2,500</p>
+          </figcaption>
+        </figure>
+        """
+        assert parse_squarespace_apartment_figures(html) == []
+
+    def test_recover_dispatches_to_figure_surface(self, landmark_html: str) -> None:
+        rows = asyncio.run(
+            recover_avail_table(
+                _Ctx(landmark_html, "https://www.fxmessina.com/the-landmark")
+            )
+        )
+        assert len(rows) == 5

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -116,7 +117,8 @@ def test_parse_oll_workflow_no_units_fallback() -> None:
     }
     units = parse_realpage_oll_workflow(body, "u")
     assert len(units) == 1
-    assert units[0]["unit_number"] == "999"
+    assert units[0]["unit_number"] == ""
+    assert units[0]["source_ids"]["floorplan_id"] == "999"
     assert units[0]["floor_plan_name"] == "Waitlist Studio"
     assert units[0]["bed_label"] == "Studio"
     assert "$1,100" in units[0]["rent_range"]
@@ -144,11 +146,7 @@ def test_parse_oll_workflow_malformed_returns_empty(body: object) -> None:
 
 def test_parse_oll_workflow_ignores_non_apartment_activities() -> None:
     body = {
-        "Workflow": {
-            "ActivityGroups": [
-                {"GroupActivities": [{"__type": "RP.MenuActivity, RP", "Id": "m"}]}
-            ]
-        }
+        "Workflow": {"ActivityGroups": [{"GroupActivities": [{"__type": "RP.MenuActivity, RP", "Id": "m"}]}]}
     }
     assert parse_realpage_oll_workflow(body, "u") == []
 
@@ -220,6 +218,194 @@ async def test_adapter_still_handles_legacy_floorplans() -> None:
     assert len(result.units) == 1
     assert result.units[0]["extraction_tier"] == "TIER_1_API_REALPAGE_OLL"
     assert "$1,400" in result.units[0]["rent_range"]
+
+
+@pytest.mark.asyncio
+async def test_adapter_handles_current_response_units_envelope_and_date() -> None:
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/8648527/units",
+            "body": {
+                "response": {
+                    "units": [
+                        {
+                            "id": 14185870,
+                            "unitNumber": "128",
+                            "rent": 1325,
+                            "squareFeet": 730,
+                            "internalAvailableDate": "2026-09-22 00:00 -0500",
+                        }
+                    ]
+                }
+            },
+        }
+    ]
+    result = await RealPageOllAdapter().extract(  # type: ignore[arg-type]
+        _DummyPage(), _make_ctx(responses)
+    )
+
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "128"
+    assert result.units[0]["availability_date"] == "2026-09-22"
+    assert result.units[0]["extraction_tier"] == "TIER_1_API_REALPAGE_OLL"
+
+
+@pytest.mark.asyncio
+async def test_floorplan_checkpoint_directly_enriches_public_units(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A captured /floorplans response must not hide the public unit roster."""
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/8648527/floorplans",
+            "body": {
+                "response": {
+                    "floorplans": [
+                        {
+                            "id": "FP-A1",
+                            "name": "A1",
+                            "bedRooms": 1,
+                            "minimumSquareFeet": 650,
+                            "minimumMarketRent": 1400,
+                        }
+                    ]
+                }
+            },
+        }
+    ]
+    ctx = _make_ctx(responses)
+    ctx.fetch_result = SimpleNamespace(
+        body=(
+            b'<script>var propertyId = "8648527"; '
+            b'var config = {apiKey: "public-browser-key"};</script>'
+        ),
+        final_url="https://www.plumtreeapt.com/",
+    )
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class _Response:
+        status_code = 200
+        text = json.dumps(
+            {
+                "response": {
+                    "units": [
+                        {
+                            "unitNumber": "128",
+                            "rent": 1325,
+                            "squareFeet": 730,
+                            "internalAvailableDate": "2026-09-22 00:00 -0500",
+                        }
+                    ]
+                }
+            }
+        )
+
+    def _probe(url: str, **kwargs: object) -> _Response:
+        calls.append((url, kwargs))
+        return _Response()
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _probe)
+
+    result = await RealPageOllAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert [unit["unit_number"] for unit in result.units] == ["128"]
+    assert result.units[0]["availability_date"] == "2026-09-22"
+    assert result.winning_url and result.winning_url.endswith(
+        "/8648527/units?available=true&honordisplayorder=true"
+    )
+    assert len(calls) == 1
+    assert calls[0][1]["unlocker"] is False
+    headers = calls[0][1]["headers"]
+    assert isinstance(headers, dict)
+    assert headers["Origin"] == "https://www.plumtreeapt.com"
+    assert headers["Referer"] == "https://www.plumtreeapt.com/"
+
+
+@pytest.mark.asyncio
+async def test_floorplan_checkpoint_is_preserved_when_unit_probe_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/8648527/floorplans",
+            "body": {
+                "response": {
+                    "floorplans": [
+                        {
+                            "id": "FP-A1",
+                            "name": "A1",
+                            "bedRooms": 1,
+                            "minimumSquareFeet": 650,
+                            "minimumMarketRent": 1400,
+                        }
+                    ]
+                }
+            },
+        }
+    ]
+    ctx = _make_ctx(responses)
+    ctx.fetch_result = SimpleNamespace(
+        body=b'propertyId = "8648527"; apiKey: "public-browser-key"',
+        final_url="https://www.plumtreeapt.com/",
+    )
+
+    class _Blocked:
+        status_code = 403
+        text = "blocked"
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda *_args, **_kwargs: _Blocked(),
+    )
+
+    result = await RealPageOllAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert len(result.units) == 1
+    assert result.units[0]["floor_plan_name"] == "A1"
+    assert result.winning_url and result.winning_url.endswith("/floorplans")
+
+
+@pytest.mark.asyncio
+async def test_floorplan_checkpoint_rejects_property_id_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/8648527/floorplans",
+            "body": {
+                "response": {
+                    "floorplans": [
+                        {
+                            "id": "FP-A1",
+                            "name": "A1",
+                            "bedRooms": 1,
+                            "minimumSquareFeet": 650,
+                            "minimumMarketRent": 1400,
+                        }
+                    ]
+                }
+            },
+        }
+    ]
+    ctx = _make_ctx(responses)
+    ctx.fetch_result = SimpleNamespace(
+        body=b'propertyId = "9999999"; apiKey: "other-property-key"',
+        final_url="https://operator.example/property-a/",
+    )
+    called = False
+
+    def _must_not_probe(*_args: object, **_kwargs: object) -> None:
+        nonlocal called
+        called = True
+        raise AssertionError("cross-property credentials must not be used")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _must_not_probe)
+
+    result = await RealPageOllAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert called is False
+    assert len(result.units) == 1
+    assert result.units[0]["floor_plan_name"] == "A1"
 
 
 @pytest.mark.asyncio

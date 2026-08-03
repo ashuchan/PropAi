@@ -1,0 +1,238 @@
+{
+  "capture_timestamp_utc": "2026-08-01T19:19:35.881324+00:00",
+  "purpose": "Fail-closed regression evidence for retired LiveBH property URLs that redirect to cross-property city portfolio landings",
+  "source_sha256": "53601150274be6cba79388ef46c380d972b2a0decb9af4702f5fc581e009164c",
+  "test_sha256": "dc95c188b5ea6574e1333ff190324d840a0607c20758fae1343bbe79a55bde2d",
+  "environment": {
+    "COMPLIANCE_MODE": "1",
+    "ENABLE_TIER4_LLM": "false",
+    "ENABLE_TIER_ESCALATION": "false",
+    "ENABLE_UNLOCKER_TIER": "false",
+    "ENABLE_FLARESOLVERR_TIER": "false",
+    "ENABLE_HYPERBROWSER": "false",
+    "ENABLE_BODY_RESOLVER": "false",
+    "ENABLE_CRAWL_GET_GATE": "false"
+  },
+  "cohort_probe_observation": {
+    "configured_livebh_rows_probed": 32,
+    "property_scoped_controls": 30,
+    "generic_city_redirects_without_configured_identity": 2,
+    "generic_city_redirect_property_ids": [
+      47182,
+      8789
+    ]
+  },
+  "negative_runs": [
+    {
+      "run_index": 1,
+      "property_id": 47182,
+      "property_name": "The Crossings at Bramblewood",
+      "canonical_address": "1401 Yellowpine Cir",
+      "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_body_bytes": 189499,
+      "configured_body_sha256": "3b347e9bf81aaf30f2e8f8ea483dde28f5b02f7d1d79890399b00f83e77af8e5",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "configured_name": "The Crossings at Bramblewood",
+        "configured_address": "1401 Yellowpine Cir",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=refe"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    },
+    {
+      "run_index": 1,
+      "property_id": 8789,
+      "property_name": "Flintridge",
+      "canonical_address": "708 Woodard Way",
+      "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+      "configured_body_bytes": 774465,
+      "configured_body_sha256": "345e2d1e396d5e655e507d2ab8ae982082e3dd18dd808df5b981207fb75eed8d",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+        "final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+        "configured_name": "Flintridge",
+        "configured_address": "708 Woodard Way",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    },
+    {
+      "run_index": 2,
+      "property_id": 47182,
+      "property_name": "The Crossings at Bramblewood",
+      "canonical_address": "1401 Yellowpine Cir",
+      "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_body_bytes": 189499,
+      "configured_body_sha256": "3b347e9bf81aaf30f2e8f8ea483dde28f5b02f7d1d79890399b00f83e77af8e5",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "configured_name": "The Crossings at Bramblewood",
+        "configured_address": "1401 Yellowpine Cir",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=refe"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    },
+    {
+      "run_index": 2,
+      "property_id": 8789,
+      "property_name": "Flintridge",
+      "canonical_address": "708 Woodard Way",
+      "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+      "configured_body_bytes": 774465,
+      "configured_body_sha256": "4f262ed523fa3af7814d8236460f4b3f8405e7abffd37471111656cfbd51c156",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+        "final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+        "configured_name": "Flintridge",
+        "configured_address": "708 Woodard Way",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    },
+    {
+      "run_index": 3,
+      "property_id": 47182,
+      "property_name": "The Crossings at Bramblewood",
+      "canonical_address": "1401 Yellowpine Cir",
+      "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_body_bytes": 189499,
+      "configured_body_sha256": "9863859d6c845ecfa583ace3aa83bcd82650776735ac6bfcf49845fc9bdc5fea",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "final_url": "https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+        "configured_name": "The Crossings at Bramblewood",
+        "configured_address": "1401 Yellowpine Cir",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/richmond-va/?utm_source=dispo&utm_medium=redirect&utm_campaign=the-crossings-at-bramblewood?utm_source=realpage&utm_medium=refe"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    },
+    {
+      "run_index": 3,
+      "property_id": 8789,
+      "property_name": "Flintridge",
+      "canonical_address": "708 Woodard Way",
+      "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+      "configured_body_bytes": 774465,
+      "configured_body_sha256": "345e2d1e396d5e655e507d2ab8ae982082e3dd18dd808df5b981207fb75eed8d",
+      "output_units": 0,
+      "output_plans": 0,
+      "tier": "generic:portfolio_redirect_identity_rejected",
+      "guard": {
+        "provider": "livebh",
+        "configured_url": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+        "final_url": "https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes",
+        "configured_name": "Flintridge",
+        "configured_address": "708 Woodard Way",
+        "adapters_skipped": true,
+        "link_hop_skipped": true
+      },
+      "partial_state": {},
+      "errors": [
+        "PORTFOLIO_REDIRECT_IDENTITY_REJECTED: configured LiveBH property redirected to identity-mismatched city landing https://livebh.com/apartments-in/arlington-tx/?utm_source=dispo&utm_medium=redirect&utm_campaign=flintridgeapartmenthomes"
+      ],
+      "extract_result_records": 0,
+      "strict_pass": true
+    }
+  ],
+  "active_property_controls": [
+    {
+      "property_id": 2190,
+      "property_name": "Marisol Vista",
+      "canonical_address": "1280 102nd Ave N",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments/marisol-vista-apartment-homes/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_body_sha256": "ebe4ca2c82e0742dc00511a92b8fa6d2d6aff1f65348f7fde309647e6a48c230",
+      "identity_guard_rejected": false,
+      "strict_pass": true
+    },
+    {
+      "property_id": 8740,
+      "property_name": "Parc Plaza",
+      "canonical_address": "333 E Denton Dr",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments/parc-plaza-apartments/",
+      "configured_body_sha256": "a4550271cf3b9073d9a3ef0cdb0c790d5534740178ca9501d0e00e21593952c6",
+      "identity_guard_rejected": false,
+      "strict_pass": true
+    },
+    {
+      "property_id": 9480,
+      "property_name": "Huntington Meadows",
+      "canonical_address": "2311 Stratton Ln",
+      "configured_status": 200,
+      "configured_final_url": "https://livebh.com/apartments/huntington-meadows-apartment-homes/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "configured_body_sha256": "31a0ce65219f175f0183cc5f0c52974b0fc49fde3ce00277df13b109da888ffb",
+      "identity_guard_rejected": false,
+      "strict_pass": true
+    }
+  ],
+  "strict_pass": true,
+  "admission": {
+    "strict_ledger_count_delta": 0,
+    "reason": "identity negatives; prevents sibling inventory contamination but does not recover the retired configured properties"
+  }
+}

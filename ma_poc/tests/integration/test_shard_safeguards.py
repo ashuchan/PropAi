@@ -78,7 +78,9 @@ def test_fix1_jugnu_timeout_handler_emits_failed_record() -> None:
     surface as 'Property X crashed' (indistinguishable from real crashes)."""
     src = _JUGNU.read_text(encoding="utf-8")
     # The dedicated except block exists.
-    assert "except (TimeoutError, asyncio.TimeoutError)" in src
+    # Python 3.11 aliases ``asyncio.TimeoutError`` to the built-in; keep the
+    # non-redundant spelling required by Ruff's UP041 rule.
+    assert "except TimeoutError" in src
     # And produces a _make_failed_record with the timeout-reason convention.
     assert "per_property_timeout:" in src
     assert "_make_failed_record" in src
@@ -100,10 +102,10 @@ def test_fix1_per_property_timeout_env_override() -> None:
     """Allow ops to dial it via PER_PROPERTY_TIMEOUT_SECONDS without a
     code change. The resolver must reject malformed/non-positive values
     and fall back to the safe default rather than hard-failing import."""
-    from ma_poc.scripts.runners.jugnu import _resolve_per_property_timeout
-
     # Bogus values must NOT crash startup — they fall back to the default.
     import os
+
+    from ma_poc.scripts.runners.jugnu import _resolve_per_property_timeout
 
     saved = os.environ.get("PER_PROPERTY_TIMEOUT_SECONDS")
     try:

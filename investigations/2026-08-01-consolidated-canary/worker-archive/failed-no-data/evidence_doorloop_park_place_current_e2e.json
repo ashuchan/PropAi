@@ -1,0 +1,130 @@
+{
+  "strict_outcome": "UNIT_QUALIFIED",
+  "property_id": 254556,
+  "property_name": "Park Place",
+  "website": "https://www.parkplacegreenville.com/",
+  "rp_oracle_native_unit_rows": 5,
+  "current_native_unit_rows": 9,
+  "native_unit_rows_with_positive_rent": 9,
+  "distinct_native_listing_ids": 9,
+  "distinct_native_unit_numbers": 9,
+  "property_boundary": {
+    "verdict": "exact_property_match",
+    "configured_address": "305 W Jack Finney Blvd, Greenville, TX 75402",
+    "observed_addresses": [
+      "305 W Jack Finney Blvd., Greenville, TX 75402"
+    ],
+    "published_portal_url": "https://parkplace.app.doorloop.com/tenant-portal/rental-applications/listing?companyId=65f8a0d0390bcd90dba4e93f&source=CompanyLink",
+    "source_endpoint": "https://parkplace.app.doorloop.com/api/units/listings/mits/json/65f8a0d0390bcd90dba4e93f/1?partnerKey=doorLoopListingSites&subdomain=parkplace&filter_rentalAppListed=true&filter_showPropertyList=false",
+    "contamination_rows": 0
+  },
+  "source_endpoint": "https://parkplace.app.doorloop.com/api/units/listings/mits/json/65f8a0d0390bcd90dba4e93f/1?partnerKey=doorLoopListingSites&subdomain=parkplace&filter_rentalAppListed=true&filter_showPropertyList=false",
+  "source_portal_url": "https://parkplace.app.doorloop.com/tenant-portal/rental-applications/listing?companyId=65f8a0d0390bcd90dba4e93f&source=CompanyLink",
+  "adapter": "wix_nopms",
+  "tier": "TIER_1_API_DOORLOOP_MITS",
+  "local_adapter_e2e_passed": true,
+  "llm_enabled": false,
+  "captcha_solving": false,
+  "paid_canary_run": false,
+  "units": [
+    {
+      "unit_number": "A2",
+      "native_unit_id": "65fb3288fac79949cd8a4212",
+      "native_property_id": "65fb3287fac79949cd8a411b",
+      "rent": 1525,
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1114",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "C6",
+      "native_unit_id": "65fb328afac79949cd8a454a",
+      "native_property_id": "65fb3289fac79949cd8a4470",
+      "rent": 1475,
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1114",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "C7",
+      "native_unit_id": "65fb328afac79949cd8a455b",
+      "native_property_id": "65fb3289fac79949cd8a4470",
+      "rent": 1475,
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1114",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "C8",
+      "native_unit_id": "65fb328afac79949cd8a456c",
+      "native_property_id": "65fb3289fac79949cd8a4470",
+      "rent": 1275,
+      "bedrooms": "1",
+      "bathrooms": "1",
+      "sqft": "782",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "R5",
+      "native_unit_id": "65fb328dfac79949cd8a4706",
+      "native_property_id": "65fb328dfac79949cd8a469c",
+      "rent": 1595,
+      "bedrooms": "3",
+      "bathrooms": "2",
+      "sqft": "1302",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "S3",
+      "native_unit_id": "65fb328efac79949cd8a483b",
+      "native_property_id": "65fb328efac79949cd8a4749",
+      "rent": 1525,
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1114",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "S4",
+      "native_unit_id": "65fb328efac79949cd8a484c",
+      "native_property_id": "65fb328efac79949cd8a4749",
+      "rent": 1595,
+      "bedrooms": "3",
+      "bathrooms": "2",
+      "sqft": "1302",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "S6",
+      "native_unit_id": "65fb328efac79949cd8a486e",
+      "native_property_id": "65fb328efac79949cd8a4749",
+      "rent": 1475,
+      "bedrooms": "2",
+      "bathrooms": "2",
+      "sqft": "1114",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    },
+    {
+      "unit_number": "S8",
+      "native_unit_id": "65fb328ffac79949cd8a4890",
+      "native_property_id": "65fb328efac79949cd8a4749",
+      "rent": 1595,
+      "bedrooms": "3",
+      "bathrooms": "2",
+      "sqft": "1302",
+      "availability_date": "2026-08-01",
+      "source_property_address": "305 W Jack Finney Blvd., Greenville, TX 75402"
+    }
+  ]
+}

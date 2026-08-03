@@ -1,0 +1,131 @@
+{
+  "batch_label": "unknown-entrata3-tight",
+  "filters": {
+    "evidence_lane": "entrata_exact_property_e2e",
+    "ledger_level": "unknown",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "entrata",
+      "batch_label": "unknown-entrata3-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.avanacourt.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 9,
+      "property_id": 3169,
+      "property_identity_match": false,
+      "property_name": "Avana Court",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "One Bedroom One Bath (610 SF)",
+        "One Bedroom One Bath (720 SF)",
+        "Studio (550 SF)",
+        "Two Bedroom One Bath (1130 SF)",
+        "Two Bedroom One Bath with Den (1245 SF)",
+        "Two Bedroom Two Bath (1250 SF)",
+        "Two Bedroom Two Bath (1300 SF)",
+        "Two Bedroom Two Bath with Den (1300 SF)"
+      ],
+      "tier": "TIER_1_DOM_ENTRATA_PP_SSR",
+      "units": 0,
+      "website": "https://www.avanacourt.com/"
+    },
+    {
+      "adapter": "entrata",
+      "batch_label": "unknown-entrata3-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.tesotamorningside.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 6,
+      "property_id": 7980,
+      "property_identity_match": false,
+      "property_name": "Tesota Morningside",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "A1A",
+        "A1AR",
+        "B2A",
+        "B2AR",
+        "B2B",
+        "B2BR"
+      ],
+      "tier": "TIER_1_DOM_ENTRATA_PP_SSR",
+      "units": 0,
+      "website": "https://www.tesotamorningside.com/"
+    },
+    {
+      "adapter": "entrata",
+      "batch_label": "unknown-entrata3-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.whitefurniturelofts.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 51,
+      "property_id": 64545,
+      "property_identity_match": false,
+      "property_name": "The Lofts at White Furniture",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "A11",
+        "A15",
+        "A16a",
+        "A16ab",
+        "A16b",
+        "A19",
+        "A19a",
+        "A2"
+      ],
+      "tier": "TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL",
+      "units": 0,
+      "website": "https://www.whitefurniturelofts.com/"
+    }
+  ]
+}

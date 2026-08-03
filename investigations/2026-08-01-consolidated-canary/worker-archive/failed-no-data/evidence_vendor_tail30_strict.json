@@ -1,0 +1,3412 @@
+{
+  "audit": "FAILED_NO_DATA deterministic residual vendor-tail strict unit audit",
+  "generated_at_utc": "2026-08-01T07:31:16.727678+00:00",
+  "cohort": {
+    "source": "/private/tmp/propai-fnd-vBkmT9/failed344_input.csv",
+    "exact_target_count": 30,
+    "target_property_ids": [
+      2282,
+      6274,
+      8119,
+      8654,
+      8740,
+      8789,
+      11089,
+      12586,
+      17984,
+      18389,
+      25489,
+      32097,
+      37798,
+      43995,
+      47182,
+      48946,
+      60141,
+      61459,
+      63191,
+      68497,
+      68956,
+      72766,
+      218177,
+      218378,
+      220109,
+      230598,
+      234945,
+      270672,
+      273790,
+      273828
+    ]
+  },
+  "strict_rule": "Count only property-scoped native unit identities with positive numeric rent and exact property-boundary evidence. Plans, synthetic IDs, sibling/corporate inventory, CAPTCHA-derived evidence, and non-positive rents are excluded.",
+  "guardrails": {
+    "source_edits": false,
+    "paid_canary": false,
+    "captcha_solving": false,
+    "hyperbrowser_calls": {
+      "63191": 1,
+      "43995": 1,
+      "8119": 2
+    },
+    "hyperbrowser_solve_captchas": false
+  },
+  "summary": {
+    "qualifying_properties": 15,
+    "excluded_properties": 15,
+    "strict_native_priced_units": 256,
+    "qualifier_rate_within_lane": 0.5,
+    "exclusion_reason_counts": {
+      "exact_current_adapter_no_native_inventory": 6,
+      "exact_provider_empty": 1,
+      "inactive_dead_property_surface": 1,
+      "native_roster_no_positive_rent": 1,
+      "plan_only_no_native_unit": 3,
+      "removed_or_redirected_property_surface": 3
+    }
+  },
+  "deduplication": {
+    "frozen_strict99_qualifier_overlap": [],
+    "current_live_ledger_qualifier_overlap": [
+      2282,
+      6274,
+      11089,
+      12586,
+      17984,
+      18389,
+      37798,
+      72766,
+      218177,
+      220109,
+      230598,
+      270672,
+      273790,
+      273828
+    ],
+    "current_live_ledger_overlap_units": 249,
+    "net_new_vs_current_live_ledger_property_ids": [
+      8119
+    ],
+    "net_new_vs_current_live_ledger_properties": 1,
+    "net_new_vs_current_live_ledger_native_priced_units": 7,
+    "note": "Computed against strict_recovery_ledger_current.csv at materialization time; merge only the net-new CSV to avoid double counting."
+  },
+  "qualifying_results": [
+    {
+      "property_id": 2282,
+      "property_name": "City View",
+      "address": "25200 Carlos Bee Blvd",
+      "city": "Hayward",
+      "state": "CA",
+      "zip": "94542",
+      "website": "https://www.essexapartmenthomes.com/california/san-francisco-bay-area-apartments/hayward-apartments/city-view",
+      "cohort_adapter": "essex",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_same_host_essex_property_api",
+      "native_priced_unit_count": 18,
+      "distinct_native_unit_count": 18,
+      "native_unit_ids": [
+        "484",
+        "238"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "484",
+          "floor_plan_name": "Plan 1D",
+          "market_rent_low": 2377,
+          "market_rent_high": 9129,
+          "availability_date": "2026-06-26",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/492967/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        },
+        {
+          "unit_number": "238",
+          "floor_plan_name": "Plan 1D",
+          "market_rent_low": 2329,
+          "market_rent_high": 9049,
+          "availability_date": "2026-09-03",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/492967/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        }
+      ],
+      "unit_rows_complete": false,
+      "unit_row_persistence_note": "Adapter replay persisted aggregate count and two native samples; exact API re-fetch later returned HTTP 429. No count is inferred from the samples.",
+      "source_urls": [
+        "https://www.essexapartmenthomes.com/api/properties/492967/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_api_id_in_url": true,
+        "same_host_as_target": true,
+        "native_identity_rows": 18,
+        "native_positive_rent_rows": 18
+      },
+      "contamination_verdict": "pass_exact_same_host_property_api_no_sibling_roster"
+    },
+    {
+      "property_id": 6274,
+      "property_name": "The Village at Voorhees",
+      "address": "10 Lucas Ln",
+      "city": "Voorhees Township",
+      "state": "NJ",
+      "zip": "08043",
+      "website": "https://www.fmgnj.com/apartments/nj/voorhees/the-village-apartments/",
+      "cohort_adapter": "g5",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_g5_page_embedded_realpage_oll",
+      "native_priced_unit_count": 32,
+      "distinct_native_unit_count": 32,
+      "native_unit_ids": [
+        "575",
+        "40",
+        "183",
+        "12",
+        "243",
+        "250",
+        "153",
+        "259",
+        "140",
+        "149",
+        "215",
+        "819",
+        "593",
+        "715",
+        "677",
+        "710",
+        "741",
+        "214",
+        "73",
+        "145",
+        "577",
+        "552",
+        "659",
+        "647",
+        "646",
+        "500",
+        "311",
+        "278",
+        "279",
+        "126",
+        "131",
+        "237"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "575",
+          "floor_plan_name": "Studio Balcony/Patio",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "484",
+          "market_rent_low": 1510,
+          "market_rent_high": 1760,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "40",
+          "floor_plan_name": "Studio Garden Window",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "484",
+          "market_rent_low": 1505,
+          "market_rent_high": 1900,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "183",
+          "floor_plan_name": "Studio Garden Window",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "484",
+          "market_rent_low": 1505,
+          "market_rent_high": 1900,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "12",
+          "floor_plan_name": "Studio Garden Window",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "484",
+          "market_rent_low": 1505,
+          "market_rent_high": 1900,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "243",
+          "floor_plan_name": "1 BD 1 BA Accessible",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1710,
+          "market_rent_high": 1960,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "250",
+          "floor_plan_name": "1 BD 1 BA Garden Window FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1700,
+          "market_rent_high": 1965,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "153",
+          "floor_plan_name": "1 BD 1 BA Garden Window FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1700,
+          "market_rent_high": 1965,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "259",
+          "floor_plan_name": "1 BD 1 BA Garden Window FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1700,
+          "market_rent_high": 1965,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "140",
+          "floor_plan_name": "1 BD 1 BA Garden Window",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1715,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "149",
+          "floor_plan_name": "1 BD 1 BA Garden Window",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1715,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "215",
+          "floor_plan_name": "1 BD 1 BA Garden Window",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1715,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "819",
+          "floor_plan_name": "1 BD 1 BA BreakBar Bal FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "593",
+          "floor_plan_name": "1 BD 1 BA BreakBar Bal FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "715",
+          "floor_plan_name": "1 BD 1 BA BreakBar Bal FP",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 2055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "677",
+          "floor_plan_name": "1 BD 1 BA BreakBar Balcony",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 1955,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "710",
+          "floor_plan_name": "1 BD 1 BA BreakBar Balcony",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 1955,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "741",
+          "floor_plan_name": "1 BD 1 BA BreakBar Balcony",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1705,
+          "market_rent_high": 1955,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "214",
+          "floor_plan_name": "1 BD 1 BA Balcony/Patio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1710,
+          "market_rent_high": 1960,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "73",
+          "floor_plan_name": "1 BD 1 BA Balcony/Patio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1710,
+          "market_rent_high": 1960,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "145",
+          "floor_plan_name": "1 BD 1 BA Balcony/Patio",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "638",
+          "market_rent_low": 1710,
+          "market_rent_high": 1960,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "577",
+          "floor_plan_name": "2 BD 1 BA Balcony/Patio",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1920,
+          "market_rent_high": 2225,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "552",
+          "floor_plan_name": "2 BD 1 BA Balcony/Patio",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1920,
+          "market_rent_high": 2225,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "659",
+          "floor_plan_name": "2 BD 1 BA Balcony/Patio",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1920,
+          "market_rent_high": 2225,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "647",
+          "floor_plan_name": "2 BD 1 BA BreakBar FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1960,
+          "market_rent_high": 2250,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "646",
+          "floor_plan_name": "2 BD 1 BA BreakBar FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1960,
+          "market_rent_high": 2250,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "500",
+          "floor_plan_name": "2 BD 1 BA BreakBar FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1960,
+          "market_rent_high": 2250,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "311",
+          "floor_plan_name": "2 BR 1 BA Accessible",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1965,
+          "market_rent_high": 2340,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "278",
+          "floor_plan_name": "2 BR 1 BA Accessible",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1965,
+          "market_rent_high": 2340,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "279",
+          "floor_plan_name": "2 BR 1 BA Accessible",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1965,
+          "market_rent_high": 2340,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "126",
+          "floor_plan_name": "2 BD 1 BA BreakBar GW FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1975,
+          "market_rent_high": 2240,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "131",
+          "floor_plan_name": "2 BD 1 BA BreakBar GW FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1975,
+          "market_rent_high": 2240,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "237",
+          "floor_plan_name": "2 BD 1 BA BreakBar GW FP",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "832",
+          "market_rent_low": 1975,
+          "market_rent_high": 2240,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.fmgnj.com/apartments/nj/voorhees/the-village-apartments/floor-plans-apply",
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1043860/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=d4c71288-bab3-4987-84e1-d9865f206e06"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_onesite_6274_direct.json",
+        "/private/tmp/vendor_tail_6274_workflow.json"
+      ],
+      "property_boundary_evidence": {
+        "page_config_realpageId": "1043860",
+        "workflow_site_id": "1043860",
+        "workflow_pmc_id": "1050146",
+        "marketing_page_name_address_exact": true,
+        "site_id_match": true
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 8119,
+      "property_name": "St. Andrews of Palm Aire",
+      "address": "1000 SW 46th Ave",
+      "city": "Pompano Beach",
+      "state": "FL",
+      "zip": "33069",
+      "website": "https://www.scullycompany.com/apartments/florida/broward-county/pompano-beach/st-andrews-palm-aire/",
+      "cohort_adapter": "sightmap",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_entrata_detail_pages_one_hyperbrowser_session",
+      "native_priced_unit_count": 7,
+      "distinct_native_unit_count": 7,
+      "native_unit_ids": [
+        "2716",
+        "2623",
+        "2660",
+        "2625",
+        "2576",
+        "2644",
+        "2526"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "2716",
+          "unit_name": "107",
+          "floor_plan_name": "Ardennes",
+          "sqft": 766,
+          "market_rent_low": 1835,
+          "market_rent_high": 1835,
+          "availability_date": "08/03/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1521.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1521",
+            "entrata_unit_space_id": "2716"
+          }
+        },
+        {
+          "unit_number": "2623",
+          "unit_name": "304",
+          "floor_plan_name": "Bordeaux",
+          "sqft": 764,
+          "market_rent_low": 1860,
+          "market_rent_high": 1860,
+          "availability_date": "08/03/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1522.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1522",
+            "entrata_unit_space_id": "2623"
+          }
+        },
+        {
+          "unit_number": "2660",
+          "unit_name": "203",
+          "floor_plan_name": "Bordeaux",
+          "sqft": 764,
+          "market_rent_low": 1975,
+          "market_rent_high": 1975,
+          "availability_date": "08/03/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1522.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1522",
+            "entrata_unit_space_id": "2660"
+          }
+        },
+        {
+          "unit_number": "2625",
+          "unit_name": "306",
+          "floor_plan_name": "Bordeaux",
+          "sqft": 764,
+          "market_rent_low": 2025,
+          "market_rent_high": 2025,
+          "availability_date": "08/03/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1522.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1522",
+            "entrata_unit_space_id": "2625"
+          }
+        },
+        {
+          "unit_number": "2576",
+          "unit_name": "103",
+          "floor_plan_name": "Bordeaux",
+          "sqft": 764,
+          "market_rent_low": 2005,
+          "market_rent_high": 2005,
+          "availability_date": "08/24/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1522.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1522",
+            "entrata_unit_space_id": "2576"
+          }
+        },
+        {
+          "unit_number": "2644",
+          "unit_name": "305",
+          "floor_plan_name": "Cannes",
+          "sqft": 970,
+          "market_rent_low": 2325,
+          "market_rent_high": 2325,
+          "availability_date": "08/03/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1520.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1520",
+            "entrata_unit_space_id": "2644"
+          }
+        },
+        {
+          "unit_number": "2526",
+          "unit_name": "105",
+          "floor_plan_name": "Cannes",
+          "sqft": 970,
+          "market_rent_low": 2320,
+          "market_rent_high": 2320,
+          "availability_date": "10/04/2026",
+          "source_api_url": "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1520.html",
+          "source_ids": {
+            "entrata_property_id": "100002888",
+            "entrata_floorplan_id": "1520",
+            "entrata_unit_space_id": "2526"
+          }
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://standrews.scullycompany.com/Apartments/module/property_floorplans/property%5Bid%5D/100002888/"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_detail3_one_session.json",
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1521.html",
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1522.html",
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_8119_plan_1520.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_host_title": true,
+        "entrata_property_id": "100002888",
+        "all_rows_repeat_exact_property_id": true,
+        "exact_floorplan_ids_probed": [
+          "1521",
+          "1522",
+          "1520"
+        ],
+        "unprobed_floorplans_not_counted": [
+          "1519",
+          "1518"
+        ],
+        "hyperbrowser_sessions": 1,
+        "solve_captchas": false,
+        "use_stealth": false
+      },
+      "contamination_verdict": "pass_exact_property_id_on_every_native_unit_row_no_sibling_inventory"
+    },
+    {
+      "property_id": 11089,
+      "property_name": "Village Green of Bear Creek",
+      "address": "1800 Fuller Wiser Rd",
+      "city": "Euless",
+      "state": "TX",
+      "zip": "76039",
+      "website": "http://www.villagegreenofbearcreekapts.com/home/",
+      "cohort_adapter": "resman",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_resman_availability_portal",
+      "native_priced_unit_count": 20,
+      "distinct_native_unit_count": 20,
+      "native_unit_ids": [
+        "1232",
+        "1517",
+        "1401",
+        "1508",
+        "0608",
+        "0620",
+        "1418",
+        "1519",
+        "0309",
+        "0317",
+        "0320",
+        "0324",
+        "0805",
+        "0905",
+        "0811",
+        "0908",
+        "1013",
+        "0713",
+        "0903",
+        "1107"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "1232",
+          "floor_plan_name": "VGA A1s 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "697",
+          "market_rent_low": 1050,
+          "market_rent_high": 1050,
+          "availability_date": "2026-07-01",
+          "available_date": "2026-07-01",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1517",
+          "floor_plan_name": "VGA A1s 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "697",
+          "market_rent_low": 960,
+          "market_rent_high": 960,
+          "availability_date": "2026-08-07",
+          "available_date": "2026-08-07",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1401",
+          "floor_plan_name": "VGA A1 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "597",
+          "market_rent_low": 975,
+          "market_rent_high": 975,
+          "availability_date": "2026-05-21",
+          "available_date": "2026-05-21",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1508",
+          "floor_plan_name": "VGA A1 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "597",
+          "market_rent_low": 985,
+          "market_rent_high": 985,
+          "availability_date": "2026-05-31",
+          "available_date": "2026-05-31",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0608",
+          "floor_plan_name": "VGA A3 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "735",
+          "market_rent_low": 1000,
+          "market_rent_high": 1000,
+          "availability_date": "2026-07-18",
+          "available_date": "2026-07-18",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0620",
+          "floor_plan_name": "VGA A3 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "735",
+          "market_rent_low": 1000,
+          "market_rent_high": 1000,
+          "availability_date": "2026-05-31",
+          "available_date": "2026-05-31",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1418",
+          "floor_plan_name": "VGA A3s 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "832",
+          "market_rent_low": 1025,
+          "market_rent_high": 1025,
+          "availability_date": "2026-05-31",
+          "available_date": "2026-05-31",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1519",
+          "floor_plan_name": "VGA A3s 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "832",
+          "market_rent_low": 1035,
+          "market_rent_high": 1035,
+          "availability_date": "2026-05-16",
+          "available_date": "2026-05-16",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0309",
+          "floor_plan_name": "VGA A2 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "722",
+          "market_rent_low": 1150,
+          "market_rent_high": 1150,
+          "availability_date": "2026-07-13",
+          "available_date": "2026-07-13",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0317",
+          "floor_plan_name": "VGA A2 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "722",
+          "market_rent_low": 1350,
+          "market_rent_high": 1350,
+          "availability_date": "2026-05-31",
+          "available_date": "2026-05-31",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0320",
+          "floor_plan_name": "VGA A4 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "836",
+          "market_rent_low": 1225,
+          "market_rent_high": 1225,
+          "availability_date": "2026-06-15",
+          "available_date": "2026-06-15",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0324",
+          "floor_plan_name": "VGA A4 1 Bed 1 Bath",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "836",
+          "market_rent_low": 1375,
+          "market_rent_high": 1375,
+          "availability_date": "2026-06-05",
+          "available_date": "2026-06-05",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0805",
+          "floor_plan_name": "VGA B1 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "935",
+          "market_rent_low": 1225,
+          "market_rent_high": 1225,
+          "availability_date": "2026-06-07",
+          "available_date": "2026-06-07",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0905",
+          "floor_plan_name": "VGA B1 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "935",
+          "market_rent_low": 1275,
+          "market_rent_high": 1275,
+          "availability_date": "2026-08-07",
+          "available_date": "2026-08-07",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0811",
+          "floor_plan_name": "VGA B1s 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1018",
+          "market_rent_low": 1400,
+          "market_rent_high": 1400,
+          "availability_date": "2026-05-24",
+          "available_date": "2026-05-24",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0908",
+          "floor_plan_name": "VGA B1s 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1018",
+          "market_rent_low": 1400,
+          "market_rent_high": 1400,
+          "availability_date": "2026-06-18",
+          "available_date": "2026-06-18",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1013",
+          "floor_plan_name": "VGA B2s 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1102",
+          "market_rent_low": 1400,
+          "market_rent_high": 1400,
+          "availability_date": "2026-07-26",
+          "available_date": "2026-07-26",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0713",
+          "floor_plan_name": "VGA B2s 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1102",
+          "market_rent_low": 1350,
+          "market_rent_high": 1350,
+          "availability_date": "2026-09-06",
+          "available_date": "2026-09-06",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "0903",
+          "floor_plan_name": "VGA B2 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1001",
+          "market_rent_low": 1375,
+          "market_rent_high": 1375,
+          "availability_date": "2026-06-17",
+          "available_date": "2026-06-17",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1107",
+          "floor_plan_name": "VGA B2 2 Beds 2 Baths",
+          "bedrooms": "2",
+          "bathrooms": "2.0",
+          "sqft": "1001",
+          "market_rent_low": 1385,
+          "market_rent_high": 1385,
+          "availability_date": "2026-05-25",
+          "available_date": "2026-05-25",
+          "source_api_url": "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://livenjoy.myresman.com/Portal/Applicants/Availability?a=1588&p=844aaf4f-ea66-4db0-9289-f5297ce3b3de"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_11089_portal.html",
+        "/private/tmp/vendor_tail_11089_floor.html",
+        "/private/tmp/vendor_tail_11089_new.html"
+      ],
+      "property_boundary_evidence": {
+        "portal_property_guid": "844aaf4f-ea66-4db0-9289-f5297ce3b3de",
+        "account_id": "1588",
+        "registration_name_address_match": "Village Green of Bear Creek, 1800 Fuller Wiser Rd, Euless TX 76039"
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 12586,
+      "property_name": "Avondale at Warner Center",
+      "address": "22222 Victory Blvd",
+      "city": "Woodland Hills",
+      "state": "CA",
+      "zip": "91367",
+      "website": "https://www.essexapartmenthomes.com/apartments/woodland-hills/avondale-at-warner-center",
+      "cohort_adapter": "essex",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_same_host_essex_property_api",
+      "native_priced_unit_count": 18,
+      "distinct_native_unit_count": 18,
+      "native_unit_ids": [
+        "B204",
+        "E118"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "B204",
+          "floor_plan_name": "Oak",
+          "market_rent_low": 1837,
+          "market_rent_high": 8287,
+          "availability_date": "2026-09-23",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/514264/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        },
+        {
+          "unit_number": "E118",
+          "floor_plan_name": "Sycamore",
+          "market_rent_low": 1967,
+          "market_rent_high": 8399,
+          "availability_date": "2026-05-08",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/514264/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        }
+      ],
+      "unit_rows_complete": false,
+      "unit_row_persistence_note": "Adapter replay persisted aggregate count and two native samples; exact API re-fetch later returned HTTP 429. No count is inferred from the samples.",
+      "source_urls": [
+        "https://www.essexapartmenthomes.com/api/properties/514264/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_api_id_in_url": true,
+        "same_host_as_target": true,
+        "native_identity_rows": 18,
+        "native_positive_rent_rows": 18
+      },
+      "contamination_verdict": "pass_exact_same_host_property_api_no_sibling_roster"
+    },
+    {
+      "property_id": 17984,
+      "property_name": "Alessio",
+      "address": "5700 W Centinela Ave",
+      "city": "Los Angeles",
+      "state": "CA",
+      "zip": "90045",
+      "website": "https://www.essexapartmenthomes.com/apartments/los-angeles/alessio",
+      "cohort_adapter": "essex",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_same_host_essex_property_api",
+      "native_priced_unit_count": 21,
+      "distinct_native_unit_count": 21,
+      "native_unit_ids": [
+        "2104",
+        "5102"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "2104",
+          "floor_plan_name": "Trapani",
+          "market_rent_low": 2467,
+          "market_rent_high": 9529,
+          "availability_date": "2026-05-21",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/510882/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        },
+        {
+          "unit_number": "5102",
+          "floor_plan_name": "Trapani",
+          "market_rent_low": 2569,
+          "market_rent_high": 9649,
+          "availability_date": "2026-06-26",
+          "source_api_url": "https://www.essexapartmenthomes.com/api/properties/510882/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+        }
+      ],
+      "unit_rows_complete": false,
+      "unit_row_persistence_note": "Adapter replay persisted aggregate count and two native samples; exact API re-fetch later returned HTTP 429. No count is inferred from the samples.",
+      "source_urls": [
+        "https://www.essexapartmenthomes.com/api/properties/510882/availability?start_date=2026-08-01&end_date=2026-09-30&format=spa"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_api_id_in_url": true,
+        "same_host_as_target": true,
+        "native_identity_rows": 21,
+        "native_positive_rent_rows": 21
+      },
+      "contamination_verdict": "pass_exact_same_host_property_api_no_sibling_roster"
+    },
+    {
+      "property_id": 18389,
+      "property_name": "Westgate Village",
+      "address": "333 Lancaster Ave",
+      "city": "Malvern",
+      "state": "PA",
+      "zip": "19355",
+      "website": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/",
+      "cohort_adapter": "g5",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_g5_page_embedded_realpage_oll",
+      "native_priced_unit_count": 6,
+      "distinct_native_unit_count": 6,
+      "native_unit_ids": [
+        "93",
+        "16",
+        "44",
+        "108",
+        "31",
+        "230"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "93",
+          "floor_plan_name": "The Malvern 1st Floor",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "850",
+          "market_rent_low": 1815,
+          "market_rent_high": 2115,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "16",
+          "floor_plan_name": "The Malvern 1st Floor",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "850",
+          "market_rent_low": 1815,
+          "market_rent_high": 2115,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "44",
+          "floor_plan_name": "The Malvern 1st Floor",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "850",
+          "market_rent_low": 1815,
+          "market_rent_high": 2115,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "108",
+          "floor_plan_name": "The Charlestown 2nd Fl w/Den",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "914",
+          "market_rent_low": 1940,
+          "market_rent_high": 2240,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "31",
+          "floor_plan_name": "The Charlestown 2nd Fl w/Den",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "914",
+          "market_rent_low": 1940,
+          "market_rent_high": 2240,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "230",
+          "floor_plan_name": "The Brandywine Townhome",
+          "bedrooms": "3",
+          "bathrooms": "2.5",
+          "sqft": "1500",
+          "market_rent_low": 3055,
+          "market_rent_high": 3055,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/floor-plans",
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1046799/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f6d24788-5a4a-5253-aa69-6450ebaff17f"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_g5_browser3.json",
+        "/private/tmp/vendor_tail_18389_g5_rendered.html"
+      ],
+      "property_boundary_evidence": {
+        "marketing_page_name_address_exact": true,
+        "page_config_realpage_id": "1046799",
+        "workflow_site_id": "1046799",
+        "site_id_match": true
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 37798,
+      "property_name": "Covington Place",
+      "address": "1247 Covington Manor Ln",
+      "city": "St Louis",
+      "state": "MO",
+      "zip": "63125",
+      "website": "http://www.covingtonplace.com/",
+      "cohort_adapter": "resman",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_resman_availability_portal",
+      "native_priced_unit_count": 12,
+      "distinct_native_unit_count": 12,
+      "native_unit_ids": [
+        "121802",
+        "127102",
+        "365507",
+        "120108",
+        "125108",
+        "374610",
+        "1252",
+        "1264",
+        "1270",
+        "3602",
+        "3620",
+        "3652"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "121802",
+          "floor_plan_name": "1X1",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "650",
+          "market_rent_low": 970,
+          "market_rent_high": 970,
+          "availability_date": "2026-05-27",
+          "available_date": "2026-05-27",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "127102",
+          "floor_plan_name": "1X1",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "650",
+          "market_rent_low": 958,
+          "market_rent_high": 958,
+          "availability_date": "2026-06-29",
+          "available_date": "2026-06-29",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "365507",
+          "floor_plan_name": "1X1",
+          "bedrooms": "1",
+          "bathrooms": "1.0",
+          "sqft": "650",
+          "market_rent_low": 994,
+          "market_rent_high": 994,
+          "availability_date": "2026-05-27",
+          "available_date": "2026-05-27",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "120108",
+          "floor_plan_name": "2x1",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "860",
+          "market_rent_low": 1304,
+          "market_rent_high": 1304,
+          "availability_date": "2026-05-27",
+          "available_date": "2026-05-27",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "125108",
+          "floor_plan_name": "2x1",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "860",
+          "market_rent_low": 1298,
+          "market_rent_high": 1298,
+          "availability_date": "2026-06-15",
+          "available_date": "2026-06-15",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "374610",
+          "floor_plan_name": "2x1",
+          "bedrooms": "2",
+          "bathrooms": "1.0",
+          "sqft": "860",
+          "market_rent_low": 1298,
+          "market_rent_high": 1298,
+          "availability_date": "2026-06-30",
+          "available_date": "2026-06-30",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1252",
+          "floor_plan_name": "Laguna",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "availability_date": "2025-12-04",
+          "available_date": "2025-12-04",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1264",
+          "floor_plan_name": "Laguna",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "availability_date": "2025-11-21",
+          "available_date": "2025-11-21",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "1270",
+          "floor_plan_name": "Laguna",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1599,
+          "market_rent_high": 1599,
+          "availability_date": "2026-02-23",
+          "available_date": "2026-02-23",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "3602",
+          "floor_plan_name": "Newport",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1514,
+          "market_rent_high": 1514,
+          "availability_date": "2026-03-13",
+          "available_date": "2026-03-13",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "3620",
+          "floor_plan_name": "Newport",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1524,
+          "market_rent_high": 1524,
+          "availability_date": "2026-06-05",
+          "available_date": "2026-06-05",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "3652",
+          "floor_plan_name": "Newport",
+          "bedrooms": "3",
+          "bathrooms": "2.0",
+          "sqft": "1800",
+          "market_rent_low": 1529,
+          "market_rent_high": 1529,
+          "availability_date": "2026-07-08",
+          "available_date": "2026-07-08",
+          "source_api_url": "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+          "extraction_tier": "TIER_1_API_RESMAN",
+          "source_ids": {}
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://stewart.myresman.com/Portal/Applicants/Availability?a=1041&p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_37798_portal.html",
+        "/private/tmp/vendor_tail_37798_floor.html"
+      ],
+      "property_boundary_evidence": {
+        "portal_property_guid": "68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+        "account_id": "1041",
+        "exact_property_floor_page": "/private/tmp/vendor_tail_37798_floor.html"
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 72766,
+      "property_name": "Fox Ridge",
+      "address": "601 Lakeview Dr",
+      "city": "Royersford",
+      "state": "PA",
+      "zip": "19468",
+      "website": "https://www.liveatfoxridge.com/?utm_source=GBP&utm_medium=organic&utm_knock=gbp",
+      "cohort_adapter": "repli360",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "repli360_exact_property_to_sightmap_submap",
+      "native_priced_unit_count": 17,
+      "distinct_native_unit_count": 17,
+      "native_unit_ids": [
+        "209",
+        "211",
+        "311",
+        "313",
+        "302",
+        "310",
+        "408",
+        "507",
+        "506",
+        "508",
+        "601",
+        "905",
+        "902",
+        "1002",
+        "1103",
+        "1110",
+        "1207"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "209",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 1914,
+          "market_rent_high": 1914,
+          "availability_date": "2026-08-16",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "211",
+          "floor_plan_name": "FR - B1 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 964,
+          "market_rent_low": 1869,
+          "market_rent_high": 1869,
+          "availability_date": "2026-09-25",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "311",
+          "floor_plan_name": "FR - B1 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 964,
+          "market_rent_low": 1869,
+          "market_rent_high": 1869,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "313",
+          "floor_plan_name": "FR - B1 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 964,
+          "market_rent_low": 1869,
+          "market_rent_high": 1869,
+          "availability_date": "2026-08-12",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "302",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 1914,
+          "market_rent_high": 1914,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "310",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 1914,
+          "market_rent_high": 1914,
+          "availability_date": "2026-09-30",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "408",
+          "floor_plan_name": "FR - B2R - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 2209,
+          "market_rent_high": 2209,
+          "availability_date": "2026-08-01",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "507",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 1914,
+          "market_rent_high": 1914,
+          "availability_date": "2026-09-02",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "506",
+          "floor_plan_name": "FR - A1 - Fox Ridge",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 863,
+          "market_rent_low": 2009,
+          "market_rent_high": 2009,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "508",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 2209,
+          "market_rent_high": 2209,
+          "availability_date": "2026-08-01",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "601",
+          "floor_plan_name": "FR - B2 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1014,
+          "market_rent_low": 1914,
+          "market_rent_high": 1914,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "905",
+          "floor_plan_name": "FR - A2R - Fox Ridge",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 873,
+          "market_rent_low": 1969,
+          "market_rent_high": 1969,
+          "availability_date": "2026-08-01",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "902",
+          "floor_plan_name": "FR - B6R - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1225,
+          "market_rent_low": 2419,
+          "market_rent_high": 2419,
+          "availability_date": "2026-09-30",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "1002",
+          "floor_plan_name": "FR - B6 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1225,
+          "market_rent_low": 2419,
+          "market_rent_high": 2419,
+          "availability_date": "2026-10-12",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "1103",
+          "floor_plan_name": "FR - A2 - Fox Ridge",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 873,
+          "market_rent_low": 2034,
+          "market_rent_high": 2034,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "1110",
+          "floor_plan_name": "FR - B6 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1225,
+          "market_rent_low": 2419,
+          "market_rent_high": 2419,
+          "availability_date": "2026-10-07",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        },
+        {
+          "unit_number": "1207",
+          "floor_plan_name": "FR - B5 - Fox Ridge",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1199,
+          "market_rent_low": 2039,
+          "market_rent_high": 2039,
+          "availability_date": "2026-09-10",
+          "source_api_url": "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.liveatfoxridge.com/",
+        "https://sightmap.com/embed/8epm5y46w6d",
+        "https://sightmap.com/app/api/v1/yjp248qrvxl/sightmaps/108287"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_72766_repli.js",
+        "/private/tmp/vendor_tail_72766_template.html",
+        "/private/tmp/vendor_tail_72766_sightmap.html",
+        "/private/tmp/vendor_tail_72766_fox_api.dec.json",
+        "/private/tmp/vendor_tail_72766_lakeview_api.dec.json"
+      ],
+      "property_boundary_evidence": {
+        "selected_submap_name": "Landing Page - Fox Ridge",
+        "selected_submap_id": "108287",
+        "all_selected_floorplans_prefixed": "FR / Fox Ridge",
+        "excluded_sibling_submap_name": "Landing Page - Lakeview Park",
+        "excluded_sibling_submap_id": "108288",
+        "excluded_sibling_unit_count": 9
+      },
+      "contamination_verdict": "pass_after_exact_submap_selection_sibling_lakeview_explicitly_excluded"
+    },
+    {
+      "property_id": 218177,
+      "property_name": "Mill & Main",
+      "address": "501 SE Main St",
+      "city": "Minneapolis",
+      "state": "MN",
+      "zip": "55414",
+      "website": "www.millandmain.com",
+      "cohort_adapter": "funnel",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "archived_exact_rentpress_payload",
+      "native_priced_unit_count": 10,
+      "distinct_native_unit_count": 10,
+      "native_unit_ids": [
+        "703",
+        "506",
+        "609",
+        "715",
+        "716",
+        "528",
+        "6007",
+        "3020",
+        "4019",
+        "7025"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "703",
+          "floor_plan_name": "Adams",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "655",
+          "market_rent_low": 1845.0,
+          "market_rent_high": 1845.0,
+          "availability_date": "8/2/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=703"
+        },
+        {
+          "unit_number": "506",
+          "floor_plan_name": "Pinnacle",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "783",
+          "market_rent_low": 2405.0,
+          "market_rent_high": 2405.0,
+          "availability_date": "9/15/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=506"
+        },
+        {
+          "unit_number": "609",
+          "floor_plan_name": "Zenith",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "628",
+          "market_rent_low": 1775.0,
+          "market_rent_high": 1775.0,
+          "availability_date": "9/24/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=609"
+        },
+        {
+          "unit_number": "715",
+          "floor_plan_name": "Lunds",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "557",
+          "market_rent_low": 1750.0,
+          "market_rent_high": 1750.0,
+          "availability_date": "8/17/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=715"
+        },
+        {
+          "unit_number": "716",
+          "floor_plan_name": "Bibelot",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "740",
+          "market_rent_low": 2299.0,
+          "market_rent_high": 2299.0,
+          "availability_date": "7/9/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=716"
+        },
+        {
+          "unit_number": "528",
+          "floor_plan_name": "Gold Medal",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "731",
+          "market_rent_low": 2295.0,
+          "market_rent_high": 2295.0,
+          "availability_date": "9/26/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=528"
+        },
+        {
+          "unit_number": "6007",
+          "floor_plan_name": "Cuyuna",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "743",
+          "market_rent_low": 1950.0,
+          "market_rent_high": 1950.0,
+          "availability_date": "8/17/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=6007"
+        },
+        {
+          "unit_number": "3020",
+          "floor_plan_name": "Afton",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "market_rent_low": 2375.0,
+          "market_rent_high": 2375.0,
+          "availability_date": "8/10/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=3020"
+        },
+        {
+          "unit_number": "4019",
+          "floor_plan_name": "Banning",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1097",
+          "market_rent_low": 3020.0,
+          "market_rent_high": 3020.0,
+          "availability_date": "9/23/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=4019"
+        },
+        {
+          "unit_number": "7025",
+          "floor_plan_name": "Blue Mounds",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "678",
+          "market_rent_low": 1890.0,
+          "market_rent_high": 1890.0,
+          "availability_date": "8/24/2026",
+          "source_api_url": "https://api.funnelleasing.com/api/v2/onlineleasing-link/?companyID=19224&communityID=8671&UnitID=7025"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://millandmain.com/apartments/mill-main/"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/raw_all/218177.html.gz"
+      ],
+      "property_boundary_evidence": {
+        "parent_property_name": "Mill & Main",
+        "parent_property_code": "8671",
+        "exact_parent_link": "https://millandmain.com/apartments/mill-main/",
+        "all_rows_same_property": true
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 220109,
+      "property_name": "Melrose Station Apartments",
+      "address": "902 Valley Rd",
+      "city": "Elkins Park",
+      "state": "PA",
+      "zip": "19027",
+      "website": "https://www.fmgnj.com/apartments/pa/elkins-park/melrose-station/floor-plans",
+      "cohort_adapter": "g5",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_g5_page_embedded_realpage_oll",
+      "native_priced_unit_count": 7,
+      "distinct_native_unit_count": 7,
+      "native_unit_ids": [
+        "62",
+        "87",
+        "90",
+        "115",
+        "4",
+        "127",
+        "136"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "62",
+          "floor_plan_name": "The Abington One Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "800",
+          "market_rent_low": 1615,
+          "market_rent_high": 1615,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "87",
+          "floor_plan_name": "The Cheltenham Two Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "900",
+          "market_rent_low": 1725,
+          "market_rent_high": 1725,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "90",
+          "floor_plan_name": "The Cheltenham Two Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "900",
+          "market_rent_low": 1725,
+          "market_rent_high": 1725,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "115",
+          "floor_plan_name": "The Cheltenham Two Bedroom",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "900",
+          "market_rent_low": 1725,
+          "market_rent_high": 1725,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "4",
+          "floor_plan_name": "The Montgomery - 2BR Deluxe",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "990",
+          "market_rent_low": 1820,
+          "market_rent_high": 1820,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "127",
+          "floor_plan_name": "The Montgomery - 2BR Deluxe",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "990",
+          "market_rent_low": 1820,
+          "market_rent_high": 1820,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        },
+        {
+          "unit_number": "136",
+          "floor_plan_name": "The Montgomery - 2BR Deluxe",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "990",
+          "market_rent_low": 1820,
+          "market_rent_high": 1820,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954",
+          "extraction_tier": "TIER_1_API_ONESITE_WORKFLOW",
+          "source_ids": {}
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.fmgnj.com/apartments/pa/elkins-park/melrose-station/floor-plans",
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1054659/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e3edf777-8cb2-cd5e-ffb1-d457aa33b954"
+      ],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_g5_browser3.json",
+        "/private/tmp/vendor_tail_220109_g5_rendered.html"
+      ],
+      "property_boundary_evidence": {
+        "marketing_page_name_address_exact": true,
+        "page_config_realpage_id": "1054659",
+        "workflow_site_id": "1054659",
+        "site_id_match": true
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 230598,
+      "property_name": "The Ridge",
+      "address": "17940 Garden Ln",
+      "city": "Hagerstown",
+      "state": "MD",
+      "zip": "21740",
+      "website": "https://www.theridgehagerstown.com/",
+      "cohort_adapter": "sightmap",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_property_embedded_sightmap_jsonld",
+      "native_priced_unit_count": 43,
+      "distinct_native_unit_count": 43,
+      "native_unit_ids": [
+        "10730-34",
+        "10740-21",
+        "10740-22",
+        "10744-03",
+        "10744-33",
+        "10748-03",
+        "10748-33",
+        "10804-01",
+        "10812-24",
+        "10812-31",
+        "10818-24",
+        "10820-21",
+        "10820-31",
+        "10822-02",
+        "10822-31",
+        "10824-34",
+        "10826-34",
+        "10828-23",
+        "10830-34",
+        "10832-23",
+        "10834-23",
+        "10834-33",
+        "10840-22",
+        "10842-01",
+        "10842-23",
+        "10842-33",
+        "10848-01",
+        "17920-31",
+        "17922-31",
+        "17922-32",
+        "17924-21",
+        "17926-01",
+        "17926-02",
+        "17928-01",
+        "17928-03",
+        "17932-34",
+        "17942-31",
+        "17944-03",
+        "17944-23",
+        "17944-34",
+        "17956-32",
+        "17960-33",
+        "17966-32"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "10730-34",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 750,
+          "market_rent_low": 1403.53,
+          "market_rent_high": 1403.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10740-21",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 750,
+          "market_rent_low": 1398.53,
+          "market_rent_high": 1398.53,
+          "availability_date": "2026-08-28"
+        },
+        {
+          "unit_number": "10740-22",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 750,
+          "market_rent_low": 1393.53,
+          "market_rent_high": 1393.53,
+          "availability_date": "2026-09-09"
+        },
+        {
+          "unit_number": "10744-03",
+          "bedrooms": 3,
+          "bathrooms": 2,
+          "sqft": 1300,
+          "market_rent_low": 1780.53,
+          "market_rent_high": 1780.53,
+          "availability_date": "2026-09-22"
+        },
+        {
+          "unit_number": "10744-33",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1545.53,
+          "market_rent_high": 1545.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10748-03",
+          "bedrooms": 3,
+          "bathrooms": 2,
+          "sqft": 1300,
+          "market_rent_low": 1780.53,
+          "market_rent_high": 1780.53,
+          "availability_date": "2026-09-10"
+        },
+        {
+          "unit_number": "10748-33",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1545.53,
+          "market_rent_high": 1545.53,
+          "availability_date": "2026-08-26"
+        },
+        {
+          "unit_number": "10804-01",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-26"
+        },
+        {
+          "unit_number": "10812-24",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10812-31",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-19"
+        },
+        {
+          "unit_number": "10818-24",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10820-21",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1643.53,
+          "market_rent_high": 1643.53,
+          "availability_date": "2026-10-03"
+        },
+        {
+          "unit_number": "10820-31",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1678.53,
+          "market_rent_high": 1678.53,
+          "availability_date": "2026-09-22"
+        },
+        {
+          "unit_number": "10822-02",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 1027,
+          "market_rent_low": 1668.53,
+          "market_rent_high": 1668.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10822-31",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1538.53,
+          "market_rent_high": 1538.53,
+          "availability_date": "2026-09-05"
+        },
+        {
+          "unit_number": "10824-34",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1643.53,
+          "market_rent_high": 1643.53,
+          "availability_date": "2026-09-30"
+        },
+        {
+          "unit_number": "10826-34",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10828-23",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1723.53,
+          "market_rent_high": 1723.53,
+          "availability_date": "2026-09-24"
+        },
+        {
+          "unit_number": "10830-34",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1583.53,
+          "market_rent_high": 1583.53,
+          "availability_date": "2026-10-21"
+        },
+        {
+          "unit_number": "10832-23",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1723.53,
+          "market_rent_high": 1723.53,
+          "availability_date": "2026-09-08"
+        },
+        {
+          "unit_number": "10834-23",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1698.53,
+          "market_rent_high": 1698.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10834-33",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1698.53,
+          "market_rent_high": 1698.53,
+          "availability_date": "2026-08-08"
+        },
+        {
+          "unit_number": "10840-22",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-27"
+        },
+        {
+          "unit_number": "10842-01",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1583.53,
+          "market_rent_high": 1583.53,
+          "availability_date": "2026-10-28"
+        },
+        {
+          "unit_number": "10842-23",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1698.53,
+          "market_rent_high": 1698.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "10842-33",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1723.53,
+          "market_rent_high": 1723.53,
+          "availability_date": "2026-09-09"
+        },
+        {
+          "unit_number": "10848-01",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 750,
+          "market_rent_low": 1393.53,
+          "market_rent_high": 1393.53,
+          "availability_date": "2026-09-25"
+        },
+        {
+          "unit_number": "17920-31",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "17922-31",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1608.53,
+          "market_rent_high": 1608.53,
+          "availability_date": "2026-10-10"
+        },
+        {
+          "unit_number": "17922-32",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "17924-21",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1583.53,
+          "market_rent_high": 1583.53,
+          "availability_date": "2026-10-28"
+        },
+        {
+          "unit_number": "17926-01",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1643.53,
+          "market_rent_high": 1643.53,
+          "availability_date": "2026-10-02"
+        },
+        {
+          "unit_number": "17926-02",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1358.53,
+          "market_rent_high": 1358.53,
+          "availability_date": "2026-11-10"
+        },
+        {
+          "unit_number": "17928-01",
+          "bedrooms": 2,
+          "bathrooms": 1,
+          "sqft": 902,
+          "market_rent_low": 1548.53,
+          "market_rent_high": 1548.53,
+          "availability_date": "2026-08-29"
+        },
+        {
+          "unit_number": "17928-03",
+          "bedrooms": 3,
+          "bathrooms": 2,
+          "sqft": 1300,
+          "market_rent_low": 1758.53,
+          "market_rent_high": 1758.53,
+          "availability_date": "2026-08-12"
+        },
+        {
+          "unit_number": "17932-34",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 740,
+          "market_rent_low": 1443.53,
+          "market_rent_high": 1443.53,
+          "availability_date": "2026-08-27"
+        },
+        {
+          "unit_number": "17942-31",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 740,
+          "market_rent_low": 1443.53,
+          "market_rent_high": 1443.53,
+          "availability_date": "2026-08-07"
+        },
+        {
+          "unit_number": "17944-03",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 900,
+          "market_rent_low": 1443.53,
+          "market_rent_high": 1443.53,
+          "availability_date": "2026-09-16"
+        },
+        {
+          "unit_number": "17944-23",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 900,
+          "market_rent_low": 1443.53,
+          "market_rent_high": 1443.53,
+          "availability_date": "2026-09-17"
+        },
+        {
+          "unit_number": "17944-34",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 740,
+          "market_rent_low": 1438.53,
+          "market_rent_high": 1438.53,
+          "availability_date": "2026-10-28"
+        },
+        {
+          "unit_number": "17956-32",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 740,
+          "market_rent_low": 1438.53,
+          "market_rent_high": 1438.53,
+          "availability_date": "2026-09-12"
+        },
+        {
+          "unit_number": "17960-33",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 880,
+          "market_rent_low": 1528.53,
+          "market_rent_high": 1528.53,
+          "availability_date": "2026-08-01"
+        },
+        {
+          "unit_number": "17966-32",
+          "bedrooms": 3,
+          "bathrooms": 1.5,
+          "sqft": 1027,
+          "market_rent_low": 1698.53,
+          "market_rent_high": 1698.53,
+          "availability_date": "2026-08-01"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://sightmap.com/embed/rxwjq74zv1e",
+        "https://sightmap.com/app/api/v1/rxwjql4zv1e/sightmaps/100250"
+      ],
+      "artifact_paths": [
+        "/private/tmp/sightmap_230598_embed.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_embed_from_target_page": true,
+        "provider_property_name": "The Ridge",
+        "provider_postal_address": {
+          "@type": "PostalAddress",
+          "streetAddress": "17920 Garden Lane",
+          "addressLocality": "Hagerstown",
+          "addressRegion": "MD",
+          "postalCode": "21740-7936",
+          "addressCountry": "USA"
+        },
+        "single_property_unit_roster": true,
+        "note": "The Ridge provider street number is 17920 vs cohort 17940; exact embed, name, city, state, and ZIP match. Apartment labels are unit identities, not conflicting addresses."
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 270672,
+      "property_name": "Pointe Grand Warner Robins",
+      "address": "1601 Leverette Rd",
+      "city": "Warner Robins",
+      "state": "GA",
+      "zip": "31088",
+      "website": "https://www.pointegrandwarnerrobins.com/",
+      "cohort_adapter": "funnel",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_property_embedded_sightmap_jsonld",
+      "native_priced_unit_count": 17,
+      "distinct_native_unit_count": 17,
+      "native_unit_ids": [
+        "2104",
+        "2301",
+        "2306",
+        "3101",
+        "3104",
+        "3202",
+        "3211",
+        "4103",
+        "4208",
+        "4303",
+        "8210",
+        "8310",
+        "9102",
+        "10207",
+        "10303",
+        "10305",
+        "10308"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "2104",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1559,
+          "market_rent_high": 1559,
+          "availability_date": "2026-10-01"
+        },
+        {
+          "unit_number": "2301",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1519,
+          "market_rent_high": 1519,
+          "availability_date": "2026-09-24"
+        },
+        {
+          "unit_number": "2306",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1519,
+          "market_rent_high": 1519,
+          "availability_date": "2026-09-10"
+        },
+        {
+          "unit_number": "3101",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1569,
+          "market_rent_high": 1569,
+          "availability_date": "2026-08-26"
+        },
+        {
+          "unit_number": "3104",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1559,
+          "market_rent_high": 1559,
+          "availability_date": "2026-08-13"
+        },
+        {
+          "unit_number": "3202",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1484,
+          "market_rent_high": 1484,
+          "availability_date": "2026-09-23"
+        },
+        {
+          "unit_number": "3211",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1484,
+          "market_rent_high": 1484,
+          "availability_date": "2026-08-13"
+        },
+        {
+          "unit_number": "4103",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1569,
+          "market_rent_high": 1569,
+          "availability_date": "2026-09-12"
+        },
+        {
+          "unit_number": "4208",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1494,
+          "market_rent_high": 1494,
+          "availability_date": "2026-10-11"
+        },
+        {
+          "unit_number": "4303",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1519,
+          "market_rent_high": 1519,
+          "availability_date": "2026-08-26"
+        },
+        {
+          "unit_number": "8210",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1529,
+          "market_rent_high": 1529,
+          "availability_date": "2026-10-10"
+        },
+        {
+          "unit_number": "8310",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1554,
+          "market_rent_high": 1554,
+          "availability_date": "2026-10-04"
+        },
+        {
+          "unit_number": "9102",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1594,
+          "market_rent_high": 1594,
+          "availability_date": "2026-09-15"
+        },
+        {
+          "unit_number": "10207",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1484,
+          "market_rent_high": 1484,
+          "availability_date": "2026-08-07"
+        },
+        {
+          "unit_number": "10303",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1519,
+          "market_rent_high": 1519,
+          "availability_date": "2026-09-30"
+        },
+        {
+          "unit_number": "10305",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1534,
+          "market_rent_high": 1534,
+          "availability_date": "2026-09-30"
+        },
+        {
+          "unit_number": "10308",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1519,
+          "market_rent_high": 1519,
+          "availability_date": "2026-10-01"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.pointegrandwarnerrobins.com/",
+        "https://sightmap.com/embed/9zw4zo6lv87"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_270672_sightmap.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_embed_from_target_page": true,
+        "provider_property_name": "Pointe Grand Warner Robins",
+        "provider_postal_address": {
+          "@type": "PostalAddress",
+          "streetAddress": "1601 Leverette Road",
+          "addressLocality": "Warner Robins",
+          "addressRegion": "GA",
+          "postalCode": "31088-8092",
+          "addressCountry": "USA"
+        },
+        "single_property_unit_roster": true,
+        "note": "Exact named property embed and single property roster."
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 273790,
+      "property_name": "Pointe Grand Augusta",
+      "address": "1400 Pointe Grand Dr",
+      "city": "Augusta",
+      "state": "GA",
+      "zip": "30909",
+      "website": "https://www.pointegrandaugusta.com/",
+      "cohort_adapter": "funnel",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_property_embedded_sightmap_jsonld",
+      "native_priced_unit_count": 10,
+      "distinct_native_unit_count": 10,
+      "native_unit_ids": [
+        "1309",
+        "1312",
+        "3108",
+        "5204",
+        "5311",
+        "7208",
+        "8107",
+        "8108",
+        "8304",
+        "9202"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "1309",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1494,
+          "market_rent_high": 1494,
+          "availability_date": "2026-07-31"
+        },
+        {
+          "unit_number": "1312",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1504,
+          "market_rent_high": 1504,
+          "availability_date": "2026-08-18"
+        },
+        {
+          "unit_number": "3108",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1544,
+          "market_rent_high": 1544,
+          "availability_date": "2026-09-15"
+        },
+        {
+          "unit_number": "5204",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1444,
+          "market_rent_high": 1444,
+          "availability_date": "2026-09-19"
+        },
+        {
+          "unit_number": "5311",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1494,
+          "market_rent_high": 1494,
+          "availability_date": "2026-08-23"
+        },
+        {
+          "unit_number": "7208",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1454,
+          "market_rent_high": 1454,
+          "availability_date": "2026-10-04"
+        },
+        {
+          "unit_number": "8107",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1544,
+          "market_rent_high": 1544,
+          "availability_date": "2026-09-27"
+        },
+        {
+          "unit_number": "8108",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1544,
+          "market_rent_high": 1544,
+          "availability_date": "2026-09-15"
+        },
+        {
+          "unit_number": "8304",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1395,
+          "market_rent_high": 1395,
+          "availability_date": "2026-09-11"
+        },
+        {
+          "unit_number": "9202",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1444,
+          "market_rent_high": 1444,
+          "availability_date": "2026-10-10"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.pointegrandaugusta.com/",
+        "https://sightmap.com/embed/n9w636emw71"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_273790_sightmap.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_embed_from_target_page": true,
+        "provider_property_name": "Pointe Grand Augusta",
+        "provider_postal_address": {
+          "@type": "PostalAddress",
+          "streetAddress": "1400 Pointe Grand Drive",
+          "addressLocality": "Augusta",
+          "addressRegion": "GA",
+          "postalCode": "30909-4864",
+          "addressCountry": "USA"
+        },
+        "single_property_unit_roster": true,
+        "note": "Exact named property embed and single property roster."
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    },
+    {
+      "property_id": 273828,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "https://www.pointegrandsouthlake.com/",
+      "cohort_adapter": "funnel",
+      "outcome": "UNIT_QUALIFIED",
+      "evidence_lane": "exact_property_embedded_sightmap_jsonld",
+      "native_priced_unit_count": 18,
+      "distinct_native_unit_count": 18,
+      "native_unit_ids": [
+        "1109",
+        "3201",
+        "3307",
+        "4203",
+        "5109",
+        "6202",
+        "6206",
+        "6304",
+        "6308",
+        "7101",
+        "8201",
+        "8207",
+        "9204",
+        "10101",
+        "10103",
+        "10201",
+        "10204",
+        "11101"
+      ],
+      "native_priced_rows": [
+        {
+          "unit_number": "1109",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1690,
+          "market_rent_high": 1690,
+          "availability_date": "2026-08-15"
+        },
+        {
+          "unit_number": "3201",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1645,
+          "market_rent_high": 1645,
+          "availability_date": "2026-08-15"
+        },
+        {
+          "unit_number": "3307",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-08-14"
+        },
+        {
+          "unit_number": "4203",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1645,
+          "market_rent_high": 1645,
+          "availability_date": "2026-10-03"
+        },
+        {
+          "unit_number": "5109",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1690,
+          "market_rent_high": 1690,
+          "availability_date": "2026-09-13"
+        },
+        {
+          "unit_number": "6202",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-10-07"
+        },
+        {
+          "unit_number": "6206",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-07-31"
+        },
+        {
+          "unit_number": "6304",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1595,
+          "market_rent_high": 1595,
+          "availability_date": "2026-08-11"
+        },
+        {
+          "unit_number": "6308",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-08-14"
+        },
+        {
+          "unit_number": "7101",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1695,
+          "market_rent_high": 1695,
+          "availability_date": "2026-10-15"
+        },
+        {
+          "unit_number": "8201",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-08-05"
+        },
+        {
+          "unit_number": "8207",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-09-09"
+        },
+        {
+          "unit_number": "9204",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1595,
+          "market_rent_high": 1595,
+          "availability_date": "2026-07-31"
+        },
+        {
+          "unit_number": "10101",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1645,
+          "market_rent_high": 1645,
+          "availability_date": "2026-08-04"
+        },
+        {
+          "unit_number": "10103",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1595,
+          "market_rent_high": 1595,
+          "availability_date": "2026-08-07"
+        },
+        {
+          "unit_number": "10201",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1645,
+          "market_rent_high": 1645,
+          "availability_date": "2026-07-31"
+        },
+        {
+          "unit_number": "10204",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1640,
+          "market_rent_high": 1640,
+          "availability_date": "2026-08-14"
+        },
+        {
+          "unit_number": "11101",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1170,
+          "market_rent_low": 1645,
+          "market_rent_high": 1645,
+          "availability_date": "2026-08-29"
+        }
+      ],
+      "unit_rows_complete": true,
+      "source_urls": [
+        "https://www.pointegrandsouthlake.com/",
+        "https://sightmap.com/embed/yjp2de1evxl"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_273828_sightmap.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_embed_from_target_page": true,
+        "provider_property_name": "Pointe Grand Southlake",
+        "provider_postal_address": {
+          "@type": "PostalAddress",
+          "streetAddress": "7147 Mount Zion Circle",
+          "addressLocality": "Morrow",
+          "addressRegion": "GA",
+          "postalCode": "30260-3307",
+          "addressCountry": "USA"
+        },
+        "single_property_unit_roster": true,
+        "note": "Exact named property embed and single property roster."
+      },
+      "contamination_verdict": "pass_exact_property_boundary_no_sibling_contamination"
+    }
+  ],
+  "excluded_results": [
+    {
+      "property_id": 8654,
+      "property_name": "Riverfalls at Bellmar",
+      "address": "10570 Stone Canyon Rd",
+      "city": "Dallas",
+      "state": "TX",
+      "zip": "75230",
+      "website": "https://www.riverfallsdallas.com/",
+      "cohort_adapter": "apts247",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "inactive_dead_property_surface",
+      "details": "Exact Riverfalls URL returns the Apts247 'Page Not Found / website no longer active' surface; no property API key or roster.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/raw_all/8654.html.gz"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_roster_dead_surface"
+    },
+    {
+      "property_id": 8740,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "https://livebh.com/apartments/parc-plaza-apartments/",
+      "cohort_adapter": "sightmap",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "native_roster_no_positive_rent",
+      "details": "Exact Parc Plaza SightMap exposes 201 native apartments, but every price is null/zero; strict rule requires positive numeric rent.",
+      "native_priced_unit_count": 0,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/8epmlyokv6d/sightmaps/69637"
+      ],
+      "artifact_paths": [
+        "/private/tmp/sightmap_8740_embed.html",
+        "/private/tmp/sightmap_8740_api.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_asset": true,
+        "native_roster_count": 201
+      },
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 8789,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com",
+      "cohort_adapter": "funnel",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "removed_or_redirected_property_surface",
+      "details": "Target URL redirects to a LiveBH Arlington city collection; target property is absent and listed inventory is sibling/corporate contamination.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_8789_live.html"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "excluded_city_collection_sibling_inventory"
+    },
+    {
+      "property_id": 25489,
+      "property_name": "Cortland North Dallas",
+      "address": "17811 Vail St",
+      "city": "Dallas",
+      "state": "TX",
+      "zip": "75287",
+      "website": "https://cortland.com/apartments/cortland-north-dallas/",
+      "cohort_adapter": "cortland",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact Cortland page exposed no preload floorplans/availprice unit data.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 32097,
+      "property_name": "Clemmons Trace Village",
+      "address": "114 Willow Trace Cir",
+      "city": "Clemmons",
+      "state": "NC",
+      "zip": "27012",
+      "website": "http://www.clemmonstracevillage.com/",
+      "cohort_adapter": "resman",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "plan_only_no_native_unit",
+      "details": "Exact ResMan portal yielded one priced 2x1.5 floor-plan placeholder but no unit number/ID.",
+      "native_priced_unit_count": 0,
+      "source_urls": [
+        "https://ginkgo.myresman.com/Portal/Applicants/Availability"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_32097_portal.html",
+        "/private/tmp/vendor_tail_32097_floor.html"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_portal": true
+      },
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 43995,
+      "property_name": "Hamilton Hall",
+      "address": "449 Hamilton St",
+      "city": "Norristown",
+      "state": "PA",
+      "zip": "19401",
+      "website": "http://www.scullycompany.com/hamilton-hall-18.html",
+      "cohort_adapter": "sightmap",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "plan_only_no_native_unit",
+      "details": "One Hyperbrowser call (solveCaptchas=false) reached exact Hamilton Hall page and showed three priced plan cards; zero native unit IDs/numbers.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_43995.html",
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_63191_43995_summary.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_host_title_address": true,
+        "entrata_property_id": "100003046"
+      },
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 47182,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+      "cohort_adapter": "funnel",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "removed_or_redirected_property_surface",
+      "details": "Target URL redirects to a LiveBH Richmond city collection; target property is absent and listed inventory is sibling/corporate contamination.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_47182_live.html"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "excluded_city_collection_sibling_inventory"
+    },
+    {
+      "property_id": 48946,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb",
+      "cohort_adapter": "knock",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact Knock community ID resolved, but Doorway API returned no units.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 60141,
+      "property_name": "Bridgeview",
+      "address": "701 Harrison St",
+      "city": "Allentown",
+      "state": "PA",
+      "zip": "18103",
+      "website": "http://www.scullycompany.com/bridgeview-14.html",
+      "cohort_adapter": "sightmap",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "removed_or_redirected_property_surface",
+      "details": "Legacy Bridgeview link resolves to generic Scully corporate apartment search, not a Bridgeview property roster.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/raw_all/60141.html.gz"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "excluded_corporate_sibling_surface"
+    },
+    {
+      "property_id": 61459,
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "website": "http://www.thiestalle.com/properties/oakstreet-st-cloud.html",
+      "cohort_adapter": "knock",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact Knock community ID resolved, but Doorway API returned no units.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 63191,
+      "property_name": "Avenir on Fifteenth",
+      "address": "42 S 15th St",
+      "city": "Philadelphia",
+      "state": "PA",
+      "zip": "19102",
+      "website": "http://avenirphilly.com/",
+      "cohort_adapter": "sightmap",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "plan_only_no_native_unit",
+      "details": "One Hyperbrowser call (solveCaptchas=false) reached exact Avenir page and showed seven priced plan cards; zero native unit IDs/numbers.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_63191.html",
+        "/private/tmp/propai-fnd-vBkmT9/hb_scully_63191_43995_summary.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_host_title_address": true,
+        "entrata_property_id": "100002834"
+      },
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 68497,
+      "property_name": "Maya",
+      "address": "535 S Kingsley Dr",
+      "city": "Los Angeles",
+      "state": "CA",
+      "zip": "90020",
+      "website": "http://www.liveatmaya.com/",
+      "cohort_adapter": "knock",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact Maya property page contains no Knock Doorway initialization and no qualifying native roster.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 68956,
+      "property_name": "266 Lofts",
+      "address": "266 S Front St",
+      "city": "Memphis",
+      "state": "TN",
+      "zip": "38103",
+      "website": "https://www.266lofts.com/",
+      "cohort_adapter": "g5",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact current G5 GraphQL apartmentComplex.apartments response was empty.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 218378,
+      "property_name": "The Terraces Apartments",
+      "address": "1330 Bush St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94109",
+      "website": "http://www.equityapartments.com/california/san-francisco-bay-apartments/lower-nob-hill/the-terraces-apartments.aspx",
+      "cohort_adapter": "equity",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_current_adapter_no_native_inventory",
+      "details": "Exact Equity property page exposed no ea5 unit blocks.",
+      "native_priced_unit_count": 0,
+      "source_urls": [],
+      "artifact_paths": [
+        "/private/tmp/propai-fnd-vBkmT9/evidence_vendor_tail30_current_adapter.json"
+      ],
+      "property_boundary_evidence": {},
+      "contamination_verdict": "no_qualifying_contamination"
+    },
+    {
+      "property_id": 234945,
+      "property_name": "IMT Belasera at Superior",
+      "address": "17720 Superior St",
+      "city": "Northridge",
+      "state": "CA",
+      "zip": "91325",
+      "website": "https://www.imtresidential.com/imtbelaseraatsuperior/",
+      "cohort_adapter": "sightmap",
+      "outcome": "EXCLUDED",
+      "strict_exclusion_reason": "exact_provider_empty",
+      "details": "Exact IMT Belasera SightMap configuration returned zero units.",
+      "native_priced_unit_count": 0,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/l8epm8e4w6d/sightmaps/12540"
+      ],
+      "artifact_paths": [
+        "/private/tmp/vendor_tail_234945_sightmap.html",
+        "/private/tmp/vendor_tail_234945_sightmap_api.dec.json"
+      ],
+      "property_boundary_evidence": {
+        "exact_property_asset": true,
+        "provider_unit_count": 0
+      },
+      "contamination_verdict": "no_qualifying_contamination"
+    }
+  ],
+  "integrity_checks": {
+    "qualifiers_plus_exclusions_equals_30": true,
+    "all_30_property_ids_unique": true,
+    "all_qualifier_counts_positive": true,
+    "frozen_strict99_overlap_zero": true,
+    "qualifier_total_recomputed": 256
+  }
+}

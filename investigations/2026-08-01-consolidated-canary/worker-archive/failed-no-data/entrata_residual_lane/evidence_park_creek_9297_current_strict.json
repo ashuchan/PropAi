@@ -1,0 +1,154 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:27:44.301228+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      9297
+    ],
+    "native_positive_rent_rows": 2,
+    "captcha_solving": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 9297,
+      "property_name": "Park Creek Manor",
+      "website": "https://www.parkcreekmanor.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 2,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_provider_count_native_ids_positive_rents",
+      "identity_evidence": {
+        "canonical_name": "Park Creek Manor",
+        "canonical_address": "2520 Coombs Creek Dr",
+        "current_page_name_match": true,
+        "current_page_full_address_match": true,
+        "current_listing_provider_property_binding": "515100",
+        "current_listing_property_floorplan_binding": "897486",
+        "current_listing_published_unit_count": 2,
+        "rows_with_native_identity": 2,
+        "rows_with_native_identity_and_positive_rent": 2,
+        "source_urls": [
+          "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "461"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1250,
+            "market_rent_high": 1250
+          },
+          "source_api_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/"
+        },
+        {
+          "identity": {
+            "unit_number": "244"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1250,
+            "market_rent_high": 1250
+          },
+          "source_api_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "B-2",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "780",
+          "unit_number": "461",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,250",
+          "market_rent_low": 1250,
+          "market_rent_high": 1250,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "B-2",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "1",
+          "sqft": "780",
+          "unit_number": "244",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,250",
+          "market_rent_low": 1250,
+          "market_rent_high": 1250,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-01",
+          "available_date": "2026-08-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:26:24.986215+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_9297_current.json",
+        "capture_artifact_sha256": "98e92bca771d3092bd22df77df8dbc203a1e72b5978477cfbd41b951b43ca97b",
+        "listing_html_sha256": "6b27c22539f1bd75457c0d61726647a5c52a1f331db1783bd5214c288d44e3ba",
+        "page_html_sha256": "5fd518b9d6a8291f48642c93a752240c7b087a7d4414d5041f7b0d586fc58f77",
+        "endpoint_html_sha256": "d218dfab598207c1412fc15bc76bb733a9ea6a09864d81215ea327afc55e7370",
+        "published_endpoint": "https://www.parkcreekmanor.com/?module=check_availability&is_secure=1&property[id]=515100&action=view_unit_spaces&property_floorplan[id]=897486&cached_rate_available=1&min_rent=$1,275&max_rent=$1,275&min_deposit=250.00&max_deposit=250.00&is_valid_rent=1&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": true,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

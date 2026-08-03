@@ -23,11 +23,11 @@ need real HTTP — only the URL sequence proves the consume contract.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from ma_poc.models.scrape_profile import NavigationConfig, ScrapeProfile
+from ma_poc.models.scrape_profile import ScrapeProfile
 from ma_poc.pms.detector import DetectedPMS
 from ma_poc.pms.scraper import _try_link_hop
 
@@ -110,6 +110,51 @@ async def _stubbed_fetch_factory(
     return _stub
 
 
+async def _capture_started_candidates(
+    *,
+    entry_url: str,
+    entry_page_html: str,
+    detected: DetectedPMS,
+    profile: ScrapeProfile | None,
+    llm_navigation_hints: list[str] | None = None,
+    embedded_portal_hints: list[tuple[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Return the final ranked candidates emitted by ``_try_link_hop``."""
+    from ma_poc.observability import events as obs_events
+
+    candidate_records: list[list[dict[str, Any]]] = []
+    visit_log: list[str] = []
+    stub = await _stubbed_fetch_factory(visit_log)
+
+    async def _no_units_scrape(**kwargs: Any) -> dict[str, Any]:
+        return {"units": [], "extraction_tier_used": None, "errors": []}
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> None:
+        kind_value = getattr(kind, "value", str(kind))
+        if "link_hop_started" in kind_value.lower():
+            candidate_records.append(payload.get("candidates", []))
+
+    with patch("ma_poc.fetch.fetch", new=stub), patch(
+        "ma_poc.pms.scraper.scrape", new=_no_units_scrape
+    ), patch.object(obs_events, "emit", new=_spy_emit):
+        await _try_link_hop(
+            entry_url=entry_url,
+            entry_page_html=entry_page_html,
+            detected=detected,
+            profile=profile,
+            expected_total_units=None,
+            property_id="candidate-order",
+            csv_row=None,
+            max_hops=7,
+            llm_navigation_hints=llm_navigation_hints,
+            embedded_portal_hints=embedded_portal_hints,
+            visited_urls={entry_url},
+        )
+
+    assert candidate_records, "LINK_HOP_STARTED must expose the ranked candidates"
+    return candidate_records[0]
+
+
 @pytest.mark.asyncio
 async def test_winning_page_url_tried_first() -> None:
     """When the profile remembers ``winning_page_url`` from a previous
@@ -145,6 +190,165 @@ async def test_winning_page_url_tried_first() -> None:
     assert visit_log, "link-hop must attempt at least one URL"
     # The profile-recorded winning URL is FIRST in the visit order.
     assert visit_log[0] == "https://x.com/floor-plans"
+
+
+@pytest.mark.asyncio
+async def test_wpu_score_outranks_embedded_portal_and_llm_hint() -> None:
+    """A proven WPU stays ahead of two fresh 10,000-point suggestions.
+
+    SecureCafe URLs receive a 120-point host/path bonus from SourceRanker. The
+    trusted source score must be preserved, or that bonus turns an untested
+    ``floorplans.aspx`` portal hint into 10,120 and sends it ahead of the
+    profile's previously proven 10,001 route.
+    """
+    profile = ScrapeProfile(canonical_id="trusted-score-order")
+    profile.navigation.winning_page_url = "https://x.com/proven-good"
+    candidates = await _capture_started_candidates(
+        entry_url="https://x.com/",
+        entry_page_html=_entry_html_with_links(),
+        detected=DetectedPMS(pms="rentcafe", confidence=0.9),
+        profile=profile,
+        llm_navigation_hints=["https://hint.example/availability"],
+        embedded_portal_hints=[
+            (
+                "https://property.securecafe.com/onlineleasing/content3/floorplans.aspx",
+                "securecafe",
+            )
+        ],
+    )
+
+    trusted = [
+        candidate
+        for candidate in candidates
+        if candidate["anchor"].startswith(
+            ("profile:winning", "embedded-portal:", "llm-hint:")
+        )
+    ]
+    assert [(candidate["anchor"].split(":", 1)[0], candidate["score"]) for candidate in trusted] == [
+        ("profile", 10_001),
+        ("embedded-portal", 10_000),
+        ("llm-hint", 10_000),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_internal_link_ranking_unchanged_by_trusted_score_preservation() -> None:
+    """Ordinary page-authored links retain their existing 5,600 ordering."""
+    candidates = await _capture_started_candidates(
+        entry_url="https://x.com/",
+        entry_page_html=_entry_html_with_links(),
+        detected=DetectedPMS(pms="unknown", confidence=0.0),
+        profile=None,
+    )
+
+    internal = [
+        (candidate["url"], candidate["score"], candidate["anchor"])
+        for candidate in candidates
+        if candidate["anchor"] in {"availability", "floor plans"}
+    ]
+    assert internal == [
+        ("https://x.com/availability", 5_600, "availability"),
+        ("https://x.com/floor-plans", 5_600, "floor plans"),
+    ]
+
+
+_BROWNSTONE_ENTRY = "https://www.brownstonetx.com/"
+_BROWNSTONE_PLAN_LEAF = (
+    "https://www.brownstonetx.com/floorplans/uvalde-TX/"
+    "brownstone-apartments/3-bedroom-2-bath-c1-55-1/"
+)
+_BROWNSTONE_INDEX = (
+    "https://www.brownstonetx.com/uvalde/brownstone-apartments/conventional/"
+)
+
+
+def _brownstone_entry_html(*, with_inventory_index: bool = True) -> str:
+    index = (
+        '<a href="/uvalde/brownstone-apartments/conventional/">Floor Plans</a>'
+        if with_inventory_index
+        else '<a href="/amenities/">Amenities</a>'
+    )
+    return f"<html><body><nav>{index}</nav></body></html>"
+
+
+async def _brownstone_visit_order(
+    *, winning_page_url: str, with_inventory_index: bool
+) -> list[str]:
+    profile = ScrapeProfile(canonical_id="brownstone-routing")
+    profile.navigation.winning_page_url = winning_page_url
+    visit_log: list[str] = []
+    stub = await _stubbed_fetch_factory(visit_log)
+
+    async def _no_units_scrape(**kwargs: Any) -> dict[str, Any]:
+        return {"units": [], "extraction_tier_used": None, "errors": []}
+
+    with patch("ma_poc.fetch.fetch", new=stub), patch(
+        "ma_poc.pms.scraper.scrape", new=_no_units_scrape
+    ):
+        await _try_link_hop(
+            entry_url=_BROWNSTONE_ENTRY,
+            entry_page_html=_brownstone_entry_html(
+                with_inventory_index=with_inventory_index
+            ),
+            detected=DetectedPMS(pms="entrata", confidence=0.95),
+            profile=profile,
+            expected_total_units=None,
+            property_id="brownstone-routing",
+            csv_row=None,
+            max_hops=3,
+            visited_urls={_BROWNSTONE_ENTRY},
+        )
+    return visit_log
+
+
+@pytest.mark.asyncio
+async def test_entrata_explicit_inventory_index_outranks_stale_plan_leaf_wpu() -> None:
+    """Brownstone's explicit property index must precede yesterday's C1 leaf."""
+    visit_log = await _brownstone_visit_order(
+        winning_page_url=_BROWNSTONE_PLAN_LEAF,
+        with_inventory_index=True,
+    )
+
+    assert visit_log[:2] == [_BROWNSTONE_INDEX, _BROWNSTONE_PLAN_LEAF]
+
+    profile = ScrapeProfile(canonical_id="brownstone-score-order")
+    profile.navigation.winning_page_url = _BROWNSTONE_PLAN_LEAF
+    candidates = await _capture_started_candidates(
+        entry_url=_BROWNSTONE_ENTRY,
+        entry_page_html=_brownstone_entry_html(with_inventory_index=True),
+        detected=DetectedPMS(pms="entrata", confidence=0.95),
+        profile=profile,
+    )
+    assert [
+        (candidate["url"], candidate["score"])
+        for candidate in candidates[:2]
+    ] == [
+        (_BROWNSTONE_INDEX, 10_002),
+        (_BROWNSTONE_PLAN_LEAF, 10_001),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_entrata_plan_leaf_wpu_stays_first_without_explicit_index() -> None:
+    """No page-authored inventory index means the proven leaf remains first."""
+    visit_log = await _brownstone_visit_order(
+        winning_page_url=_BROWNSTONE_PLAN_LEAF,
+        with_inventory_index=False,
+    )
+
+    assert visit_log[0] == _BROWNSTONE_PLAN_LEAF
+
+
+@pytest.mark.asyncio
+async def test_entrata_property_wide_wpu_stays_first_over_explicit_index() -> None:
+    """Ordinary property-wide navigation memory keeps the global WPU contract."""
+    property_wide_wpu = "https://www.brownstonetx.com/floorplans/"
+    visit_log = await _brownstone_visit_order(
+        winning_page_url=property_wide_wpu,
+        with_inventory_index=True,
+    )
+
+    assert visit_log[0] == property_wide_wpu
 
 
 @pytest.mark.asyncio

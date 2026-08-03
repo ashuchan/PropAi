@@ -1,0 +1,65 @@
+{
+  "8095670": {
+    "units": [
+      {
+        "id": 12950711,
+        "name": "1295",
+        "propertyId": 8095670,
+        "floorplanId": 8790480,
+        "leaseStatus": "AVAILABLE_READY",
+        "unitNumber": "1295",
+        "internalAvailableDate": "2026-06-01 00:00 -0500",
+        "numberOfBeds": 3,
+        "numberOfBaths": 2.0,
+        "floorNumber": 0,
+        "squareFeet": 1210,
+        "rent": 2221,
+        "buildingName": "N/A",
+        "floorplanName": "Canyon",
+        "partnerPropertyId": "4531827"
+      }
+    ]
+  },
+  "9146180": {
+    "units": [
+      {
+        "id": 17428905,
+        "name": "0844",
+        "propertyId": 9146180,
+        "floorplanId": 11282807,
+        "leaseStatus": "AVAILABLE_READY",
+        "unitNumber": "0844",
+        "internalAvailableDate": "2025-09-09 00:00 -0500",
+        "numberOfBeds": 2,
+        "numberOfBaths": 2.0,
+        "floorNumber": 3,
+        "squareFeet": 1289,
+        "rent": 1789,
+        "buildingName": "N/A",
+        "floorplanName": "Desenia",
+        "partnerPropertyId": "5404210"
+      }
+    ]
+  },
+  "6189022": {
+    "units": [
+      {
+        "id": 11001980,
+        "name": "121",
+        "propertyId": 6189022,
+        "floorplanId": 7385929,
+        "leaseStatus": "AVAILABLE_READY",
+        "unitNumber": "121",
+        "internalAvailableDate": "2025-06-30 00:00 -0500",
+        "numberOfBeds": 2,
+        "numberOfBaths": 2.0,
+        "floorNumber": 3,
+        "squareFeet": 905,
+        "rent": 1350,
+        "buildingName": "1",
+        "floorplanName": "2 Bedroom / 2 Bath",
+        "partnerPropertyId": "4270005"
+      }
+    ]
+  }
+}

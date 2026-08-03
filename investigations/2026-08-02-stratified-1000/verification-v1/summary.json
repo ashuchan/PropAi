@@ -1,0 +1,16 @@
+{
+  "cluster_counts": {
+    "dead_entry_salvage": 6,
+    "entrata_parallel_roster": 8,
+    "identity_natural_id": 4,
+    "managebuilding_archive": 3,
+    "negative_status_date": 3,
+    "timeout_diagnostics": 7
+  },
+  "properties_sha256": "26d074a211e1150678760dfe2f071240541d1cf379dc2bec4b6951fd95823a32",
+  "property_count": 29,
+  "schema_version": 1,
+  "shared_profile_store_mutation_allowed": false,
+  "source_run": "2026-08-02-strat1000-ff7b377",
+  "verification_case_count": 31
+}

@@ -117,7 +117,9 @@ def _extract_floorplans(html: str) -> dict[str, Any]:
 
 _APT_NUMBER_RE = re.compile(r"Apt\s*#\s*([A-Z0-9][A-Z0-9\-]{1,12})", re.IGNORECASE)
 _STARTING_AT_RE = re.compile(r"Starting\s+at\s+\$\s*([1-9]\d{0,3}(?:,\d{3})*)", re.IGNORECASE)
+_BASE_RENT_RE = re.compile(r"Base\s+Rent\s+\$\s*([1-9]\d{0,3}(?:,\d{3})*)", re.IGNORECASE)
 _FLOOR_RE = re.compile(r"Floor\s+(\d{1,3})", re.IGNORECASE)
+_BUILDING_RE = re.compile(r"Building\s+(?:Number\s*)?([A-Z0-9][A-Z0-9\- ]{0,20})", re.IGNORECASE)
 _BBS_RE = re.compile(
     r"(\d+(?:\.\d+)?|studio)\s*Bed[s]?\s*[|•/· \s]+\s*"
     r"(\d+(?:\.\d+)?)\s*Bath[s]?\s*[|•/· \s]+\s*"
@@ -175,6 +177,8 @@ def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
                 continue
             if line.startswith("Starting at") or line.startswith("Floor "):
                 continue
+            if line.startswith("Base Rent") or line.startswith("Building "):
+                continue
             if "Bed" in line and "Bath" in line:
                 continue
             if "Available" in line:
@@ -184,7 +188,8 @@ def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
             break
 
         # Rent
-        rent_m = _STARTING_AT_RE.search(text)
+        total_rent_m = _STARTING_AT_RE.search(text)
+        rent_m = _BASE_RENT_RE.search(text) or total_rent_m
         rent = None
         if rent_m:
             try:
@@ -192,9 +197,51 @@ def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
             except (ValueError, TypeError):
                 rent = None
 
+        fee_inclusive_rent = None
+        if total_rent_m:
+            try:
+                fee_inclusive_rent = int(total_rent_m.group(1).replace(",", ""))
+            except (ValueError, TypeError):
+                fee_inclusive_rent = None
+
         # Floor
         floor_m = _FLOOR_RE.search(text)
         floor = floor_m.group(1) if floor_m else ""
+
+        event_extra: dict[str, Any] = {}
+        raw_event_extra = str(card.get("data-event-extra") or "").strip()
+        if raw_event_extra:
+            try:
+                parsed_event = json.loads(_html.unescape(raw_event_extra))
+                if isinstance(parsed_event, dict):
+                    event_extra = parsed_event
+            except (json.JSONDecodeError, TypeError, ValueError):
+                event_extra = {}
+        building = str(
+            event_extra.get("building_number")
+            or event_extra.get("buildingNumber")
+            or ""
+        ).strip()
+        if not building:
+            building_m = _BUILDING_RE.search(text)
+            building = building_m.group(1).strip() if building_m else ""
+
+        apartment_id = str(
+            card.get("data-apartment-id")
+            or card.get("data-apartmentid")
+            or ""
+        ).strip()
+        native_unit_id = str(
+            card.get("data-unit-id")
+            or card.get("data-unitid")
+            or ""
+        ).strip()
+        canonical_id = apartment_id or native_unit_id
+        source_ids: dict[str, Any] = {}
+        if canonical_id:
+            source_ids["cortland_apartment_id"] = canonical_id
+        if native_unit_id and native_unit_id != canonical_id:
+            source_ids["cortland_unit_id"] = native_unit_id
 
         # Beds / baths / sqft from the "N Bed | N Bath | NNN sq. ft." line.
         # The ``&nbsp;`` non-breaking-space variant is normalised by
@@ -246,15 +293,16 @@ def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
             except (ValueError, TypeError):
                 beds_int = None
 
-        out.append(
-            make_unit_dict(
+        row = make_unit_dict(
                 floor_plan_name=floor_plan_name,
                 bed_label=bed_label_from(beds_int, floor_plan_name),
                 bedrooms=beds,
                 bathrooms=baths,
                 sqft=sqft,
                 unit_number=unit_number,
+                unit_name=unit_number,
                 floor=floor,
+                building=building,
                 rent_range=format_rent_range(rent, rent) if rent else "",
                 rent_low=rent,
                 rent_high=rent,
@@ -263,8 +311,13 @@ def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
                 concession="",
                 source_api_url=url,
                 extraction_tier=OLL_TIER,
+                source_ids=source_ids,
             )
-        )
+        if canonical_id:
+            row["unit_id"] = canonical_id
+        if fee_inclusive_rent is not None and fee_inclusive_rent != rent:
+            row["rent_including_fees"] = fee_inclusive_rent
+        out.append(row)
 
     return out
 
@@ -305,14 +358,14 @@ def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str,
         availprice = fp.get("availprice")
         if not isinstance(availprice, dict):
             continue
-        for info in availprice.values():
+        for apartment_id, info in availprice.items():
             if not isinstance(info, dict):
                 continue
             unit_no = str(info.get("apartment_number") or "").strip()
             rent = money_to_int(str(info.get("price") or "")) or None
             avail_date = _epoch_to_date(info.get("date"))
-            units.append(
-                make_unit_dict(
+            native_id = str(apartment_id or "").strip()
+            row = make_unit_dict(
                     floor_plan_name=fp_name,
                     bed_label=bed_label_from(beds, fp_name),
                     bedrooms=str(beds) if beds is not None else "",
@@ -322,6 +375,7 @@ def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str,
                     ),
                     sqft=sqft,
                     unit_number=unit_no,
+                    unit_name=unit_no,
                     rent_range=format_rent_range(rent, rent),
                     rent_low=rent,
                     rent_high=rent,
@@ -330,8 +384,15 @@ def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str,
                     concession=_conc,
                     source_api_url=url,
                     extraction_tier=OLL_TIER,
+                    source_ids=(
+                        {"cortland_apartment_id": native_id}
+                        if native_id
+                        else {}
+                    ),
                 )
-            )
+            if native_id:
+                row["unit_id"] = native_id
+            units.append(row)
     return units
 
 

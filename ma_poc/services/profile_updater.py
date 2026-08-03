@@ -208,9 +208,11 @@ def _emit_mapping_save_dropped(canonical_id: str, reason: str) -> None:
     """
     try:
         from ma_poc.observability.events import EventKind, emit
+
         emit(EventKind.MAPPING_SAVE_DROPPED, canonical_id or "unknown", reason=reason)
     except Exception:
         pass
+
 
 # Tier name → tier number mapping
 _TIER_MAP: dict[str, int] = {
@@ -281,13 +283,13 @@ def _compute_quality_signals(
     coverage = (total / expected) if (expected and expected > 0) else None
     rent_ratio = (rent_present / total) if total else None
     if expected and expected > 0 and total > max(30, 3 * expected):
-        flag = "CONTAMINATED"          # e.g. AppFolio PMC-wide dump
+        flag = "CONTAMINATED"  # e.g. AppFolio PMC-wide dump
     elif total == 0:
         flag = "UNKNOWN"
     elif unit_level == 0:
         flag = "PLAN_LEVEL"
     elif coverage is not None and coverage < 0.3:
-        flag = "THIN"                  # unit-level but far below expected
+        flag = "THIN"  # unit-level but far below expected
     else:
         flag = "UNIT_LEVEL"
     return unit_level, plan_level, coverage, rent_ratio, flag
@@ -421,13 +423,10 @@ def result_contamination_reason(
         if flag == "CONTAMINATED":
             return "quality_flag_contaminated"
         resolved, foreign = _foreign_zip_counts(units, property_zip)
-        if (
-            resolved >= _ROSTER_MIN_RESOLVED_ROWS
-            and foreign / resolved >= _ROSTER_FOREIGN_ZIP_RATIO
-        ):
+        if resolved >= _ROSTER_MIN_RESOLVED_ROWS and foreign / resolved >= _ROSTER_FOREIGN_ZIP_RATIO:
             return f"foreign_zip_scope:{foreign}/{resolved}"
     except Exception:  # noqa: BLE001 — a contamination check must never
-        return ""      # sink the profile update; declining is the safe side
+        return ""  # sink the profile update; declining is the safe side
     return ""
 
 
@@ -451,24 +450,24 @@ def _response_looks_like_units(body: Any) -> bool:
 # these directly without the originating browser session will always fail
 # (401/403/0-byte body) and pollutes the profile with unreplayable hints.
 _INFRA_API_DOMAINS: tuple[str, ...] = (
-    "supabase.co",          # Supabase REST / Realtime backend
+    "supabase.co",  # Supabase REST / Realtime backend
     "supabase.io",
-    "hereapi.com",          # HERE Location Services (maps/geocoding POIs)
+    "hereapi.com",  # HERE Location Services (maps/geocoding POIs)
     "here.com/v1/",
     "browse.search.hereapi",
-    "googleapis.com",       # Google APIs
+    "googleapis.com",  # Google APIs
     "firebase.com",
     "firebaseio.com",
-    "amazonaws.com/",       # AWS S3 / Lambda paths
-    "execute-api.",         # AWS API Gateway custom domains (*.execute-api.*.amazonaws.com)
-    "cloudfront.net",       # AWS CloudFront CDN assets (no /api/ restriction)
-    "matterport.com",       # 3-D virtual tour API — never serves apartment data
-    "omappapi.com",         # OptinMonster popup service
+    "amazonaws.com/",  # AWS S3 / Lambda paths
+    "execute-api.",  # AWS API Gateway custom domains (*.execute-api.*.amazonaws.com)
+    "cloudfront.net",  # AWS CloudFront CDN assets (no /api/ restriction)
+    "matterport.com",  # 3-D virtual tour API — never serves apartment data
+    "omappapi.com",  # OptinMonster popup service
     "omappa.com",
-    "theconversioncloud.com",   # Conversion Cloud widget
+    "theconversioncloud.com",  # Conversion Cloud widget
     "nestiolistings.com/api/",  # Nestio/Funnel neighborhoods/config API
-    "sightmap.com/app/api/",    # SightMap internal config (not the unit data endpoint)
-    "s3.amazonaws.com",     # S3 direct object URLs
+    "sightmap.com/app/api/",  # SightMap internal config (not the unit data endpoint)
+    "s3.amazonaws.com",  # S3 direct object URLs
 )
 
 
@@ -477,6 +476,80 @@ def _is_infra_api_url(url: str) -> bool:
     cannot be replayed without the originating browser session."""
     lower = url.lower()
     return any(domain in lower for domain in _INFRA_API_DOMAINS)
+
+
+def _identity_admitted_unit_source_urls(scrape_result: dict[str, Any]) -> list[str]:
+    """Exact unit-producing routes safe enough to persist for replay.
+
+    A successful roster alone is not route-identity evidence: the August 1
+    audit found valid-looking wrong-property API responses. Require the
+    response hash, a successful status, physical rows, and an explicit
+    property-identity ``MATCH`` emitted by the adapter. ``UNKNOWN`` remains a
+    diagnostic record in the property output but never becomes warm state.
+    """
+    from ma_poc.pms.source_provenance import sanitise_source_url
+
+    raw_candidates: list[str] = []
+    winner = str(scrape_result.get("_winning_page_url") or "").strip()
+    if winner:
+        raw_candidates.append(winner)
+    for response in scrape_result.get("_raw_api_responses") or []:
+        if not isinstance(response, dict):
+            continue
+        candidate = str(response.get("url") or "").strip()
+        if candidate and candidate not in raw_candidates:
+            raw_candidates.append(candidate)
+
+    urls: list[str] = []
+    for record in scrape_result.get("_unit_source_provenance") or []:
+        if not isinstance(record, dict):
+            continue
+        identity = record.get("identity") or {}
+        if not isinstance(identity, dict) or str(identity.get("status") or "").upper() != "MATCH":
+            continue
+        try:
+            status = int(record.get("response_status") or 0)
+            unit_count = int(record.get("unit_count") or 0)
+        except (TypeError, ValueError):
+            continue
+        response_hash = str(record.get("response_sha256") or "").strip().lower()
+        safe_url = str(record.get("source_url") or "").strip()
+        # Provenance is intentionally output-safe and redacts credential-like
+        # query values. A redacted URL is evidence, not a replay route. Recover
+        # the exact in-memory URL only when it sanitizes to this same record;
+        # otherwise withhold it instead of persisting a broken placeholder.
+        exact_candidates = [
+            candidate for candidate in raw_candidates if sanitise_source_url(candidate) == safe_url
+        ]
+        redacted = "<redacted>" in urllib.parse.unquote(safe_url).casefold()
+        if exact_candidates:
+            url = exact_candidates[0]
+        elif redacted:
+            continue
+        else:
+            url = safe_url
+        parsed = urllib.parse.urlparse(url)
+        if (
+            not 200 <= status < 300
+            or unit_count <= 0
+            or not re.fullmatch(r"[0-9a-f]{64}", response_hash)
+            or parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or _is_infra_api_url(url)
+        ):
+            continue
+        if url not in urls:
+            urls.append(url)
+    return urls
+
+
+def _route_has_admitted_provenance(url: str, admitted_urls: list[str]) -> bool:
+    """Require the exact sanitized route, including non-secret query keys."""
+
+    from ma_poc.pms.source_provenance import sanitise_source_url
+
+    safe = sanitise_source_url(url)
+    return any(sanitise_source_url(candidate) == safe for candidate in admitted_urls)
 
 
 _MAX_BLOCKED_ENDPOINTS = 50
@@ -508,7 +581,7 @@ def _classify_llm_analysis_verdict(value: Any) -> tuple[str, dict | None, str | 
     if value == "blocked":
         return "noise", None, "no_unit_data"
     if isinstance(value, str) and value.startswith("noise:"):
-        reason = value[len("noise:"):].strip() or "no_unit_data"
+        reason = value[len("noise:") :].strip() or "no_unit_data"
         return "noise", None, reason
     return "ignored", None, None
 
@@ -626,16 +699,26 @@ def save_llm_field_mapping(
     # would always produce 0 units), so we pin quality_score=0.5 and skip the Phase 10
     # check rather than letting it demote a known-degraded mapping to its 0.4 floor.
     quality_score = 0.5 if is_degraded else 1.0
-    if not is_degraded and not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
+    if (
+        not is_degraded
+        and not multi_source
+        and body_for_validation is not None
+        and expected_unit_count is not None
+        and expected_unit_count > 0
+    ):
         try:
             from ma_poc.services.llm_extractor import apply_saved_mapping
-            replayed = apply_saved_mapping(
-                body_for_validation,
-                {
-                    "response_envelope": mapping_dict.get("response_envelope", ""),
-                    "json_paths": json_paths,
-                },
-            ) or []
+
+            replayed = (
+                apply_saved_mapping(
+                    body_for_validation,
+                    {
+                        "response_envelope": mapping_dict.get("response_envelope", ""),
+                        "json_paths": json_paths,
+                    },
+                )
+                or []
+            )
         except Exception:
             replayed = []
         ratio = len(replayed) / expected_unit_count
@@ -643,7 +726,10 @@ def save_llm_field_mapping(
             quality_score = max(DOM_HINT_QUALITY_REPLAY_FLOOR, ratio)
             log.warning(
                 "Mapping for %s saved at quality_score=%.2f (replay produced %d/%d units)",
-                url_pattern[:80], quality_score, len(replayed), expected_unit_count,
+                url_pattern[:80],
+                quality_score,
+                len(replayed),
+                expected_unit_count,
             )
 
     for existing in profile.api_hints.llm_field_mappings:
@@ -733,14 +819,16 @@ def save_field_patch(profile: ScrapeProfile, patch_dict: dict) -> bool:
                 if patch_dict.get("_envelope_hash"):
                     existing.source_envelope_hash = patch_dict["_envelope_hash"]
                 return True
-        profile.api_hints.field_patches.append(FieldPatch(
-            api_url_pattern=url,
-            field_name=field_name,
-            json_path=json_path,
-            confidence=patch_dict.get("confidence", 0.85),
-            parser_fix=patch_dict.get("parser_fix"),
-            source_envelope_hash=patch_dict.get("_envelope_hash", ""),
-        ))
+        profile.api_hints.field_patches.append(
+            FieldPatch(
+                api_url_pattern=url,
+                field_name=field_name,
+                json_path=json_path,
+                confidence=patch_dict.get("confidence", 0.85),
+                parser_fix=patch_dict.get("parser_fix"),
+                source_envelope_hash=patch_dict.get("_envelope_hash", ""),
+            )
+        )
         if len(profile.api_hints.field_patches) > 50:
             profile.api_hints.field_patches = profile.api_hints.field_patches[-50:]
         return True
@@ -844,6 +932,16 @@ def update_profile_after_extraction(
     store: ProfileStore,
 ) -> ScrapeProfile:
     """Update profile based on what worked during this scrape."""
+    from ma_poc.services.profile_route_quarantine import (
+        quarantine_reason,
+        route_is_quarantined,
+        sanitise_profile_routes,
+    )
+
+    # Stop a legacy poisoned profile before any of its routes can be refreshed
+    # into another warm generation. Existing stores remain untouched until the
+    # normal successful write boundary below.
+    profile, _quarantined_on_read = sanitise_profile_routes(profile)
     tier = scrape_result.get("extraction_tier_used")
 
     # Data-quality signals, computed ONCE up front (2026-07-28). They were
@@ -875,9 +973,7 @@ def update_profile_after_extraction(
     llm_interactions = scrape_result.get("_llm_interactions") or []
     if llm_interactions:
         profile.stats.total_llm_calls += len(llm_interactions)
-        profile.stats.total_llm_cost_usd += sum(
-            (i.get("cost_usd", 0.0) or 0.0) for i in llm_interactions
-        )
+        profile.stats.total_llm_cost_usd += sum((i.get("cost_usd", 0.0) or 0.0) for i in llm_interactions)
 
     # Record success/failure streak
     if units_extracted > 0 and tier and tier != "FAILED":
@@ -898,9 +994,7 @@ def update_profile_after_extraction(
         q.last_coverage_ratio = _cov
         q.last_rent_present_ratio = _rent
         q.last_quality_flag = _flag
-        q.consecutive_plan_level = (
-            q.consecutive_plan_level + 1 if _flag == "PLAN_LEVEL" else 0
-        )
+        q.consecutive_plan_level = q.consecutive_plan_level + 1 if _flag == "PLAN_LEVEL" else 0
         # task #45 circuit-breaker feedback loop. Counts only renders that were
         # ATTEMPTED (runner stamps _plan_render_attempted) and HELD (final
         # result still not unit-level) — so flag-off periods can never inflate
@@ -944,24 +1038,64 @@ def update_profile_after_extraction(
     # permanent — it comes back next run at the top hop score (10_001) and
     # re-ships the same wrong roster, so the residual is a function of which
     # URLs got persisted rather than of how many properties use the platform.
+    admitted_unit_sources = _identity_admitted_unit_source_urls(scrape_result)
+    has_unit_source_provenance = any(
+        isinstance(item, dict) for item in (scrape_result.get("_unit_source_provenance") or [])
+    )
     winning_url = scrape_result.get("_winning_page_url")
+    if not winning_url and len(admitted_unit_sources) == 1:
+        winning_url = admitted_unit_sources[0]
     # Captured BEFORE the write: the invalidation below must judge the URL
     # this run INHERITED from disk, not one this same call just wrote.
     _stored_wpu = profile.navigation.winning_page_url
-    if winning_url and units_extracted > 0 and not _is_infra_api_url(winning_url):
+    if (
+        winning_url
+        and units_extracted > 0
+        and not _is_infra_api_url(winning_url)
+        and not route_is_quarantined(profile.canonical_id, winning_url)
+        and (
+            not has_unit_source_provenance
+            or _route_has_admitted_provenance(winning_url, admitted_unit_sources)
+        )
+    ):
         if contamination:
             log.warning(
                 "refusing to persist winning_page_url for %s (%s): %s",
-                profile.canonical_id, contamination, winning_url,
+                profile.canonical_id,
+                contamination,
+                winning_url,
             )
-            _emit_mapping_save_dropped(
-                profile.canonical_id, f"contaminated_winning_url:{contamination}"
-            )
+            _emit_mapping_save_dropped(profile.canonical_id, f"contaminated_winning_url:{contamination}")
         else:
             profile.navigation.winning_page_url = winning_url
             path = urllib.parse.urlparse(winning_url).path
             if path and path != "/":
                 profile.navigation.availability_page_path = path
+    elif winning_url and route_is_quarantined(profile.canonical_id, winning_url):
+        log.warning(
+            "refusing to persist quarantined route for %s (%s): %s",
+            profile.canonical_id,
+            quarantine_reason(profile.canonical_id, winning_url),
+            winning_url,
+        )
+    elif winning_url and has_unit_source_provenance:
+        log.warning(
+            "refusing to persist unit-source route without MATCH provenance for %s: %s",
+            profile.canonical_id,
+            winning_url,
+        )
+        _emit_mapping_save_dropped(profile.canonical_id, "winning_url_without_match_identity")
+
+    # Preserve every independently property-matched unit-producing response,
+    # including multi-plan rosters where there is no honest single winner.
+    # These are route hints, not output admission evidence; contamination and
+    # quarantine still dominate.
+    if units_extracted > 0 and not contamination:
+        for source_url in admitted_unit_sources:
+            if route_is_quarantined(profile.canonical_id, source_url):
+                continue
+            if source_url not in profile.navigation.availability_links:
+                profile.navigation.availability_links.append(source_url)
 
     # ── Invalidate a winning_page_url that must not be replayed ────────
     # (a) zero units — the scraper tried profile:winning_page_url as a hop
@@ -980,11 +1114,7 @@ def update_profile_after_extraction(
     # instead of taking the profile shortcut.
     _hop_anchor_used = scrape_result.get("_winning_page_url_hop_outcome")
     _invalidate_reason = ""
-    if (
-        units_extracted == 0
-        and _hop_anchor_used == "profile:winning_page_url:failed"
-        and _stored_wpu
-    ):
+    if units_extracted == 0 and _hop_anchor_used == "profile:winning_page_url:failed" and _stored_wpu:
         _invalidate_reason = "zero_units"
     elif contamination and _stored_wpu and _same_surface(winning_url, _stored_wpu):
         _invalidate_reason = f"contaminated:{contamination}"
@@ -993,9 +1123,7 @@ def update_profile_after_extraction(
         profile.navigation.winning_page_url = None
         profile.navigation.availability_page_path = None
         profile.confidence.maturity = ProfileMaturity.COLD  # type: ignore[attr-defined]
-        profile.confidence.consecutive_failures = max(
-            3, profile.confidence.consecutive_failures
-        )
+        profile.confidence.consecutive_failures = max(3, profile.confidence.consecutive_failures)
         if contamination and _stored_wpu:
             # Clearing winning_page_url alone only demotes the poisoned URL
             # from score 10_001 to 10_000 — availability_links is injected as
@@ -1004,28 +1132,40 @@ def update_profile_after_extraction(
             # it. Note explored_skip subtracts winning_page_url +
             # availability_links, so the skip only bites once both are clear.
             profile.navigation.availability_links = [
-                u
-                for u in (profile.navigation.availability_links or [])
-                if not _same_surface(u, _stored_wpu)
+                u for u in (profile.navigation.availability_links or []) if not _same_surface(u, _stored_wpu)
             ]
             record_explored_link(profile, _stored_wpu, had_data=False)
             log.warning(
                 "invalidated poisoned winning_page_url for %s (%s): %s",
-                profile.canonical_id, _invalidate_reason, _stored_wpu,
+                profile.canonical_id,
+                _invalidate_reason,
+                _stored_wpu,
             )
-            _emit_mapping_save_dropped(
-                profile.canonical_id, f"invalidated_winning_url:{contamination}"
-            )
+            _emit_mapping_save_dropped(profile.canonical_id, f"invalidated_winning_url:{contamination}")
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
     # 2026-07-19 fix: gate on the resolved tier FAMILY (base 1), not the exact
     # bare code, so suffixed API wins (TIER_1_API_ENTRATA, TIER_1_KNOCK_API, …)
     # also persist their endpoints. The _response_looks_like_units filter below
     # still guards against noise, so broadening the gate is safe.
-    if _base_tier_num(tier) == 1 or tier == "TIER_5_5_EXPLORATORY":
+    if not contamination and (_base_tier_num(tier) == 1 or tier == "TIER_5_5_EXPLORATORY"):
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")
+            if route_is_quarantined(profile.canonical_id, url):
+                log.warning(
+                    "refusing to persist quarantined API route for %s: %s",
+                    profile.canonical_id,
+                    url,
+                )
+                continue
+            if has_unit_source_provenance and not _route_has_admitted_provenance(url, admitted_unit_sources):
+                log.warning(
+                    "refusing to persist API route without MATCH provenance for %s: %s",
+                    profile.canonical_id,
+                    url,
+                )
+                continue
             if _response_looks_like_units(api.get("body")):
                 # Track widget endpoints separately (they need special handling)
                 if "/apartments/module/widgets/" in url.lower():
@@ -1101,9 +1241,7 @@ def update_profile_after_extraction(
             # the daily LLM-tax pattern this fix targets.
             quality_raw = llm_hints.get("css_selectors_quality")
             if isinstance(quality_raw, (int, float)):
-                profile.dom_hints.field_selectors_quality = max(
-                    0.0, min(1.0, float(quality_raw))
-                )
+                profile.dom_hints.field_selectors_quality = max(0.0, min(1.0, float(quality_raw)))
             else:
                 profile.dom_hints.field_selectors_quality = 1.0
 
@@ -1198,11 +1336,7 @@ def update_profile_after_extraction(
     # ── Record LLM API analysis results (new workflow) ─────────
     # Build a url→body lookup from the raw captured responses once
     raw_apis = scrape_result.get("_raw_api_responses", []) or []
-    url_to_body: dict[str, Any] = {
-        r.get("url", ""): r.get("body")
-        for r in raw_apis
-        if isinstance(r, dict)
-    }
+    url_to_body: dict[str, Any] = {r.get("url", ""): r.get("body") for r in raw_apis if isinstance(r, dict)}
     # Use actual unit count from this run as the validation target
     expected_n = max(len(scrape_result.get("units", []) or []), 1)
 
@@ -1272,7 +1406,9 @@ def update_profile_after_extraction(
             # the property's other learning still completes.
             log.warning(
                 "Unrecognised _llm_analysis_results value for %s on %s (type=%s) — skipped",
-                api_url, profile.canonical_id, type(result).__name__,
+                api_url,
+                profile.canonical_id,
+                type(result).__name__,
             )
 
     # Merge into prior verdicts (newer entries supersede; cap at 50 to
@@ -1324,8 +1460,12 @@ def update_profile_after_extraction(
             # bucket once it crosses 0.8.
             try:
                 from ma_poc.config.feature_flags import enable_promote_on_hint
+
                 if enable_promote_on_hint():
-                    cur_q = float(getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX) or DOM_HINT_QUALITY_MAX)
+                    cur_q = float(
+                        getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX)
+                        or DOM_HINT_QUALITY_MAX
+                    )
                     # round(.., 2) avoids float drift (see DOM_HINT_QUALITY_PROMOTE_STEP comment)
                     profile.dom_hints.field_selectors_quality = min(
                         DOM_HINT_QUALITY_MAX,
@@ -1334,11 +1474,10 @@ def update_profile_after_extraction(
             except Exception:
                 pass
         else:
-            profile.dom_hints.consecutive_misses = getattr(
-                profile.dom_hints, "consecutive_misses", 0
-            ) + 1
+            profile.dom_hints.consecutive_misses = getattr(profile.dom_hints, "consecutive_misses", 0) + 1
             try:
                 from ma_poc.observability.events import EventKind, emit
+
                 emit(
                     EventKind.DOM_HINTS_MISS,
                     profile.canonical_id,
@@ -1347,7 +1486,8 @@ def update_profile_after_extraction(
             except Exception:
                 pass
             fs_quality = float(
-                getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX) or DOM_HINT_QUALITY_MAX
+                getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX)
+                or DOM_HINT_QUALITY_MAX
             )
             eviction_threshold = 3 if fs_quality >= DOM_HINT_QUALITY_RESILIENT_FLOOR else 1
             if profile.dom_hints.consecutive_misses >= eviction_threshold:
@@ -1362,6 +1502,7 @@ def update_profile_after_extraction(
                 profile.dom_hints.consecutive_misses = 0
                 try:
                     from ma_poc.observability.events import EventKind, emit
+
                     emit(
                         EventKind.DOM_HINTS_EVICTED,
                         profile.canonical_id,
@@ -1375,7 +1516,8 @@ def update_profile_after_extraction(
     _EVICTION_THRESHOLD = 3
     before_count = len(profile.api_hints.llm_field_mappings)
     profile.api_hints.llm_field_mappings = [
-        m for m in profile.api_hints.llm_field_mappings
+        m
+        for m in profile.api_hints.llm_field_mappings
         if getattr(m, "consecutive_replay_failures", 0) < _EVICTION_THRESHOLD
     ]
     evicted = before_count - len(profile.api_hints.llm_field_mappings)
@@ -1383,6 +1525,7 @@ def update_profile_after_extraction(
         log.info("Evicted %d stale mapping(s) for %s", evicted, profile.canonical_id)
         try:
             from ma_poc.observability.events import EventKind, emit
+
             emit(EventKind.MAPPING_EVICTED, profile.canonical_id, count=evicted)
         except Exception:
             pass
@@ -1390,7 +1533,8 @@ def update_profile_after_extraction(
     # Phase 7: evict stale FieldPatches after 3 consecutive replay failures
     fp_before = len(profile.api_hints.field_patches)
     profile.api_hints.field_patches = [
-        p for p in profile.api_hints.field_patches
+        p
+        for p in profile.api_hints.field_patches
         if getattr(p, "consecutive_replay_failures", 0) < _EVICTION_THRESHOLD
     ]
     fp_evicted = fp_before - len(profile.api_hints.field_patches)
@@ -1398,6 +1542,7 @@ def update_profile_after_extraction(
         log.info("Evicted %d stale field patch(es) for %s", fp_evicted, profile.canonical_id)
         try:
             from ma_poc.observability.events import EventKind, emit
+
             emit(EventKind.FIELD_PATCH_EVICTED, profile.canonical_id, count=fp_evicted)
         except Exception:
             pass
@@ -1407,6 +1552,7 @@ def update_profile_after_extraction(
     if merged_units:
         try:
             from ma_poc.services.source_observer import record_source_observations
+
             record_source_observations(profile, merged_units)
         except Exception as exc:
             log.warning("record_source_observations call failed: %s", exc)
@@ -1438,18 +1584,17 @@ def update_profile_after_extraction(
     try:
         pid = scrape_result.get("_rentcafe_property_id")
         rc_tier = scrape_result.get("extraction_tier_used", "")
-        if (
-            pid
-            and rc_tier
-            in (
-                "TIER_1_API_RENTCAFE_DIRECT",
-                "TIER_1_API_RENTCAFE_DIRECT_LIST_EMPTY",
-            )
+        if pid and rc_tier in (
+            "TIER_1_API_RENTCAFE_DIRECT",
+            "TIER_1_API_RENTCAFE_DIRECT_LIST_EMPTY",
         ):
             profile.api_hints.rentcafe_property_id = str(pid)
     except Exception as exc:
         log.warning("failed to persist rentcafe_property_id: %s", exc)
 
+    # Catch every secondary persistence channel (LLM mappings, field patches,
+    # navigation hints) at one final boundary as defence in depth.
+    profile, _quarantined_before_save = sanitise_profile_routes(profile)
     profile.updated_at = datetime.utcnow()
     profile.version += 1
     store.save(profile)
@@ -1495,8 +1640,12 @@ def update_fetch_profile_after_fetch(
                 fp.total_escalations += 1
                 fp.consecutive_successes_at_floor = 1
                 fp.consecutive_failures_at_floor = 0
-                emit(EventKind.FETCH_TIER_PERSISTED, profile.canonical_id,
-                     new_floor=fp.tier_floor.name, reason="promotion")
+                emit(
+                    EventKind.FETCH_TIER_PERSISTED,
+                    profile.canonical_id,
+                    new_floor=fp.tier_floor.name,
+                    reason="promotion",
+                )
             elif tier_used == int(fp.tier_floor):
                 fp.consecutive_successes_at_floor += 1
                 fp.consecutive_failures_at_floor = 0
@@ -1505,8 +1654,7 @@ def update_fetch_profile_after_fetch(
                 fp.tier_floor = FetchTier(tier_used)
                 fp.consecutive_successes_at_floor = 1
                 fp.consecutive_failures_at_floor = 0
-                emit(EventKind.FETCH_TIER_DEMOTED, profile.canonical_id,
-                     new_floor=fp.tier_floor.name)
+                emit(EventKind.FETCH_TIER_DEMOTED, profile.canonical_id, new_floor=fp.tier_floor.name)
         else:
             fp.consecutive_failures_at_floor += 1
             if outcome_str == "BOT_BLOCKED":

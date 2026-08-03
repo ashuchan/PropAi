@@ -252,6 +252,7 @@ def test_template_a_unit_level_two_rows() -> None:
     assert len(units) == 2
     u0 = units[0]
     assert u0["floor_plan_name"] == "2 Bedroom 1 Bath"
+    assert u0["_floor_plan_name_provenance"] == "marketapts.plan.name"
     assert u0["unit_number"] == "213"
     assert u0["bedrooms"] == "2"
     assert u0["bathrooms"] == "1"
@@ -282,6 +283,44 @@ def test_template_a_mixed_plans() -> None:
         [_PLAN_A_TWO_UNITS, _PLAN_A_PLAN_ONLY], "u"
     )
     assert len(rows) == 3  # 2 unit-level + 1 plan-level fallback
+
+
+def test_template_a_retains_scalar_and_range_area_without_midpoint() -> None:
+    """Sandpiper's exact/ranged plan area survives on unit-level rows."""
+
+    exact = dict(_PLAN_A_TWO_UNITS, areaText="1,458 sq.ft.")
+    ranged = dict(_PLAN_A_TWO_UNITS, areaText="1,128 - 1,458 sq.ft.")
+
+    exact_rows = parse_marketapts_template_a([exact], "https://example.test/floorplans")
+    range_rows = parse_marketapts_template_a([ranged], "https://example.test/floorplans")
+
+    assert all(row["sqft"] == "1458" for row in exact_rows)
+    assert all(row["area_low"] == 1458 for row in exact_rows)
+    assert all(row["area_high"] == 1458 for row in exact_rows)
+    assert all(row["area_provenance"] == "published_plan_exact" for row in exact_rows)
+    assert all(row["sqft"] == "" for row in range_rows)
+    assert all(row["area_low"] == 1128 for row in range_rows)
+    assert all(row["area_high"] == 1458 for row in range_rows)
+    assert all(
+        row["area_provenance"] == "published_plan_range_no_midpoint"
+        for row in range_rows
+    )
+
+
+@pytest.mark.asyncio
+async def test_template_a_area_source_payload_is_archived_and_hashed() -> None:
+    """A field-producing live DOM payload remains replayable by hash."""
+
+    plan = dict(_PLAN_A_TWO_UNITS, areaText="1,458 sq.ft.")
+    payload = {"template": "A", "plans": [plan]}
+
+    result = await MarketAptsAdapter().extract(_FakePage(payload), _ctx())  # type: ignore[arg-type]
+
+    assert len(result.html_responses) == 1
+    assert result.html_responses[0]["body"] == payload
+    assert len(result.unit_source_provenance) == 1
+    expected_hash = result.unit_source_provenance[0]["response_sha256"]
+    assert all(row["source_response_sha256"] == expected_hash for row in result.units)
 
 
 # ── Template B parser tests ─────────────────────────────────────────
@@ -1386,6 +1425,7 @@ _STATIC_A_LISTING = """
   <div class="floorplan-block" data-bedrooms="1" data-bathrooms="1">
     <div class="floorplan-name">A1</div>
     <div class="floorplan-num">$975</div>
+    <div class="floorplan-sqft">930 sq.ft.</div>
     <div class="floorplan-unit-single" data-price="975" data-when="2026-08-07">
       UNIT 3109 <span class="unit-price-single">$975</span>
       <span class="unit-available-single">Available 08/07/2026</span>
@@ -1438,6 +1478,8 @@ def test_static_payload_template_a_inline() -> None:
     assert units[0]["unit_number"] == "3109"
     assert str(units[0]["market_rent_low"]) == "975"
     assert units[0]["availability_date"] == "2026-08-07"
+    assert units[0]["sqft"] == "930"
+    assert units[0]["area_range"] == "930"
 
 
 def test_static_payload_none_when_no_markers() -> None:

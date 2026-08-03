@@ -1,0 +1,8 @@
+result_type,family,adapter_variant,probed_properties,historical_exact_tier_properties,identity_proven_properties,inventory_properties,future_oracle_properties,future_defect_properties,future_defect_rate,native_future_rows,future_preserved_rows,scrape_date_default_rows,classification_counts_json,defect_property_ids
+local_current_live_scrape_date_only_tier_audit_not_canary,AspenSquare,ASPENSQUARE_OPERATOR,3,3,3,3,2,0,0.0,24,24,0,"{""ambiguous"": 1, ""native_future_preserved"": 2}",
+local_current_live_scrape_date_only_tier_audit_not_canary,Entrata API,ENTRATA_API,3,3,3,3,3,0,0.0,29,29,8,"{""native_future_preserved"": 3}",
+local_current_live_scrape_date_only_tier_audit_not_canary,OneSite / OneSite Workflow,ONESITE_API,5,5,5,4,2,2,1.0,23,0,0,"{""ambiguous"": 2, ""native_future_lost/defaulted_to_scrape_date"": 2, ""no_inventory"": 1}",7886;25395
+local_current_live_scrape_date_only_tier_audit_not_canary,OneSite / OneSite Workflow,ONESITE_WORKFLOW,3,2,3,3,1,1,1.0,2,0,26,"{""native_future_lost/defaulted_to_scrape_date"": 1, ""no_native_date"": 2}",283561
+local_current_live_scrape_date_only_tier_audit_not_canary,RealPage OLL API,REALPAGE_OLL,4,4,4,3,3,3,1.0,20,0,0,"{""native_future_lost/defaulted_to_scrape_date"": 3, ""no_inventory"": 1}",2114;263081;263789
+local_current_live_scrape_date_only_tier_audit_not_canary,Squarespace,SQUARESPACE_SHELL_APPFOLIO,2,0,2,2,2,0,0.0,10,10,0,"{""native_future_preserved"": 2}",
+local_current_live_scrape_date_only_tier_audit_not_canary,Squarespace,SQUARESPACE_UNIT_BLOCK,1,1,1,1,1,1,1.0,3,0,8,"{""native_future_lost/defaulted_to_scrape_date"": 1}",241432

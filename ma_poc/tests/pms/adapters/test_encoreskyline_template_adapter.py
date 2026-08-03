@@ -10,6 +10,7 @@ Jonah widget to insert its rendered rows, and parses
 
 from __future__ import annotations
 
+import json
 import types
 
 import pytest
@@ -333,9 +334,14 @@ _JONAH_ONLY_BODY = "<html><body><script>jonahdigital.init()</script>no plans her
 _PLAIN_BODY = "<html><body>plain marketing site, no widget</body></html>"
 
 
-def _ctx_with_body(body, url="https://www.example-encore.com/"):
+def _ctx_with_body(
+    body,
+    url="https://www.example-encore.com/",
+    *,
+    final_url="",
+):
     from ma_poc.pms.detector import detect_pms
-    fr = types.SimpleNamespace(body=body)
+    fr = types.SimpleNamespace(body=body, final_url=final_url)
     return AdapterContext(
         base_url=url,
         detected=detect_pms(url),
@@ -388,9 +394,16 @@ async def test_extract_page_none_recovers_rentpress_from_body() -> None:
 
 
 @pytest.mark.asyncio
-async def test_extract_page_none_gate_passes_on_body_marker() -> None:
+async def test_extract_page_none_gate_passes_on_body_marker(monkeypatch) -> None:
     """Gate must no longer false-fail: a jonahdigital body with no plans now
     gets PAST the marker gate to an honest no-plan-links verdict."""
+    async def _no_network(_url: str):
+        return "", _url
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.encoreskyline_template._probe_public_html",
+        _no_network,
+    )
     adapter = EncoreSkylineTemplateAdapter()
     res = await adapter.extract(None, _ctx_with_body(_JONAH_ONLY_BODY))
     assert res.tier_used != "NOT_ENCORESKYLINE_TEMPLATE"
@@ -403,3 +416,185 @@ async def test_extract_page_none_plain_body_still_rejected() -> None:
     adapter = EncoreSkylineTemplateAdapter()
     res = await adapter.extract(None, _ctx_with_body(_PLAIN_BODY))
     assert res.tier_used == "NOT_ENCORESKYLINE_TEMPLATE"
+
+
+def _resource_html(
+    *, plan: str, unit: str, rent: str, date: str, source_id: str
+) -> str:
+    payload = {
+        "type": "floorplan",
+        "title": plan,
+        "bedrooms": "1",
+        "bathrooms": "1",
+        "square_feet": "700",
+        "units": [
+            {
+                "type": "unit",
+                "apartment_number": unit,
+                "availability_count": 1,
+                "floorplan_title": plan,
+                "bedrooms": "1",
+                "bathrooms": "1",
+                "square_feet": "700",
+                "price_entity": {
+                    "date": date,
+                    "adjusted": {"low_no_fees": rent, "high_no_fees": rent},
+                },
+                "engrain_data": {"unit_id": source_id},
+            }
+        ],
+    }
+    return (
+        "<script>jonahdigital</script>"
+        "<script type='application/json' id='jd-fp-data-script-resource'>"
+        + json.dumps(payload)
+        + "</script>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_page_none_fetches_static_jonah_plan_resources(monkeypatch) -> None:
+    """Production page=None recovers actual unit rows without JS clicks."""
+    base = "https://gsc.example/apartments/north-carolina/duke-manor/"
+    a = base + "floorplans/arthur/"
+    b = base + "floorplans/bristol/"
+    landing = (
+        "<script>jonahdigital</script>"
+        f"<a href='{a}'>Arthur</a><a href='{b}'>Bristol</a>"
+    )
+    bodies = {
+        a: _resource_html(
+            plan="Arthur", unit="B", rent="1000", date="2026-08-17", source_id="u1"
+        ),
+        b: _resource_html(
+            plan="Bristol", unit="14", rent="1100", date="2026-09-01", source_id="u2"
+        ),
+    }
+    calls: list[str] = []
+
+    async def _fake_probe(url: str):
+        calls.append(url)
+        return bodies.get(url, ""), url
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.encoreskyline_template._probe_public_html",
+        _fake_probe,
+    )
+    result = await EncoreSkylineTemplateAdapter().extract(
+        None, _ctx_with_body(landing, base)
+    )
+    assert result.tier_used == "TIER_1_DOM_JONAH_RESOURCE_JSON"
+    assert [(u["floor_plan_name"], u["unit_number"]) for u in result.units] == [
+        ("Arthur", "B"),
+        ("Bristol", "14"),
+    ]
+    assert [u["market_rent_low"] for u in result.units] == [1000, 1100]
+    assert calls == [a, b]
+
+
+@pytest.mark.asyncio
+async def test_page_none_fetches_exact_floorplan_index_when_landing_has_no_links(
+    monkeypatch,
+) -> None:
+    base = "https://gsc.example/apartments/florida/harbour-pointe/"
+    index = base + "floorplans/"
+    plan = index + "cayman/"
+    bodies = {
+        index: f"<script>jonahdigital</script><a href='{plan}'>Cayman</a>",
+        plan: _resource_html(
+            plan="Cayman", unit="016", rent="1345", date="2026-08-10", source_id="u16"
+        ),
+    }
+    calls: list[str] = []
+
+    async def _fake_probe(url: str):
+        calls.append(url)
+        return bodies.get(url, ""), url
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.encoreskyline_template._probe_public_html",
+        _fake_probe,
+    )
+    result = await EncoreSkylineTemplateAdapter().extract(
+        None, _ctx_with_body("<script>jonahdigital</script>", base)
+    )
+    assert result.tier_used == "TIER_1_DOM_JONAH_RESOURCE_JSON"
+    assert result.units[0]["unit_number"] == "016"
+    assert calls == [index, plan]
+
+
+@pytest.mark.asyncio
+async def test_page_none_builds_index_from_redirect_final_url(monkeypatch) -> None:
+    """A retired vanity URL must not own the post-redirect floorplan path."""
+    configured = (
+        "https://www.livebellrock.com/apartments/tx/katy/"
+        "bellrock-market-station/"
+    )
+    current = "https://bellrockmarketstation.com/"
+    index = current + "floorplans/"
+    plan = index + "a1/"
+    bodies = {
+        index: f"<script>jonahdigital</script><a href='{plan}'>A1</a>",
+        plan: _resource_html(
+            plan="A1",
+            unit="4231",
+            rent="1280",
+            date="2026-08-01",
+            source_id="u1",
+        ),
+    }
+    calls: list[str] = []
+
+    async def _fake_probe(url: str):
+        calls.append(url)
+        return bodies.get(url, ""), url
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.encoreskyline_template._probe_public_html",
+        _fake_probe,
+    )
+    result = await EncoreSkylineTemplateAdapter().extract(
+        None,
+        _ctx_with_body(
+            "<script>jonahdigital</script>",
+            configured,
+            final_url=current,
+        ),
+    )
+    assert result.tier_used == "TIER_1_DOM_JONAH_RESOURCE_JSON"
+    assert result.units[0]["unit_number"] == "4231"
+    assert result.winning_url == index
+    assert calls == [index, plan]
+
+
+@pytest.mark.asyncio
+async def test_static_jonah_fanout_keeps_nineteenth_plan(monkeypatch) -> None:
+    """Bellrock's 19-plan roster must not be truncated at the former cap 18."""
+    base = "https://bellrock.example/"
+    links = [base + f"floorplans/p{i}/" for i in range(1, 20)]
+    landing = "<script>jonahdigital</script>" + "".join(
+        f"<a href='{url}'>P{i}</a>" for i, url in enumerate(links, start=1)
+    )
+
+    async def _fake_probe(url: str):
+        i = links.index(url) + 1
+        return (
+            _resource_html(
+                plan=f"P{i}",
+                unit=str(4000 + i),
+                rent=str(1200 + i),
+                date="2026-08-01",
+                source_id=f"u{i}",
+            ),
+            url,
+        )
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters.encoreskyline_template._probe_public_html",
+        _fake_probe,
+    )
+    result = await EncoreSkylineTemplateAdapter().extract(
+        None, _ctx_with_body(landing, base)
+    )
+    assert len(result.units) == 19
+    assert result.units[-1]["unit_number"] == "4019"

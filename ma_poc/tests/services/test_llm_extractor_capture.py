@@ -351,6 +351,125 @@ def test_apply_saved_mapping_skips_unknown_field_paths() -> None:
     assert units[0]["unit_id"] == "U1"
 
 
+def test_apply_saved_mapping_preserves_unit_number_identity() -> None:
+    """A learned ``unit_number`` path must survive deterministic replay.
+
+    Prometheus' public availability API uses ``unitNumber`` rather than a
+    mapping-owned ``unit_id``.  Ignoring that saved field converted a live
+    apartment roster into inferred floor-plan rows despite positive rent.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    body = [
+        {
+            "unitNumber": "247",
+            "rent": "5032.0000",
+            "floorPlanName": "Plan 1K",
+            "bedrooms": "1",
+            "bathrooms": "1",
+            "area": "794",
+        }
+    ]
+    mapping = {
+        "response_envelope": "",
+        "json_paths": {
+            "unit_number": "unitNumber",
+            "rent_low": "rent",
+            "rent_high": "rent",
+            "floor_plan_name": "floorPlanName",
+            "bedrooms": "bedrooms",
+            "bathrooms": "bathrooms",
+            "sqft": "area",
+        },
+    }
+
+    units = apply_saved_mapping(body, mapping)
+
+    assert len(units) == 1
+    # The legacy normalizer canonicalizes either source identity spelling onto
+    # ``unit_id``; the key point is that the mapped live unitNumber survives.
+    assert units[0]["unit_id"] == "247"
+    assert units[0]["market_rent_low"] == 5032.0
+    assert unit_has_real_anchor(units[0]) is True
+
+
+def test_apply_saved_mapping_does_not_promote_plan_id_as_unit_number() -> None:
+    """A historical floor-plan ``id`` mapping is not apartment identity."""
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    body = {
+        "widget_data": {
+            "content": {
+                "floor_plans": {
+                    "floor_plans": [
+                        {
+                            "id": "5212",
+                            "floorplan-name": "A4",
+                            "min_rent": "1450",
+                            "no_of_bedroom": "1",
+                            "no_of_bathroom": "1",
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    mapping = {
+        "response_envelope": "widget_data.content.floor_plans.floor_plans",
+        "json_paths": {
+            "unit_number": "id",
+            "rent_low": "min_rent",
+            "floor_plan_name": "floorplan-name",
+            "bedrooms": "no_of_bedroom",
+            "bathrooms": "no_of_bathroom",
+        },
+    }
+
+    units = apply_saved_mapping(body, mapping)
+
+    assert len(units) == 1
+    assert units[0].get("unit_id") is None
+    assert unit_has_real_anchor(units[0]) is False
+
+
+def test_apply_saved_mapping_parses_exact_currency_rent() -> None:
+    """A scalar ``$909.00`` API value remains numeric replay evidence."""
+    body = [{"unitNumber": "8350", "rentString": "$909.00"}]
+    mapping = {
+        "response_envelope": "",
+        "json_paths": {
+            "unit_number": "unitNumber",
+            "rent_low": "rentString",
+            "rent_high": "rentString",
+        },
+    }
+
+    units = apply_saved_mapping(body, mapping)
+
+    assert units == [
+        {
+            "unit_id": "8350",
+            "floor_plan_name": None,
+            "bedrooms": None,
+            "bathrooms": None,
+            "sqft": None,
+            "market_rent_low": 909.0,
+            "market_rent_high": 909.0,
+            "available_date": None,
+            "availability_status": "UNKNOWN",
+            "confidence": 0.85,
+            "amenities": None,
+            "concession_text": None,
+            "concession_value": None,
+            "concession_source": None,
+            "floor_plan_source": None,
+            "availability_count": None,
+            "lease_term": None,
+            "move_in_date": None,
+        }
+    ]
+
+
 # ── _resolve_prior_observations_block ────────────────────────────────────────
 
 

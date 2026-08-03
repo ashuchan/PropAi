@@ -1,0 +1,56 @@
+{
+  "canary_confirmed": 0,
+  "cohort": "2026-07-31-fetchfix-5k FAILED_NO_DATA exact cohort",
+  "evidence_lane_counts": {
+    "entrata_exact_property_e2e": 6,
+    "generic_direct_e2e": 4,
+    "jonah_gsc_or_rentpress_e2e": 6,
+    "onesite_direct_e2e": 20,
+    "other_current_code_e2e_or_archived_replay": 23,
+    "page_local_archived_replay": 9,
+    "rentcafe_direct_e2e": 31
+  },
+  "goal_target": 207,
+  "known_recovery_level_counts": {
+    "plan": 8,
+    "unit": 38,
+    "unknown": 53
+  },
+  "notes": [
+    "Recovery level is unknown where prior terminal-only probe output did not retain per-property row counts.",
+    "RP counts are same-day validation-oracle counts and are not recovered output counts.",
+    "Plan-only rows remain FAILED_NO_DATA conversions but do not satisfy the native-unit-qualified 207 gate."
+  ],
+  "provenance": "local current-code exact evidence only; RP is validation oracle, never extraction source",
+  "residual_count": 245,
+  "residual_detected_adapter_counts": {
+    "appfolio": 15,
+    "apts247": 1,
+    "cortland": 1,
+    "encoreskyline_template": 6,
+    "entrata": 54,
+    "equity": 1,
+    "essex": 3,
+    "funnel": 6,
+    "g5": 4,
+    "generic_plan_text": 12,
+    "knock": 3,
+    "onesite": 7,
+    "rentcafe": 44,
+    "rentmanager": 16,
+    "repli360": 1,
+    "resman": 3,
+    "sightmap": 7,
+    "squarespace_nopms": 2,
+    "unknown": 48,
+    "wix_nopms": 11
+  },
+  "residual_disposition_counts": {
+    "direct_or_archived_lane_exhausted_no_strict_win": 54,
+    "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill": 36,
+    "residual_unconverted": 132,
+    "securecafe_exact_base_direct_blocked_or_pending_hb": 23
+  },
+  "strict_nonfailed_count": 99,
+  "strict_rate": 0.287791
+}

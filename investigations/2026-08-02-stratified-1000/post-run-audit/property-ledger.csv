@@ -1,0 +1,1001 @@
+apartment_id,name,state,prior_adapter,prior_property_type,current_adapter,current_verdict,unit_count,plan_count,real_id_units,synthetic_id_units,avoidable_synthetic_id_units,building_id_units,unresolved_area_units,exact_area_units,area_range_units,rent_range_units,prior_future_dates_checked,prior_future_dates_preserved,archive_source_count,archive_snapshot_present,identity_status,critical_issues,high_issues,medium_issues,finding_ids,selection_layers
+43,Centennial Place,TX,entrata,SUCCESS,entrata,SUCCESS,15,0,15,0,0,0,0,15,0,0,7,7,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+147,West of Eastland,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,6,0,0,0,6,6,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+446,Cottages @ Sanford,FL,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+486,Rosewood,FL,entrata,SUCCESS,entrata,SUCCESS,6,0,6,0,0,0,0,6,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+540,Bridgepoint I,FL,mri_prospectconnect,SUCCESS,mri_prospectconnect,SUCCESS,1,0,1,0,0,1,0,1,0,1,0,0,3,1,NOT_RECORDED,0,0,0,41,finding_evidence_census
+738,Cross Creek,CA,irvine,SUCCESS,irvine,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+1060,Bolton Estates,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1084,Black Hawk,IN,rentcafe_layout_tab,SUCCESS,UNATTRIBUTED,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,42,finding_evidence_census
+1156,Northview Southview Apartment Homes,CA,rentcafe_layout_tab,SUCCESS,rentcafe_layout_tab,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,1,1,UNKNOWN,0,0,0,42,finding_evidence_census
+1165,Tustin View,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,3,0,3,0,0,3,0,3,0,0,2,2,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+1310,Green Oaks at Medical,TX,apts247,SUCCESS,apts247,SUCCESS,4,5,4,0,0,0,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1312,Knoll Crest,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,32,0,32,0,0,0,0,32,0,32,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1340,Waterway Crossing,SC,appfolio,SUCCESS,appfolio,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1352,Pinebrook,MS,generic,SUCCESS,generic,SUCCESS,41,0,41,0,0,0,0,41,0,0,23,23,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1721,Hidden Valley Club,MI,rentmanager,SUCCESS,rentmanager,SUCCESS,60,0,60,0,0,0,0,60,0,60,10,10,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+1740,Camden Fairview,NC,camden,SUCCESS,camden,SUCCESS,10,0,10,0,0,10,0,10,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+1752,Kensington Park,OH,fortresstech,SUCCESS,fortresstech,SUCCESS,3,0,3,0,0,0,0,3,0,0,1,1,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+1765,Annaberg,GA,nesthub_public,SUCCESS,nesthub_public,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,MATCH,0,0,0,49,finding_evidence_census
+1767,Waverly Place,SC,realpage_oll,SUCCESS,realpage_oll,SUCCESS,22,0,22,0,0,0,0,22,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+1777,Rustic Woods,OK,residentservices365,SUCCESS,residentservices365,SUCCESS,4,4,4,0,0,0,0,4,0,0,4,4,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+1783,Madison at Largo,FL,knock,SUCCESS,knock,SUCCESS,34,0,34,0,0,34,0,34,0,0,18,18,0,1,MATCH,0,0,0,5,finding_evidence_census
+1845,Sterling Place,OH,g5,SUCCESS,g5,SUCCESS,16,0,16,0,0,16,0,16,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+1973,Rosslyn Heights,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+2196,Hickory Highlands,TN,sightmap,SUCCESS,sightmap,SUCCESS,13,0,13,0,0,0,0,13,0,0,12,12,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+2282,City View,CA,essex,SUCCESS,essex,SUCCESS,19,0,19,0,0,0,0,19,0,19,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+2305,Sun Lake Apartments,FL,knock,SUCCESS,knock,SUCCESS,48,0,48,0,0,48,0,48,0,0,26,26,0,1,MATCH,0,0,0,5,finding_evidence_census
+2405,Foster's Landing,CA,essex,FAILED_NO_DATA,essex,SUCCESS,21,0,21,0,0,0,0,21,0,21,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+2507,Terrain,TX,appfolio,SUCCESS,appfolio,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+2537,Bothell Ridge,WA,essex,SUCCESS,essex,SUCCESS,14,0,14,0,0,0,0,14,0,14,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+2585,Homestead Apartments,IL,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+2587,The Palms at Laguna Niguel,CA,essex,FAILED_NO_DATA,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+2594,The Reserve At Capital Center,CA,repli360,SUCCESS,repli360,SUCCESS,14,10,14,0,0,0,0,14,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+2598,Shore Park at Riverlake,CA,repli360,SUCCESS,repli360,SUCCESS,23,11,23,0,0,0,0,23,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+2709,Wellington Place at Olde Town,VA,generic_plan_text,SUCCESS,generic,SUCCESS,37,0,37,0,0,0,0,37,0,0,33,33,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+2955,2501 Porter Apartments,DC,equity,SUCCESS,equity,SUCCESS,13,0,13,0,0,13,0,13,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census;route_candidate:equity_apartments
+2957,Arbor Park of Alexandria,VA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,93,0,93,0,0,93,0,93,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+2958,Newport Village I,VA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,68,0,68,0,0,68,0,68,0,0,0,0,1,1,NOT_RECORDED,0,0,0,4|16,finding_evidence_census
+2982,Cortland on Pike,VA,cortland,SUCCESS,cortland,SUCCESS,57,0,57,0,0,0,0,57,0,0,0,0,1,1,NOT_RECORDED,0,0,0,9,finding_evidence_census
+3106,Woodhollow,TX,rentmanager,SUCCESS,rentmanager,SUCCESS,7,0,7,0,0,0,0,7,0,0,6,6,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+3108,Woodman Park,OH,knock,SUCCESS,knock,SUCCESS,4,0,4,0,0,0,0,4,0,0,4,4,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+3116,Lakeside Terraces,MI,knock,SUCCESS,knock,SUCCESS,41,0,41,0,0,0,0,41,0,0,16,16,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+3181,Cortland Mirror Lake,FL,cortland,SUCCESS,cortland,SUCCESS,40,0,40,0,0,0,0,40,0,0,0,0,1,1,NOT_RECORDED,0,0,0,8|9,finding_evidence_census
+3185,Rosemont Chamblee,GA,sightmap,SUCCESS,sightmap,SUCCESS,54,2,54,0,0,54,0,54,0,0,0,0,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+3197,The Atlantic Vinings,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,14,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+3307,The Lake House at Martins Landing,GA,knock,SUCCESS,knock,SUCCESS,49,0,49,0,0,49,0,49,0,0,42,42,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+3379,Atwater Cove,CA,marketapts,SUCCESS,marketapts,SUCCESS,5,5,5,0,0,0,0,5,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+3535,Aspire Thunderbird,AZ,marketapts,SUCCESS,marketapts,SUCCESS,10,9,10,0,0,0,0,10,0,0,5,5,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+3748,Brookside Oaks,CA,essex,FAILED_NO_DATA,essex,SUCCESS,4,0,4,0,0,0,0,4,0,4,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+3749,Highlands of Marin,CA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,14,0,14,0,0,14,0,14,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+3785,Shadowbrook,UT,g5,SUCCESS,g5,SUCCESS,18,0,18,0,0,0,0,18,0,0,0,0,2,1,UNKNOWN,0,0,0,10,finding_evidence_census
+3811,Vista Del Sol,NM,rentcafe_layout_tab,SUCCESS,rentcafe_layout_tab,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+3896,Preserve At Owings Crossing,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,47,1,47,0,0,0,0,47,0,40,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4079,The View at Waters Edge,FL,aspensquare,SUCCESS,aspensquare,SUCCESS,31,6,31,0,0,31,0,31,0,0,15,15,4,1,MATCH,0,0,0,38,finding_evidence_census
+4101,Ocean Oaks,FL,knock,SUCCESS,knock,SUCCESS,18,0,18,0,0,0,0,18,0,0,16,16,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+4167,The Hilltop,TX,knock,SUCCESS,knock,SUCCESS,27,0,27,0,0,27,1,26,0,0,23,23,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+4170,Beechwood,NC,generic,SUCCESS,generic,SUCCESS,36,2,36,0,0,0,0,36,0,0,12,12,1,1,UNKNOWN,8,8,0,,proportional_adapter_type_fill
+4296,101 N Ripley,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,5,6,6,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4579,Laurel Crossing,CA,entrata,DEAD_URL,entrata,DEAD_URL,5,0,5,0,0,0,0,5,0,0,5,5,2,1,UNKNOWN,1,0,0,,observed_adapter_type_stratum
+4599,Paramont,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4724,MiraBella,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,17,0,17,0,0,17,0,17,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+4752,Regatta Shores,FL,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,14,0,14,0,0,0,0,14,0,0,12,12,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+4767,The Pointe at South Mountain,AZ,knock,SUCCESS,knock,SUCCESS,38,0,38,0,0,38,3,35,0,0,22,22,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+4880,Clairmont Reserve,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4904,Saybrooke,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,11,0,0,2,1,NOT_RECORDED,0,0,0,18,finding_evidence_census;route_candidate:rentcafe_unit_roster
+4907,The Jaxon,GA,resman,SUCCESS,resman,SUCCESS,52,4,52,0,0,0,0,52,0,0,35,35,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4939,Grove at St Andrews,SC,rentcafe,FAILED_NO_DATA,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+4944,Triangle Place,NC,knock,SUCCESS,knock,SUCCESS,16,0,16,0,0,16,0,16,0,0,5,5,3,1,MATCH,0,0,0,11,finding_evidence_census
+5091,Rise Broadway,AZ,entrata,SUCCESS,entrata,SUCCESS,48,0,48,0,0,24,0,48,0,0,0,0,2,1,NOT_RECORDED,26,0,0,,proportional_adapter_type_fill
+5119,Embarc at West Jordan,UT,marketapts,SUCCESS,marketapts,SUCCESS,8,2,8,0,0,0,0,8,0,0,6,6,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+5157,The Sycamores,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5194,The Nathaniel,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,35,0,35,0,0,0,0,35,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5395,Cambridge on Seventh,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,3,0,3,0,0,0,0,3,0,0,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5488,Arcadia 4127,AZ,apts247,SUCCESS,apts247,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5546,Retreat at Candelaria,NM,rentcafe,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5752,Regency Woods,IA,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,3,3,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5774,River Oak,KY,rentcafe,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,16,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5791,Greens at Hollymead,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5855,Meyer Forest,TX,UNATTRIBUTED,FAILED_UNREACHABLE,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+5974,Promenade at Aventura Apartments,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,11,0,0,0,1,NOT_RECORDED,0,0,0,18,finding_evidence_census;route_candidate:rentcafe_unit_roster
+6125,Northgreen at Carrollwood,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,4,4,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+6147,Spark Pax River,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,5,5,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+6194,MAA Rocky Point,FL,maac,SUCCESS,maac,SUCCESS,79,0,79,0,0,0,0,79,0,79,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+6281,Wildwood,TX,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+6371,The Place at Barker Cypress -Enclave,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,42,0,42,0,0,0,0,42,0,38,3,3,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+6485,Skye At Conway,FL,knock,SUCCESS,knock,SUCCESS,12,0,12,0,0,0,0,12,0,0,4,4,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+6526,Southwood Acres,MA,aspensquare,SUCCESS,knock,SUCCESS,15,0,15,0,0,15,0,15,0,0,9,9,0,1,MATCH,0,0,0,38,finding_evidence_census
+7370,Morganton Place,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,16,1,16,0,0,0,0,16,0,16,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+7383,Camden Lakeway,CO,camden,SUCCESS,camden,SUCCESS,39,0,39,0,0,0,0,39,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+7483,West End Flats,NC,rentvision,SUCCESS,rentvision,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+7744,Ascent Apartment Homes,UT,rentcafe,SUCCESS,rentcafe,SUCCESS,9,0,9,0,0,0,0,9,0,9,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+7763,Scottsdale 5th Ave,AZ,appfolio,SUCCESS,appfolio,SUCCESS,11,0,11,0,0,0,0,11,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+7797,Village at Del Mar Heights,CA,equity,SUCCESS,equity,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census;route_candidate:equity_apartments
+8098,Heights of Kennesaw,GA,sightmap,SUCCESS,sightmap,SUCCESS,29,6,29,0,0,29,0,29,0,0,0,0,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+8179,Cambridge Woods,FL,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,1,1,NOT_RECORDED,0,0,0,4|16,finding_evidence_census
+8366,Brookside 112,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,28,0,28,0,0,0,0,28,0,28,10,10,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+8418,City Gate at Cupertino Apartments,CA,equity,SUCCESS,equity,SUCCESS,19,0,19,0,0,19,0,19,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census;route_candidate:equity_apartments
+8565,Brookbend,TX,sightmap,SUCCESS,sightmap,SUCCESS,22,7,22,0,0,22,0,22,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+8740,Parc Plaza,TX,sightmap,SUCCESS_PLAN_LEVEL,sightmap,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,2,1,MATCH,0,0,0,,observed_adapter_type_stratum
+9133,Lane at Towne Crossing,TX,knock,SUCCESS,knock,SUCCESS,29,0,29,0,0,29,0,29,0,0,20,20,3,1,MATCH,0,0,0,41,finding_evidence_census
+9168,The Lake Lofts,TX,apts247,SUCCESS,apts247,SUCCESS,61,0,61,0,0,0,0,61,0,0,0,0,2,1,NOT_RECORDED,0,0,0,24,finding_evidence_census
+9394,Sun Ridge Apartments,TX,generic,SUCCESS,generic,SUCCESS,4,13,4,0,0,0,0,4,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+9974,Skye at Love,TX,knock,SUCCESS,knock,SUCCESS,63,0,63,0,0,0,0,63,0,0,17,17,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+10291,The Mirage Apartments,TX,entrata,SUCCESS,generic,SUCCESS,36,0,36,0,0,0,0,36,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+10343,Willow Glen,TX,knock,SUCCESS,knock,SUCCESS,11,0,11,0,0,11,0,11,0,0,3,3,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+10629,The Oakley,TX,sightmap,SUCCESS,sightmap,SUCCESS,4,1,4,0,0,4,0,4,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+10929,Highland Park Apartments,TX,rentcafe,SUCCESS_PLAN_LEVEL,rentcafe,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+11130,Mercer Park,TX,generic,SUCCESS,generic,SUCCESS,18,4,0,18,18,0,0,18,0,0,0,0,3,1,UNKNOWN,0,18,0,,proportional_adapter_type_fill
+11317,Dixon at Stonegate,TX,realpage_oll,SUCCESS,realpage_oll,SUCCESS,69,11,69,0,0,0,0,69,0,0,0,0,4,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+11342,The Village Lakes,TX,entrata,SUCCESS,entrata,SUCCESS,27,0,27,0,0,27,0,27,0,0,19,19,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+11524,Casa De Arroyo,TX,resman,SUCCESS,resman,SUCCESS,1,4,1,0,0,0,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+11793,The Laney,TX,resman,SUCCESS,resman,SUCCESS,8,14,8,0,0,0,0,8,0,0,6,6,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+11805,Woodland Hills,TX,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,31,0,31,0,0,0,0,31,0,31,0,0,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+12190,Eaves North Dallas,TX,avalonbay,SUCCESS,avalonbay,SUCCESS,19,0,19,0,0,0,0,19,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+12260,Essence at North Dallas,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,35,0,35,0,0,0,0,35,0,35,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+12350,Remi,TX,knock,SUCCESS,knock,SUCCESS,19,0,19,0,0,19,0,19,0,0,18,18,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+12355,THIRTY377,TX,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,26,0,26,0,0,0,0,26,0,0,23,23,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+12370,Rockbrook Creek I,TX,knock,SUCCESS,knock,SUCCESS,37,0,37,0,0,37,0,37,0,0,23,23,3,1,MATCH,0,0,0,41,finding_evidence_census
+12377,Metropolitan at Cityplace,TX,edificecms,SUCCESS,edificecms,SUCCESS,3,7,3,0,0,3,0,3,0,0,3,3,2,1,MATCH,0,0,0,39,finding_evidence_census
+12380,McDermott Place,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,21,0,21,0,0,0,0,21,0,21,13,13,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+12525,MAA Boulder Ridge,TX,maac,SUCCESS,maac,SUCCESS,44,0,44,0,0,0,0,44,0,44,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+12557,Bridge Pointe Landing,TX,knock,SUCCESS,knock,SUCCESS,140,0,140,0,0,140,0,140,0,0,13,13,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+12566,High Point Crossing,GA,g5,DEAD_URL,g5,DEAD_URL,7,0,7,0,0,7,0,7,0,0,0,0,2,1,UNKNOWN,1,0,0,,observed_adapter_type_stratum
+12586,Avondale at Warner Center,CA,essex,FAILED_NO_DATA,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+12727,Riverway,TX,generic,SUCCESS,generic,SUCCESS,152,11,152,0,0,0,0,152,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+12927,Wyvernwood Garden,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,24,0,24,0,0,24,0,24,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+12963,The Blake LA,CA,essex,SUCCESS,essex,SUCCESS,5,0,5,0,0,0,0,5,0,5,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+12985,Meadowood,CA,essex,SUCCESS,essex,SUCCESS,19,0,19,0,0,0,0,19,0,19,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+13095,Trails at Dominion Park,TX,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+13153,Canyon Creek Apartments,CA,equity,SUCCESS,equity,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+13181,Park Hill at Issaquah,WA,essex,SUCCESS,essex,SUCCESS,16,0,16,0,0,0,0,16,0,16,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+13305,Portola Redlands,CA,marketapts,SUCCESS,marketapts,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+13339,Woodstone,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,19,2,19,0,0,0,0,19,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+13607,Casa Del Mar,FL,appfolio,SUCCESS,appfolio,SUCCESS,6,0,6,0,0,0,0,6,0,0,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+13736,The Langston,GA,appfolio,SUCCESS,appfolio,SUCCESS,2,0,2,0,0,0,0,2,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+13756,Ellis Midtown,AZ,marketapts,SUCCESS,marketapts,SUCCESS,7,4,7,0,0,0,0,7,0,0,5,5,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+13925,Sterling Glen,GA,generic,SUCCESS,generic,SUCCESS,3,13,3,0,0,0,0,3,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+14062,Camden Lake Pine,NC,camden,SUCCESS,generic,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,44,finding_evidence_census
+14117,Marquis at Great Hills,TX,repli360,SUCCESS,repli360,SUCCESS,33,0,33,0,0,0,0,33,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+14155,Waterside at Ocotillo,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,0,0,1,1,NOT_RECORDED,0,0,0,12,finding_evidence_census
+14314,Copper Terrace,CO,knock,SUCCESS,knock,SUCCESS,23,0,23,0,0,0,0,23,0,0,16,16,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+14325,The Berkley,TX,apts247,SUCCESS_PLAN_LEVEL,apts247,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+14332,IMT Desert Palm Village,AZ,sightmap,SUCCESS,sightmap,SUCCESS,18,6,18,0,0,18,0,18,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+14336,Mountain View Casitas,AZ,marketapts,SUCCESS,marketapts,SUCCESS,15,0,15,0,0,0,0,15,0,0,12,12,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+14338,Granite Bay,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,34,0,34,0,0,0,0,34,0,34,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+14524,Canton Mill Lofts,GA,sightmap,SUCCESS,sightmap,SUCCESS,14,115,14,0,0,14,0,14,0,0,8,8,2,1,MATCH,0,0,0,7,finding_evidence_census
+14538,Mira Santi,AZ,generic_plan_text,SUCCESS_PLAN_LEVEL,rentcafe,SUCCESS,44,0,44,0,0,0,0,44,0,44,0,0,2,1,UNKNOWN,0,0,0,12,finding_evidence_census
+14581,Milano,TX,generic,SUCCESS,resman,SUCCESS,353,16,353,0,0,0,0,353,0,0,0,0,2,1,UNKNOWN,0,0,0,15,finding_evidence_census
+14596,Portola South Mountain,AZ,marketapts,SUCCESS,marketapts,SUCCESS,2,4,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+14795,Emerson Apartments,TX,generic,SUCCESS_PLAN_LEVEL,appfolio,SUCCESS,13,4,13,0,0,0,0,13,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+14906,Weston Place,FL,g5,SUCCESS,g5,SUCCESS,18,0,18,0,0,18,0,18,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+14907,Boca Winds,FL,aspensquare,SUCCESS,aspensquare,SUCCESS,6,6,6,0,0,6,0,6,0,0,6,6,4,1,MATCH,0,0,0,38,finding_evidence_census
+14934,Country Manor,MA,aspensquare,SUCCESS,knock,SUCCESS,3,0,3,0,0,3,0,3,0,0,3,3,4,1,MATCH,0,0,0,38,finding_evidence_census
+14945,Fox Run,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+14956,Mill Creek,TX,onsite_apply,SUCCESS,onsite_apply,SUCCESS,2,6,2,0,0,2,0,0,2,0,0,0,5,1,PARTIAL_MATCH,0,0,0,32,finding_evidence_census
+15049,Verandah at Lakepointe,TX,yotta,SUCCESS,yotta,SUCCESS,18,0,18,0,0,0,0,18,0,0,9,9,3,1,MATCH,0,0,0,48,finding_evidence_census
+15064,Camden Holly Springs,TX,camden,SUCCESS,camden,SUCCESS,47,0,47,0,0,0,0,47,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+15332,Camden Ashburn Farm,VA,camden,SUCCESS,camden,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+15361,Hidden Springs,CA,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+15541,Palms at Clear Lake,TX,sightmap,SUCCESS,sightmap,SUCCESS,25,0,25,0,0,25,0,25,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+15579,Regency Palm Court,CA,essex,SUCCESS,essex,SUCCESS,9,0,9,0,0,0,0,9,0,9,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+16060,Ellyn Crossing,IL,entrata,SUCCESS,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+16078,San Cervantes,AZ,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,12,finding_evidence_census
+16101,Park Place Townhomes,CA,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+16104,Twin Springs Apartments,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+16186,Edgewood Court,MA,aspensquare,SUCCESS,knock,SUCCESS,1,0,1,0,0,1,0,1,0,0,0,0,4,1,MATCH,0,0,0,38,finding_evidence_census
+16196,Village Square Apartments,MD,residentservices365,SUCCESS,residentservices365,SUCCESS,8,3,8,0,0,8,0,8,0,0,3,3,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+16198,Rose Luxury Apartments,CA,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+16326,Dawson,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,92,0,92,0,0,0,0,92,0,92,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+16373,The Villages At Montpelier,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,44,2,44,0,0,0,0,44,0,37,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+16377,Westshore,FL,residentservices365,SUCCESS_PLAN_LEVEL,residentservices365,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,36,finding_evidence_census
+16387,The Colony at Fashion Island,CA,irvine,SUCCESS,irvine,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+16499,Palm Flats,FL,appfolio,SUCCESS,appfolio,SUCCESS,8,0,8,0,0,0,0,8,0,0,6,6,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+16754,Waterford Point,FL,resman,SUCCESS,resman,SUCCESS,15,11,15,0,0,0,0,15,0,0,11,11,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+16758,Sonoma at Oak Creek,CA,irvine,SUCCESS,irvine,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+16796,Santa Rosa,CA,irvine,SUCCESS,irvine,SUCCESS,30,0,30,0,0,30,0,30,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+16953,Serrano Highlands,CA,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,11,5,5,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+16961,Creek at 2645 Apartments,CA,marketapts,SUCCESS,marketapts,SUCCESS,8,0,8,0,0,0,0,8,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+16969,Hidden Hills,CA,repli360,SUCCESS,repli360,SUCCESS,14,9,14,0,0,0,0,14,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+17102,Woodbridge Willows,CA,irvine,SUCCESS,irvine,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+17161,Monterey Villas,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,2,0,2,0,0,2,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+17178,Oak Glen,CA,irvine,SUCCESS,irvine,SUCCESS,28,0,28,0,0,28,0,28,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+17320,The Villas of Renaissance,CA,irvine,SUCCESS,irvine,SUCCESS,2,0,2,0,0,2,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+17329,Finley at Fairfax Corner,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,41,0,41,0,0,0,0,41,0,41,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+17362,Congressional Towers,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+17541,Greentree Gardens,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+17965,Laguna Park,FL,resman,SUCCESS,resman,SUCCESS,1,4,1,0,0,0,0,1,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+17966,Terraces at Clearwater Beach,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,16,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+17984,Alessio,CA,essex,SUCCESS,essex,SUCCESS,22,0,22,0,0,0,0,22,0,22,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+18187,KRC Reserve,GA,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,25,0,25,0,0,25,0,25,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+18194,Parke Place Townhomes,NH,onesite,FAILED_NO_DATA,onesite,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+18379,Bromley House,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,4,2,4,0,0,0,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+18752,Brookstone Apartments,NV,marketapts,SUCCESS,marketapts,SUCCESS,6,0,6,0,0,0,0,6,0,0,6,6,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+19108,Canopy,WA,generic,SUCCESS,onsite_apply,SUCCESS,23,0,23,0,0,23,0,23,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+19299,Phoenix Orlando,FL,entrata,SUCCESS,entrata,SUCCESS,21,0,21,0,0,21,0,21,0,0,0,0,2,1,NOT_RECORDED,0,0,0,3,finding_evidence_census
+19357,Newport Village Apartments,NV,edificecms,SUCCESS,edificecms,SUCCESS,25,2,25,0,0,25,0,25,0,0,1,1,2,1,MATCH,0,0,0,39,finding_evidence_census
+19396,Alcove at Seahurst,WA,knock,SUCCESS,knock,SUCCESS,53,0,53,0,0,53,0,53,0,0,38,38,3,1,MATCH,0,0,0,41,finding_evidence_census
+19535,Windsor Court,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19538,Stadium Apartments,AL,wix_nopms,SUCCESS,wix_nopms,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+19713,Elmhurst Terrace,IL,realpage_oll,SUCCESS,realpage_oll,SUCCESS,10,5,10,0,0,0,0,10,0,0,0,0,4,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19851,One Superior Place,IL,onesite,SUCCESS,onesite,SUCCESS,35,0,35,0,0,35,0,35,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19877,Advenir at Magnolia,FL,entrata,SUCCESS_PLAN_LEVEL,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19924,Maybeck at the Bend,OR,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,0,7,7,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19940,Portola Biltmore,AZ,marketapts,SUCCESS,marketapts,SUCCESS,3,0,3,0,0,0,0,3,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+19955,Brookside,OR,appfolio,SUCCESS,appfolio,SUCCESS,3,0,3,0,0,0,0,3,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+19995,BellCentre,WA,essex,SUCCESS,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+20050,Carmel Creek,CA,essex,FAILED_NO_DATA,essex,SUCCESS,22,0,22,0,0,0,0,22,0,22,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+20189,Wilderness Village,WA,knock,SUCCESS,knock,SUCCESS,4,0,4,0,0,0,0,4,0,0,3,3,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+20192,Twelve Central Square,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+20349,Loma Palisades,CA,generic,SUCCESS,onsite_apply,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+20977,Cobblestone,AZ,edificecms,SUCCESS,edificecms,SUCCESS,20,6,20,0,0,20,0,20,0,0,0,0,2,1,MATCH,0,0,0,39,finding_evidence_census
+21149,Pinnacle at MacArthur Place,CA,essex,SUCCESS,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+21169,Montebello at Summit Ridge,NV,onsite_apply,SUCCESS,onsite_apply,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+21199,Sky Rock,CO,rentcafe,SUCCESS,sightmap,SUCCESS,6,1,6,0,0,6,0,6,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+21347,River Oaks,CA,repli360,SUCCESS_PLAN_LEVEL,repli360,SUCCESS,11,11,11,0,0,0,0,11,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+21381,Summit Park Village,CA,essex,FAILED_NO_DATA,essex,SUCCESS,12,0,12,0,0,0,0,12,0,12,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+21996,Marsh Creek Village,MI,realpage_cws,SUCCESS,realpage_cws,SUCCESS,10,0,10,0,0,10,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+22138,Greenway Park,MI,appfolio,SUCCESS,appfolio,SUCCESS,2,0,2,0,0,0,0,2,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+22382,4418 Spruce Street,PA,entrata,FAILED_NO_DATA,entrata,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+22383,Curren Terrace,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,13,1,13,0,0,0,0,13,0,13,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23143,Mira Monte,CA,essex,FAILED_NO_DATA,essex,SUCCESS,12,0,12,0,0,0,0,12,0,12,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+23161,Citation Club,MI,knock,SUCCESS,knock,SUCCESS,51,0,51,0,0,0,0,51,0,0,33,33,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+23281,Mill Bridge,TX,onesite,SUCCESS,onesite,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23296,Clinton Manor,MI,entrata,SUCCESS,entrata,SUCCESS,7,0,7,0,0,0,0,7,0,0,7,7,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23306,Villas Willow Glen,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,5,0,5,0,0,5,0,5,0,0,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+23367,Broadway Towers,CA,rentcafe_layout_tab,SUCCESS,generic_plan_text,SUCCESS,1,2,1,0,0,0,0,1,0,0,2,2,1,1,UNKNOWN,0,0,0,42,finding_evidence_census
+23494,Indian Village,MI,wix_nopms,FAILED_NO_DATA,wix_nopms,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+23549,Landmark,NM,marketapts,SUCCESS,marketapts,SUCCESS,6,5,6,0,0,0,0,6,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+23788,The Aspect,TX,rentvision,SUCCESS,rentvision,SUCCESS,12,0,12,0,0,0,0,12,0,0,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23798,The Columns at Hiram,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,24,0,24,0,0,0,0,24,0,24,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23870,The Park at London,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+23963,Luna Bear Arcos,AZ,wix_nopms,SUCCESS_PLAN_LEVEL,wix_nopms,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+24049,River Bluff of Lexington,SC,aspensquare,SUCCESS,aspensquare,SUCCESS,16,3,16,0,0,16,0,16,0,0,9,9,4,1,MATCH,0,0,0,38,finding_evidence_census
+24180,Pinnacle at Otay Ranch,CA,essex,SUCCESS,essex,SUCCESS,16,0,16,0,0,0,0,16,0,16,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+24315,Riley Square,CA,essex,SUCCESS,essex,SUCCESS,3,0,3,0,0,0,0,3,0,3,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+24366,Bay Terrace,CA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,14,0,14,0,0,0,0,14,0,0,13,13,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+24542,Archstone Fremont Center Apartments,CA,equity,SUCCESS,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+24544,Bexley Park,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,14,12,12,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+24562,Frank Estates,OR,realpage_oll,SUCCESS,realpage_oll,SUCCESS,15,0,15,0,0,0,0,15,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+24577,Magnolia Crossing,LA,knock,SUCCESS,knock,SUCCESS,11,0,11,0,0,11,0,11,0,0,11,11,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+24584,Westchase Apartments,LA,rentcafe,SUCCESS,knock,SUCCESS,111,0,111,0,0,0,0,111,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+24648,Camden Overlook,NC,camden,SUCCESS,camden,SUCCESS,29,0,29,0,0,29,0,29,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+24776,Hidden Lakes,MI,rentcafe,SUCCESS,sightmap,SUCCESS,16,3,16,0,0,16,0,16,0,0,0,0,2,1,PARTIAL_MATCH,0,0,0,,proportional_adapter_type_fill
+24928,Summer Winds,NV,sightmap,SUCCESS,sightmap,SUCCESS,27,0,27,0,0,27,0,27,0,0,0,0,2,1,MATCH,0,0,0,,route_candidate:touchtour
+24998,Liberty Park Apartments,MA,equity,SUCCESS,equity,SUCCESS,9,0,9,0,0,9,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+25063,Highgrove at Big Bend,MO,realpage_oll,SUCCESS,realpage_oll,SUCCESS,2,6,2,0,0,0,0,2,0,0,0,0,6,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+25357,Timbercreek,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,6,7,7,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+25494,La Casita,TX,apts247,SUCCESS,apts247,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+25551,Morada Grande,AZ,knock,SUCCESS,knock,SUCCESS,26,0,26,0,0,26,0,26,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+25730,Ellery at Lake Sherwood,FL,apts247,SUCCESS,apts247,SUCCESS,18,0,18,0,0,0,0,18,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+25781,Mayflower,VA,realpage_oll,SUCCESS,realpage_oll,SUCCESS,74,11,74,0,0,0,0,74,0,0,0,0,4,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+25996,Lumberton Apartment Homes,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26094,Garrison Square,MA,generic,SUCCESS,generic_plan_text,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+26151,Madera,NV,sightmap,SUCCESS,sightmap,SUCCESS,24,0,24,0,0,24,0,24,0,0,0,0,0,1,MATCH,0,0,0,,route_candidate:touchtour
+26194,Ventana Palms,AZ,marketapts,SUCCESS,marketapts,SUCCESS,5,2,5,0,0,0,0,5,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+26274,Catalina Gardens,NV,generic,SUCCESS_NO_DATA_PUBLISHED,generic,SUCCESS_NO_DATA_PUBLISHED,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26278,The Park at Morella,GA,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,6,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26312,Creekwood Estates,MN,UNATTRIBUTED,FAILED_NO_DATA,rentmanager,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26523,Concierge Apartments,MN,entrata,SUCCESS,entrata,SUCCESS,54,0,54,0,0,1,0,54,0,53,0,0,2,1,NOT_RECORDED,3,0,0,,proportional_adapter_type_fill
+26730,Camden Brookwood,GA,camden,SUCCESS,camden,SUCCESS,28,0,28,0,0,0,0,28,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+26782,Stonebridge Ranch,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,25,0,25,0,0,0,0,25,0,0,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26785,San Cierra,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,2,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+26892,Avalon at Arlington Square,VA,avalonbay,SUCCESS,avalonbay,SUCCESS,81,0,81,0,0,0,0,81,0,0,0,0,3,1,UNKNOWN,0,0,0,2,finding_evidence_census
+26901,Bordeaux,CA,irvine,SUCCESS,irvine,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+26946,Bermuda Terrace,NV,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,4,4,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+26967,The Estates at Cougar Mountain,WA,funnel,SUCCESS,funnel,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,25,finding_evidence_census
+27096,The Summit at Avent Ferry,NC,funnel,SUCCESS_PLAN_LEVEL,funnel,SUCCESS,12,0,12,0,0,0,0,12,0,12,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+27125,Tudor Place,MD,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,0,0,0,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+27161,Huntington Gardens,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+27165,Regatta Apartments Homes,TX,UNATTRIBUTED,SUCCESS_PLAN_LEVEL,UNATTRIBUTED,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,,proportional_adapter_type_fill
+27190,The Park at Palermo,FL,funnel,SUCCESS,funnel,SUCCESS,9,0,9,0,0,9,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+27390,The Willows,TX,appfolio,SUCCESS,appfolio,SUCCESS,5,0,5,0,0,0,0,5,0,0,4,4,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+27574,Belle Fontaine Apartments,CA,equity,SUCCESS,equity,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+27577,Park Catalina,CA,essex,SUCCESS,essex,SUCCESS,6,0,6,0,0,0,0,6,0,6,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+27595,Positano,NV,sightmap,SUCCESS,sightmap,SUCCESS,31,0,31,0,0,31,0,31,0,0,0,0,0,1,MATCH,0,0,0,,route_candidate:touchtour
+27725,The Gardens of Pinecrest,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+27941,MAA Twin Lakes,FL,maac,SUCCESS,maac,SUCCESS,31,0,31,0,0,0,0,31,0,31,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+27950,Marquis Parkside,TX,repli360,SUCCESS,repli360,SUCCESS,49,0,49,0,0,0,0,49,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+27999,Echo Pointe,CA,marketapts,SUCCESS,marketapts,SUCCESS,4,5,4,0,0,0,0,4,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+28085,Canyon Square Townhomes,FL,entrata,SUCCESS,entrata,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+28372,Las Ventanas,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+28386,Greenback Ridge,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+28391,Hill Country Villas,TX,marketapts,SUCCESS,marketapts,SUCCESS,14,0,14,0,0,0,0,14,0,0,7,7,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+28538,The Mark,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+28596,Stonehill at Pipers Creek,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,0,21,21,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+28696,Ellinwood,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+28728,ArtHaus Central,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+29154,Cardinal Hill,NJ,generic,SUCCESS,generic,SUCCESS,3,2,3,0,0,0,0,3,0,0,3,3,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+29448,Manor Homes of Fox Crest,MO,entrata,SUCCESS,entrata,SUCCESS,26,0,26,0,0,14,0,26,0,26,0,0,2,1,NOT_RECORDED,14,0,0,,proportional_adapter_type_fill
+29583,Norcross Crossings,GA,UNATTRIBUTED,DEAD_URL,UNATTRIBUTED,DEAD_URL,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,41,finding_evidence_census
+29673,Le Montreaux,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+29739,Gateway at Ellington,TX,entrata,SUCCESS,entrata,SUCCESS,14,0,14,0,0,0,0,14,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+30237,Forest View,TX,venterra,SUCCESS,venterra,SUCCESS,20,0,20,0,0,0,0,20,0,20,0,0,1,1,NOT_RECORDED,0,0,0,7,finding_evidence_census
+30273,Park at Willowbrook,TX,apts247,SUCCESS,apts247,SUCCESS,16,1,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+30472,Beach,NM,realpage_cws,SUCCESS,realpage_cws,SUCCESS,31,0,31,0,0,31,0,31,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+30657,Pegasus Apartments,CA,equity,SUCCESS,equity,SUCCESS,9,0,9,0,0,9,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+30723,Mountain Ridge,CO,marketapts,SUCCESS,marketapts,SUCCESS,5,1,5,0,0,0,0,5,0,0,5,5,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+30734,Waterford Village,MA,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,20,0,20,0,0,0,0,20,0,0,0,0,1,1,NOT_RECORDED,0,0,0,11,finding_evidence_census
+30751,Commons at Windsor Gardens,MA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,59,0,59,0,0,59,0,59,0,0,0,0,1,1,NOT_RECORDED,0,0,0,4|16,finding_evidence_census
+30796,Eden Prairie Apartments,IL,appfolio,SUCCESS,appfolio,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+30918,Cortland Bear Creek,TX,cortland,SUCCESS,cortland,SUCCESS,26,0,26,0,0,0,0,26,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+30997,Camden Fallsgrove,MD,camden,SUCCESS,camden,SUCCESS,14,0,14,0,0,0,0,14,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+31197,The Village at Toluca Lake I,CA,essex,FAILED_NO_DATA,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+31564,The 1856 Apartments,TX,apts247,SUCCESS,apts247,SUCCESS,38,0,38,0,0,0,0,38,0,38,0,0,2,1,NOT_RECORDED,0,0,0,24,finding_evidence_census
+31701,Arcadia Villa,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,8,8,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+31743,Boston Woods,TX,rentcafe,SUCCESS,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+32065,Carlisle Park Apartments,PA,entrata,SUCCESS,entrata,SUCCESS,6,2,6,0,0,0,0,6,0,0,5,5,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+32097,Clemmons Trace Village,NC,resman,SUCCESS_PLAN_LEVEL,UNATTRIBUTED,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,,observed_adapter_type_stratum
+32307,Bear Valley Park,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,13,0,13,0,0,0,0,13,0,13,10,10,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+32336,1210 Mass Apartments,DC,generic,SUCCESS_PLAN_LEVEL,equity,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+32540,Stonegate at Devon,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,30,13,30,0,0,0,0,30,0,30,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+32561,Pacific View,CA,irvine,SUCCESS,irvine,SUCCESS,19,0,19,0,0,19,0,19,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+32722,Rivergate Meadows,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,15,15,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+32746,Wildwood off Main,MI,sightmap,SUCCESS,sightmap,SUCCESS,188,0,188,0,0,188,0,188,0,0,1,1,0,1,MATCH,0,0,0,23,finding_evidence_census
+32747,Pleasant Woods,AR,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,0,7,7,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+32793,The Reserve,IL,onsite_apply,SUCCESS_PLAN_LEVEL,onsite_apply,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+32995,2400 M Apartments,DC,equity,SUCCESS,equity,SUCCESS,28,0,28,0,0,28,0,28,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+33267,Brookside Village,WA,g5,SUCCESS,g5,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,2,1,UNKNOWN,0,0,0,10,finding_evidence_census
+33318,Riverstone,CA,generic,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+33327,The Parker,OK,sightmap,SUCCESS,sightmap,SUCCESS,18,1,18,0,0,18,0,18,0,0,0,0,2,1,MATCH,0,0,0,7,finding_evidence_census
+33550,Princeton Bradford Apartment Homes,MA,entrata,SUCCESS,entrata,SUCCESS,13,0,13,0,0,0,0,13,0,0,5,5,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+33764,Haven at Birkdale Village,NC,entrata,SUCCESS,entrata,SUCCESS,32,0,32,0,0,32,0,32,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+33986,South City Station Apartments,CA,equity,SUCCESS,equity,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+33987,Villages at Lost Creek,TX,rentcafe,SUCCESS_PLAN_LEVEL,rentcafe,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+33996,Hampshire Green,NH,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+34079,The Village Westside,TX,entrata,SUCCESS,entrata,SUCCESS,9,0,9,0,0,0,0,9,0,0,9,9,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+34131,Whispering Lake,MO,sightmap,SUCCESS,sightmap,SUCCESS,20,0,20,0,0,20,1,19,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+34275,Bella Rose,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,2,0,2,0,0,2,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+34482,Abberly Grove,NC,entrata,SUCCESS,entrata,SUCCESS,7,0,7,0,0,7,0,7,0,7,0,0,3,1,NOT_RECORDED,0,0,0,3,finding_evidence_census
+34500,Cortland Brier Creek,NC,cortland,SUCCESS,cortland,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,8|9,finding_evidence_census
+34523,Constellation Ranch,TX,wix_nopms,SUCCESS_PLAN_LEVEL,wix_nopms,SUCCESS_PLAN_LEVEL,0,9,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+34548,Marbella,CA,irvine,SUCCESS,irvine,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+34661,San Paloma,TX,funnel,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+34785,Pepper Tree,TX,yotta,SUCCESS,yotta,SUCCESS,14,0,14,0,0,0,0,14,0,0,12,12,3,1,MATCH,0,0,0,48,finding_evidence_census
+34880,The Morehead,NC,apts247,SUCCESS,apts247,SUCCESS,12,0,12,0,0,0,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+34909,Polo Downs,MO,residentservices365,SUCCESS,residentservices365,SUCCESS,1,5,1,0,0,1,0,1,0,0,1,1,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+35166,Signature Pointe,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+35256,Camden Manor Park,NC,camden,SUCCESS,camden,SUCCESS,33,0,33,0,0,33,0,33,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+35349,The Redland,TX,yotta,SUCCESS,yotta,SUCCESS,27,0,27,0,0,0,0,27,0,0,20,20,3,1,MATCH,0,0,0,48,finding_evidence_census
+35365,Independence Place,RI,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,state_floor
+35540,The Flats At Dupont Circle Apartments,DC,equity,SUCCESS,equity,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+35717,Bridges on Kinsey,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+35919,Murray Hill Tower,NY,equity,SUCCESS,generic,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+35934,Hawthorn Village,CA,g5,SUCCESS,g5,SUCCESS,12,0,12,0,0,0,0,12,0,0,0,0,2,1,UNKNOWN,0,0,0,10,finding_evidence_census
+35966,The Crossings At Hillcroft,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+35968,Westheimer,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+36143,MAA Beaver Creek,NC,maac,SUCCESS,maac,SUCCESS,23,0,23,0,0,0,0,23,0,23,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+36168,Bennington Hills,NY,encoreskyline_template,DEAD_URL,encoreskyline_template,DEAD_URL,3,0,3,0,0,0,0,3,0,0,0,0,1,1,NOT_RECORDED,1,0,0,,observed_adapter_type_stratum
+36173,Wedgewood on the Green,NY,entrata,SUCCESS,entrata,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,3,finding_evidence_census
+36175,Chocolate Works,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,route_candidate:reinhold
+36198,Lion's Gate,PA,generic,SUCCESS,generic,SUCCESS_PLAN_LEVEL,0,7,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+36268,Stoney Creek,NY,wix_nopms,SUCCESS_PLAN_LEVEL,wix_nopms,SUCCESS_PLAN_LEVEL,0,19,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+36341,CenterPointe Apartments and Townhomes,NY,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,0,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+36786,Hawthorne Village,FL,realpage_oll,SUCCESS,realpage_oll,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+36925,View 14,DC,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,13,0,13,0,0,0,0,13,0,0,10,10,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+36964,Avalon Meydenbauer,WA,avalonbay,SUCCESS,avalonbay,SUCCESS,28,0,28,0,0,0,0,28,0,0,0,0,3,1,UNKNOWN,0,0,0,2,finding_evidence_census
+36972,The Kennedy Building,WA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,6,0,6,0,0,0,0,6,0,0,4,4,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+37065,Pointe Inverness,IN,entrata,SUCCESS,entrata,SUCCESS,4,0,4,0,0,2,0,4,0,0,0,0,2,1,NOT_RECORDED,4,0,0,,proportional_adapter_type_fill
+37143,Village of Cross Creek,KY,resman,SUCCESS,resman,SUCCESS,234,2,234,0,0,0,0,234,0,0,10,10,2,1,UNKNOWN,0,0,0,15|22,finding_evidence_census
+37160,Rivers Edge,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+37360,Goldstone Place,UT,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,9,0,9,0,0,0,0,9,0,0,5,5,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+37376,The Retreat at Mountain Brook,AL,rentcafe,SUCCESS,rentcafe,SUCCESS,44,0,44,0,0,0,0,44,0,44,4,4,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+37386,AMLI Quadrangle,TX,amli,SUCCESS,amli,SUCCESS,18,0,18,0,0,18,0,18,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+37388,Villas At Wylie,TX,edificecms,SUCCESS,edificecms,SUCCESS,34,8,34,0,0,34,0,34,0,0,1,1,2,1,MATCH,0,0,0,39,finding_evidence_census
+37476,Cole,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,6,6,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+37538,Amalie Apartment Homes,TN,entrata,SUCCESS_PLAN_LEVEL,entrata,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+37545,Camden Cedar Hills,TX,camden,SUCCESS,camden,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+37577,Siena Villas,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,13,0,13,0,0,13,4,9,0,0,2,2,5,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+37597,Riverset Apartments,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,40,0,40,0,0,0,0,40,0,40,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+37712,The Enclave,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,37,0,37,0,0,0,0,37,0,28,26,26,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+37716,Ten20,WA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,9,0,9,0,0,0,0,9,0,0,7,7,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+37721,Belcarra,WA,essex,FAILED_NO_DATA,essex,SUCCESS,13,0,13,0,0,0,0,13,0,13,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+37805,The Gentry's Landing,MO,wix_nopms,SUCCESS_PLAN_LEVEL,wix_nopms,SUCCESS_PLAN_LEVEL,0,6,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+37919,Parc Coliseum Apartments,NY,equity,SUCCESS,equity,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+37920,Parc Cameron,NY,equity,SUCCESS,equity,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+37972,Eagle Rock Apartments at West Hartford,CT,spherexx,SUCCESS,spherexx,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,17,finding_evidence_census
+37983,Eagle Rock Apartments at Towson,MD,spherexx,SUCCESS,spherexx,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,17,finding_evidence_census
+37991,Wynnewood Park,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,12,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38167,The Villas on Brightside,LA,appfolio,SUCCESS,appfolio,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38314,Coppermill,LA,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,2,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38378,Park Northside,VA,showmojo_public,SUCCESS,showmojo_public,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,1,1,MATCH,0,0,0,49,finding_evidence_census
+38398,The Monterey by Windsor,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,23,23,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38517,Auxo at Memorial,TX,funnel,SUCCESS,sightmap,SUCCESS,25,8,25,0,0,25,0,25,0,0,15,15,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+38525,Marquis Sonoran Preserve,AZ,repli360,SUCCESS,repli360,SUCCESS,31,0,31,0,0,0,0,31,0,0,0,0,1,1,MATCH,0,0,0,27,finding_evidence_census
+38541,Camden Brushy Creek,TX,camden,SUCCESS,camden,SUCCESS,15,0,15,0,0,0,0,15,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+38551,5 Oaks,TX,apts247,SUCCESS,apts247,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38733,Versailles Koreatown Apartments,CA,equity,SUCCESS,equity,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+38897,Halstead Haverhill,MA,rentcafe,SUCCESS,rentcafe,SUCCESS,18,0,18,0,0,0,0,18,0,0,9,9,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+38984,Lakeview Arms,MS,rentmanager,FAILED_NO_DATA,rentmanager,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+39154,ReNew on Ridgewood,MS,entrata,SUCCESS,entrata,SUCCESS,29,0,29,0,0,29,0,29,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+39346,Bella Mirage,AZ,realpage_oll,SUCCESS,realpage_oll,SUCCESS,72,0,72,0,0,0,0,72,0,0,0,0,2,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+39387,High Rock 5300,NV,generic,SUCCESS,onsite_apply,SUCCESS,9,0,9,0,0,9,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+39573,Prime at Gardenside,KY,residentservices365,SUCCESS,residentservices365,SUCCESS,21,7,21,0,0,0,0,21,0,0,6,6,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+39779,Riverpark Apartments,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,27,0,27,0,0,0,0,27,0,27,6,6,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+39961,88 Leonard Street,NY,rentcafe,SUCCESS,rentcafe,SUCCESS,13,0,13,0,0,0,0,13,0,8,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+39995,South Pointe,SC,onesite,SUCCESS_PLAN_LEVEL,onesite,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+40117,Sofi at 50 Forest,CT,funnel,SUCCESS,funnel,SUCCESS,19,0,19,0,0,0,0,19,0,19,3,3,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+40144,Riverside Villas,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,0,6,6,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+40178,Park Plaza,OR,onesite,SUCCESS,onesite,SUCCESS,4,0,4,0,0,0,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+40193,AMLI South Shore,TX,amli,SUCCESS,amli,SUCCESS,34,0,34,0,0,34,0,34,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+40493,Bristol Park at Oak Ridge,TN,realpage_oll,SUCCESS_PLAN_LEVEL,realpage_oll,SUCCESS_PLAN_LEVEL,0,7,0,0,0,0,0,0,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+40566,The Courts at Huntington Station I,VA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,36,0,36,0,0,36,0,36,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+40710,Chloe on Union,WA,equity,SUCCESS,equity,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+40986,Gramercy on the Park,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,3,3,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+40989,Savoye,TX,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,39,0,39,0,0,39,0,39,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+40996,ibex at Uptown,GA,knock,SUCCESS,knock,SUCCESS,72,0,72,0,0,0,0,72,0,0,45,45,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+41185,Gallery 421,CA,sightmap,SUCCESS,sightmap,SUCCESS,1,4,1,0,0,1,0,1,0,0,0,0,0,1,MATCH,0,0,0,,route_candidate:imt_spaces
+41556,Steeplechase on Maple,NE,knock,SUCCESS,knock,SUCCESS,25,0,25,0,0,25,0,25,0,0,7,7,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+41973,Rosewood Park,NV,onsite_apply,SUCCESS,onsite_apply,SUCCESS,17,0,17,0,0,17,0,17,0,0,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+42179,Avalon Hoboken,NJ,avalonbay,SUCCESS_PLAN_LEVEL,avalonbay,SUCCESS,13,0,13,0,0,0,0,13,0,0,0,0,2,1,UNKNOWN,0,0,0,,observed_adapter_type_stratum
+42361,Winston Apartments,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,32,0,32,0,0,0,0,32,0,31,3,3,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+42525,Park Place Apartments,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,5,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+42662,Highlands North,KS,g5,SUCCESS,g5,SUCCESS,34,0,34,0,0,0,0,34,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+43097,Big Creek Apartments and Townhomes,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,34,0,34,0,0,0,0,34,0,34,0,0,0,1,NOT_RECORDED,0,0,0,13,finding_evidence_census
+43299,Windsail,OK,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+43372,Water's Edge,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,0,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+43547,Reserve Bartram Springs,FL,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,26,0,26,0,0,26,0,26,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+44153,Arlo of Olathe,KS,rentcafe,SUCCESS,rentcafe,SUCCESS,21,0,21,0,0,0,0,21,0,21,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+44304,LaSalle Villas,TX,appfolio,SUCCESS,appfolio,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+44339,Pronghorn Apartments,WY,entrata,SUCCESS,entrata,SUCCESS,2,0,2,0,0,0,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,state_floor
+44754,LivGreen Gardens,NC,appfolio,SUCCESS,appfolio,SUCCESS,6,0,6,0,0,0,0,6,0,0,3,3,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+44765,Aero Place Apartments,CO,onsite_apply,SUCCESS,onsite_apply,SUCCESS,15,0,15,0,0,15,0,15,0,0,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+44985,The Park at Whispering Pines,CO,appfolio,SUCCESS,appfolio,SUCCESS,11,0,11,0,0,0,0,11,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+45318,Tall Oaks Apartment Homes,MI,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,12,9,9,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+45353,Mall,MA,appfolio,SUCCESS,appfolio,SUCCESS,4,0,4,0,0,0,0,4,0,0,4,4,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+45720,Piper Lofts at Crossroads,MO,rentcafe,SUCCESS,rentcafe,SUCCESS,9,5,9,0,0,0,0,9,0,9,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+45986,Aaron Lake Apartments,FL,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,6,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+46108,Stratford Mill,FL,realpage_oll,DEAD_URL,realpage_oll,DEAD_URL,68,0,68,0,0,68,0,68,0,0,0,0,2,1,NOT_RECORDED,1,0,0,,observed_adapter_type_stratum
+46179,East Hampton,KS,wix_nopms,FAILED_NO_DATA,wix_nopms,SUCCESS,1,0,1,0,0,0,0,1,0,0,0,0,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+46313,Crescent Park Commons,SC,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+46355,Kickingbird Hills,OK,knock,SUCCESS,knock,SUCCESS,17,0,17,0,0,17,0,17,0,0,11,11,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+46561,Preserve at Creekside,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,15,0,15,0,0,15,0,15,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+46576,Campus Pointe,OK,appfolio,SUCCESS,appfolio,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+46915,Barberton,VA,rentcafe,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+46920,Arbor Park Gainesville,FL,entrata,SUCCESS,entrata,SUCCESS,15,0,15,0,0,15,0,15,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+46986,Mountain Ridge Manor,UT,marketapts,SUCCESS,marketapts,SUCCESS,3,0,3,0,0,0,0,3,0,0,3,3,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+46993,Addison Lane,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+47164,Satyr Hill Apartments,MD,knock,SUCCESS,knock,SUCCESS,2,0,2,0,0,2,0,2,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+47346,Pembroke Crossing,VA,appfolio,SUCCESS,appfolio,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+47523,Luma Apartments,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,10,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+47710,Adley at 72nd,NE,aspensquare,SUCCESS,aspensquare,SUCCESS,7,3,7,0,0,7,0,7,0,0,4,4,4,1,MATCH,0,0,0,38,finding_evidence_census
+47909,Westerville Park Apartment Homes,OH,wix_floor_plans,FAILED_NO_DATA,wix_floor_plans,SUCCESS,3,0,3,0,0,0,3,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,43,finding_evidence_census
+47982,Dwell at Greenridge,SC,rentcafe,SUCCESS,rentcafe,SUCCESS,42,0,42,0,0,0,0,42,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+47991,Rose Vista,MN,realpage_cws,SUCCESS,realpage_cws,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+48052,Summerville Station,SC,entrata,SUCCESS,entrata,SUCCESS,16,0,16,0,0,8,0,16,0,14,0,0,2,1,NOT_RECORDED,10,0,0,,proportional_adapter_type_fill
+48075,Edgefield,VA,onesite,SUCCESS,onesite,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+48092,Edgewater Village,NC,entrata,SUCCESS,entrata,SUCCESS,108,0,108,0,0,85,0,108,0,23,0,0,2,1,NOT_RECORDED,25,0,0,,proportional_adapter_type_fill
+48116,Crown Park,NC,resman,SUCCESS,resman,SUCCESS,12,5,12,0,0,0,0,12,0,0,8,8,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+48118,Oceanaire,MS,rentcafe,SUCCESS,knock,SUCCESS,15,0,15,0,0,0,0,15,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+48177,The Metropolitan,KY,sightmap,SUCCESS,sightmap,SUCCESS,14,0,14,0,0,14,0,14,0,0,0,0,2,1,MATCH,0,0,0,7,finding_evidence_census
+48514,The Avenue,AR,aspensquare,SUCCESS,aspensquare,SUCCESS,8,3,8,0,0,8,0,8,0,0,6,6,4,1,MATCH,0,0,0,38,finding_evidence_census
+48517,Foxboro,NE,appfolio,SUCCESS,appfolio,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+48762,Whitnall Garden Apartments,WI,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,4,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+48769,Spring Gate,FL,knock,SUCCESS,knock,SUCCESS,6,0,6,0,0,6,0,6,0,0,2,2,3,1,MATCH,0,0,0,41,finding_evidence_census
+48897,Brittany Place of LaGrange,GA,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+49102,Parkview Apartments,MN,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,21,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+49248,Sandpiper,UT,marketapts,SUCCESS,marketapts,SUCCESS,11,1,11,0,0,0,0,7,4,0,5,5,2,1,UNKNOWN,0,0,0,40,finding_evidence_census
+49529,Enclave,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,7,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+49726,Landmark of D'Iberville,MS,rentvision,SUCCESS,rentvision,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+49752,Revolve,UT,knock,SUCCESS,knock,SUCCESS,9,0,9,0,0,9,6,3,0,0,3,3,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+49986,Echelon,WA,knock,SUCCESS,knock,SUCCESS,14,0,14,0,0,0,0,14,0,0,6,6,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+50160,Costa Azul,TX,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,12,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+50339,Parc At Denham Springs I,LA,realpage_cws,SUCCESS,realpage_cws,SUCCESS,26,0,26,0,0,0,0,26,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+50746,Crawford Square,PA,fortresstech,SUCCESS,fortresstech,SUCCESS,24,0,24,0,0,0,0,24,0,0,13,13,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+50950,Bishops Gate,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,10,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+51080,Verandas at Taylor Oaks,AL,rentcafe,SUCCESS,rentcafe,SUCCESS,24,0,24,0,0,0,0,24,0,24,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+51123,Oak Hill Apartments,PA,onesite,SUCCESS,onesite,SUCCESS,23,0,23,0,0,0,0,23,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+51775,Aspen Meadow,KY,resman,FAILED_NO_DATA,resman,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+51921,Deer Run,OH,thinkreside,SUCCESS_PLAN_LEVEL,thinkreside,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,46,finding_evidence_census
+51998,Thousand Oaks,TX,onesite,SUCCESS,sightmap,SUCCESS,159,48,159,0,0,159,0,159,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+52105,The District,NC,knock,SUCCESS,knock,SUCCESS,19,0,19,0,0,0,0,19,0,0,15,15,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+52140,MAA Wade Park,NC,maac,SUCCESS,maac,SUCCESS,64,0,64,0,0,0,0,64,0,64,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+52328,The Fort Apartments,IN,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,4,4,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+52348,The Vue,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,12,2,2,2,1,NOT_RECORDED,0,0,0,36,finding_evidence_census
+52697,Clearview,MI,UNATTRIBUTED,FAILED_NO_DATA,UNATTRIBUTED,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,,proportional_adapter_type_fill
+52934,Davis Creek,MI,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,8,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+52961,The Villages at Fort Town,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,11,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+52967,Seville at Mace Ranch,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,5,0,5,0,0,5,1,4,0,0,2,2,3,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+53117,Watersedge Apartments,IL,g5,SUCCESS_PLAN_LEVEL,g5,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,UNKNOWN,0,0,0,,observed_adapter_type_stratum
+53164,Arbor Pointe Townhomes,MI,rentcafe,SUCCESS,rentcafe,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+53165,Foxwood and The Hermitage,MI,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+53440,The Reserves Of Thomas Glen,KY,venterra,SUCCESS,venterra,SUCCESS,13,0,13,0,0,0,0,13,0,13,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+53932,Misty Hollow,LA,generic,FAILED_NO_DATA,generic,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+53963,Hillside Apartments,LA,resman,SUCCESS,resman,SUCCESS,218,1,218,0,0,0,0,218,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+54550,MAA West Village,GA,maac,SUCCESS,maac,SUCCESS,42,0,42,0,0,0,0,42,0,42,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+54553,AMLI Evanston,IL,amli,SUCCESS,amli,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+54743,Twin Oaks,DC,UNATTRIBUTED,FAILED_UNREACHABLE,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,0,1,NOT_RECORDED,0,0,0,13,finding_evidence_census
+54769,Emerson Park Apartment Homes,AZ,marketapts,SUCCESS,marketapts,SUCCESS,4,1,4,0,0,0,0,4,0,0,4,4,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+55165,Legacy Oaks,OR,rentmanager,SUCCESS,rentmanager,SUCCESS,9,0,9,0,0,0,0,9,0,0,3,3,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+55194,Village,OR,onsite_apply,SUCCESS,onsite_apply,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+55381,Summit Pointe,IN,rentcafe,SUCCESS,rentcafe,SUCCESS,25,0,25,0,0,0,0,25,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+55709,Vista Pointe Apartments,GA,betternoi_public,SUCCESS,betternoi_public,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,1,1,PARTIAL_MATCH,0,0,0,49,finding_evidence_census
+55940,Eleven by Windsor,TX,rentcafe,SUCCESS,funnel,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+56151,Brandon Place,OK,resman,SUCCESS,resman,SUCCESS,200,1,200,0,0,0,0,200,0,0,11,11,2,1,UNKNOWN,0,0,0,22,finding_evidence_census
+56166,Village at Crown Woods,OK,generic,SUCCESS,resman,SUCCESS,428,2,428,0,0,0,0,428,0,0,0,0,2,1,UNKNOWN,0,0,0,15,finding_evidence_census
+56182,Acorn Acres,IN,rentvision,SUCCESS,rentvision,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+56750,SB1K,CO,marketapts,SUCCESS,marketapts,SUCCESS,10,4,10,0,0,0,0,10,0,0,4,4,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+56775,Avalon Hill Country,TX,avalonbay,SUCCESS,avalonbay,SUCCESS,48,0,48,0,0,0,0,48,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+56903,The Landmark,MA,squarespace_nopms,FAILED_NO_DATA,squarespace_nopms,SUCCESS,5,0,5,0,0,0,0,5,0,0,0,0,1,1,NOT_RECORDED,0,0,0,45,finding_evidence_census
+57192,Park Avenue Lofts,AR,onesite,SUCCESS,knock,SUCCESS,29,0,29,0,0,29,3,26,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+57195,Tribeca,OH,squarespace_nopms,SUCCESS,squarespace_nopms,SUCCESS,21,0,21,0,0,21,0,21,0,21,18,18,1,1,NOT_RECORDED,0,0,0,45,finding_evidence_census
+57761,Bell Knox District,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,5,5,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+57918,Chandler,NV,rentcafe,SUCCESS,rentcafe,SUCCESS,30,0,30,0,0,0,0,30,0,30,11,11,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+57976,One India Street,MA,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+58156,District at Seven Springs,TN,fortresstech,SUCCESS,fortresstech,SUCCESS,16,0,16,0,0,0,0,16,0,0,12,12,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+58311,Winchester Park,OH,onesite,SUCCESS,onesite,SUCCESS,27,0,27,0,0,27,0,27,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+58341,Heritage Park,WA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+58386,Medley Row Hoigaard Village,MN,rentcafe,SUCCESS,rentcafe,SUCCESS,21,0,21,0,0,0,0,21,0,0,19,19,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+58969,Cirrus,WA,funnel,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,25,finding_evidence_census
+59063,CityScape Residences,AZ,sightmap,SUCCESS,sightmap,SUCCESS,10,17,10,0,0,10,0,10,0,0,3,3,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+59649,801 Polaris,OH,encoreskyline_template,SUCCESS_PLAN_LEVEL,encoreskyline_template,SUCCESS_PLAN_LEVEL,0,10,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+59698,The Reserve at Whiskey Creek,GA,apts247,SUCCESS,apts247,SUCCESS,4,1,4,0,0,0,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+60038,Velo,MN,knock,SUCCESS,knock,SUCCESS,12,0,12,0,0,12,0,12,0,0,11,11,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+60125,Cumberland Links,OH,rentcafe,SUCCESS_PLAN_LEVEL,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+60146,Woodmont Place at Palmer,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,10,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+60316,Highland Park,MO,apts247,SUCCESS_PLAN_LEVEL,apts247,SUCCESS_PLAN_LEVEL,2,0,2,0,0,0,0,2,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+60386,The Paramount at South Market,LA,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,2,2,2,1,NOT_RECORDED,0,0,0,13,finding_evidence_census
+60578,1105 Town Brookhaven,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,10,10,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+60727,The Reserves at Alafaya,FL,rentcafe,SUCCESS,sightmap,SUCCESS,12,1,12,0,0,12,1,11,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+60750,The Meyden,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,20,0,0,0,1,NOT_RECORDED,0,0,0,18,finding_evidence_census;route_candidate:rentcafe_unit_roster
+60939,Greenarch,OK,residentservices365,SUCCESS,residentservices365,SUCCESS,8,7,8,0,0,0,0,8,0,0,7,7,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+60941,Link Brookstown,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+61168,Greylyn Estates,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,14,4,4,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+61343,Paragon at Columbia Overlook,MD,realpage_oll,SUCCESS,realpage_oll,SUCCESS,12,0,12,0,0,0,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+61392,Arcata,MN,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+61396,The Grain Belt,MN,generic,SUCCESS,generic,SUCCESS,4,0,4,0,0,0,0,4,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+61459,Oak Street Townhomes,MN,knock,FAILED_NO_DATA,knock,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+61548,AMLI Dadeland,FL,amli,SUCCESS,amli,SUCCESS,20,0,20,0,0,20,0,20,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+61721,Villages of Magnolia,TX,rentcafe,SUCCESS,sightmap,SUCCESS,33,3,33,0,0,33,0,33,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+61950,250 High,OH,squarespace_nopms,SUCCESS,squarespace_nopms,SUCCESS,12,11,12,0,0,12,0,12,0,0,6,6,1,1,MATCH,0,0,0,45,finding_evidence_census
+61951,Ellis at Germantown,TN,fortresstech,SUCCESS,fortresstech,SUCCESS,7,0,7,0,0,0,0,7,0,0,3,3,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+61963,Grand Oak at Town Park,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,31,0,31,0,0,0,0,31,0,31,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+61979,Villa Milano,KS,rentcafe,FAILED_NO_DATA,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+62144,South Ridge,SC,knock,SUCCESS,knock,SUCCESS,17,0,17,0,0,17,0,17,0,0,0,0,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+62159,Cottages on Tazewell,TN,appfolio,SUCCESS,appfolio,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+62177,Estate at Woodmen Ridge,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,20,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+62178,Bungalows,NV,onsite_apply,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+62322,Element 28,MD,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,4,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+62512,Camden Chandler,AZ,camden,SUCCESS,camden,SUCCESS,27,0,27,0,0,0,0,27,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+62743,Residences at Falcon North,CO,entrata,SUCCESS,entrata,SUCCESS,48,0,48,0,0,24,0,48,0,24,0,0,2,1,NOT_RECORDED,26,0,0,,proportional_adapter_type_fill
+62778,AMLI Dry Creek,CO,amli,SUCCESS,amli,SUCCESS,20,0,20,0,0,20,0,20,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+62782,Cortland Alameda Station,CO,cortland,SUCCESS,cortland,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,9,finding_evidence_census
+62949,Midtown on the Rail,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,9,0,9,0,0,0,0,9,0,9,6,6,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+62969,Rize at Winter Springs,FL,apts247,SUCCESS,apts247,SUCCESS,25,0,25,0,0,0,0,25,0,1,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+63122,The Artessa,TN,knock,SUCCESS,knock,SUCCESS,22,0,22,0,0,22,0,22,0,0,17,17,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+63462,Telfair Lofts,TX,residentservices365,SUCCESS,residentservices365,SUCCESS,29,15,29,0,0,0,0,29,0,0,22,22,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+63498,Hanover Montrose,TX,entrata,SUCCESS,entrata,SUCCESS,31,0,31,0,0,0,0,31,0,0,29,29,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+63732,HighLine,TX,entrata,SUCCESS,entrata,SUCCESS,33,0,33,0,0,33,0,33,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+63770,1000 Kiely,CA,essex,SUCCESS,essex,SUCCESS,6,0,6,0,0,0,0,6,0,6,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+63771,Apex,CA,essex,SUCCESS,essex,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,34,finding_evidence_census
+63933,Vercanta Riverfront,OR,onsite_apply,SUCCESS,onsite_apply,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+64158,Allure by Windsor,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,5,5,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+64360,Kinects Tower,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,0,10,10,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+64390,Broadway Palace,CA,apts247,SUCCESS,apts247,SUCCESS,65,0,65,0,0,65,0,65,0,65,0,0,2,1,NOT_RECORDED,0,0,0,24,finding_evidence_census
+64618,70 Pine,NY,onsite_apply,SUCCESS,onsite_apply,SUCCESS,16,0,16,0,0,16,0,16,0,0,7,7,4,1,MATCH,0,0,0,32,finding_evidence_census
+64634,Retreat at Fremaux,LA,sightmap,SUCCESS,sightmap,SUCCESS,11,3,11,0,0,11,0,11,0,0,5,5,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+64789,Spectrum Majestic,MD,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+64938,Lake Vue,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,18,0,18,0,0,0,0,18,0,18,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+65134,Garnet Creek,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,21,0,21,0,0,21,0,21,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+65138,The Thornton,OR,knock,SUCCESS,knock,SUCCESS,17,0,17,0,0,0,0,17,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+65327,Beacon Harbor Point,CT,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,13,0,13,0,0,13,0,13,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+65468,Red Tail Apartments,ID,entrata,SUCCESS,entrata,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+65562,Lantower Waverly,NC,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+66940,AMLI Riverfront Green,CO,amli,SUCCESS,amli,SUCCESS,26,0,26,0,0,26,0,26,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+66979,Ascent Uptown,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,38,0,38,0,0,0,0,38,0,38,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+66998,345 Harrison,MA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,24,0,24,0,0,0,0,24,0,0,21,21,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+67146,Aria at Millenia,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67150,Harbor Vista at Crawford Street,VA,wix_nopms,SUCCESS,wix_nopms,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+67327,Windsong Estates,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,14,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67516,The Eastland,TN,fortresstech,SUCCESS,fortresstech,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+67524,Riverworks,PA,generic,SUCCESS,generic,SUCCESS,23,0,23,0,0,0,0,23,0,0,0,0,1,1,NOT_RECORDED,0,0,0,11,finding_evidence_census
+67527,Griffin Center City,PA,funnel,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,20,8,8,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67566,The Kennedy at Brooks City Base,TX,sightmap,SUCCESS,sightmap,SUCCESS,29,3,29,0,0,29,1,28,0,0,1,1,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+67581,The Aria at Woodlands South,OK,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,3,3,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67598,Lofts At Little Creek,NC,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,6,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67678,Crossroads Westside,MO,knock,SUCCESS,knock,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+67689,Adara Overland Park,KS,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+68148,AMLI Midtown 29,FL,amli,SUCCESS,amli,SUCCESS,24,0,24,0,0,24,0,24,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+68313,The Maxwell,TX,apts247,SUCCESS,apts247,SUCCESS,37,0,37,0,0,0,0,37,0,0,0,0,2,1,NOT_RECORDED,0,0,0,24,finding_evidence_census
+68395,Parkside Residences,TX,funnel,SUCCESS,funnel,SUCCESS,29,14,29,0,0,29,0,29,0,0,6,6,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+68465,The Morgan Sandy Springs,GA,entrata,SUCCESS,entrata,SUCCESS,17,0,17,0,0,0,0,17,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+68505,30Sixty Apartments,CA,squarespace_nopms,SUCCESS_PLAN_LEVEL,squarespace_nopms,SUCCESS,1,0,1,0,0,0,0,1,0,0,0,0,1,1,NOT_RECORDED,0,0,0,45,finding_evidence_census
+68537,SYMBOL Scotts Addition,VA,knock,SUCCESS,knock,SUCCESS,13,0,13,0,0,13,0,13,0,0,10,10,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+68716,The Harrison Collection 330 Angelo Cifelli,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,22,0,0,0,8,8,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+68956,266 Lofts,TN,g5,FAILED_NO_DATA,g5,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+68991,The Reserve At Water Tower Village,CO,marketapts,SUCCESS,marketapts,SUCCESS,4,0,4,0,0,0,0,4,0,0,0,0,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+69153,Axis Hamilton,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,5,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+69154,The Mark Huebner Oaks,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,25,0,25,0,0,0,0,25,0,25,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+69203,The Marq,VA,wix_nopms,SUCCESS,wix_nopms,SUCCESS,8,0,8,0,0,0,0,8,0,0,8,8,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+69323,Fusion 355,CO,onsite_apply,SUCCESS,onsite_apply,SUCCESS,17,0,17,0,0,17,0,17,0,0,3,3,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+69928,The Azlee,UT,marketapts,SUCCESS,marketapts,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+70179,Woodington West,MD,realpage_cws,SUCCESS,realpage_cws,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+70238,Grace Apartments,OR,entrata,SUCCESS_PLAN_LEVEL,UNATTRIBUTED,SUCCESS_PLAN_LEVEL,0,7,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,,proportional_adapter_type_fill
+70255,Coventry Square,NJ,generic,SUCCESS,generic,SUCCESS,8,0,8,0,0,8,3,0,5,0,1,1,1,1,PARTIAL_MATCH,0,0,0,14,finding_evidence_census
+70938,Maybrook,PA,sightmap,SUCCESS,sightmap,SUCCESS,14,39,14,0,0,14,0,14,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+71143,The Cedars at Johns Creek,GA,funnel,SUCCESS,funnel,SUCCESS,33,0,33,0,0,0,0,33,0,33,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+71345,Westgate Village Townhouses,MI,wix_nopms,FAILED_NO_DATA,wix_nopms,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+71385,Pine Meadow Townhomes,KS,UNATTRIBUTED,FAILED_NO_DATA,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+71558,The Bishop,GA,sightmap,SUCCESS,equity,SUCCESS,27,0,27,0,0,27,0,27,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+71651,Waterfront at the Marina,NV,onsite_apply,SUCCESS,onsite_apply,SUCCESS,6,0,6,0,0,6,0,6,0,0,3,3,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+72192,Autumn Oaks,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,2,0,2,0,0,2,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+72374,Alderwood Park,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,1,0,1,0,0,1,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+72593,Slade at Channelside,FL,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+72988,River Springs at Barge Ranch,TX,appfolio,SUCCESS,appfolio,SUCCESS,25,0,25,0,0,0,0,25,0,0,25,25,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+73079,The Palazzo,TX,apts247,SUCCESS,apts247,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+73500,Reserve at Oakleigh,TN,knock,SUCCESS,knock,SUCCESS,18,0,18,0,0,0,0,18,0,0,4,4,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+73713,Briarcliff Manor,WV,knock,SUCCESS,knock,SUCCESS,2,0,2,0,0,2,0,2,0,0,1,1,0,1,MATCH,0,0,0,,state_floor
+73728,Rockside Park Towers,OH,knock,SUCCESS,knock,SUCCESS,1,0,1,0,0,1,0,1,0,0,1,1,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+73916,Riverbank Apartments,CA,marketapts,SUCCESS,marketapts,SUCCESS,4,0,4,0,0,0,0,4,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+73949,Diamond Ridge,TX,rentcafe,DEAD_URL,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+74067,The Huntington,WA,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+74193,Summerhill Terrace,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+74369,Local 1896,NM,knock,SUCCESS,knock,SUCCESS,18,0,18,0,0,18,0,18,0,0,16,16,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+74523,Charter Club,OH,mri_prospectconnect,SUCCESS,mri_prospectconnect,SUCCESS,1,0,1,0,0,1,0,1,0,0,0,0,3,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+74571,Stoney Park Place,MI,appfolio,SUCCESS,appfolio,SUCCESS,5,0,5,0,0,0,0,5,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+74592,Crosswynde Apartments,FL,sightmap,SUCCESS,sightmap,SUCCESS,22,0,22,0,0,22,0,22,0,0,1,1,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+74872,Heather Ridge,NJ,onesite,SUCCESS,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75126,Hawthorne House,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,9,0,9,0,0,0,0,9,0,9,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75158,The Glen at Oldtown,AZ,funnel,SUCCESS_PLAN_LEVEL,funnel,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75314,Village Park at Paladin,DE,mri_prospectconnect,SUCCESS,mri_prospectconnect,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,3,1,NOT_RECORDED,0,0,0,,observed_adapter_floor
+75340,1005 Grove Avenue,VA,sightmap,SUCCESS,sightmap,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75392,Hickory Point Townhomes,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75722,Birch Pond,NC,rentvision,SUCCESS,knock,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,0,1,MATCH,0,0,0,21,finding_evidence_census
+75744,Newtown Place,PA,realpage_cws,SUCCESS,realpage_cws,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+75912,TGM Creekside Village,MD,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,7,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+76589,Palm Bay Club,FL,rentcafe,SUCCESS,rentcafe_layout_tab,SUCCESS,17,0,17,0,0,0,0,17,0,0,11,11,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+77547,Main Street Flats II,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,27,0,27,0,0,0,0,27,0,25,11,11,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+77585,The Willows at Ashley Park,GA,entrata,SUCCESS,entrata,SUCCESS,38,0,38,0,0,0,0,38,0,38,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+77713,Pure Redmond Apartments,WA,essex,SUCCESS,essex,SUCCESS,3,0,3,0,0,0,0,3,0,3,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+77949,Viridian Central,MN,appfolio,SUCCESS,appfolio,SUCCESS,13,0,13,0,0,0,0,13,0,0,12,12,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+78373,Fenway Apartments,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,9,0,9,0,0,9,9,0,0,0,0,0,4,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+78381,Rose Park Commons,MN,rentmanager,SUCCESS,rentmanager,SUCCESS,5,0,5,0,0,0,0,5,0,0,0,0,1,1,NOT_RECORDED,0,0,0,20,finding_evidence_census
+78693,Cortland Peachtree Corners,GA,cortland,SUCCESS,cortland,SUCCESS,24,0,24,0,0,0,0,24,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+78700,Adley City Springs,GA,sightmap,FAILED_NO_DATA,sightmap,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+78713,Amorance,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,7,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+78724,Camden North End,AZ,camden,SUCCESS,camden,SUCCESS,63,0,63,0,0,0,0,63,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+78758,Vance At Bishop Union,TX,g5,SUCCESS,g5,SUCCESS,33,0,33,0,0,0,0,33,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+78910,Hawthorne at Friendly,NC,rentcafe,SUCCESS,knock,SUCCESS,27,0,27,0,0,0,0,27,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+84757,Meridia Transit Plaza,NJ,appfolio,SUCCESS,appfolio,SUCCESS,8,0,8,0,0,0,0,8,0,0,7,7,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+88115,HighPoint Town Square,IL,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+91537,UrbA I,VA,onesite,SUCCESS,onesite,SUCCESS,33,0,33,0,0,0,0,33,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+94295,Silver,CA,essex,SUCCESS,essex,SUCCESS,7,0,7,0,0,0,0,7,0,7,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+94396,The Otis at Fort Ben,IN,onesite,SUCCESS,onesite,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+94494,Highbridge,DC,knock,SUCCESS,knock,SUCCESS,7,0,7,0,0,7,0,7,0,0,6,6,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+94940,The Liberty Lofts,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,24,0,24,0,0,0,0,24,0,0,17,17,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+95149,HQ @ 1532 Harrison,CA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,10,0,10,0,0,10,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+97765,Icon One Daytona Rise Collection,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+97778,Brookview at Navarre Sound,FL,entrata,SUCCESS,entrata,SUCCESS,9,0,9,0,0,9,0,9,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+97837,Five Points Northshore,TN,g5,SUCCESS,g5,SUCCESS,17,0,17,0,0,0,0,17,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+118445,Mara Pacific Beach Apartments,CA,equity,SUCCESS,equity,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+118965,16 Bennett,NJ,wix_nopms,FAILED_NO_DATA,wix_nopms,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+119144,Windsor Burnet,TX,funnel,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,0,0,2,1,NOT_RECORDED,0,0,0,25,finding_evidence_census
+120503,The Bridges Lofts,IA,realpage_oll,SUCCESS,realpage_oll,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+217343,Eagle Harbor II,VA,wix_nopms,SUCCESS,wix_nopms,SUCCESS,10,0,10,0,0,0,0,10,0,0,10,10,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+217511,Soleste SeaSide,FL,knock,SUCCESS,knock,SUCCESS,47,0,47,0,0,47,0,47,0,0,23,23,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+217564,Altitude,CO,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,10,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+217578,Acadia Court,IN,rentmanager,SUCCESS_PLAN_LEVEL,rentmanager,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+217605,Bennett Pointe,OK,residentservices365,SUCCESS,residentservices365,SUCCESS,10,3,10,0,0,0,0,10,0,0,9,9,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+217716,Taylor Pointe Residences,NH,realpage_oll,SUCCESS,realpage_oll,SUCCESS,10,9,10,0,0,0,0,10,0,0,0,0,4,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+217796,Old Shell Lofts,AL,encoreskyline_template,FAILED_NO_DATA,encoreskyline_template,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+217956,Cedar Falls Apartments,OR,marketapts,SUCCESS,marketapts,SUCCESS,6,2,6,0,0,0,0,6,0,0,4,4,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+218177,Mill & Main,MN,funnel,FAILED_NO_DATA,funnel,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+218296,Park 7,TX,knock,SUCCESS,knock,SUCCESS,7,0,7,0,0,7,0,7,0,0,5,5,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+218359,Old Farm,TX,sightmap,SUCCESS,sightmap,SUCCESS,70,3,70,0,0,70,0,70,0,0,3,3,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+218378,The Terraces Apartments,CA,equity,FAILED_NO_DATA,equity,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+218580,Harbor Sky,OR,apts247,SUCCESS,apts247,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+218586,Cedar Ridge,CA,rentaladdress,SUCCESS_PLAN_LEVEL,rentaladdress,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,37,finding_evidence_census
+218589,Main Street Lofts,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,0,14,0,14,4,4,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+218757,The Village Drey,TX,entrata,SUCCESS,entrata,SUCCESS,19,0,19,0,0,19,0,19,0,0,17,17,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+218893,Volta at Voyager I,CO,repli360,DEAD_URL,repli360,DEAD_URL,14,0,14,0,0,0,0,14,0,14,6,6,1,1,NOT_RECORDED,1,0,0,,observed_adapter_type_stratum
+218985,MAA Trinity II,NC,maac,SUCCESS,maac,SUCCESS,43,0,43,0,0,0,0,43,0,43,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+219128,The Curb,CT,appfolio,SUCCESS,appfolio,SUCCESS,42,0,42,0,0,0,0,42,0,0,31,31,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+219390,Confluence at Harvest Hills,ND,rentcafe,SUCCESS,rentcafe,SUCCESS,13,0,13,0,0,0,0,13,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+219959,The Hadley Riverside,TX,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+220088,Ashbrooke,IA,entrata,SUCCESS,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+220345,Vestawood Apartments,AL,wix_floor_plans,SUCCESS,wix_floor_plans,SUCCESS,18,0,18,0,0,0,0,18,0,0,3,3,1,1,NOT_RECORDED,0,0,0,43,finding_evidence_census
+220734,Kendrick,TX,resman,SUCCESS,resman,SUCCESS,50,3,50,0,0,0,0,50,0,0,40,40,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+220763,Northwoods I-II,FL,appfolio,SUCCESS,appfolio,SUCCESS,17,0,17,0,0,0,0,17,0,0,11,11,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+220976,The Summit at Rivery Park I,TX,fortresstech,SUCCESS,fortresstech,SUCCESS,35,0,35,0,0,0,0,35,0,0,13,13,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+221098,Ayla Stonebriar,TX,sightmap,SUCCESS,equity,SUCCESS,20,0,20,0,0,20,0,20,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+221319,Royal Park,NC,knock,SUCCESS,knock,SUCCESS,30,0,30,0,0,30,0,30,0,0,23,23,0,1,MATCH,0,0,0,5,finding_evidence_census
+221389,Troy Apartment Homes,AL,generic,SUCCESS,generic,SUCCESS,19,0,19,0,0,0,11,8,0,0,17,17,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+221973,The Park,GA,apts247,SUCCESS,apts247,SUCCESS,3,1,3,0,0,0,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+222197,The Mariner I,WI,knock,SUCCESS,knock,SUCCESS,9,0,9,0,0,9,0,9,0,0,8,8,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+222652,Turtle Dove I,TX,edificecms,SUCCESS,edificecms,SUCCESS,5,20,5,0,0,5,0,5,0,0,3,3,2,1,MATCH,0,0,0,39,finding_evidence_census
+222988,Arlo West End,MN,rentcafe,SUCCESS,rentcafe,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+223507,The West Living,WI,generic,DEAD_URL,generic,DEAD_URL,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+223517,Vista Brooklyn,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,32,0,32,0,0,0,0,32,0,32,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+223579,Settler's Landing,OH,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+224139,Meadows Apartments,TX,knock,SUCCESS,knock,SUCCESS,24,0,24,0,0,24,0,24,0,0,21,21,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+224538,The Toluca Lofts,CA,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,1,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+224746,Upshore Residences,IL,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,0,9,9,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+224788,Progress Terrace,OR,marketapts,SUCCESS,marketapts,SUCCESS,11,1,11,0,0,0,0,11,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+224962,Perse,FL,rentvision,SUCCESS,rentvision,SUCCESS,18,0,18,0,0,0,0,18,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+225197,Pine Forest Apartments,OH,realpage_oll,SUCCESS,realpage_cws,SUCCESS,20,0,20,0,0,20,0,20,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+225321,Residences at La Colombe d'Or,TX,entrata,SUCCESS,sightmap,SUCCESS,21,11,21,0,0,21,0,21,0,0,14,14,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+225610,610 West,MN,funnel,SUCCESS,funnel,SUCCESS,38,0,38,0,0,0,0,38,0,37,11,11,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+225914,Fox Glen,MI,rentcafe,FAILED_NO_DATA,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+225934,KD Place,NV,marketapts,SUCCESS,marketapts,SUCCESS,5,0,5,0,0,0,0,5,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+226350,1250 Lakeside,CA,essex,SUCCESS,essex,SUCCESS,10,0,10,0,0,0,0,10,0,10,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+226992,Forest Ridge,IN,knock,DEAD_URL,knock,DEAD_URL,10,0,10,0,0,10,0,10,0,0,8,8,3,1,MATCH,1,0,0,,observed_adapter_type_stratum
+227350,King's Manor,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,15,1,15,0,0,0,0,15,0,15,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+227366,Stazione:25,WA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,14,0,14,0,0,14,0,14,0,0,5,5,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+227790,The Charles,UT,rentcafe,SUCCESS,rentcafe,SUCCESS,30,0,30,0,0,0,0,30,0,29,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+227981,Sixth & Alder,WA,knock,SUCCESS,knock,SUCCESS,3,0,3,0,0,3,0,3,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+227989,Camden Riverwalk,TX,camden,SUCCESS,generic,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,1,1,NOT_RECORDED,0,0,0,44,finding_evidence_census
+228359,Milo,CO,equity,SUCCESS,equity,SUCCESS,21,0,21,0,0,21,0,21,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+228582,1274 at Towson,MD,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,20,0,20,0,0,20,0,20,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+228903,Fitchburg Square Apartments,WI,entrata,SUCCESS,entrata,SUCCESS,6,0,6,0,0,6,0,6,0,6,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+229189,Harrison Park Apartments,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,0,4,4,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+229295,Camden Farmers Market,TX,camden,SUCCESS,camden,SUCCESS,80,0,80,0,0,80,0,80,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+229594,Stoneridge on the 8,TX,venterra,SUCCESS,sightmap,SUCCESS,40,0,40,0,0,40,0,40,0,0,27,27,2,1,MATCH,0,0,0,,observed_adapter_floor
+229616,93 East,GA,entrata,SUCCESS,entrata,SUCCESS,9,0,9,0,0,0,0,9,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+229748,Chestnut Street,CA,essex,SUCCESS,essex,SUCCESS,12,0,12,0,0,0,0,12,0,12,0,0,2,1,UNKNOWN,0,0,0,34,finding_evidence_census
+229986,The Adley Lakewood Ranch Waterside,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,27,0,27,0,0,0,0,27,0,27,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+230081,Vitruvian West II,TX,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,91,0,91,0,0,91,0,91,0,0,0,0,1,1,NOT_RECORDED,0,0,0,16,finding_evidence_census
+230542,Santa Clara Square,CA,irvine,SUCCESS,irvine,SUCCESS,80,0,80,0,0,80,0,80,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+230598,The Ridge,MD,repli360,FAILED_NO_DATA,repli360,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+230770,Lake Haven,IL,rentcafe,SUCCESS,rentcafe,SUCCESS,36,0,36,0,0,0,0,36,0,36,0,0,1,1,UNKNOWN,0,0,0,19,finding_evidence_census
+231107,Crescent Village - Verona,CA,irvine,SUCCESS,irvine,SUCCESS,79,0,79,0,0,79,0,79,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+231315,Hickory Heights,MD,appfolio,SUCCESS,appfolio,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+231524,Harbor Blu,FL,knock,SUCCESS,knock,SUCCESS,23,0,23,0,0,0,0,23,0,0,12,12,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+231711,Williamsburg on the Lake,IN,rentcafe,SUCCESS,rentcafe,SUCCESS,38,0,38,0,0,0,0,38,0,38,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+232470,Madison at Ballston Station I,VA,entrata,SUCCESS,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+232480,Vintage at 425 Broadway,CA,equity,SUCCESS,equity,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+232538,Woodman Apartment Homes,CA,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,0,1,1,0,1,NOT_RECORDED,0,0,0,13,finding_evidence_census
+232876,MAA Denton Pointe,MO,maac,SUCCESS,maac,SUCCESS,49,0,49,0,0,0,0,49,0,49,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+232992,The Paddock Club at Providence,AL,maac,SUCCESS,maac,SUCCESS,55,0,55,0,0,0,0,55,0,55,0,0,2,1,NOT_RECORDED,0,0,0,28,finding_evidence_census
+233692,Residences,OH,apts247,SUCCESS,apts247,SUCCESS,12,0,12,0,0,0,0,12,0,12,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+234581,Georgetown Crossing,PA,rentcafe,SUCCESS_PLAN_LEVEL,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,1,finding_evidence_census
+234584,The Crescent at Chevy Chase,MD,sightmap,SUCCESS,encoreskyline_template,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+234761,Hanover,OR,rentcafe,SUCCESS,rentcafe,SUCCESS,4,0,4,0,0,0,0,4,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+234916,Camden Vanderbilt,TX,camden,SUCCESS,camden,SUCCESS,42,0,42,0,0,0,0,42,0,0,0,0,2,1,MATCH,0,0,0,44,finding_evidence_census
+234936,Amber Ridge Apartments,ND,fortresstech,SUCCESS,fortresstech,SUCCESS,3,0,3,0,0,0,0,3,0,0,3,3,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+234945,IMT Belasera at Superior,CA,imt_spaces,FAILED_NO_DATA,sightmap,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+235187,The Beverly,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+235407,Bonterra,IN,knock,SUCCESS,knock,SUCCESS,17,0,17,0,0,17,0,17,0,0,15,15,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+235693,79 West,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,24,0,24,0,0,0,0,24,0,24,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+235871,Elmtree Park Apartments,IN,mri_prospectconnect,SUCCESS,mri_prospectconnect,SUCCESS,9,0,9,0,0,9,0,9,0,9,5,5,3,1,NOT_RECORDED,0,0,0,41,finding_evidence_census
+235996,Stratford Chase,OH,appfolio,SUCCESS,appfolio,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+236188,Monticello Lee,VA,realpage_oll,SUCCESS_PLAN_LEVEL,realpage_oll,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+236195,Walnut Crossing,PA,generic,FAILED_UNREACHABLE,generic,FAILED_UNREACHABLE,0,16,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+236598,Vault Apartments,CT,rentcafe,SUCCESS,knock,SUCCESS,11,0,11,0,0,0,0,11,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+237704,AMLI on Aldrich,TX,amli,SUCCESS,amli,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+237769,Avalon Frisco North,TX,avalonbay,SUCCESS,avalonbay,SUCCESS,33,0,33,0,0,0,0,33,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+238082,The Bexley,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,5,5,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+238171,230 Ash,OR,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+238380,The Caroline Eastside,TX,rentcafe,SUCCESS,sightmap,SUCCESS,148,4,148,0,0,148,0,148,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+238540,29 WYN,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,26,5,5,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+238662,The Hydro,VA,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,20,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+238797,Revere at Hidden Creek,TN,realpage_cws,SUCCESS,realpage_cws,SUCCESS,43,0,43,0,0,43,0,43,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+238944,Eagle Rock Apartments At Woodbury,NY,spherexx,SUCCESS,spherexx,SUCCESS,40,0,40,0,0,0,0,40,0,0,0,0,1,1,NOT_RECORDED,0,0,0,17,finding_evidence_census
+239094,Zander Place,WI,rentcafe,SUCCESS,rentcafe,SUCCESS,7,5,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,1,finding_evidence_census
+239121,Enclave,TX,rentvision,SUCCESS,rentvision,SUCCESS,5,0,5,0,0,5,0,5,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+239250,Sweetwater,AL,entrata,SUCCESS,entrata,SUCCESS,7,0,7,0,0,0,0,7,0,0,6,6,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+239318,Legacy Fort Mill,SC,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,26,1,1,0,1,NOT_RECORDED,0,0,0,13,finding_evidence_census
+239369,Easton,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+239392,Blair Mill Village East,PA,rentcafe,SUCCESS,rentcafe,SUCCESS,38,0,38,0,0,0,0,38,0,36,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+239397,Soco On The Lake,TX,repli360,SUCCESS,repli360,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+239952,AMLI Toscana Place,FL,amli,SUCCESS,amli,SUCCESS,35,0,35,0,0,35,0,35,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+240168,Parker Hilltop,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,63,0,63,0,0,0,0,63,0,63,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+240525,RiverMark Northern Liberties,PA,knock,SUCCESS,knock,SUCCESS,114,0,114,0,0,114,0,114,0,0,24,24,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+240595,Stockbridge Trails,WI,rentcafe,SUCCESS,rentcafe,SUCCESS,4,12,4,0,0,0,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,1,finding_evidence_census
+240745,The Allure at Jefferson I,VA,wix_nopms,SUCCESS,wix_nopms,SUCCESS,31,0,31,0,0,0,0,31,0,0,18,18,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+241432,Cricket Flats,PA,squarespace_nopms,SUCCESS,squarespace_nopms,SUCCESS,8,0,8,0,0,0,8,0,0,0,3,3,1,1,NOT_RECORDED,0,0,0,45,finding_evidence_census
+241643,Jade at North Hills,WI,appfolio,SUCCESS,appfolio,SUCCESS,23,0,23,0,0,0,0,23,0,0,15,15,1,1,NOT_RECORDED,0,0,0,6,finding_evidence_census
+241655,Encore Skyline,ID,onsite_apply,SUCCESS,onsite_apply,SUCCESS,5,0,5,0,0,5,0,5,0,0,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+241680,Blu on Farrington,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,39,0,39,0,0,0,0,39,0,39,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+241798,Waterford Landings,TN,generic,SUCCESS,generic,SUCCESS,71,18,0,71,71,0,0,71,0,0,0,0,3,1,UNKNOWN,0,71,0,,proportional_adapter_type_fill
+241986,West Lake Quarter - The Gateway,MN,rentcafe,SUCCESS,rentcafe,SUCCESS,21,0,21,0,0,0,0,21,0,0,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+242191,AMLI West Loop,IL,amli,SUCCESS,amli,SUCCESS,28,0,28,0,0,28,0,28,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+242344,Franklin Flats,CO,marketapts,SUCCESS,marketapts,SUCCESS,4,0,4,0,0,0,0,4,0,0,2,2,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+242360,Oaks Vernon,MN,knock,SUCCESS,knock,SUCCESS,2,0,2,0,0,2,0,2,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+242565,One Six Six,IL,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,9,0,9,0,0,9,0,9,0,0,7,7,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+243523,The Elaine,IL,knock,SUCCESS,knock,SUCCESS,3,0,3,0,0,3,0,3,0,0,1,1,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+243746,Ventana Hills,PA,g5,SUCCESS,g5,SUCCESS,26,0,26,0,0,0,0,26,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+243907,Tall Oaks Apartments,KS,onesite,SUCCESS,onesite,SUCCESS,17,0,17,0,0,17,0,17,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+243936,Centennial Gardens,TN,resman,SUCCESS,resman,SUCCESS,713,1,713,0,0,0,0,713,0,0,15,15,2,1,UNKNOWN,0,0,0,22,finding_evidence_census
+244533,Lynn Hill,MD,entrata,SUCCESS,entrata,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+244546,Sterlington,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+244705,Devine District,SC,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+244906,Sterling Heights,MN,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+245185,Parkwood Apartments,MD,g5,SUCCESS,g5,SUCCESS,21,0,21,0,0,21,0,21,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+245501,Luna Upper Westside Apartments,GA,equity,SUCCESS,equity,SUCCESS,25,0,25,0,0,25,0,25,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+245526,The Bridgewater Apartments,IN,onesite,SUCCESS,onesite,SUCCESS,25,0,25,0,0,25,0,25,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+245903,Green Leaf Jasper,OR,entrata,SUCCESS,entrata,SUCCESS,4,0,4,0,0,0,0,4,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+246152,Oxford at Lake View,TX,residentservices365,SUCCESS,residentservices365,SUCCESS,28,14,28,0,0,28,0,28,0,0,13,13,1,1,UNKNOWN,0,0,0,36,finding_evidence_census
+246304,Vista Creek Apartments,CA,generic,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,1,0,1,0,0,1,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+246641,Passenger Flats,TN,entrata,SUCCESS,entrata,SUCCESS,10,0,10,0,0,0,0,10,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+246757,V2,MA,rentcafe,SUCCESS,rentcafe,SUCCESS,31,0,31,0,0,0,0,31,0,31,2,2,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+247337,Aspire Kenwood,OH,resman,SUCCESS,resman,SUCCESS,247,16,247,0,0,0,0,247,0,0,25,25,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+247383,Vanguard at 16 Tech,IN,repli360,SUCCESS,repli360,SUCCESS,72,0,72,0,0,0,0,72,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+249898,Bell Alderwood,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,27,0,27,0,0,0,0,27,0,27,7,7,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+250124,One Clinton Park,NY,rentcafe,SUCCESS,rentcafe,SUCCESS,18,0,18,0,0,0,18,0,0,18,0,0,0,1,NOT_RECORDED,0,0,0,18,finding_evidence_census
+250342,Station House,WA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,2,0,2,0,0,2,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+251165,The Overland,CO,sightmap,SUCCESS,sightmap,SUCCESS,12,6,12,0,0,12,0,12,0,0,4,4,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+251974,Domain at Founders Parc,TX,onesite,SUCCESS,onesite,SUCCESS,7,0,7,0,0,0,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+252153,District at 54,NC,knock,SUCCESS,knock,SUCCESS,27,0,27,0,0,27,0,27,0,0,21,21,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+252218,The Piedmont Raleigh,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,83,0,83,0,0,0,21,62,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+252585,Titletown Flats,WI,rentcafe,SUCCESS,rentcafe,SUCCESS,9,10,9,0,0,0,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+252794,Vintage Station North,TN,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+252880,Broadacre,WI,onesite,SUCCESS,onesite,SUCCESS,11,0,11,0,0,11,0,11,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+252947,Gage Crossing,OH,appfolio,SUCCESS_PLAN_LEVEL,appfolio,SUCCESS_PLAN_LEVEL,1,0,1,0,0,0,1,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+252997,The Eddy,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,14,0,14,0,0,0,14,0,0,0,7,7,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253074,Turquesa,NM,sightmap,SUCCESS,sightmap,SUCCESS,26,1,26,0,0,26,0,26,0,0,1,1,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+253383,Pullman Lofts,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,12,0,12,0,0,12,0,12,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+253388,Quattro,UT,encoreskyline_template,SUCCESS,sightmap,SUCCESS,8,25,8,0,0,8,0,8,0,0,4,4,0,1,MATCH,0,0,0,29,finding_evidence_census
+253447,Brickline at the Mercantile,NE,sightmap,SUCCESS,entrata,SUCCESS,22,36,22,0,0,22,0,22,0,0,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253571,The Kent,IN,UNATTRIBUTED,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,18,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253743,Walcott Jeffersonville,IN,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,3,3,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253774,27Seventy Lower Heights,TX,rentcafe_layout_tab,SUCCESS,rentcafe_layout_tab,SUCCESS,28,0,28,0,0,0,0,28,0,14,23,23,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+253777,Jayne,CO,entrata,SUCCESS,entrata,SUCCESS,11,0,11,0,0,0,0,11,0,0,9,9,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253780,Banner At Westfield,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,23,0,23,0,0,0,0,23,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253788,Legacy Cool Springs,TN,rentcafe,SUCCESS,rentcafe,SUCCESS,67,0,67,0,0,0,0,67,0,67,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+253966,Aventura at Maryland Oaks,MO,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,5,5,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+254122,Avril Cambridge Village,NC,generic_plan_text,SUCCESS_PLAN_LEVEL,generic_plan_text,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+254143,Christopher Todd Communities On Camelback,AZ,sightmap,DEAD_URL,sightmap,DEAD_URL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+254167,Harbisons Dairy,PA,rentcafe_layout_tab,SUCCESS,rentcafe_layout_tab,SUCCESS,2,3,2,0,0,0,0,2,0,0,2,2,1,1,UNKNOWN,0,0,0,42,finding_evidence_census
+254488,Gathering at Arbor Greens,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,20,0,20,0,0,0,0,20,0,20,18,18,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+254556,Park Place,TX,wix_nopms,SUCCESS,wix_nopms,SUCCESS,9,0,9,0,0,9,0,9,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+254859,The Brooke on Bagley,MI,entrata,SUCCESS,entrata,SUCCESS,5,0,5,0,0,0,0,5,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+255134,Cortland Royal Palm Beach,FL,cortland,SUCCESS,cortland,SUCCESS,28,0,28,0,0,0,0,28,0,0,0,0,1,1,NOT_RECORDED,0,0,0,8,finding_evidence_census
+255548,Redbud Ranch,OK,rentcafe,SUCCESS,rentcafe,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+255578,Circa Fitzsimons,CO,equity,SUCCESS,equity,SUCCESS,27,0,27,0,0,27,0,27,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+255637,Tuscany at Gabriella Pointe,AZ,knock,SUCCESS,knock,SUCCESS,11,0,11,0,0,11,0,11,0,0,5,5,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+255737,Vanguard,ID,marketapts,SUCCESS,marketapts,SUCCESS,4,7,4,0,0,0,0,4,0,0,4,4,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+255884,Tin Top at the Creamery,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+255949,Magnolia South,NC,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+256972,Pottery Creek,WA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,8,0,8,0,0,8,0,8,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+257328,Seasons at Mount Pleasant,WI,entrata,SUCCESS,entrata,SUCCESS,20,0,20,0,0,20,0,20,0,20,6,6,2,1,NOT_RECORDED,0,0,0,3,finding_evidence_census
+257557,The Salado at Red Berry,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,12,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+257702,The Apartments at Kelton Station,VA,realpage_oll,SUCCESS,realpage_oll,SUCCESS,10,0,10,0,0,0,0,10,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+257779,38 North,CA,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,26,17,17,1,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+257792,Moana Vista Apartments,HI,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,state_floor
+257860,Quin,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+257946,Parc View I,UT,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,7,7,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+258119,Timber Falls,WI,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+258135,Aven Ridge,TX,realpage_oll,SUCCESS,realpage_oll,SUCCESS,40,0,40,0,0,0,0,40,0,0,0,0,2,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+258143,Alleia Long Meadow Farms,TX,resman,SUCCESS,resman,SUCCESS,399,7,399,0,0,0,0,399,0,0,37,37,2,1,UNKNOWN,0,0,0,15,finding_evidence_census
+258188,Springs at Lakeville,MN,onesite,SUCCESS,sightmap,SUCCESS,23,3,23,0,0,23,0,23,0,0,0,0,2,1,PARTIAL_MATCH,0,0,0,,observed_adapter_type_stratum
+258309,Atlee Square,PA,rentcafe,SUCCESS_PLAN_LEVEL,sightmap,SUCCESS,96,15,96,0,0,96,0,96,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+258391,Neuhoff,TN,rentcafe,SUCCESS_PLAN_LEVEL,sightmap,SUCCESS,43,72,43,0,0,43,0,43,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+258497,Casa Blanca I,AZ,generic,SUCCESS_PLAN_LEVEL,generic,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+258543,Alta Wren,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,11,0,11,0,0,0,0,11,0,11,9,9,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+258550,Aviara East Pompano,FL,generic,SUCCESS,generic,SUCCESS,15,10,15,0,0,15,0,15,0,0,4,4,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+259357,Cypress McKinney Falls,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,12,0,12,0,0,0,0,12,0,12,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+259386,Fairmount,NJ,generic,SUCCESS,generic,SUCCESS,2,0,2,0,0,0,0,1,1,0,1,1,1,1,PARTIAL_MATCH,0,0,0,14,finding_evidence_census
+259569,Beaumont Oaks,NC,sightmap,SUCCESS,sightmap,SUCCESS,14,2,14,0,0,14,0,14,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+259784,Reflection Pointe,TN,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+259786,Viking Lakes I,MN,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,18,0,18,0,0,18,0,18,0,0,10,10,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+259919,Compass at the Grove,DE,sightmap,SUCCESS,sightmap,SUCCESS,22,21,22,0,0,22,0,22,0,0,1,1,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+260117,Apex,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,51,0,51,0,0,0,0,51,0,51,7,7,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+260340,Linden At The Rim,TX,knock,SUCCESS,knock,SUCCESS,43,0,43,0,0,43,0,43,0,0,34,34,3,1,MATCH,0,0,0,41,finding_evidence_census
+260872,Balsa,DC,rentcafe,SUCCESS,rentcafe,SUCCESS,33,0,33,0,0,0,0,33,0,32,20,20,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+261116,Copper Pointe,TX,realpage_oll,FAILED_NO_DATA,realpage_oll,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+261349,Broadstone Centennial,TN,onesite,SUCCESS,onesite,SUCCESS,16,0,16,0,0,0,0,16,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+261358,Edge Avenue G,NJ,rentcafe,SUCCESS,rentcafe,SUCCESS,57,0,57,0,0,0,0,57,0,19,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+261530,Waterline Square,NY,rentcafe,SUCCESS,rentcafe,SUCCESS,42,0,42,0,0,0,2,40,0,1,0,0,6,1,MATCH,0,0,0,18,finding_evidence_census
+261580,1515 Park Place,NY,static_residence_table,SUCCESS,static_residence_table,SUCCESS,3,5,3,0,0,0,1,2,0,0,0,0,3,1,PARTIAL_MATCH,0,0,0,49,finding_evidence_census
+261603,Wellspring,TX,entrata,SUCCESS_PLAN_LEVEL,entrata,SUCCESS_PLAN_LEVEL,0,5,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+261648,The Larson,WA,onsite_apply,SUCCESS_PLAN_LEVEL,onsite_apply,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+261739,The Pointe at Palm Bay,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,6,4,4,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+261770,AMLI Broadway Park,CO,amli,SUCCESS,amli,SUCCESS,30,0,30,0,0,30,0,30,0,0,0,0,1,1,MATCH,0,0,0,31,finding_evidence_census
+262292,Camelot at Marlboro,NJ,entrata,SUCCESS,entrata,SUCCESS,20,0,20,0,0,0,0,20,0,0,17,17,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+262518,Bloom,WA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,6,0,6,0,0,6,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+262539,Modera Montville,NJ,entrata,SUCCESS_PLAN_LEVEL,entrata,SUCCESS,20,10,20,0,0,0,0,20,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+262540,AvalonBay Montville,NJ,avalonbay,SUCCESS,avalonbay,SUCCESS,25,0,25,0,0,0,0,25,0,0,0,0,2,1,UNKNOWN,0,0,0,2,finding_evidence_census
+262964,The Bellagio,NY,wix_floor_plans,FAILED_NO_DATA,wix_floor_plans,SUCCESS_PLAN_LEVEL,0,12,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,43,finding_evidence_census
+263110,Briley,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,33,0,33,0,0,0,0,33,0,33,3,3,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+263127,Hickory Grove,GA,rentmanager,SUCCESS_PLAN_LEVEL,rentmanager,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+263158,Promenade at Irvine Spectrum,CA,irvine,SUCCESS,irvine,SUCCESS,315,0,315,0,0,315,0,315,0,0,0,0,2,1,NOT_RECORDED,0,0,0,30,finding_evidence_census
+263732,Hoyt Tower,NJ,wix_nopms,FAILED_NO_DATA,wix_nopms,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+263788,Autumn Breeze,TX,realpage_oll,SUCCESS,realpage_oll,SUCCESS,5,9,5,0,0,0,0,5,0,0,0,0,4,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+263981,The Lafayette,CT,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+263992,Rivermont Park,VA,entrata,SUCCESS,entrata,SUCCESS,5,0,5,0,0,0,0,5,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+264077,Novi Flats,NC,sightmap,SUCCESS,rentcafe,SUCCESS,112,6,112,0,0,0,0,112,0,0,2,2,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+264139,Continuum 115,NC,knock,SUCCESS,knock,SUCCESS,16,0,16,0,0,16,0,16,0,0,11,11,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+264397,Linden Ranch,TX,knock,SUCCESS,knock,SUCCESS,34,0,34,0,0,34,0,34,0,0,18,18,3,1,MATCH,0,0,0,41,finding_evidence_census
+264764,East Bend,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,19,0,19,0,0,0,0,19,0,19,6,6,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+264994,The Fitzgerald,WI,generic,SUCCESS,generic,SUCCESS,8,0,8,0,0,0,0,8,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+265110,Bexley Sugarloaf,GA,rentcafe,SUCCESS,sightmap,SUCCESS,37,15,37,0,0,37,0,37,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+265147,Aura Delray Beach,FL,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+265281,The Louise,TX,equity,SUCCESS,equity,SUCCESS,22,0,22,0,0,22,0,22,0,0,0,0,2,1,NOT_RECORDED,0,0,0,33,finding_evidence_census
+265383,Monterey Garden,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,1,0,1,0,0,1,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+265402,Elevate at Skyline,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,7,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+265769,Signal,GA,repli360,SUCCESS,repli360,SUCCESS,25,0,25,0,0,0,0,25,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+266348,Solasta,CA,generic_plan_text,SUCCESS,onsite_apply,SUCCESS,18,0,18,0,0,18,0,18,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+266891,The Grove at La Frontera,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,131,0,131,0,0,0,0,131,0,131,1,1,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+266951,Seven Oaks,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,41,0,41,0,0,0,0,41,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+267117,Azure Carnes Crossroads,SC,onesite,SUCCESS,onesite,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+267118,The Spoke at McCullough Station,NC,apts247,SUCCESS,apts247,SUCCESS,31,0,31,0,0,0,0,31,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+267574,Bridge at Heritage Woods,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,17,0,17,0,0,0,0,17,0,17,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+267958,Pinnacle,DC,rentcafe,SUCCESS,rentcafe,SUCCESS,23,0,23,0,0,0,0,23,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+268521,The Lucy,MN,onesite,SUCCESS,onesite,SUCCESS,1,0,1,0,0,0,0,1,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+268552,14 Lincoln Place,NJ,knock,SUCCESS,knock,SUCCESS,2,0,2,0,0,2,0,2,0,0,2,2,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+268592,Jasper House,PA,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,0,2,2,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+268747,Arthur On Aberdeen,IL,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,22,20,20,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+268764,Cadia Grand Praire,TX,UNATTRIBUTED,FAILED_UNREACHABLE,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+268941,Azola South Tampa,FL,sightmap,SUCCESS,sightmap,SUCCESS,24,0,24,0,0,24,0,24,0,0,2,2,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+269136,Coventry Townhomes,UT,marketapts,SUCCESS,marketapts,SUCCESS,4,1,4,0,0,0,0,4,0,0,1,1,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+269311,Link Apartments Calyx,NC,rentcafe,SUCCESS,rentcafe,SUCCESS,18,0,18,0,0,0,0,18,0,18,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+269320,Collection Champions Circle,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,29,0,29,0,0,0,0,29,0,29,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+269510,The Camden,WA,rentcafe,SUCCESS,rentcafe,SUCCESS,55,0,55,0,0,0,0,55,0,0,6,6,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+269594,Marlowe Place,NC,repli360,SUCCESS,repli360,SUCCESS,15,0,15,0,0,0,0,15,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+269642,Veranda,PA,entrata,SUCCESS,entrata,SUCCESS,35,0,35,0,0,0,0,35,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+269664,The Pinnacle at Stone Creek Falls,MO,entrata,FAILED_NO_DATA,entrata,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+269721,Skyview Lofts,MT,UNATTRIBUTED,SUCCESS_PLAN_LEVEL,appfolio,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+269985,Resia Tributary,GA,fortresstech,SUCCESS,fortresstech,SUCCESS,68,0,68,0,0,0,0,68,0,0,38,38,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+270484,The Casco,ME,rentcafe,SUCCESS_PLAN_LEVEL,rentcafe,SUCCESS_PLAN_LEVEL,0,4,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,state_floor
+270574,Satori West Ashley,SC,rentcafe,SUCCESS,rentcafe,SUCCESS,23,0,23,0,0,0,0,23,0,23,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+270897,Avilla Vista Norte,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+270909,Union Mill,KS,entrata,SUCCESS,entrata,SUCCESS,43,0,43,0,0,0,0,43,0,0,30,30,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+271123,Fox Bridge North,TX,knock,SUCCESS,knock,SUCCESS,20,0,20,0,0,20,0,20,0,0,18,18,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+271190,The Millstone Commons,SD,appfolio,SUCCESS,appfolio,SUCCESS,9,0,9,0,0,0,0,9,0,0,8,8,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+271195,Indy Flats,IN,thinkreside,SUCCESS,thinkreside,SUCCESS,46,7,46,0,0,0,0,46,0,0,0,0,1,1,NOT_RECORDED,0,0,0,46,finding_evidence_census
+271348,Alta Rochelle,TN,funnel,SUCCESS,funnel,SUCCESS,89,0,89,0,0,0,0,89,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+271682,Princeton Place,OH,sightmap,SUCCESS,sightmap,SUCCESS,1,7,1,0,0,1,0,1,0,0,1,1,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+271721,The Millennium on Monroe,WA,wix_nopms,FAILED_NO_DATA,wix_nopms,SUCCESS,4,0,4,0,0,0,0,4,0,0,0,0,2,1,UNKNOWN,0,0,0,47,finding_evidence_census
+272772,Hawkeye Village,IA,generic,FAILED_NO_DATA,UNATTRIBUTED,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,,proportional_adapter_type_fill
+272802,The Residences at Water Square,MI,sightmap,SUCCESS,sightmap,SUCCESS,18,3,18,0,0,18,0,18,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+273117,The Whitley,MN,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,26,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+273160,Bowery West,NC,funnel,SUCCESS,funnel,SUCCESS,18,0,18,0,0,18,0,18,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+273516,The Abbey at Sonterra,TX,knock,SUCCESS,knock,SUCCESS,19,0,19,0,0,19,0,19,0,0,17,17,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+273919,Avon Commons,NY,rentcafe,SUCCESS,rentcafe,SUCCESS,1,0,1,0,0,0,0,1,0,1,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+273930,West Shire Village,FL,apts247,SUCCESS,apts247,SUCCESS,27,0,27,0,0,27,0,27,0,27,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+274384,Bryn House,GA,encoreskyline_template,SUCCESS,sightmap,SUCCESS,38,21,38,0,0,38,0,38,0,0,32,32,0,1,MATCH,0,0,0,29,finding_evidence_census
+274886,Aster Village Two,IA,generic_plan_text,FAILED_NO_DATA,generic_plan_text,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+274909,The Sinclair II,WA,onsite_apply,SUCCESS,UNATTRIBUTED,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,1,3,0,32,finding_evidence_census
+275151,Hamlet at MidCity,AL,knock,SUCCESS,knock,SUCCESS,19,0,19,0,0,19,0,19,0,0,6,6,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+275548,Redwood Kannapolis Parkway,NC,rentcafe,SUCCESS,rentcafe,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+276192,The Grand at Cibolo,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,31,0,31,0,0,0,0,31,0,31,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+276351,The Parkline,CA,wix_nopms,SUCCESS,wix_nopms,SUCCESS,3,13,3,0,0,3,0,3,0,0,1,1,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+276734,5Line,NC,encoreskyline_template,SUCCESS,sightmap,SUCCESS,157,19,157,0,0,157,0,157,0,0,117,117,0,1,MATCH,0,0,0,29,finding_evidence_census
+277774,Redwood Superior Township,MI,rentcafe,SUCCESS,rentcafe,SUCCESS,4,149,4,0,0,0,0,4,0,4,1,1,1,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+278113,Ascend NonaWest I,FL,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,56,0,56,0,0,56,0,56,0,0,0,0,1,1,NOT_RECORDED,0,0,0,29,finding_evidence_census
+278167,Aspen Vista at Anchor Pointe,NV,onsite_apply,SUCCESS,onsite_apply,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+278706,The Prairie Villas,MO,rentcafe,SUCCESS,rentcafe,SUCCESS,6,0,6,0,0,0,0,6,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+278904,Mirra,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,0,12,12,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+278953,Ascend at Ventana Lakes,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,34,0,34,0,0,0,0,34,0,0,33,33,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+279103,Shade,NV,realpage_oll,SUCCESS,realpage_oll,SUCCESS,42,11,42,0,0,0,0,42,0,0,0,0,4,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+279758,Tisdale at Lakeline Station,TX,sightmap,SUCCESS,sightmap,SUCCESS,219,1,219,0,0,219,0,219,0,0,0,0,2,1,MATCH,0,0,0,23,finding_evidence_census
+280355,Town Center Apartments,VA,squarespace_nopms,SUCCESS,squarespace_nopms,SUCCESS,17,0,17,0,0,0,0,17,0,0,11,11,1,1,NOT_RECORDED,0,17,0,45,finding_evidence_census
+280797,Aspire,OH,entrata,SUCCESS,entrata,SUCCESS,18,0,18,0,0,9,0,18,0,18,0,0,2,1,NOT_RECORDED,11,0,0,,proportional_adapter_type_fill
+281149,Irondale at Wharton,NJ,rentmanager,SUCCESS,rentmanager,SUCCESS,6,0,6,0,0,0,6,0,0,0,2,2,1,1,NOT_RECORDED,0,0,0,14,finding_evidence_census
+281369,Dupont Meadows,IN,g5,SUCCESS,g5,SUCCESS,4,0,4,0,0,4,0,4,0,0,0,0,2,1,UNKNOWN,0,0,0,,proportional_adapter_type_fill
+281751,The Franklin Marlboro,NJ,rentcafe_layout_tab,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,0,0,0,1,1,NOT_RECORDED,0,0,0,42,finding_evidence_census
+281837,Railyard I,TX,spherexx,SUCCESS,spherexx,SUCCESS,18,4,18,0,0,0,18,0,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+281928,Mosby Citrus Ridge,FL,knock,SUCCESS,knock,SUCCESS,75,0,75,0,0,75,0,75,0,0,14,14,0,1,MATCH,0,0,0,5,finding_evidence_census
+282381,Mission Ranch,TX,appfolio,FAILED_NO_DATA,appfolio,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+282696,Allen Ranch Estates,OR,wix_nopms,FAILED_NO_DATA,wix_nopms,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,47,finding_evidence_census
+282952,Melissa Ranch,TX,realpage_oll,SUCCESS,realpage_oll,SUCCESS,29,9,29,0,0,29,0,29,0,0,0,0,4,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+283126,Tara Ridge,AR,rentcafe,FAILED_NO_DATA,sightmap,SUCCESS,13,0,13,0,0,13,0,13,0,0,0,0,2,1,PARTIAL_MATCH,0,0,0,,proportional_adapter_type_fill
+283780,Riverwalk Luxe,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,15,0,15,0,0,0,0,15,0,15,13,13,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+284136,Broadstone Oliver,TX,knock,SUCCESS,knock,SUCCESS,49,0,49,0,0,49,0,49,0,0,26,26,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+284598,Sunrise Station,CA,marketapts,SUCCESS,marketapts,SUCCESS,17,0,17,0,0,0,0,17,0,0,6,6,1,1,NOT_RECORDED,0,0,0,40,finding_evidence_census
+284663,Quail Creek,OH,knock,SUCCESS_PLAN_LEVEL,knock,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+285096,Century Plaza,AK,rentcafe,SUCCESS,rentcafe,SUCCESS,3,0,3,0,0,0,0,3,0,0,1,1,0,1,NOT_RECORDED,0,0,0,,state_floor
+285247,The Clark Lofts,SD,sightmap,SUCCESS,sightmap,SUCCESS,12,12,12,0,0,12,0,12,0,0,5,5,2,1,MATCH,0,0,0,,state_floor
+285397,Vistas Palmetto Bay,FL,onesite,SUCCESS,onesite,SUCCESS,1,0,1,0,0,0,0,1,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+286698,The Southerly at Shipyards,FL,spherexx,SUCCESS,spherexx,SUCCESS,20,4,20,0,0,0,20,0,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+286725,Kinsley Yards,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,7,0,7,0,0,7,0,7,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+286957,Edison,OR,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,5,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+288197,Redwood Copley Heritage Woods Drive,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,2,0,2,0,0,0,0,2,0,2,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+288502,Marlowe Tomoka Village,FL,encoreskyline_template,SUCCESS,sightmap,SUCCESS,136,0,136,0,0,136,0,136,0,0,16,16,0,1,MATCH,0,0,0,29,finding_evidence_census
+288891,The Parker,GA,sightmap,SUCCESS,sightmap,SUCCESS,113,2,113,0,0,113,0,113,0,0,1,1,0,1,MATCH,0,0,0,23,finding_evidence_census
+289463,Redwood Norton I,OH,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,5,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+290551,The Asher,MA,knock,SUCCESS,knock,SUCCESS,1,0,1,0,0,1,0,1,0,0,1,1,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+290592,Colina Ranch Hill,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,28,0,28,0,0,0,0,28,0,0,3,3,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+290807,Meri Palm Bay,FL,onsite_apply,SUCCESS,onsite_apply,SUCCESS,8,0,8,0,0,8,0,8,0,0,1,1,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+291150,Carlson Place,ND,fortresstech,SUCCESS,fortresstech,SUCCESS,3,0,3,0,0,0,0,3,0,0,1,1,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+291337,Vasari at Ventana,CA,onsite_apply,SUCCESS,onsite_apply,SUCCESS,42,0,42,0,0,42,0,42,0,0,2,2,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+292744,Chartwell Commons at Green Lea,TN,UNATTRIBUTED,FAILED_UNREACHABLE,knock,SUCCESS,450,0,450,0,0,0,0,450,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+292753,TerraLane at Campo del Sol,TX,knock,SUCCESS,knock,SUCCESS,16,0,16,0,0,0,0,16,0,0,5,5,3,1,MATCH,0,0,0,,proportional_adapter_type_fill
+292887,Horizon Apartments and Villas,NE,appfolio,SUCCESS,appfolio,SUCCESS,5,0,5,0,0,0,0,5,0,0,2,2,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+292894,Lenox Timbergrove,TX,sightmap,SUCCESS,sightmap,SUCCESS,47,4,47,0,0,47,0,47,0,0,2,2,2,1,MATCH,0,0,0,,proportional_adapter_type_fill
+292955,3140 Clybourn,IL,generic,SUCCESS_NO_DATA_PUBLISHED,generic,SUCCESS_NO_DATA_PUBLISHED,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+293154,Kinsley,CT,generic,SUCCESS_NO_DATA_PUBLISHED,generic,SUCCESS_NO_DATA_PUBLISHED,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+293332,Taverna at the Forum,FL,realpage_oll,SUCCESS,realpage_oll,SUCCESS,68,0,68,0,0,0,0,68,0,0,0,0,2,1,NOT_RECORDED,0,0,0,26,finding_evidence_census
+293735,Pelican Crossing,SC,rentcafe,SUCCESS,sightmap,SUCCESS,160,0,160,0,0,160,0,160,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+294493,Ashland,MN,UNATTRIBUTED,FAILED_UNREACHABLE,rentmanager,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+294552,Red Hawk Laurel Grey,OR,onsite_apply,SUCCESS,onsite_apply,SUCCESS,3,0,3,0,0,3,0,3,0,0,0,0,2,1,NOT_RECORDED,0,0,0,32,finding_evidence_census
+294569,Mihir Taylor,TX,rentcafe,SUCCESS,rentcafe,SUCCESS,34,0,34,0,0,0,0,34,0,0,15,15,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+294926,The Collier at Clift Farm,AL,repli360,SUCCESS,repli360,SUCCESS,206,0,206,0,0,0,0,206,0,0,0,0,1,1,MATCH,0,0,0,,proportional_adapter_type_fill
+295254,Broadstone Overlands,FL,encoreskyline_template,SUCCESS,encoreskyline_template,SUCCESS,17,0,17,0,0,17,0,17,0,0,1,1,1,1,NOT_RECORDED,0,0,0,29,finding_evidence_census
+296586,Summerwell,NC,entrata,SUCCESS,entrata,SUCCESS,9,0,9,0,0,0,0,9,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+296916,Vivo Living Port Royal,SC,fortresstech,SUCCESS,fortresstech,SUCCESS,9,0,9,0,0,0,0,9,0,0,3,3,2,1,UNKNOWN,0,0,0,35,finding_evidence_census
+297075,Tribute Verdae,SC,entrata,SUCCESS_PLAN_LEVEL,UNATTRIBUTED,FAILED_UNREACHABLE,0,0,0,0,0,0,0,0,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+297341,Colina WeHo,AL,rentcafe,SUCCESS,rentcafe,SUCCESS,26,0,26,0,0,0,0,26,0,0,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+297381,Rainier View,WA,appfolio,SUCCESS_PLAN_LEVEL,appfolio,SUCCESS_PLAN_LEVEL,0,2,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+297947,Alexan Montview Plaza,CO,rentcafe,SUCCESS,rentcafe,SUCCESS,51,0,51,0,0,0,0,51,0,0,0,0,0,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+297957,James Run,MD,onesite,SUCCESS,sightmap,SUCCESS,30,9,30,0,0,30,0,30,0,0,0,0,0,1,MATCH,0,0,0,,proportional_adapter_type_fill
+298547,Allora Creekbend,GA,rentcafe,SUCCESS,rentcafe,SUCCESS,22,0,22,0,0,0,0,22,0,0,11,11,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+298632,Churchwoods,IN,appfolio,SUCCESS,appfolio,SUCCESS,3,0,3,0,0,0,0,3,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+299380,Jodeco Landing,GA,generic_plan_text,SUCCESS,generic_plan_text,SUCCESS,7,0,7,0,0,0,0,7,0,0,3,3,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+299535,Alpine Landing,ID,rentcafe,SUCCESS,rentcafe,SUCCESS,7,0,7,0,0,0,0,7,0,0,1,1,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+299847,Mirabella,TX,spherexx,FAILED_NO_DATA,spherexx,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,observed_adapter_type_stratum
+300551,AVIA Liberty Ridge,FL,rentcafe,SUCCESS,rentcafe,SUCCESS,5,0,5,0,0,0,0,5,0,0,1,1,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+301567,Enby Gardens,MA,generic,SUCCESS_NO_DATA_PUBLISHED,generic,SUCCESS_NO_DATA_PUBLISHED,0,0,0,0,0,0,0,0,0,0,0,0,1,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+302570,The Landings at Gateway,CO,apts247,SUCCESS,apts247,SUCCESS,2,1,2,0,0,0,0,2,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+303514,The Arno at Coventry,NE,rentcafe,SUCCESS,rentcafe,SUCCESS,50,0,50,0,0,0,0,50,0,0,0,0,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill
+304379,Crossings at Windsong,AZ,rentcafe,SUCCESS,rentcafe,SUCCESS,8,0,8,0,0,0,0,8,0,8,2,2,2,1,NOT_RECORDED,0,0,0,,proportional_adapter_type_fill

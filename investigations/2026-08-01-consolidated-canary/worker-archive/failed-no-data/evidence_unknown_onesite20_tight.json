@@ -1,0 +1,949 @@
+{
+  "batch_label": "unknown-onesite20-tight",
+  "filters": {
+    "evidence_lane": "onesite_direct_e2e",
+    "ledger_level": "unknown",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "realpage_oll",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": ""
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 2948,
+      "property_identity_match": false,
+      "property_name": "Crystal Woods of Alexandria",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "www.crystalwoodsapts.com"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 9,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=cf54223a-8288-45a4-8a90-dbcc65e8a519"
+        ],
+        "website_host": "www.parkatcanyonridge.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "aade76502b6a",
+            "unit_number": "182"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=cf54223a-8288-45a4-8a90-dbcc65e8a519",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1B",
+          "identity": {
+            "floor_plan_id": "773f8a0aaa45",
+            "unit_number": "139"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=cf54223a-8288-45a4-8a90-dbcc65e8a519",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 4554,
+      "property_identity_match": false,
+      "property_name": "Park at Canyon Ridge",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A1B",
+        "B2"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 9,
+      "website": "https://www.parkatcanyonridge.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 3,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eb526c07-9766-42fd-a1bb-2b03c02bd06b"
+        ],
+        "website_host": "www.courtneyparkapthomes.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Keystone with Sunroom",
+          "identity": {
+            "floor_plan_id": "27973dde81cc",
+            "unit_number": "119"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eb526c07-9766-42fd-a1bb-2b03c02bd06b",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Breckenridge",
+          "identity": {
+            "floor_plan_id": "0f7137524102",
+            "unit_number": "212"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eb526c07-9766-42fd-a1bb-2b03c02bd06b",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 4,
+      "property_id": 12398,
+      "property_identity_match": false,
+      "property_name": "Courtney Park",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Aspen",
+        "Breckenridge",
+        "Breckenridge with Sunroom",
+        "Keystone",
+        "Keystone with Sunroom",
+        "Telluride",
+        "Telluride with Sunroom"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "https://www.courtneyparkapthomes.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": ""
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 8,
+      "property_id": 14295,
+      "property_identity_match": false,
+      "property_name": "Timber Ridge Apartment Homes",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "Alpine",
+        "Cascade",
+        "Sierra",
+        "Tahoe",
+        "Three Bedroom",
+        "Unique One Bedroom",
+        "Unique Two Bedroom",
+        "Yukon"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "www.myboulderapartment.com"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 3,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9819e6c6-d3dc-41e5-9508-61cb0fb8921f"
+        ],
+        "website_host": "www.mountainviewapartmenthomes.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan A",
+          "identity": {
+            "floor_plan_id": "33e06e12ba6f",
+            "unit_number": "9"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9819e6c6-d3dc-41e5-9508-61cb0fb8921f",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan A",
+          "identity": {
+            "floor_plan_id": "33e06e12ba6f",
+            "unit_number": "138"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9819e6c6-d3dc-41e5-9508-61cb0fb8921f",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 1,
+      "property_id": 15358,
+      "property_identity_match": false,
+      "property_name": "Mountain View",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Plan A",
+        "Plan B",
+        "Plan C"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "http://www.mountainviewapartmenthomes.com/"
+    },
+    {
+      "adapter": "realpage_oll",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.townecrest.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 16172,
+      "property_identity_match": false,
+      "property_name": "Towne Crest",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "http://www.townecrest.com/"
+    },
+    {
+      "adapter": "realpage_oll",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.forestproperties.net"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 18194,
+      "property_identity_match": false,
+      "property_name": "Parke Place Townhomes",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "https://www.forestproperties.net/property/availabilities/parke-place-village"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 14,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 14,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=8288fed2-13a8-477e-b180-f36eb72e2eff"
+        ],
+        "website_host": ""
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Aspen",
+          "identity": {
+            "floor_plan_id": "3db3d2b9a148",
+            "unit_number": "2"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=8288fed2-13a8-477e-b180-f36eb72e2eff",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Aspen",
+          "identity": {
+            "floor_plan_id": "3db3d2b9a148",
+            "unit_number": "42"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=8288fed2-13a8-477e-b180-f36eb72e2eff",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 2,
+      "property_id": 18736,
+      "property_identity_match": false,
+      "property_name": "Central Park",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Ashford",
+        "Aspen",
+        "Lennox",
+        "Lexington",
+        "Madison",
+        "Monroe"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 14,
+      "website": "www.centralparkmontgomery.com"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.southpointehanahan.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 2,
+      "property_id": 39995,
+      "property_identity_match": false,
+      "property_name": "South Pointe",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "A1",
+        "B1"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "https://www.southpointehanahan.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.parkatblanding.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 9,
+      "property_id": 43520,
+      "property_identity_match": false,
+      "property_name": "Park at Blanding",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "2x1",
+        "2x1 Large",
+        "2x1 Large Premium",
+        "2x1 Large Signature",
+        "2x1 Premium",
+        "2x1 Signature",
+        "3x2",
+        "3x2 Premium"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "http://www.parkatblanding.com/"
+    },
+    {
+      "adapter": "knock",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "knock-adapter: no knockDoorway.init() call in HTML"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.coveatoverlakeapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 224888,
+      "property_identity_match": false,
+      "property_name": "The Cove at Overlake",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "http://www.coveatoverlakeapts.com/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.posthouseevv.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 18,
+      "property_id": 251908,
+      "property_identity_match": false,
+      "property_name": "The Post House",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "Courier",
+        "Ledger",
+        "Messenger",
+        "Parcel",
+        "Post",
+        "Studio Apartments",
+        "Telegram"
+      ],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "https://www.posthouseevv.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 11,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 11,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=68888a8d-8f37-4001-994b-39585e4e0ffd"
+        ],
+        "website_host": "www.domainatfoundersparc.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "fa12269bccc8",
+            "unit_number": "18"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=68888a8d-8f37-4001-994b-39585e4e0ffd",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "fa12269bccc8",
+            "unit_number": "65"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=68888a8d-8f37-4001-994b-39585e4e0ffd",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 7,
+      "property_id": 251974,
+      "property_identity_match": false,
+      "property_name": "Domain at Founders Parc",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 11,
+      "website": "https://www.domainatfoundersparc.com/"
+    },
+    {
+      "adapter": "realpage_oll",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.thepointatreston.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 253326,
+      "property_identity_match": false,
+      "property_name": "The Point at Reston",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "https://www.thepointatreston.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 9,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=3ae44b3c-8432-49b7-904f-05d1cc40b372"
+        ],
+        "website_host": "www.alapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Little Talbot",
+          "identity": {
+            "floor_plan_id": "feb9242d8407",
+            "unit_number": "246"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=3ae44b3c-8432-49b7-904f-05d1cc40b372",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Little Talbot",
+          "identity": {
+            "floor_plan_id": "feb9242d8407",
+            "unit_number": "255"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=3ae44b3c-8432-49b7-904f-05d1cc40b372",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 3,
+      "property_id": 253646,
+      "property_identity_match": false,
+      "property_name": "Tapestry Westland Village",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Amelia",
+        "Ana Maria",
+        "Anastasia",
+        "Caladesi",
+        "Captivia",
+        "Little Talbot",
+        "Marco",
+        "Sanibel"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 9,
+      "website": "https://www.alapts.com/apartments/fl/jacksonville/tapestry-westland-village/"
+    },
+    {
+      "adapter": "knock",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "knock-adapter: no knockDoorway.init() call in HTML"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "copperpointeapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 261116,
+      "property_identity_match": false,
+      "property_name": "Copper Pointe",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "https://copperpointeapts.com/"
+    },
+    {
+      "adapter": "realpage_oll",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "No RealPage OLL data found in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.thepointatkingston.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 265143,
+      "property_identity_match": false,
+      "property_name": "The Point at Kingston",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REALPAGE_OLL",
+      "units": 0,
+      "website": "https://www.thepointatkingston.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 3,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eaf30401-f5e9-4e61-9d76-716429f289c8"
+        ],
+        "website_host": "blvd45apts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Sunset",
+          "identity": {
+            "floor_plan_id": "163c67ca9794",
+            "unit_number": "117"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eaf30401-f5e9-4e61-9d76-716429f289c8",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Sunset",
+          "identity": {
+            "floor_plan_id": "163c67ca9794",
+            "unit_number": "124"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=eaf30401-f5e9-4e61-9d76-716429f289c8",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 6,
+      "property_id": 270367,
+      "property_identity_match": false,
+      "property_name": "Boulevard 45",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Broadway",
+        "Hollywood",
+        "Independence",
+        "Las Vegas",
+        "Santa Monica",
+        "Sunset",
+        "Wilshire"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "https://blvd45apts.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4047044/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f072115f-e765-4882-92a6-a0a58cf39afc"
+        ],
+        "website_host": "www.501brady.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "2C",
+          "identity": {
+            "floor_plan_id": "5efbf6509c54",
+            "unit_number": "26"
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4047044/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f072115f-e765-4882-92a6-a0a58cf39afc",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 7,
+      "property_id": 284199,
+      "property_identity_match": false,
+      "property_name": "501 Brady",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1A",
+        "1B",
+        "1C",
+        "1D",
+        "2A",
+        "2B",
+        "2C",
+        "Studio"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 1,
+      "website": "https://www.501brady.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "unknown-onesite20-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.123taylor.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 5,
+      "property_id": 291774,
+      "property_identity_match": false,
+      "property_name": "Gallatin Village",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "2/1",
+        "2/1 Deluxe",
+        "2/1.5",
+        "2/1.5 Deluxe",
+        "3/2 Deluxe"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 0,
+      "website": "https://www.123taylor.com/gallatin-village"
+    }
+  ]
+}

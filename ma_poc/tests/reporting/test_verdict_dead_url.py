@@ -21,7 +21,6 @@ from ma_poc.reporting.verdict import (
     verdict_is_success,
 )
 
-
 # ── Enum addition ────────────────────────────────────────────────────────────
 
 
@@ -63,6 +62,36 @@ class TestComputeDeadUrl:
     def test_dead_url_reason_describes_classification(self):
         result = compute(fetch_outcome="DEAD_URL")
         assert "dead" in result.reason.lower()
+
+    @pytest.mark.parametrize(
+        ("adapter", "unit_id"),
+        [
+            ("entrata", "E-101"),
+            ("realpage_cws", "CWS-68"),
+            ("knock", "K-210"),
+        ],
+    )
+    def test_recovered_units_outrank_dead_entry_url(
+        self,
+        adapter: str,
+        unit_id: str,
+    ) -> None:
+        """A dead configured URL cannot veto a successful bounded sub-route."""
+        units = [
+            {
+                "unit_number": unit_id,
+                "market_rent_low": 1800,
+                "extraction_tier": f"TIER_1_API_{adapter.upper()}",
+            }
+        ]
+
+        result = compute(
+            fetch_outcome="DEAD_URL",
+            extract_result={"units": units},
+            units=units,
+        )
+
+        assert result.verdict == Verdict.SUCCESS
 
 
 # ── verdict_is_success ───────────────────────────────────────────────────────

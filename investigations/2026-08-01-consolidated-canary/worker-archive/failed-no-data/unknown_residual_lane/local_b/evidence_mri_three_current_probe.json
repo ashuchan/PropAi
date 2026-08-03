@@ -1,0 +1,142 @@
+{
+  "audit": "unknown residual MRI three-site current deep probe",
+  "capture_date": "2026-08-01",
+  "ledger_snapshot": {
+    "sha256": "fdf82e2b4db693da776944ac58927e071559a726522a353cd94f207efd7cfd60",
+    "unchanged_after_validation": true
+  },
+  "native_near_miss_ids": [
+    "74523"
+  ],
+  "policy": {
+    "captcha_interactions": 0,
+    "hyperbrowser_sessions": 0,
+    "llm_calls": 0,
+    "paid_canary": false,
+    "web_unlocker_calls": 0
+  },
+  "results": [
+    {
+      "configured_url": "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+      "contamination_verdict": "single_exact_mri_property_session",
+      "current_configured_route_scraper_e2e": {
+        "adapter": "generic",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_API",
+        "units": 0
+      },
+      "index_body_sha256": "f5d656bd32cb208e024e6a521de61a4dfc582146861e548a6ea03b45e8c8a1c4",
+      "index_status": 200,
+      "minimal_code_lever": "none_without_new_native_inventory",
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "native_rows": [],
+      "plan_cards": 0,
+      "property_id": 53567,
+      "property_identity_match": true,
+      "property_name": "Trafalgar Square Apartments",
+      "provider_heading": "Trafalgar Square Apartments",
+      "provider_identity_text": "Search - Trafalgar Square Apartments We use cookies to enhance your site experience, analyze site performance and customize content and advertisements. By continuing to browse our site (by scrolling or clicking), you agree to the use of these cookies. You can view our cookie policy by clicking on our Privacy Policy . I Understand Trafalgar Square Apartments 33210 TRAFALGAR SQUARE, WESTLAND, MI 48186 (734) 326-1820 trafalgarsquare@pmapts.com Collapse Menu Search Availability - Application Type: Standard Application Application Type: Standard Application Beds Any 1 2 Search Search Clear Clear Start your search above Application Types To get started, select an application type below. Standard Application Guarantor Application Preferred Move-in Date Confirm One Moment Please wait while the page is loading. \u00a92026 MRI Software LLC. All Rights Reserved. Terms of Use | Portal Privacy Policy Notice | Licenses Loading...",
+      "provider_index_url": "https://princeton.mriprospectconnect.com/Search/Index/065",
+      "provider_property_id": "065",
+      "provider_search_url": "https://princeton.mriprospectconnect.com/Search/Search",
+      "rejection_reason": "current_exact_mri_search_publishes_plan_pricing_only_no_native_unit_rows",
+      "sample_plan_titles": [],
+      "search_body_sha256": "8ef6f4d89f3f7f02a2dad744730a04eb2ca231a12ba4cbf00e2c962487ce4258",
+      "search_status": 200,
+      "strict_qualifies": false
+    },
+    {
+      "configured_url": "https://charterclubapts.com/",
+      "contamination_verdict": "single_exact_mri_property_session",
+      "current_configured_route_scraper_e2e": {
+        "adapter": "generic_plan_text",
+        "errors": [
+          "generic_plan_text: static-body fallback (no live page evaluate)",
+          "generic_plan_text: <2 distinct plan rows found (anti-noise threshold; falls to LLM)"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+        "units": 0
+      },
+      "index_body_sha256": "0ae2bd2107a0468695e90771431dfd88bd4bc9d045a2aa4f0b0e87dfc7632be6",
+      "index_status": 200,
+      "minimal_code_lever": "property-scoped MRI ProspectConnect link hop; preserve session/CSRF, POST /Search/Search with the published Community ID, then parse button[data-unitid] rows",
+      "native_identity_rows": 1,
+      "native_positive_rent_rows": 1,
+      "native_rows": [
+        {
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-30",
+          "building_id": "A01",
+          "lease_term_months": "12",
+          "provider_unit_id": "A01:42-B",
+          "rent": 1099.0,
+          "source_url": "https://smg.mriprospectconnect.com/Search/Search",
+          "unit_address": "1042 B SEACOVE CIRCLE",
+          "unit_number": "42-B"
+        }
+      ],
+      "plan_cards": 4,
+      "property_id": 74523,
+      "property_identity_match": true,
+      "property_name": "Charter Club",
+      "provider_heading": "CHARTER CLUB APARTMENT HOMES",
+      "provider_identity_text": "Search - CHARTER CLUB APARTMENT HOMES We use cookies to enhance your site experience, analyze site performance and customize content and advertisements. By continuing to browse our site (by scrolling or clicking), you agree to the use of these cookies. You can view our cookie policy by clicking on our Privacy Policy . I Understand CHARTER CLUB APARTMENT HOMES 1040 WINDWARD DRIVE, LONDON, OH 43140 (740) 845-1967 charterclubmangement@sciotomanagementgroup.com Collapse Menu Search Availability Unit # Move-in Date Today Beds Any 1 2 Search Search Clear Clear Start your search above Application Types To get started, select an application type below. Standard Application Move-in Date Confirm One Moment Please wait while the page is loading. \u00a92026 MRI Software LLC. All Rights Reserved. Terms of Use | Portal Privacy Policy Notice | Licenses Loading...",
+      "provider_index_url": "https://smg.mriprospectconnect.com/Search/Index/CCA",
+      "provider_property_id": "CCA",
+      "provider_search_url": "https://smg.mriprospectconnect.com/Search/Search",
+      "rejection_reason": "current_configured_route_scraper_does_not_follow_exact_mri_portal_or_emit_native_rows",
+      "sample_plan_titles": [
+        "1BD DOWNSTAIRS UNIT 1 available",
+        "1BD UPSTAIRS UNIT",
+        "2BD DOWNSTAIRS UNIT",
+        "2BD UPSTAIRS UNIT"
+      ],
+      "search_body_sha256": "28640ce71a7f63bc5a003a87bb0f6743727d267048333482d34a21464831d9ad",
+      "search_status": 200,
+      "strict_qualifies": false
+    },
+    {
+      "configured_url": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+      "contamination_verdict": "single_exact_mri_property_session",
+      "current_configured_route_scraper_e2e": {
+        "adapter": "generic",
+        "errors": [
+          "Generic parser found no units in captured API responses"
+        ],
+        "outcome": "EMPTY",
+        "plans": 0,
+        "tier": "TIER_1_API",
+        "units": 0
+      },
+      "index_body_sha256": "c804eecca0821f3d06e7d23602964a6ce6ce1f13da0f9f6cc25cb6344fc3766a",
+      "index_status": 200,
+      "minimal_code_lever": "none_without_new_native_inventory",
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "native_rows": [],
+      "plan_cards": 0,
+      "property_id": 232583,
+      "property_identity_match": true,
+      "property_name": "Custer Crossing Apartments",
+      "provider_heading": "Custer Crossing Apartments",
+      "provider_identity_text": "Search - Custer Crossing Apartments We use cookies to enhance your site experience, analyze site performance and customize content and advertisements. By continuing to browse our site (by scrolling or clicking), you agree to the use of these cookies. You can view our cookie policy by clicking on our Privacy Policy . I Understand Custer Crossing Apartments 1763 CARROLL STREET #102, DICKINSON, ND 58601 (701) 300-8033 custercrossing@pmapts.com Collapse Menu Search Availability Beds Any 1 2 3 Search Search Clear Clear Start your search above Application Types To get started, select an application type below. Standard Application Preferred Move-in Date Confirm One Moment Please wait while the page is loading. \u00a92026 MRI Software LLC. All Rights Reserved. Terms of Use | Portal Privacy Policy Notice | Licenses Loading...",
+      "provider_index_url": "https://princeton.mriprospectconnect.com/Search/Index/404",
+      "provider_property_id": "404",
+      "provider_search_url": "https://princeton.mriprospectconnect.com/Search/Search",
+      "rejection_reason": "current_exact_mri_search_publishes_plan_pricing_only_no_native_unit_rows",
+      "sample_plan_titles": [],
+      "search_body_sha256": "efacd825d216e37047d4a8e7d98634c072667df5c0dcb4ca90d1eebb564cf2ba",
+      "search_status": 200,
+      "strict_qualifies": false
+    }
+  ],
+  "strict_recoveries": 0,
+  "targets": 3
+}

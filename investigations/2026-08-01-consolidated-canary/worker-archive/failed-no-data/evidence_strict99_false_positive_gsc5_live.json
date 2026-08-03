@@ -1,0 +1,200 @@
+{
+  "results": [
+    {
+      "adapter": "knock",
+      "contamination_verdict": "pass_exact_gsc_name_rediscovery_and_native_positive_rent",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/florida/harbour-pointe-apartment-homes/",
+      "identity_evidence": {
+        "rediscovery_method_gate": "current_code_mgmt_sitemap_or_homepage_confidence_ge_0.9",
+        "rediscovery_same_gsc_host": true,
+        "rows_with_native_identity": 15,
+        "rows_with_native_identity_and_positive_rent": 15,
+        "source_urls": []
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "22AX",
+          "identity": {
+            "floor_plan_id": "12daad6ac85a",
+            "unit_number": "060"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1520,
+            "market_rent_low": 1520
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        },
+        {
+          "floor_plan_name": "11AX",
+          "identity": {
+            "floor_plan_id": "7d7c60cadbaf",
+            "unit_number": "076"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1350,
+            "market_rent_low": 1350
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 6477,
+      "property_identity_match": true,
+      "property_name": "Harbour Pointe",
+      "rediscovered_url": "https://gscapts.com/apartments/florida/harbour-pointe-apartment-homes/",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 15,
+      "website": "http://www.gscapts.com/apartments/Bradenton_FL/zip_34210/gsc/15388"
+    },
+    {
+      "adapter": "knock",
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/north-carolina/duke-manor/",
+      "identity_evidence": {
+        "rediscovery_method_gate": "current_code_mgmt_sitemap_or_homepage_confidence_ge_0.9",
+        "rediscovery_same_gsc_host": true,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "native_samples": [],
+      "outcome": "EMPTY",
+      "plans": 20,
+      "property_id": 34303,
+      "property_identity_match": true,
+      "property_name": "Duke Manor",
+      "rediscovered_url": "https://gscapts.com/apartments/north-carolina/duke-manor/",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Durham_NC/zip_27705/gsc/4506"
+    },
+    {
+      "adapter": "knock",
+      "contamination_verdict": "pass_exact_gsc_name_rediscovery_and_native_positive_rent",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/virginia/st-johns-wood/",
+      "identity_evidence": {
+        "rediscovery_method_gate": "current_code_mgmt_sitemap_or_homepage_confidence_ge_0.9",
+        "rediscovery_same_gsc_host": true,
+        "rows_with_native_identity": 188,
+        "rows_with_native_identity_and_positive_rent": 188,
+        "source_urls": []
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "floor_plan_id": "8e4445f90bd8",
+            "unit_number": "1003"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1505,
+            "market_rent_low": 1505
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        },
+        {
+          "floor_plan_name": "21.5A1T",
+          "identity": {
+            "floor_plan_id": "8e4445f90bd8",
+            "unit_number": "1046"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1505,
+            "market_rent_low": 1505
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 74488,
+      "property_identity_match": true,
+      "property_name": "St. Johns Wood",
+      "rediscovered_url": "https://gscapts.com/apartments/virginia/st-johns-wood/",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 188,
+      "website": "http://www.gscapts.com/apartments/Richmond_VA/zip_23225/gsc/4497"
+    },
+    {
+      "adapter": "knock",
+      "contamination_verdict": "pass_exact_gsc_name_rediscovery_and_native_positive_rent",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/north-carolina/estes-park/",
+      "identity_evidence": {
+        "rediscovery_method_gate": "current_code_mgmt_sitemap_or_homepage_confidence_ge_0.9",
+        "rediscovery_same_gsc_host": true,
+        "rows_with_native_identity": 61,
+        "rows_with_native_identity_and_positive_rent": 61,
+        "source_urls": []
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "21AX",
+          "identity": {
+            "floor_plan_id": "ee92a75b246f",
+            "unit_number": "04"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1160,
+            "market_rent_low": 1160
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        },
+        {
+          "floor_plan_name": "21AX",
+          "identity": {
+            "floor_plan_id": "ee92a75b246f",
+            "unit_number": "01"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1160,
+            "market_rent_low": 1160
+          },
+          "source_api_url": "",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 78593,
+      "property_identity_match": true,
+      "property_name": "Estes Park",
+      "rediscovered_url": "https://gscapts.com/apartments/north-carolina/estes-park/",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 61,
+      "website": "http://www.gscapts.com/apartments/Carrboro_NC/zip_27510/gsc/4510"
+    },
+    {
+      "adapter": "knock",
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "final_url": "https://gscapts.com/apartments/north-carolina/booker-creek-townhouse-apartments/",
+      "identity_evidence": {
+        "rediscovery_method_gate": "current_code_mgmt_sitemap_or_homepage_confidence_ge_0.9",
+        "rediscovery_same_gsc_host": true,
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "native_samples": [],
+      "outcome": "EMPTY",
+      "plans": 2,
+      "property_id": 221995,
+      "property_identity_match": true,
+      "property_name": "Booker Creek Townhouse Apartments",
+      "rediscovered_url": "https://gscapts.com/apartments/north-carolina/booker-creek-townhouse-apartments/",
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "http://www.gscapts.com/apartments/Chapel_Hill_NC/zip_27514/gsc/4508"
+    }
+  ]
+}

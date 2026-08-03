@@ -1,0 +1,82 @@
+[
+  {
+    "property_id": "234940",
+    "source_url": "https://www.1010ontherhine.com/",
+    "plan_urls": [
+      "/floorplans/studio/a1",
+      "/floorplans/one-bedroom/b1",
+      "/floorplans/one-bedroom/b2",
+      "/floorplans/one-bedroom/b3",
+      "/floorplans/one-bedroom/b4",
+      "/floorplans/one-bedroom/c1",
+      "/floorplans/one-bedroom/c2",
+      "/floorplans/one-bedroom/c4",
+      "/floorplans/two-bedroom/d1",
+      "/floorplans/two-bedroom/d2",
+      "/floorplans/two-bedroom/d3"
+    ],
+    "units_by_plan": {
+      "/floorplans/studio/a1": [["1509", 1600]]
+    }
+  },
+  {
+    "property_id": "3106",
+    "source_url": "https://www.woodhollowwaco.com/",
+    "plan_urls": [
+      "/floorplans/one-bedroom/a1-aspen",
+      "/floorplans/one-bedroom/a2-oak",
+      "/floorplans/one-bedroom/a2-oak-furnished",
+      "/floorplans/two-bedroom/b1-cypress",
+      "/floorplans/two-bedroom/b2-hickory",
+      "/floorplans/three-bedroom/c1-magnolia"
+    ],
+    "units_by_plan": {
+      "/floorplans/one-bedroom/a1-aspen": [
+        ["616", 974],
+        ["1010", 974],
+        ["915", 974],
+        ["914", 935],
+        ["912", 974]
+      ],
+      "/floorplans/two-bedroom/b2-hickory": [
+        ["1209", 1340],
+        ["212", 1375]
+      ]
+    }
+  },
+  {
+    "property_id": "64955",
+    "source_url": "https://www.liveatdrycreekranch.com/",
+    "plan_urls": [
+      "/floorplans/one-bedroom/cavaller",
+      "/floorplans/one-bedroom/conestoga",
+      "/floorplans/one-bedroom/esquela",
+      "/floorplans/one-bedroom/palomino",
+      "/floorplans/one-bedroom/parado",
+      "/floorplans/one-bedroom/saguaro",
+      "/floorplans/two-bedroom/casita",
+      "/floorplans/two-bedroom/el-vista",
+      "/floorplans/two-bedroom/mesquite",
+      "/floorplans/two-bedroom/ranchero",
+      "/floorplans/two-bedroom/seguin",
+      "/floorplans/two-bedroom/vaquero",
+      "/floorplans/three-bedroom/conquistador",
+      "/floorplans/three-bedroom/hacienda"
+    ],
+    "units_by_plan": {
+      "/floorplans/one-bedroom/cavaller": [["1828", 1259], ["1817", 1261], ["1524", 1251]],
+      "/floorplans/one-bedroom/conestoga": [["0424", 1540], ["0723", 1400], ["0814", 1380]],
+      "/floorplans/one-bedroom/palomino": [["0113", 1259], ["0125", 1289], ["1016", 1252]],
+      "/floorplans/one-bedroom/parado": [["1734", 1320], ["1612", 1350], ["1611", 1379]],
+      "/floorplans/one-bedroom/saguaro": [["0335", 1195], ["0215", 1205], ["0525", 1188]],
+      "/floorplans/two-bedroom/casita": [["1538", 1553], ["1527", 1584]],
+      "/floorplans/two-bedroom/el-vista": [["1332", 1623], ["1712", 1653], ["1921", 1665]],
+      "/floorplans/two-bedroom/mesquite": [["0238", 1613], ["0838", 1863], ["0427", 1903]],
+      "/floorplans/two-bedroom/ranchero": [["0131", 1713], ["0112", 1843]],
+      "/floorplans/two-bedroom/seguin": [["1328", 1513], ["1737", 1510]],
+      "/floorplans/two-bedroom/vaquero": [["0431", 1713], ["0531", 1534], ["0311", 1671]],
+      "/floorplans/three-bedroom/conquistador": [["1521", 1871], ["1532", 1868]],
+      "/floorplans/three-bedroom/hacienda": [["1218", 1861], ["0128", 2061], ["1127", 1869]]
+    }
+  }
+]

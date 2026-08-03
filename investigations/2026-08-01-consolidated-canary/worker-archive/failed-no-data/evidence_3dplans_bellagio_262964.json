@@ -1,0 +1,40 @@
+{
+  "batch_label": "residual-wix-3dplans-bellagio-live-chrome",
+  "captured_at": "2026-08-01T02:14:49-05:00",
+  "property_id": 262964,
+  "property_name": "The Bellagio",
+  "website": "https://www.bellagio1384.com/",
+  "source_url": "https://apps.3dplans.com/InteractivePropertyMap/PropertyMap?Embed=True&Id=640c40c9-6c72-4c16-b6d3-4a996fcff013",
+  "source_endpoint": "https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetUnits",
+  "property_boundary": {
+    "verdict": "exact_property_match",
+    "published_by_marketing_site": true,
+    "source_property_guid": "640c40c9-6c72-4c16-b6d3-4a996fcff013",
+    "source_property_id": "6",
+    "source_property_name": "Bellagio",
+    "source_address": "1384 Empire Blvd, Rochester, NY 14609",
+    "source_email_link": "https://www.bellagio1384.com/",
+    "address_conflict": false,
+    "sibling_property_rows_observed": false
+  },
+  "http_status": 200,
+  "native_unit_rows_with_positive_rent": 1,
+  "units": [
+    {
+      "native_unit_id": "989",
+      "unit_number": "509 - Mountain Scenic View",
+      "floor_plan_id": "39",
+      "floor_plan_name": "X09",
+      "bedrooms": 1,
+      "bathrooms": 1.0,
+      "sqft": 892,
+      "rent": 2089.0,
+      "available_date": "2026-08-14",
+      "location_id": "2105",
+      "currency": "$"
+    }
+  ],
+  "contamination_verdict": "clean_property_scoped_native_unit",
+  "strict_outcome": "UNIT_QUALIFIED",
+  "notes": "Chrome CDP captured the public OutSystems inventory response. The same row was returned twice by duplicate client refreshes and is deduplicated here by native unit id 989. No CAPTCHA, challenge interaction, login, or form submission was used."
+}

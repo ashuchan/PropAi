@@ -1,0 +1,106 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:30:31.358112+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      234772
+    ],
+    "native_positive_rent_rows": 1,
+    "captcha_solving": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 234772,
+      "property_name": "The Pointe at Harpers Mill",
+      "website": "http://www.liveattp.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 1,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "The Pointe at Harpers Mill",
+        "canonical_address": "600 Harpers Mill Rd",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "589277",
+        "current_listing_property_floorplan_binding": "633553",
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_urls": [
+          "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "511"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1712,
+            "market_rent_high": 1712
+          },
+          "source_api_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Solo",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "840",
+          "unit_number": "511",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,712",
+          "market_rent_low": 1712,
+          "market_rent_high": 1712,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-10-14",
+          "available_date": "2026-10-14",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:29:08.251276+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_234772_current.json",
+        "capture_artifact_sha256": "aa288182f9f4a68e0d6bd51c77a0407dfac1232a2d6ce0a9f8f1b739464e0e55",
+        "listing_html_sha256": "ad18a0c6a38278cd27d5476eb96b0df325451c74e79019199b5679081e9841e5",
+        "page_html_sha256": "94af78c49e704c13637ac266ec462a70bd868d8748cd43340d1f3f665e2d0525",
+        "endpoint_html_sha256": "c04d6a15f701447d6dbc24c6e487c2b8aaf9a1e3445b5e8efe0d0cae648dc92d",
+        "published_endpoint": "https://www.liveattp.com/?module=check_availability&is_secure=1&property[id]=589277&action=view_unit_spaces&property_floorplan[id]=633553&cached_rate_available=1&min_rent=$1,712&max_rent=$1,712&min_advertised_base_rent=1712&max_advertised_base_rent=1712&lease_term_name=12mo lease&popup_lease_term_name=12 month lease&move_in_date=2026-08-01&occupancy_type=conventional",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": true,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

@@ -502,8 +502,7 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
             out = [
                 (cid, r)
                 for cid, r in out
-                if str(r.get("type") or r.get("Type") or r.get("Property Type") or "").upper()
-                in wanted_types
+                if str(r.get("type") or r.get("Type") or r.get("Property Type") or "").upper() in wanted_types
             ]
         return out
 
@@ -552,6 +551,57 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
         pairs = self._apply_filters(pairs, filters)
         pairs = self._apply_shard(pairs, filters)
         return len(pairs)
+
+
+def hydrate_property_catalog_rows(
+    rows: list[PropertyToScrape],
+    canonical_rows: list[PropertyToScrape],
+) -> list[PropertyToScrape]:
+    """Fill missing cohort metadata from the canonical property catalog.
+
+    A focused canary CSV commonly contains only ``property_id`` and
+    ``website``. Running it as an explicit ``--csv`` override previously
+    discarded the name/address fields needed by property-identity gates even
+    though the same IDs were complete in ``config/properties.csv``. Explicit,
+    non-empty cohort values remain authoritative; this function only fills
+    blanks and never introduces properties outside ``rows``.
+    """
+
+    canonical_by_id = {row.canonical_id: row for row in canonical_rows}
+    scalar_fields = (
+        "url",
+        "proj_name",
+        "address",
+        "city",
+        "state",
+        "zip_code",
+        "country",
+        "phone",
+        "email_address",
+        "website",
+        "pmc",
+        "apartment_id",
+        "property_type",
+    )
+    hydrated: list[PropertyToScrape] = []
+    for row in rows:
+        canonical = canonical_by_id.get(row.canonical_id)
+        if canonical is None:
+            hydrated.append(row)
+            continue
+        update: dict[str, Any] = {}
+        for field in scalar_fields:
+            current = getattr(row, field)
+            incoming = getattr(canonical, field)
+            if current in (None, "") and incoming not in (None, ""):
+                update[field] = incoming
+        merged_raw = dict(canonical.raw)
+        for key, value in row.raw.items():
+            if value not in (None, "", "null", "None"):
+                merged_raw[key] = value
+        update["raw"] = merged_raw
+        hydrated.append(row.model_copy(update=update))
+    return hydrated
 
 
 # ── DataProvider facade ─────────────────────────────────────────────────────

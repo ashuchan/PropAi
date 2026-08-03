@@ -91,3 +91,45 @@ def test_dedup_by_unit_id() -> None:
     units = parse_rentcafe_hosted_table(dup, _URL)
     assert len(units) == 1
     assert units[0]["unit_number"] == "A1"
+
+
+def test_nested_floor_plan_and_native_provenance() -> None:
+    html = """
+    <div class="fp-item" data-floorplan-id="4259393" data-name="A1">
+      <table><tbody>
+        <tr class="fp-unit" data-unit-id="47011615" data-unit-name="2083"
+            data-unit-beds="1 Bed" data-unit-baths="1 Bath"
+            data-unit-size="950 Sqft" data-unit-rent="$1,335 - $3,659">
+          <th>2083</th><td>$1,335 - $3,659</td><td><span>Now</span></td>
+          <td><button onclick="openApplyNow(
+            'oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175')">
+            Apply now
+          </button></td>
+        </tr>
+      </tbody></table>
+    </div>
+    """
+    units = parse_rentcafe_hosted_table(html, _URL)
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["floor_plan_name"] == "A1"
+    assert unit["source_property_id"] == "1505175"
+    assert unit["source_ids"] == {
+        "securecafe_apartment_id": "47011615",
+        "rentcafe_floorplan_id": "4259393",
+    }
+
+
+def test_waitlist_sentinels_are_not_physical_units() -> None:
+    rows = "".join(
+        f"""
+        <tr class="fp-unit" data-unit-id="{i}" data-unit-name="{label}"
+            data-unit-beds="1 Bed" data-unit-baths="1 Bath"
+            data-unit-size="670 Sqft" data-unit-rent="$1,055">
+          <th>{label}</th><td>$1,055</td><td><span>Now</span></td>
+        </tr>
+        """
+        for i, label in enumerate(("WAIT1BD", "WAITAPP", "WAIT S", "wait-2br"), start=1)
+    )
+    html = f'<div data-floorplan-id="2330097" data-name="1 Bed">{rows}</div>'
+    assert parse_rentcafe_hosted_table(html, _URL) == []

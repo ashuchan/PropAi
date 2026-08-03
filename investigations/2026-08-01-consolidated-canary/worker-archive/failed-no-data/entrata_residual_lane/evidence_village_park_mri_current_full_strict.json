@@ -1,0 +1,144 @@
+{
+  "generated_at_utc": "2026-08-01T12:36:05.185353+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions_for_source_capture": 1,
+    "llm_enabled": false,
+    "new_hyperbrowser_sessions_for_validation": 0,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "village_park_mri_current_full_configured_pipeline",
+  "results": [
+    {
+      "adapter": "mri_prospectconnect",
+      "configured_final_url": "https://pettinaro.com/village-park-paladin/",
+      "contamination_verdict": "pass_configured_page_sole_mri_community_full_provider_identity_native_units",
+      "elapsed_seconds": 4.71,
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "fallback_chain": [
+        "mri_prospectconnect"
+      ],
+      "identity_evidence": {
+        "distinct_provider_native_ids": 8,
+        "published_provider_urls": [
+          "https://residebpg.mriprospectconnect.com/475PV"
+        ],
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "source_property_ids": [
+          "475PV"
+        ],
+        "source_urls": [
+          "https://residebpg.mriprospectconnect.com/Search/Search"
+        ]
+      },
+      "link_hop_anchor": "embedded-portal:mri_published_link:apply online",
+      "link_hop_from": "https://pettinaro.com/village-park-paladin/",
+      "native_samples": [
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "VP 2 bed 2 bath",
+          "identity": {
+            "building": "1000",
+            "mri_unit_id": "1000:2",
+            "unit_number": "2"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1845
+          },
+          "source_api_url": "https://residebpg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "475PV"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "VP 2 bed 2 bath",
+          "identity": {
+            "building": "700",
+            "mri_unit_id": "700:3",
+            "unit_number": "3"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1845
+          },
+          "source_api_url": "https://residebpg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "475PV"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "VP 2 bed 2 bath",
+          "identity": {
+            "building": "1500",
+            "mri_unit_id": "1500:4",
+            "unit_number": "4"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1845
+          },
+          "source_api_url": "https://residebpg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "475PV"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "VP 2 bed 2 bath",
+          "identity": {
+            "building": "600",
+            "mri_unit_id": "600:4",
+            "unit_number": "4"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1845
+          },
+          "source_api_url": "https://residebpg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "475PV"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "VP 2 bed 2 bath",
+          "identity": {
+            "building": "1500",
+            "mri_unit_id": "1500:5",
+            "unit_number": "5"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1845
+          },
+          "source_api_url": "https://residebpg.mriprospectconnect.com/Search/Search",
+          "source_property_id": "475PV"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 75314,
+      "property_identity_match": true,
+      "property_name": "Village Park at Paladin",
+      "published_provider_route": "https://residebpg.mriprospectconnect.com/475PV",
+      "strict_gates": {
+        "all_emitted_rows_native_and_positive_rent": true,
+        "configured_root_name_visible": true,
+        "configured_root_zip_visible": true,
+        "current_full_pipeline_fetched_exact_published_route_first": true,
+        "current_full_pipeline_link_hop_from_configured_root": true,
+        "current_full_pipeline_provider_link_priority": true,
+        "current_full_pipeline_selected_mri": true,
+        "current_full_pipeline_selected_native_unit_tier": true,
+        "current_hb_capture_is_substantive": true,
+        "provider_full_property_identity_matches": true,
+        "provider_index_http_200": true,
+        "sole_exact_page_published_mri_route": true,
+        "sole_exact_provider_community": true,
+        "sole_exact_provider_search_source": true,
+        "unique_provider_native_unit_ids": true
+      },
+      "tier": "TIER_1_API_MRI_PROSPECTCONNECT",
+      "units": 8,
+      "website": "https://pettinaro.com/village-park-paladin/",
+      "winning_page_url": "https://residebpg.mriprospectconnect.com/Search/Search"
+    }
+  ],
+  "source_capture": "/private/tmp/propai-fnd-vBkmT9/hb_unknown_high_value5_probe/75314.html.gz",
+  "source_capture_sha256": "68c945d6f2f63054e1bce7cd5d052b6b5f9ada4e71166ef96dcd4da04c8b0b0a"
+}

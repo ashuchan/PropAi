@@ -328,6 +328,34 @@ class TestParseApiResponses:
         assert len(units) == 1
         assert units[0]["floor_plan_name"] == "A1"
 
+    def test_realpage_internal_available_date_survives_generic_route(self):
+        """Fresh detection can route a public RealPage response to generic."""
+        responses = [
+            {
+                "url": "https://api.ws.realpage.com/v2/property/8648527/units",
+                "body": {
+                    "response": {
+                        "units": [
+                            {
+                                "unitNumber": "128",
+                                "rent": 1325,
+                                "squareFeet": 730,
+                                "internalAvailableDate": (
+                                    "2026-09-22 00:00 -0500"
+                                ),
+                            }
+                        ]
+                    }
+                },
+            }
+        ]
+
+        units = parse_api_responses(responses)
+
+        assert len(units) == 1
+        assert units[0]["unit_number"] == "128"
+        assert units[0]["availability_date"] == "2026-09-22 00:00 -0500"
+
     def test_deduplication(self):
         item = {"floorPlanName": "1BR", "minRent": 1500, "beds": "1"}
         responses = [{"url": "url", "body": [item, item]}]

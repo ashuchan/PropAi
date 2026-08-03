@@ -84,6 +84,7 @@ def test_jd_fp_rent_and_availability():
     assert units[0]["market_rent_low"] == 2400
     assert units[1]["market_rent_low"] == 2725
     assert all(u["availability_status"] == "AVAILABLE" for u in units)
+    assert units[0]["availability_date"] == "Available Now"
     # M/D/Y "06/15/2026" -> ISO.
     assert units[1]["availability_date"] == "2026-06-15"
 

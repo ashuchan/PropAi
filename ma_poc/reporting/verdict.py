@@ -329,9 +329,13 @@ def compute(
     if carry_forward_applied:
         return VerdictResult(Verdict.CARRY_FORWARD, "carry_forward_applied", "carry_forward")
 
-    # Stage 3: dead URLs are terminal — distinct from transient unreachable
-    # so reporting can exclude them from the success-rate denominator.
-    if fetch_outcome == "DEAD_URL":
+    # Stage 3: a dead ENTRY URL is terminal only when the extraction cascade
+    # recovered nothing. Six properties in the stratified Aug-02 canary
+    # produced 107 priced, physically identified units from bounded sub-routes
+    # despite a 404/410 entry response. The recovered inventory is stronger
+    # evidence than the configured URL's status and must reach the normal
+    # SUCCESS/PLAN decision below.
+    if fetch_outcome == "DEAD_URL" and not _has_any_extracted_units(extract_result):
         return VerdictResult(
             Verdict.DEAD_URL,
             "url is dead (404 / 410 / 451 / NXDOMAIN)",

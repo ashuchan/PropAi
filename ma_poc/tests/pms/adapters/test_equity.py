@@ -17,6 +17,9 @@ These tests pin:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from pathlib import Path
+
 import pytest
 
 from ma_poc.pms.adapters.base import AdapterContext
@@ -25,6 +28,9 @@ from ma_poc.pms.adapters.equity import (
     EquityAdapter,
     parse_equity_units,
 )
+from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class _FakeProbeResponse:
@@ -61,9 +67,7 @@ def _stub_probe_get(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake_probe_get(url: str, **_kw: object) -> _FakeProbeResponse:
         return _FakeProbeResponse(url)
 
-    monkeypatch.setattr(
-        "ma_poc.pms.adapters._probe.probe_get", _fake_probe_get
-    )
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _fake_probe_get)
 
 
 def _make_ctx(html: bytes | str | None) -> AdapterContext:
@@ -133,6 +137,18 @@ def test_parse_equity_units_extracts_real_block_shape() -> None:
     assert "1,150" in u["rent_range"] or "1150" in u["rent_range"]
     # Plan name from img alt
     assert "S3" in (u.get("floor_plan_name") or "")
+    assert u["unit_number"] == "175"
+    assert u["unit_id"] == "1:175"
+    assert u["building"] == "1"
+    assert u["source_ids"] == {
+        "equity_building_unit_id": "1:175",
+        "equity_unit_id": "175",
+        "equity_building_id": "1",
+        "equity_ledger_id": "24112",
+    }
+    assert u["source_property_id"] == "24112"
+    assert u["source_property_provenance"] == ("equity_unit_comment.ledgerId")
+    assert u["source_response_provenance"] == ("equity_server_rendered_ea5_unit")
 
 
 def test_parse_equity_units_empty_html_returns_empty() -> None:
@@ -142,12 +158,67 @@ def test_parse_equity_units_empty_html_returns_empty() -> None:
 
 def test_parse_equity_units_dedups_multiple_blocks() -> None:
     """Two ea5-unit blocks → two units (different unitIds)."""
-    block2 = _REAL_EA5_BLOCK.replace("unitId: 175", "unitId: 176").replace(
-        "$1,150", "$1,400"
-    )
+    block2 = _REAL_EA5_BLOCK.replace("unitId: 175", "unitId: 176").replace("$1,150", "$1,400")
     html = f"<html><body>{_REAL_EA5_BLOCK}{block2}</body></html>"
     units = parse_equity_units(html, "x")
     assert len(units) == 2
+
+
+def test_building_composite_preserves_colliding_public_unit_numbers() -> None:
+    block2 = _REAL_EA5_BLOCK.replace("buildingId: 1", "buildingId: 2")
+    units = parse_equity_units(_REAL_EA5_BLOCK + block2, "x")
+
+    assert [unit["unit_number"] for unit in units] == ["175", "175"]
+    assert [unit["unit_id"] for unit in units] == ["1:175", "2:175"]
+    assert len({unit["unit_id"] for unit in units}) == 2
+    assert all(unit["source_ids"]["equity_ledger_id"] == "24112" for unit in units)
+
+
+def test_current_403_control_fixture_preserves_exact_identity_and_values() -> None:
+    html = (FIXTURES / "equity_village_del_mar_7797_unit.html").read_text(encoding="utf-8")
+    units = parse_equity_units(
+        html,
+        "https://www.equityapartments.com/san-diego/del-mar/the-village-at-del-mar-heights-apartments",
+    )
+
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["unit_id"] == "01:033"
+    assert unit["unit_number"] == "033"
+    assert unit["building"] == "01"
+    assert unit["floor_plan_name"] == "1 Bedroom A"
+    assert unit["bedrooms"] == "1"
+    assert unit["bathrooms"] == "1"
+    assert unit["sqft"] == "700"
+    assert unit["market_rent_low"] == 3298
+    assert unit["lease_term"] == "12 mo"
+    assert unit["availability_date"] == "2026-08-21"
+    assert unit["source_ids"]["equity_ledger_id"] == "29855"
+
+
+def test_current_403_fixture_survives_source_to_final_format() -> None:
+    source = parse_equity_units(
+        (FIXTURES / "equity_village_del_mar_7797_unit.html").read_text(encoding="utf-8"),
+        "https://www.equityapartments.com/village",
+    )[0]
+
+    final = _format_v2_unit(
+        source,
+        datetime(2026, 8, 2, 12, tzinfo=UTC),
+        property_id="7797",
+    )
+
+    assert final["unit_id"] == "01:033"
+    assert final["building"] == "01"
+    assert final["floor_plan_name"] == "1 Bedroom A"
+    assert final["beds"] == 1
+    assert final["baths"] == 1.0
+    assert final["area"] == 700
+    assert final["rent_low"] == 3298
+    assert final["lease_term"] == 12
+    assert final["lease_term_raw"] == "12 mo"
+    assert final["available_date"] == "2026-08-21"
+    assert final["source_ids"]["equity_building_unit_id"] == "01:033"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -164,10 +235,10 @@ async def test_equity_emits_bare_success_label_on_real_data() -> None:
     adapter = EquityAdapter()
     ctx = _make_ctx(html)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert result.tier_used == OLL_TIER, (
-        f"real data must keep bare success label; got {result.tier_used!r}"
-    )
+    assert result.tier_used == OLL_TIER, f"real data must keep bare success label; got {result.tier_used!r}"
     assert len(result.units) >= 1
+    assert result.api_responses[0]["via"] == "equity_server_rendered_html"
+    assert result.api_responses[0]["rows"] == 1
 
 
 @pytest.mark.asyncio
@@ -176,11 +247,7 @@ async def test_equity_emits_no_response_when_no_ea5_blocks() -> None:
     with no ea5-unit blocks (legacy .aspx redirect, Cloudflare
     challenge, or genuine no-availability). Adapter must emit
     ``TIER_1_API_EQUITY_NO_RESPONSE`` so retry/fallback can engage."""
-    html = (
-        "<html><body><h1>Welcome</h1>"
-        "<p>This page doesn't have any unit blocks.</p>"
-        "</body></html>"
-    )
+    html = "<html><body><h1>Welcome</h1><p>This page doesn't have any unit blocks.</p></body></html>"
     adapter = EquityAdapter()
     ctx = _make_ctx(html)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -223,6 +290,7 @@ async def test_equity_empty_labels_in_empty_exit_registry() -> None:
     """Both empty-exit labels must be recognized by ``is_empty_exit``
     so the Path B/C retry hook in scraper.py fires on them."""
     from ma_poc.pms.empty_exit import is_empty_exit
+
     assert is_empty_exit(f"{OLL_TIER}_NO_RESPONSE") is True
     assert is_empty_exit(f"{OLL_TIER}_EMPTY") is True
     # Bare success label must NOT trigger retry.

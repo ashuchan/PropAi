@@ -1,0 +1,256 @@
+{
+  "generated_from": {
+    "capture": "/private/tmp/propai-fnd-vBkmT9/hb_arthaus_provider_capture/capture.json",
+    "rendered_html": "/private/tmp/propai-fnd-vBkmT9/hb_unknown_high_value5_probe/268888.html.gz",
+    "live_cluster_probe": "/private/tmp/propai-fnd-vBkmT9/hb_arthaus_yardi_cluster_probe/cluster.json",
+    "llm_enabled": false,
+    "paid_canary": false,
+    "captcha_solving": false
+  },
+  "results": [
+    {
+      "property_id": 268888,
+      "property_name": "Artthaus Jack London",
+      "website": "https://arthaus.mov/building-community.php?slug=arthaus-jack-london",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "rentcafe",
+      "tier": "TIER_1_API_RENTCAFE",
+      "units": 11,
+      "plans": 2,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_slug_address_and_single_yardi_property_id",
+      "identity_evidence": {
+        "configured_name": "Artthaus Jack London",
+        "configured_address": "233 Broadway, Oakland, CA, 94607",
+        "api_title": "ArtHaus Jack London",
+        "api_address": "233 Broadway, Oakland, CA 94607",
+        "api_slug": "arthaus-jack-london",
+        "property_endpoint": "https://arthaus.mov/api-proxy.php?endpoint=property&slug=arthaus-jack-london",
+        "rows_with_native_identity": 11,
+        "rows_with_native_identity_and_positive_rent": 11,
+        "distinct_native_apartment_ids": 11,
+        "distinct_native_unit_numbers": 11,
+        "source_property_ids": [
+          "2142454"
+        ],
+        "raw_property_ids": [
+          "2142454"
+        ],
+        "apply_url_property_ids": [
+          "2142454"
+        ],
+        "source_urls": [
+          "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661"
+        ],
+        "native_dates_preserved_exactly": true
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "329",
+            "native_unit_id": "46285742"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285742"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "07/05/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 2048,
+            "market_rent_high": 2048
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "103",
+            "native_unit_id": "45926784"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "45926784"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/05/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1798,
+            "market_rent_high": 1798
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "230",
+            "native_unit_id": "46285698"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285698"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/05/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 2129,
+            "market_rent_high": 2129
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "102",
+            "native_unit_id": "45926783"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "45926783"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/07/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1744,
+            "market_rent_high": 1744
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "104",
+            "native_unit_id": "45926785"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "45926785"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/08/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1944,
+            "market_rent_high": 1944
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "PH07",
+            "native_unit_id": "46285765"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285765"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/12/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1998,
+            "market_rent_high": 1998
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "233",
+            "native_unit_id": "46285701"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285701"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "08/18/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1798,
+            "market_rent_high": 1798
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "PH15",
+            "native_unit_id": "46285773"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285773"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "09/04/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1771,
+            "market_rent_high": 1771
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "111",
+            "native_unit_id": "45926792"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "45926792"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "09/08/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1648,
+            "market_rent_high": 1648
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "307",
+            "native_unit_id": "46285720"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "46285720"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "09/13/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1798,
+            "market_rent_high": 1798
+          }
+        },
+        {
+          "identity": {
+            "unit_number": "212",
+            "native_unit_id": "45926818"
+          },
+          "source_ids": {
+            "rentcafe_floorplan_id": "6104327",
+            "securecafe_apartment_id": "45926818"
+          },
+          "source_property_id": "2142454",
+          "source_api_url": "https://arthaus.mov/api-proxy.php?yardi_endpoint=/data/PJDUP/availability/p2109661",
+          "floor_plan_name": "Floor Plan A Studio 1BA",
+          "availability_date": "09/14/2026",
+          "positive_rent_evidence": {
+            "market_rent_low": 1798,
+            "market_rent_high": 1798
+          }
+        }
+      ],
+      "local_validation": {
+        "strict_pass": true,
+        "all_output_rows_equal_native_roster": true,
+        "all_output_dates_equal_native_dates": true,
+        "all_output_rows_have_unique_native_ids": true,
+        "all_output_rows_have_positive_rent": true
+      }
+    }
+  ]
+}

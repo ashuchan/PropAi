@@ -63,8 +63,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse, urlunparse
+from html import unescape
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urljoin, urlparse, urlunparse
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -110,6 +111,62 @@ _SQFT_RE = re.compile(r"([\d,]+)")
 _MONEY_RE = re.compile(r"\$[\s]?[\d,]+")
 _VACANT_RE = re.compile(r"(\d+)\s+vacant", re.IGNORECASE)
 
+# Cross-route recovery is deliberately narrower than detector attribution.
+# ``rentvision.com`` alone can be an unrelated outbound/vendor link; these
+# phrases are emitted by the RentVision CMS footer itself on every proven
+# member of the 2026-07-31 cohort.
+_RENTVISION_CMS_MARKERS: tuple[str, ...] = (
+    "website created by rentvision",
+    "website powered by rentvision",
+    "websitepoweredbyrentvision",
+)
+RENTVISION_MAX_PLAN_URLS = 30
+_RENTVISION_MAX_BODY_BYTES = 2_000_000
+_RENTVISION_FETCH_CONCURRENCY = 4
+_RENTVISION_MAX_REDIRECTS = 3
+
+
+def is_strong_rentvision_cms_html(html: str | bytes) -> bool:
+    """Return whether *html* contains an exact RentVision CMS footer marker."""
+    if isinstance(html, bytes):
+        text = html.decode("utf-8", errors="replace")
+    elif isinstance(html, str):
+        text = html
+    else:
+        return False
+    lowered = text.casefold()
+    return any(marker in lowered for marker in _RENTVISION_CMS_MARKERS)
+
+
+def _normalized_host(url: str) -> str:
+    """Normalize a host while treating the optional ``www`` label as equal."""
+    try:
+        host = (urlparse(url).hostname or "").casefold().rstrip(".")
+    except ValueError:
+        return ""
+    return host.removeprefix("www.")
+
+
+def _has_positive_numeric_rent(row: dict[str, object]) -> bool:
+    for key in (
+        "asking_rent",
+        "rent_low",
+        "market_rent_low",
+        "rent_high",
+        "market_rent_high",
+        "rent",
+    ):
+        value = row.get(key)
+        if isinstance(value, bool):
+            continue
+        try:
+            if value not in (None, "") and float(value) > 0:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
 # 2026-05-25 — per-plan detail-page URL pattern. RentVision marketing
 # sites link each plan card to /floorplans/{bed-tier}/{plan-slug}, where
 # bed-tier is one of "studio"/"one-bedroom"/"two-bedroom"/"three-bedroom"/
@@ -126,21 +183,21 @@ _PLAN_DETAIL_HREF_RE = re.compile(
 # liveatwalnutcreekapts.com/floorplans/two-bedroom/greystone).
 _UNIT_TH_RE = re.compile(
     r'<th\b[^>]*class="[^"]*\bleft\b[^"]*\bwrap\b[^"]*"[^>]*>'
-    r'([A-Za-z0-9][A-Za-z0-9._/\- ]*?)</th>',
+    r"([A-Za-z0-9][A-Za-z0-9._/\- ]*?)</th>",
     re.IGNORECASE,
 )
 _UNIT_RENT_SPAN_RE = re.compile(
     r'<td\b[^>]*class="[^"]*\bidentifiable-links\b[^"]*"[^>]*>[\s\S]{0,250}?'
-    r'<span\b[^>]*>\s*\$([\d,]+(?:\.\d+)?)',
+    r"<span\b[^>]*>\s*\$([\d,]+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 _UNIT_AVAIL_CELL_RE = re.compile(
     r'<td\b[^>]*class="[^"]*\bunit-availability\b[^"]*"[^>]*>'
-    r'([\s\S]*?)</td>',
+    r"([\s\S]*?)</td>",
     re.IGNORECASE,
 )
 _UNIT_AVAIL_DATE_RE = re.compile(
-    r'Available\s+on\s*<span\b[^>]*>([^<]+)</span>',
+    r"Available\s+on\s*<span\b[^>]*>([^<]+)</span>",
     re.IGNORECASE,
 )
 # Apply-button onclick window.open URL. The HTML entities &#61; ('=') and
@@ -151,16 +208,59 @@ _APPLY_MOVE_IN_DATE_RE = re.compile(
     r"moveInDate(?:&#61;|=)(\d{1,2}/\d{1,2}/\d{4})",
     re.IGNORECASE,
 )
+_APPLY_UNIT_ID_RE = re.compile(
+    r"\bUnitId(?:&#61;|=)([A-Za-z0-9_-]+)",
+    re.IGNORECASE,
+)
+# The first cell after the apartment <th> is the provider-labelled Building
+# column on the current detail template. Anchor at the start of the row slice
+# so nested term-pricing tables cannot be mistaken for the building.
+_UNIT_BUILDING_CELL_RE = re.compile(
+    r'^\s*<td\b[^>]*class="[^"]*\bstandard\b[^"]*\bwrap\b[^"]*"[^>]*>'
+    r"([\s\S]{0,100}?)</td>",
+    re.IGNORECASE,
+)
+_SIGHTMAP_ROW_ID_RE = re.compile(
+    r"openEngrainSightMapPopup\(\s*\[\s*['\"]([A-Za-z0-9_-]+)['\"]\s*\]\s*,"
+    r"\s*['\"]([A-Za-z0-9_-]+)['\"]\s*\)",
+    re.IGNORECASE,
+)
 # Backup: term-pricing-popup <h3> confirms unit-number (used to validate
 # that a <th> match isn't a column-header false positive on edge themes).
 _TERM_PRICING_H3_RE = re.compile(
-    r'<h3\b[^>]*>\s*Unit\s+Term\s+Pricing\s*[-–]\s*([A-Za-z0-9][^<]+?)\s*</h3>',
+    r"<h3\b[^>]*>\s*Unit\s+Term\s+Pricing\s*[-–]\s*([A-Za-z0-9][^<]+?)\s*</h3>",
     re.IGNORECASE,
 )
 
+# The detail page repeats the physical plan dimensions above the unit table.
+# Fetch-only Jugnu runs have no browser-evaluated grid cards, so these markers
+# are the authoritative way to enrich each native unit before the orchestrator's
+# dimension/area quality gates run.
+_DETAIL_H1_RE = re.compile(
+    r"<h1\b[^>]*>([\s\S]{0,300}?)</h1>",
+    re.IGNORECASE,
+)
+_DETAIL_SQFT_BLOCK_RE = re.compile(
+    r"<(?P<sqft_tag>[A-Za-z][\w:-]*)\b[^>]*"
+    r"class=[\"'][^\"']*\bfloorplanSquareFootage\b[^\"']*[\"'][^>]*>"
+    r"(?P<sqft_body>[\s\S]{0,500}?)</(?P=sqft_tag)>",
+    re.IGNORECASE,
+)
+_DETAIL_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*Bath\b", re.IGNORECASE)
+_DETAIL_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*Bed\b", re.IGNORECASE)
+
 _MONTHS = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
     "december": 12,
 }
 
@@ -263,11 +363,24 @@ def _beds_from_url(url: str) -> int | None:
         return None
     tier = parts[-2]
     mapping = {
-        "studio": 0, "one-bedroom": 1, "two-bedroom": 2,
-        "three-bedroom": 3, "four-bedroom": 4, "five-bedroom": 5,
+        "studio": 0,
+        "one-bedroom": 1,
+        "two-bedroom": 2,
+        "three-bedroom": 3,
+        "four-bedroom": 4,
+        "five-bedroom": 5,
         "six-bedroom": 6,
     }
     return mapping.get(tier)
+
+
+def _html_text(fragment: str) -> str:
+    """Collapse a small trusted HTML fragment to visible text."""
+    return re.sub(
+        r"\s+",
+        " ",
+        re.sub(r"<[^>]+>", " ", unescape(fragment or "")),
+    ).strip()
 
 
 def parse_rentvision_unit_table(
@@ -295,8 +408,23 @@ def parse_rentvision_unit_table(
     if not detail_html or "left wrap" not in detail_html:
         return []
 
-    plan_name = (floor_plan_name or _plan_name_from_url(source_url)).strip()
+    heading_match = _DETAIL_H1_RE.search(detail_html)
+    heading = _html_text(heading_match.group(1)) if heading_match else ""
+    plan_name = (floor_plan_name or heading or _plan_name_from_url(source_url)).strip()
     plan_beds = _beds_from_url(source_url)
+    if plan_beds is None:
+        if re.search(r"\bStudio\b", heading, re.IGNORECASE):
+            plan_beds = 0
+        else:
+            bed_match = _DETAIL_BED_RE.search(heading)
+            if bed_match:
+                plan_beds = int(float(bed_match.group(1)))
+    bath_match = _DETAIL_BATH_RE.search(heading)
+    plan_baths = bath_match.group(1) if bath_match else ""
+    sqft_match = _DETAIL_SQFT_BLOCK_RE.search(detail_html)
+    sqft_text = _html_text(sqft_match.group("sqft_body")) if sqft_match else ""
+    plan_sqft_match = _SQFT_RE.search(sqft_text)
+    plan_sqft = plan_sqft_match.group(1).replace(",", "") if plan_sqft_match else ""
 
     # Find every <th class="left wrap"> anchor; each one starts a row.
     anchors: list[tuple[int, int, str]] = []
@@ -306,7 +434,11 @@ def parse_rentvision_unit_table(
         # — the live theme only ever puts real unit numbers here, but be
         # defensive against future tenants that add a header row.
         if unit_text.lower() in {
-            "apartment", "unit", "price", "availability", "actions",
+            "apartment",
+            "unit",
+            "price",
+            "availability",
+            "actions",
         }:
             continue
         # Require alphanumeric content with a digit somewhere — real
@@ -323,6 +455,13 @@ def parse_rentvision_unit_table(
     for i, (_start, end, unit_number) in enumerate(anchors):
         slice_end = anchors[i + 1][0] if i + 1 < len(anchors) else len(detail_html)
         block = detail_html[end:slice_end]
+
+        building_match = _UNIT_BUILDING_CELL_RE.search(block)
+        building = _html_text(building_match.group(1)) if building_match else ""
+        apply_unit_match = _APPLY_UNIT_ID_RE.search(block)
+        apply_unit_id = apply_unit_match.group(1) if apply_unit_match else ""
+        sightmap_match = _SIGHTMAP_ROW_ID_RE.search(block)
+        sightmap_unit_id = sightmap_match.group(2) if sightmap_match else ""
 
         # Asking rent — first $X.XX span in the row (the term-pricing
         # table inside the popup is full of additional $X spans, so we
@@ -353,29 +492,195 @@ def parse_rentvision_unit_table(
             if apply_m:
                 availability_date = _to_iso_date(apply_m.group(1))
 
-        out.append(
-            make_unit_dict(
-                floor_plan_name=plan_name,
-                bed_label=bed_label_from(plan_beds, plan_name),
-                bedrooms=str(plan_beds) if plan_beds is not None else "",
-                bathrooms="",
-                sqft="",
-                unit_number=unit_number,
-                rent_range=format_rent_range(rent, rent),
-                rent_low=rent,
-                rent_high=rent,
-                availability_status=availability_status,
-                availability_date=availability_date,
-                source_api_url=source_url,
-                extraction_tier="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
-            )
+        source_ids: dict[str, Any] = {}
+        if apply_unit_id:
+            source_ids["rentvision_unit_id"] = apply_unit_id
+        if sightmap_unit_id:
+            source_ids["sightmap_unit_id"] = sightmap_unit_id
+
+        unit = make_unit_dict(
+            floor_plan_name=plan_name,
+            bed_label=bed_label_from(plan_beds, plan_name),
+            bedrooms=str(plan_beds) if plan_beds is not None else "",
+            bathrooms=plan_baths,
+            sqft=plan_sqft,
+            unit_number=unit_number,
+            unit_name=unit_number,
+            building=building,
+            rent_range=format_rent_range(rent, rent),
+            rent_low=rent,
+            rent_high=rent,
+            availability_status=availability_status,
+            availability_date=availability_date,
+            source_api_url=source_url,
+            extraction_tier="TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+            source_ids=source_ids or None,
         )
+        # Prefer the property-scoped Apply UnitId. When a legacy row omits it,
+        # an explicit Building + apartment pair is still a bounded physical
+        # identity and prevents cross-building display-number collisions.
+        if apply_unit_id:
+            unit["unit_id"] = apply_unit_id
+        elif building:
+            unit["unit_id"] = f"{building}-{unit_number}"
+        out.append(unit)
     return out
 
 
-def parse_rentvision_cards(
-    cards: list[dict[str, str]], url: str
-) -> list[dict[str, str]]:
+async def _fetch_rentvision_html_pages(
+    urls: list[str],
+    allowed_host: str,
+    *,
+    client: Any | None = None,
+) -> list[tuple[str, int, str, str]]:
+    """Fetch bounded same-property HTML using plain direct HTTP.
+
+    The production client intentionally has no proxy, browser impersonation,
+    fingerprint rotation, unlocker, CAPTCHA, or FlareSolverr integration.
+    Redirects are followed manually so no request can leave the marketing
+    property's host (an optional ``www.`` label is considered equivalent).
+    ``client`` exists for deterministic transport tests; production callers
+    leave it unset.
+    """
+    import asyncio
+
+    import httpx
+
+    bounded = list(dict.fromkeys(urls))[:RENTVISION_MAX_PLAN_URLS]
+    if not bounded or not allowed_host:
+        return []
+    semaphore = asyncio.Semaphore(_RENTVISION_FETCH_CONCURRENCY)
+
+    async def fetch_one(http_client: httpx.AsyncClient, requested: str) -> tuple[str, int, str, str]:
+        current = requested
+        last_status = 0
+        for _ in range(_RENTVISION_MAX_REDIRECTS + 1):
+            if _normalized_host(current) != allowed_host:
+                return requested, last_status, "", current
+            try:
+                async with semaphore, http_client.stream("GET", current) as response:
+                    last_status = int(response.status_code)
+                    final_url = str(response.url)
+                    if _normalized_host(final_url) != allowed_host:
+                        return requested, last_status, "", final_url
+                    if response.is_redirect:
+                        location = str(response.headers.get("location") or "").strip()
+                        if not location:
+                            return requested, last_status, "", final_url
+                        next_url = urljoin(final_url, location)
+                        next_parts = urlparse(next_url)
+                        if (
+                            next_parts.scheme not in {"http", "https"}
+                            or _normalized_host(next_url) != allowed_host
+                        ):
+                            return requested, last_status, "", next_url
+                        current = next_url
+                        continue
+                    if not 200 <= last_status < 300:
+                        return requested, last_status, "", final_url
+
+                    chunks: list[bytes] = []
+                    size = 0
+                    async for chunk in response.aiter_bytes():
+                        size += len(chunk)
+                        if size > _RENTVISION_MAX_BODY_BYTES:
+                            return requested, last_status, "", final_url
+                        chunks.append(chunk)
+                    return (
+                        requested,
+                        last_status,
+                        b"".join(chunks).decode("utf-8", errors="replace"),
+                        final_url,
+                    )
+            except (httpx.HTTPError, ValueError):
+                return requested, 0, "", current
+        return requested, last_status, "", current
+
+    async def run(http_client: httpx.AsyncClient) -> list[tuple[str, int, str, str]]:
+        return list(await asyncio.gather(*(fetch_one(http_client, url) for url in bounded)))
+
+    if client is not None:
+        return await run(client)
+    async with httpx.AsyncClient(
+        follow_redirects=False,
+        timeout=httpx.Timeout(15.0),
+        trust_env=False,
+        headers={"Accept": "text/html,application/xhtml+xml"},
+    ) as direct_client:
+        return await run(direct_client)
+
+
+async def recover_rentvision_crossroute(ctx: AdapterContext) -> list[dict[str, Any]]:
+    """Recover RentVision detail rosters after a detector/adapter misroute.
+
+    This lane only activates for the exact RentVision CMS footer marker in
+    the already-fetched property body. It drills at most 30 plan pages on the
+    same property host and returns only canonical apartment rows carrying a
+    positive numeric rent. A miss returns ``[]`` so the universal chain keeps
+    any richer plan-level result it already found.
+    """
+    from ma_poc.core.identity import unit_has_real_anchor
+
+    fetch_result = getattr(ctx, "fetch_result", None)
+    body = getattr(fetch_result, "body", None)
+    if not is_strong_rentvision_cms_html(body if isinstance(body, (str, bytes)) else ""):
+        return []
+
+    source_url = str(getattr(fetch_result, "final_url", "") or getattr(ctx, "base_url", "") or "").strip()
+    try:
+        source_parts = urlparse(source_url)
+    except ValueError:
+        return []
+    allowed_host = _normalized_host(source_url)
+    if source_parts.scheme not in {"http", "https"} or not source_parts.netloc or not allowed_host:
+        return []
+
+    floorplans_url = urlunparse((source_parts.scheme, source_parts.netloc, "/floorplans", "", "", ""))
+    fetched_index = await _fetch_rentvision_html_pages([floorplans_url], allowed_host)
+    if not fetched_index:
+        return []
+    _, status, floorplans_html, resolved_index_url = fetched_index[0]
+    if (
+        not 200 <= status < 300
+        or not floorplans_html
+        or _normalized_host(resolved_index_url) != allowed_host
+        or not is_strong_rentvision_cms_html(floorplans_html)
+    ):
+        return []
+
+    detail_urls = [
+        url
+        for url in find_plan_detail_urls(floorplans_html, resolved_index_url)
+        if _normalized_host(url) == allowed_host
+    ][:RENTVISION_MAX_PLAN_URLS]
+    if not detail_urls:
+        return []
+
+    recovered: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    detail_pages = await _fetch_rentvision_html_pages(detail_urls, allowed_host)
+    for _, detail_status, detail_html, resolved_detail_url in detail_pages:
+        if (
+            not 200 <= detail_status < 300
+            or not detail_html
+            or _normalized_host(resolved_detail_url) != allowed_host
+        ):
+            continue
+        for row in parse_rentvision_unit_table(detail_html, resolved_detail_url):
+            if not unit_has_real_anchor(row) or not _has_positive_numeric_rent(row):
+                continue
+            key = (
+                str(row.get("building") or "").strip().casefold(),
+                str(row.get("unit_number") or "").strip().casefold(),
+            )
+            if not key[1] or key in seen:
+                continue
+            seen.add(key)
+            recovered.append(row)
+    return recovered
+
+
+def parse_rentvision_cards(cards: list[dict[str, str]], url: str) -> list[dict[str, str]]:
     """Parse RentVision ``.floorplanItem`` rows into plan-level unit dicts.
 
     Plan-level (one row per floor plan). ``available_units`` carries the
@@ -491,9 +796,7 @@ class RentVisionAdapter:
         # derives the plan name from its URL and still emits real unit rows.
         card_by_slug = self._cards_by_slug(cards)
         try:
-            floorplans_html = await self._fetch_floorplans_html(
-                page, floorplans_url
-            )
+            floorplans_html = await self._fetch_floorplans_html(page, floorplans_url)
         except Exception as exc:
             log.debug("RentVision floorplans-self-fetch failed err=%s", exc)
             floorplans_html = ""
@@ -506,16 +809,15 @@ class RentVisionAdapter:
                 except Exception as exc:
                     log.debug(
                         "RentVision detail-fetch failed url=%s err=%s",
-                        detail_url, exc,
+                        detail_url,
+                        exc,
                     )
                     detail_html = ""
                 if not detail_html:
                     continue
                 slug = detail_url.rstrip("/").rsplit("/", 1)[-1].lower()
                 plan_name = (card_by_slug.get(slug) or "").strip()
-                unit_blocks = parse_rentvision_unit_table(
-                    detail_html, detail_url, plan_name
-                )
+                unit_blocks = parse_rentvision_unit_table(detail_html, detail_url, plan_name)
                 unit_level_drill.extend(unit_blocks)
 
         if unit_level_drill:
@@ -533,8 +835,7 @@ class RentVisionAdapter:
                 result.confidence = min(0.95, 0.75 + 0.02 * pp.n_admitted)
                 return result
             result.errors.append(
-                f"RENTVISION_UNIT_LEVEL_VALIDITY_REJECTED: "
-                f"{len(unit_level_drill)} rows failed unit_validity"
+                f"RENTVISION_UNIT_LEVEL_VALIDITY_REJECTED: {len(unit_level_drill)} rows failed unit_validity"
             )
 
         if units:
@@ -548,8 +849,7 @@ class RentVisionAdapter:
                 result.confidence = min(0.9, 0.65 + 0.05 * pp.n_admitted)
                 return result
             result.errors.append(
-                f"RENTVISION_VALIDITY_REJECTED: {len(units)} rows failed "
-                f"unit_validity (no numeric dimension)"
+                f"RENTVISION_VALIDITY_REJECTED: {len(units)} rows failed unit_validity (no numeric dimension)"
             )
 
         result.confidence = 0.0
@@ -577,9 +877,7 @@ class RentVisionAdapter:
         return out
 
     @staticmethod
-    async def _fetch_floorplans_html(
-        page: Page | None, floorplans_url: str
-    ) -> str:
+    async def _fetch_floorplans_html(page: Page | None, floorplans_url: str) -> str:
         """Get the ``/floorplans`` SSR HTML.
 
         Preference order: (1) if the live page is already at that URL, use
@@ -600,6 +898,7 @@ class RentVisionAdapter:
                     pass
         try:
             import httpx
+
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -608,9 +907,7 @@ class RentVisionAdapter:
                 ),
                 "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
             }
-            async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True, headers=headers
-            ) as c:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as c:
                 r = await c.get(floorplans_url)
             if r.status_code == 200:
                 return r.text
@@ -619,14 +916,21 @@ class RentVisionAdapter:
         return ""
 
     @staticmethod
-    async def _fetch_detail_html(detail_url: str) -> str:
+    async def _fetch_detail_html(
+        detail_url: str,
+        *,
+        client: object | None = None,
+    ) -> str:
         """Self-fetch a single per-plan detail page via httpx.
 
         RentVision detail pages are pure SSR — the unit-listing table is
-        in the initial HTML, no JS rendering required.
+        in the initial HTML, no JS rendering required. ``client`` lets a
+        bounded multi-page drill reuse one connection pool; the optional
+        standalone path remains useful for focused probes and tests.
         """
         try:
             import httpx
+
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -635,15 +939,75 @@ class RentVisionAdapter:
                 ),
                 "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
             }
-            async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True, headers=headers
-            ) as c:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as c:
                 r = await c.get(detail_url)
             if r.status_code == 200:
                 return r.text
         except Exception as exc:
             log.debug("RentVision detail httpx-fetch failed err=%s", exc)
         return ""
+
+    @classmethod
+    async def _fetch_detail_pages(
+        cls,
+        detail_urls: list[str],
+        *,
+        max_concurrency: int = 8,
+    ) -> list[tuple[str, str]]:
+        """Fetch detail pages concurrently through one reusable client.
+
+        Some RentVision properties publish 40+ plan-detail pages. Opening a
+        fresh client and awaiting each page serially can exceed the Jugnu run
+        budget even when every page is public and fast enough in isolation.
+        A small semaphore keeps the crawl polite while reducing the wall time
+        to the slowest bounded batch. ``gather`` preserves URL order, which
+        keeps emitted unit ordering deterministic across repeated runs.
+        """
+        if not detail_urls:
+            return []
+
+        import asyncio
+
+        import httpx
+
+        concurrency = max(1, int(max_concurrency))
+        semaphore = asyncio.Semaphore(concurrency)
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+
+        async with httpx.AsyncClient(
+            timeout=15.0,
+            follow_redirects=True,
+            headers=headers,
+            limits=httpx.Limits(
+                max_connections=concurrency,
+                max_keepalive_connections=concurrency,
+            ),
+        ) as client:
+
+            async def _one(detail_url: str) -> tuple[str, str]:
+                async with semaphore:
+                    try:
+                        html = await cls._fetch_detail_html(
+                            detail_url,
+                            client=client,
+                        )
+                    except Exception as exc:
+                        log.debug(
+                            "RentVision detail-fetch failed url=%s err=%s",
+                            detail_url,
+                            exc,
+                        )
+                        html = ""
+                    return detail_url, html
+
+            return list(await asyncio.gather(*(_one(url) for url in detail_urls)))
 
     @staticmethod
     def _floorplans_url(page: Page | None, ctx: AdapterContext) -> str:

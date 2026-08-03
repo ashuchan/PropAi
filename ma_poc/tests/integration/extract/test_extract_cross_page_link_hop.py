@@ -12,11 +12,10 @@ import sys
 import types
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from ma_poc.models.scrape_profile import ScrapeProfile
 from ma_poc.pms.detector import DetectedPMS
 
 
@@ -96,7 +95,9 @@ def test_h5_visited_urls_dedupe() -> None:
     async def fake_scrape(**kw):
         return {"units": [], "extraction_tier_used": "TIER_3_DOM"}
 
-    # Pre-mark availability as visited; only floor-plans + apply remain
+    # Pre-mark availability as visited. The explicit floor-plans link remains
+    # eligible; universal recovery priors may legitimately use the other
+    # bounded hop slots before the low-signal /apply link.
     visited = {"https://example.com/availability", "https://example.com"}
 
     detected = DetectedPMS(pms="unknown", confidence=0.5)
@@ -128,9 +129,9 @@ def test_h5_visited_urls_dedupe() -> None:
     assert "https://example.com/availability" not in fetched_urls
     # entry URL never re-fetched by link-hop
     assert "https://example.com" not in fetched_urls
-    # remaining candidates fetched
+    # The strongest remaining page-authored candidate is still fetched.
     assert "https://example.com/floor-plans" in fetched_urls
-    assert "https://example.com/apply" in fetched_urls
+    assert len(fetched_urls) <= 3
 
 
 def test_h5_max_hops_caps_fetches() -> None:

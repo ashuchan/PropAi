@@ -1,0 +1,464 @@
+{
+  "batch_label": "edgewater-entrata-current-configured-capture-route-replay",
+  "generated_at_utc": "2026-08-01T11:28:00.201058+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified_by_lane": false,
+    "shared_builder_modified": false,
+    "shared_ledger_modified": false,
+    "web_unlocker": false
+  },
+  "ledger_snapshot": {
+    "net_new_ids": [
+      48092
+    ],
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "rows": 192,
+    "sha256": "cae354f94c95160693b3ac6f8398ecae9b239fd23ff0aa0eb1ab180741645da8"
+  },
+  "recoveries": [
+    {
+      "current_full_pipeline_capture": {
+        "adapter": "entrata",
+        "canonical_address": "5500 Weslo Willow Dr",
+        "configured_final_url": "https://www.edgewatervillage-apts.com/",
+        "configured_outcome": "OK",
+        "configured_status": 200,
+        "current_detected_pms": "entrata",
+        "elapsed_ms": 22277,
+        "emitted_rows": 23,
+        "errors": [],
+        "exception": "",
+        "fallback_chain": [
+          "entrata"
+        ],
+        "link_hop_from": "",
+        "link_hop_success": false,
+        "property_id": 48092,
+        "property_name": "Edgewater Village",
+        "residual_detected_adapter": "entrata",
+        "sample_units": [
+          {
+            "floor_plan_name": "01AR",
+            "market_rent_high": 1139,
+            "market_rent_low": 939,
+            "native_unit_id": "",
+            "source_api_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+            "source_property_id": "",
+            "unit_id": "",
+            "unit_number": "114"
+          },
+          {
+            "floor_plan_name": "01AR",
+            "market_rent_high": 1139,
+            "market_rent_low": 939,
+            "native_unit_id": "",
+            "source_api_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+            "source_property_id": "",
+            "unit_id": "",
+            "unit_number": "112"
+          },
+          {
+            "floor_plan_name": "01AR",
+            "market_rent_high": 1139,
+            "market_rent_low": 939,
+            "native_unit_id": "",
+            "source_api_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+            "source_property_id": "",
+            "unit_id": "",
+            "unit_number": "115"
+          },
+          {
+            "floor_plan_name": "11BR",
+            "market_rent_high": 1179,
+            "market_rent_low": 979,
+            "native_unit_id": "",
+            "source_api_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+            "source_property_id": "",
+            "unit_id": "",
+            "unit_number": "117"
+          },
+          {
+            "floor_plan_name": "11BR",
+            "market_rent_high": 1179,
+            "market_rent_low": 979,
+            "native_unit_id": "",
+            "source_api_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+            "source_property_id": "",
+            "unit_id": "",
+            "unit_number": "215"
+          }
+        ],
+        "source_property_ids": [],
+        "source_urls": [
+          "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/"
+        ],
+        "strict_native_priced_rows": 23,
+        "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+        "website": "https://www.edgewatervillageapts.com/",
+        "winning_page_url": "https://www.edgewatervillage-apts.com/floorplans/greensboro-NC/edgewater-village/21bd-30090-1/"
+      },
+      "current_published_route_replay": {
+        "adapter": "entrata",
+        "errors": [],
+        "strict_native_positive_rent_rows": 23,
+        "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
+      },
+      "native_identity_rows": 23,
+      "native_positive_rent_rows": 23,
+      "property_boundary_evidence": {
+        "canonical_address": "5500 Weslo Willow Dr",
+        "canonical_city": "Greensboro",
+        "canonical_state": "NC",
+        "canonical_zip": "27409",
+        "configured_final_url": "https://www.edgewatervillage-apts.com/",
+        "full_configured_capture_artifact": "/private/tmp/propai-fnd-vBkmT9/realpage_onesite_residual_lane/scan_remaining_current_pipeline.json",
+        "full_configured_capture_generated_at_utc": "2026-08-01T11:14:18.744817+00:00",
+        "full_configured_capture_sha256": "822b2191ed8c63cb03b3a0bac8b7bebd6d001232fc125149ae55b41189b9bb3f",
+        "gates": {
+          "all_emitted_rows_strict_native_positive": true,
+          "all_floorplan_ids_present": true,
+          "all_native_ids_present": true,
+          "all_source_urls_exact_published_route": true,
+          "all_unit_numbers_present": true,
+          "configured_capture_adapter_entrata": true,
+          "configured_capture_exact_final_host": true,
+          "configured_capture_http_200": true,
+          "configured_capture_native_positive_rows": true,
+          "configured_capture_no_errors": true,
+          "configured_capture_tier_unit_level": true,
+          "configured_live_city_visible": true,
+          "configured_live_exact_final_host": true,
+          "configured_live_http_200": true,
+          "configured_live_name_visible": true,
+          "configured_live_publishes_sole_exact_route": true,
+          "configured_live_state_visible": true,
+          "configured_live_street_exact_normalized": true,
+          "configured_live_zip_visible": true,
+          "every_native_id_floorplan_id_and_unit_replayed_in_route_body": true,
+          "published_route_adapter_entrata": true,
+          "published_route_http_200": true,
+          "published_route_no_errors": true,
+          "published_route_tier_unit_level": true,
+          "scan_guardrails_all_prohibited_paths_off": true
+        },
+        "published_route": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/"
+      },
+      "property_id": 48092,
+      "property_name": "Edgewater Village",
+      "source_urls": [
+        "https://www.edgewatervillageapts.com/",
+        "https://www.edgewatervillage-apts.com/",
+        "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/"
+      ],
+      "strict_verdict": "pass_exact_configured_current_e2e_capture_and_published_route_replay",
+      "units": [
+        {
+          "availability_date": "2026-04-29",
+          "floor_plan_name": "01AR",
+          "market_rent_high": 1139,
+          "rent": 939,
+          "source_ids": {
+            "entrata_fpid": "30051",
+            "entrata_uid": "100455",
+            "unit_id_engrain": "114"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "114"
+        },
+        {
+          "availability_date": "2026-05-23",
+          "floor_plan_name": "01AR",
+          "market_rent_high": 1139,
+          "rent": 939,
+          "source_ids": {
+            "entrata_fpid": "30051",
+            "entrata_uid": "100476",
+            "unit_id_engrain": "112"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "112"
+        },
+        {
+          "availability_date": "2026-07-31",
+          "floor_plan_name": "01AR",
+          "market_rent_high": 1139,
+          "rent": 939,
+          "source_ids": {
+            "entrata_fpid": "30051",
+            "entrata_uid": "100432",
+            "unit_id_engrain": "115"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "115"
+        },
+        {
+          "availability_date": "2026-04-29",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1179,
+          "rent": 979,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100848",
+            "unit_id_engrain": "117"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "117"
+        },
+        {
+          "availability_date": "2026-08-03",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1179,
+          "rent": 979,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100785",
+            "unit_id_engrain": "215"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "215"
+        },
+        {
+          "availability_date": "2026-08-05",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1189,
+          "rent": 989,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100721",
+            "unit_id_engrain": "312"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "312"
+        },
+        {
+          "availability_date": "2026-08-06",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1179,
+          "rent": 979,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100885",
+            "unit_id_engrain": "315"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "315"
+        },
+        {
+          "availability_date": "2026-08-08",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1189,
+          "rent": 989,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100851",
+            "unit_id_engrain": "212"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "212"
+        },
+        {
+          "availability_date": "2026-08-08",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1214,
+          "rent": 1014,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100692",
+            "unit_id_engrain": "214"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "214"
+        },
+        {
+          "availability_date": "2026-08-09",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1199,
+          "rent": 999,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100723",
+            "unit_id_engrain": "314"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "314"
+        },
+        {
+          "availability_date": "2026-08-27",
+          "floor_plan_name": "11BR",
+          "market_rent_high": 1189,
+          "rent": 989,
+          "source_ids": {
+            "entrata_fpid": "30089",
+            "entrata_uid": "100741",
+            "unit_id_engrain": "217"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "217"
+        },
+        {
+          "availability_date": "2026-04-29",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1264,
+          "rent": 1064,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100709",
+            "unit_id_engrain": "116"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "116"
+        },
+        {
+          "availability_date": "2026-07-29",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1264,
+          "rent": 1064,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100776",
+            "unit_id_engrain": "113"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "113"
+        },
+        {
+          "availability_date": "2026-07-30",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1264,
+          "rent": 1064,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100786",
+            "unit_id_engrain": "216"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "216"
+        },
+        {
+          "availability_date": "2026-08-04",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1264,
+          "rent": 1064,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100872",
+            "unit_id_engrain": "118"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "118"
+        },
+        {
+          "availability_date": "2026-08-05",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1274,
+          "rent": 1074,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100682",
+            "unit_id_engrain": "111"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "111"
+        },
+        {
+          "availability_date": "2026-08-05",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1284,
+          "rent": 1084,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100880",
+            "unit_id_engrain": "218"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "218"
+        },
+        {
+          "availability_date": "2026-08-13",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1274,
+          "rent": 1074,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100814",
+            "unit_id_engrain": "313"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "313"
+        },
+        {
+          "availability_date": "2026-08-26",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1284,
+          "rent": 1084,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100750",
+            "unit_id_engrain": "318"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "318"
+        },
+        {
+          "availability_date": "2026-08-27",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1274,
+          "rent": 1074,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100783",
+            "unit_id_engrain": "213"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "213"
+        },
+        {
+          "availability_date": "2026-08-27",
+          "floor_plan_name": "21BR",
+          "market_rent_high": 1284,
+          "rent": 1084,
+          "source_ids": {
+            "entrata_fpid": "30088",
+            "entrata_uid": "100781",
+            "unit_id_engrain": "211"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "211"
+        },
+        {
+          "availability_date": "2026-07-30",
+          "floor_plan_name": "11AR",
+          "market_rent_high": 1164,
+          "rent": 964,
+          "source_ids": {
+            "entrata_fpid": "30086",
+            "entrata_uid": "100519",
+            "unit_id_engrain": "317"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "317"
+        },
+        {
+          "availability_date": "2026-08-16",
+          "floor_plan_name": "21AR",
+          "market_rent_high": 1264,
+          "rent": 1064,
+          "source_ids": {
+            "entrata_fpid": "30085",
+            "entrata_uid": "100472",
+            "unit_id_engrain": "316"
+          },
+          "source_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "unit_number": "316"
+        }
+      ],
+      "website": "https://www.edgewatervillageapts.com/"
+    }
+  ]
+}

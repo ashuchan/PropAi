@@ -335,6 +335,7 @@ def _fetch_scraped_units_from_sql(
                 "rent_range_raw": "",
                 "available_date": "",
                 "available_date_raw": "",
+                "availability_date_provenance": "",
                 "availability_status": "",
                 "lease_term": None,
                 "move_in_date": "",
@@ -376,7 +377,14 @@ def _fetch_scraped_units_from_sql(
                 "available_date": u.get("available_date") or "",
                 # Raw availability string preserved by v2 schema (text forms
                 # like "Available Now" / "Call" that don't ISO-normalize).
-                "available_date_raw": u.get("_available_date_raw") or "",
+                "available_date_raw": (
+                    u.get("available_date_raw")
+                    or u.get("_available_date_raw")
+                    or ""
+                ),
+                "availability_date_provenance": (
+                    u.get("availability_date_provenance") or ""
+                ),
                 "availability_status": u.get("availability_status") or "",
                 "lease_term": u.get("lease_term"),
                 "move_in_date": u.get("move_in_date") or "",
@@ -687,6 +695,7 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "beds": None, "baths": None, "area": None,
                 "rent_low": None, "rent_high": None, "rent_range_raw": "",
                 "available_date": "", "available_date_raw": "",
+                "availability_date_provenance": "",
                 "availability_status": "", "lease_term": None,
                 "move_in_date": "", "building": "", "floor": "",
                 "available_units": "", "deposit": "",
@@ -709,7 +718,14 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "rent_high": u.get("rent_high"),
                 "rent_range_raw": u.get("_rent_range_raw") or "",
                 "available_date": u.get("available_date") or "",
-                "available_date_raw": u.get("_available_date_raw") or "",
+                "available_date_raw": (
+                    u.get("available_date_raw")
+                    or u.get("_available_date_raw")
+                    or ""
+                ),
+                "availability_date_provenance": (
+                    u.get("availability_date_provenance") or ""
+                ),
                 "availability_status": u.get("availability_status") or "",
                 "lease_term": u.get("lease_term"),
                 "move_in_date": u.get("move_in_date") or "",
@@ -781,6 +797,7 @@ _SCRAPED_COLUMNS: list[tuple[str, str]] = [
     ("rent_range_raw", "Rent Range (raw)"),
     ("available_date", "Available Date"),
     ("available_date_raw", "Available Date (raw)"),
+    ("availability_date_provenance", "Availability Date Provenance"),
     ("availability_status", "Availability Status"),
     ("lease_term", "Lease Term"),
     ("move_in_date", "Move-In Date"),

@@ -1,0 +1,4097 @@
+{
+  "batch_label": "appfolio-generic-remaining-current-strict-consolidated",
+  "capture_date": "2026-08-01",
+  "baseline_cohort": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+  "evidence_is_current_live": true,
+  "hyperbrowser_used": false,
+  "captcha_used": false,
+  "paid_canary_run": false,
+  "source_edits_performed": false,
+  "component_artifacts": [
+    "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/evidence_appfolio_generic_appfolio_current_strict.json",
+    "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/evidence_appfolio_generic_generic_current_strict.json"
+  ],
+  "results": [
+    {
+      "property_id": 15014,
+      "property_name": "Wildwood Park",
+      "website": "http://www.rentdittmar.com/apartment-communities/wildwood-park",
+      "current_exact_website": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/conventional/",
+      "adapter": "entrata_prospect_portal_unit_cards",
+      "tier": "TIER_1_CURRENT_CHROME_ENTRATA_UNIT_CARDS",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 11,
+      "plans": 1,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 11,
+        "rows_with_native_identity_and_positive_rent": 11,
+        "distinct_native_unit_ids": 11,
+        "distinct_visible_unit_numbers": 11,
+        "property_boundary": "Exact Wildwood Park plan page title/address identifies 5550 Columbia Pike, Arlington, VA 22204; its calculator link carries property id 211184 and every modal row publishes native data-unit/data-floorplan attributes.",
+        "source_urls": [
+          "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/conventional/",
+          "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json": "955ae8f14c6bc891d86b51c2e8da29a5274b329f03d33bd2c5c5fa6b9b7fcd0c"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "4410006",
+          "unit_number": "361",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 1995,
+          "rent_high": 1995,
+          "availability_date": "2026/08/01",
+          "source_ids": {
+            "entrata_uid": "4410006",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410199",
+          "unit_number": "831",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "775",
+          "building": "",
+          "floor": "",
+          "rent_low": 1995,
+          "rent_high": 1995,
+          "availability_date": "2026/08/01",
+          "source_ids": {
+            "entrata_uid": "4410199",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410227",
+          "unit_number": "891",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 2125,
+          "rent_high": 2125,
+          "availability_date": "08/18/2026",
+          "source_ids": {
+            "entrata_uid": "4410227",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410117",
+          "unit_number": "631",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "775",
+          "building": "",
+          "floor": "",
+          "rent_low": 2155,
+          "rent_high": 2155,
+          "availability_date": "08/18/2026",
+          "source_ids": {
+            "entrata_uid": "4410117",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410212",
+          "unit_number": "852",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "720",
+          "building": "",
+          "floor": "",
+          "rent_low": 2110,
+          "rent_high": 2110,
+          "availability_date": "08/25/2026",
+          "source_ids": {
+            "entrata_uid": "4410212",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4409979",
+          "unit_number": "291",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 2065,
+          "rent_high": 2065,
+          "availability_date": "08/29/2026",
+          "source_ids": {
+            "entrata_uid": "4409979",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410273",
+          "unit_number": "1003",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 2185,
+          "rent_high": 2185,
+          "availability_date": "09/02/2026",
+          "source_ids": {
+            "entrata_uid": "4410273",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410268",
+          "unit_number": "991",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 2095,
+          "rent_high": 2095,
+          "availability_date": "09/03/2026",
+          "source_ids": {
+            "entrata_uid": "4410268",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410209",
+          "unit_number": "845",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "775",
+          "building": "",
+          "floor": "",
+          "rent_low": 2265,
+          "rent_high": 2265,
+          "availability_date": "09/16/2026",
+          "source_ids": {
+            "entrata_uid": "4410209",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410169",
+          "unit_number": "750",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "720",
+          "building": "",
+          "floor": "",
+          "rent_low": 2145,
+          "rent_high": 2145,
+          "availability_date": "09/24/2026",
+          "source_ids": {
+            "entrata_uid": "4410169",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4409932",
+          "unit_number": "171",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "670",
+          "building": "",
+          "floor": "",
+          "rent_low": 1950,
+          "rent_high": 1950,
+          "availability_date": "10/21/2026",
+          "source_ids": {
+            "entrata_uid": "4409932",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "4410006",
+          "unit_number": "361",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 1995,
+          "rent_high": 1995,
+          "availability_date": "2026/08/01",
+          "source_ids": {
+            "entrata_uid": "4410006",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410199",
+          "unit_number": "831",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "775",
+          "building": "",
+          "floor": "",
+          "rent_low": 1995,
+          "rent_high": 1995,
+          "availability_date": "2026/08/01",
+          "source_ids": {
+            "entrata_uid": "4410199",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        },
+        {
+          "native_unit_id": "4410227",
+          "unit_number": "891",
+          "floor_plan_id": "1152758",
+          "floor_plan_name": "1x1 Modernized",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "building": "",
+          "floor": "",
+          "rent_low": 2125,
+          "rent_high": 2125,
+          "availability_date": "08/18/2026",
+          "source_ids": {
+            "entrata_uid": "4410227",
+            "entrata_fpid": "1152758",
+            "property_id": "211184"
+          },
+          "source_url": "https://www.rentwwp.com/arlington-vaapartments/wildwood-park/floorplans/1x1-modernized-1152758/fp_name/occupancy_type/conventional/"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 11,
+        "observed_native_unit_count": 11,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "captcha_used": false
+      },
+      "errors": []
+    },
+    {
+      "property_id": 38107,
+      "property_name": "Fountain Place",
+      "website": "https://www.livefountainplaceapts.com/",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 8,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "distinct_unit_numbers": 8,
+        "distinct_native_listable_uids": 8,
+        "excluded_nonphysical_leasing_office_rows": 0,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "exact-property AppFolio-Websites domain; its current collection has exactly eight rows and every row is tagged `fountain`; the same eight native listable UIDs are linked by the exact availability page",
+        "source_urls": [
+          "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.livefountainplaceapts.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "5471-valley-ridge-columbus-oh-43228",
+            "unit_number": "4b0339fb-749"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "4b0339fb-749f-4823-b602-d83fcf8b2adf",
+            "appfolio_id": "3112",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "5471 Valley Ridge, Columbus, OH 43228"
+          },
+          "unit_name": "5471 Valley Ridge, Columbus, OH 43228",
+          "floor_plan_name": "2x2SC",
+          "availability_date": "2026-08-01",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "777-cliff-creek-drive-columbus-oh-43228",
+            "unit_number": "b1142b86-536"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "b1142b86-5367-4df4-9b1c-4bf0fe737455",
+            "appfolio_id": "3113",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "777 Cliff Creek Drive, Columbus, OH 43228"
+          },
+          "unit_name": "777 Cliff Creek Drive, Columbus, OH 43228",
+          "floor_plan_name": "1x1SC",
+          "availability_date": "",
+          "positive_rent_evidence": {
+            "market_rent_low": 1050,
+            "market_rent_high": 1050
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "783-cliff-creek-drive-columbus-oh-43228",
+            "unit_number": "17ecb0ef-884"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "17ecb0ef-8843-4669-834c-d6fddc8c7f12",
+            "appfolio_id": "3114",
+            "appfolio_database_name": "terracemgmt",
+            "appfolio_full_address": "783 Cliff Creek Drive, Columbus, OH 43228"
+          },
+          "unit_name": "783 Cliff Creek Drive, Columbus, OH 43228",
+          "floor_plan_name": "2x2SC",
+          "availability_date": "2026-06-24",
+          "positive_rent_evidence": {
+            "market_rent_low": 1150,
+            "market_rent_high": 1150
+          },
+          "source_api_url": "https://www.livefountainplaceapts.com/rts/collections/public/1b4904d2/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 46576,
+      "property_name": "Campus Pointe",
+      "website": "https://www.proresidential.com/oklahoma-properties/campus-pointe-",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 13,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 13,
+        "rows_with_native_identity_and_positive_rent": 13,
+        "distinct_unit_numbers": 13,
+        "distinct_native_listable_uids": 13,
+        "excluded_nonphysical_leasing_office_rows": 8,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "every admitted record belongs to AppFolio property_list `Campus Pointe`",
+        "source_urls": [
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=1&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=2&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=3&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=4&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=5&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=6&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=7&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=8&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=9&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=10&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=11&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=12&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=13&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=14&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=15&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=16&query=()&language=ENGLISH",
+          "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=17&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.proresidential.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "1602-nw-31st-st-265-oklahoma-city-ok-73118",
+            "unit_number": "265"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "829f1518-9442-4e0a-8497-d0502e8672bb",
+            "appfolio_id": "280",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1602 NW 31st St., 265, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1602 NW 31st St., 265, Oklahoma City, OK 73118",
+          "floor_plan_name": "1+1 Up",
+          "availability_date": "2026-03-18",
+          "positive_rent_evidence": {
+            "market_rent_low": 759,
+            "market_rent_high": 759
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "1601-nw-30th-st-109-oklahoma-city-ok-73118",
+            "unit_number": "109"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "ee321e0c-b097-4afe-aa3f-5d81093cb0a3",
+            "appfolio_id": "289",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1601 NW 30th St., 109, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1601 NW 30th St., 109, Oklahoma City, OK 73118",
+          "floor_plan_name": "Junior Down",
+          "availability_date": "2025-05-14",
+          "positive_rent_evidence": {
+            "market_rent_low": 729,
+            "market_rent_high": 729
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "1604-nw-31th-st-233-oklahoma-city-ok-73118",
+            "unit_number": "233"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "ee3eb59e-7764-4951-8587-aa6325fa6a08",
+            "appfolio_id": "318",
+            "appfolio_database_name": "proresidential",
+            "appfolio_full_address": "1604 NW 31th St., 233, Oklahoma City, OK 73118"
+          },
+          "unit_name": "1604 NW 31th St., 233, Oklahoma City, OK 73118",
+          "floor_plan_name": "2+1 Up",
+          "availability_date": "2025-11-20",
+          "positive_rent_evidence": {
+            "market_rent_low": 849,
+            "market_rent_high": 849
+          },
+          "source_api_url": "https://www.proresidential.com/rts/collections/public/08205cf0/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 55709,
+      "property_name": "Vista Pointe Apartments",
+      "website": "https://ridgepointeblueridgeapts.com/en/",
+      "current_exact_website": "https://livevistapointeapts.com/en/",
+      "adapter": "betternoi_public_units",
+      "tier": "TIER_1_PUBLIC_BETTERNOI_API",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 7,
+      "plans": 3,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "distinct_native_unit_ids": 7,
+        "distinct_visible_unit_numbers": 7,
+        "property_boundary": "The exact current Vista Pointe floor-plan page embeds client UUID 54523ff9-0329-43dd-83b4-3066820f136e; every API row carries that UUID and 2981 Ridge Avenue, Macon, GA 31210.",
+        "source_urls": [
+          "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "https://livevistapointeapts.com/en/floor-plans"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes3/55709_betternoi_all_b590dedd1e2b.body",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes3/55709_betternoi_all_b590dedd1e2b.headers",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes2/55709_exact_floorplans_1353f17f02f7.body"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes3/55709_betternoi_all_b590dedd1e2b.body": "35bcfadc9a1f837065d28e62196f52fe4cdf3e8d658a5eec4171d80caa0ea331",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes3/55709_betternoi_all_b590dedd1e2b.headers": "d4b00ea779d848eed2307f3786f1874b7bcf58672cc48e778a506fd0c733e33f",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes2/55709_exact_floorplans_1353f17f02f7.body": "797433286169016e5305fee552f99446a03b25ac61890c0e2a97e969b3400c42"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "8c211d96-4829-4cc5-9da6-6c13f07d29ea",
+          "unit_number": "04",
+          "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f",
+          "floor_plan_name": "2 Bedroom 2 Bath B",
+          "bedrooms": "2.00",
+          "bathrooms": "2.00",
+          "sqft": "1240.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 1165,
+          "rent_high": 1165,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "8c211d96-4829-4cc5-9da6-6c13f07d29ea",
+            "betternoi_unit_id": "422074",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "available"
+        },
+        {
+          "native_unit_id": "b8c46980-e738-4ef5-a702-e204f065f15d",
+          "unit_number": "06",
+          "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f",
+          "floor_plan_name": "2 Bedroom 2 Bath B",
+          "bedrooms": "2.00",
+          "bathrooms": "2.00",
+          "sqft": "1240.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 1165,
+          "rent_high": 1165,
+          "availability_date": "2026-08-31",
+          "source_ids": {
+            "betternoi_unit_uuid": "b8c46980-e738-4ef5-a702-e204f065f15d",
+            "betternoi_unit_id": "422076",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        },
+        {
+          "native_unit_id": "02b41d07-a90a-4e9c-84aa-630645619662",
+          "unit_number": "10",
+          "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9",
+          "floor_plan_name": "1 Bedroom 1 Bath",
+          "bedrooms": "1.00",
+          "bathrooms": "1.00",
+          "sqft": "881.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 915,
+          "rent_high": 915,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "02b41d07-a90a-4e9c-84aa-630645619662",
+            "betternoi_unit_id": "422080",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "available"
+        },
+        {
+          "native_unit_id": "20f1121c-5d3f-4ba2-bd9f-918fd7d3d461",
+          "unit_number": "13",
+          "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9",
+          "floor_plan_name": "1 Bedroom 1 Bath",
+          "bedrooms": "1.00",
+          "bathrooms": "1.00",
+          "sqft": "881.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 915,
+          "rent_high": 915,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "20f1121c-5d3f-4ba2-bd9f-918fd7d3d461",
+            "betternoi_unit_id": "422083",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        },
+        {
+          "native_unit_id": "7b64172c-90f7-491e-818d-1cea074b252a",
+          "unit_number": "15",
+          "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9",
+          "floor_plan_name": "1 Bedroom 1 Bath",
+          "bedrooms": "1.00",
+          "bathrooms": "1.00",
+          "sqft": "881.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 915,
+          "rent_high": 915,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "7b64172c-90f7-491e-818d-1cea074b252a",
+            "betternoi_unit_id": "422085",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        },
+        {
+          "native_unit_id": "df5302c5-aa50-4596-82ca-519ecdb96a2a",
+          "unit_number": "22",
+          "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9",
+          "floor_plan_name": "1 Bedroom 1 Bath",
+          "bedrooms": "1.00",
+          "bathrooms": "1.00",
+          "sqft": "881.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 915,
+          "rent_high": 915,
+          "availability_date": "2026-08-31",
+          "source_ids": {
+            "betternoi_unit_uuid": "df5302c5-aa50-4596-82ca-519ecdb96a2a",
+            "betternoi_unit_id": "422092",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        },
+        {
+          "native_unit_id": "2a6befe0-209e-49dc-a86b-4d61cf9835ce",
+          "unit_number": "BP-03",
+          "floor_plan_id": "c64e3195-a349-41d7-8c5f-fc94fac81abf",
+          "floor_plan_name": "2 Bedroom 2 Bath",
+          "bedrooms": "2.00",
+          "bathrooms": "2.00",
+          "sqft": "1150.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 1115,
+          "rent_high": 1115,
+          "availability_date": "2026-08-31",
+          "source_ids": {
+            "betternoi_unit_uuid": "2a6befe0-209e-49dc-a86b-4d61cf9835ce",
+            "betternoi_unit_id": "422113",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "c64e3195-a349-41d7-8c5f-fc94fac81abf"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "8c211d96-4829-4cc5-9da6-6c13f07d29ea",
+          "unit_number": "04",
+          "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f",
+          "floor_plan_name": "2 Bedroom 2 Bath B",
+          "bedrooms": "2.00",
+          "bathrooms": "2.00",
+          "sqft": "1240.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 1165,
+          "rent_high": 1165,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "8c211d96-4829-4cc5-9da6-6c13f07d29ea",
+            "betternoi_unit_id": "422074",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "available"
+        },
+        {
+          "native_unit_id": "b8c46980-e738-4ef5-a702-e204f065f15d",
+          "unit_number": "06",
+          "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f",
+          "floor_plan_name": "2 Bedroom 2 Bath B",
+          "bedrooms": "2.00",
+          "bathrooms": "2.00",
+          "sqft": "1240.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 1165,
+          "rent_high": 1165,
+          "availability_date": "2026-08-31",
+          "source_ids": {
+            "betternoi_unit_uuid": "b8c46980-e738-4ef5-a702-e204f065f15d",
+            "betternoi_unit_id": "422076",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "e707a040-eed0-4358-a2b5-b0e78e32345f"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "on_notice"
+        },
+        {
+          "native_unit_id": "02b41d07-a90a-4e9c-84aa-630645619662",
+          "unit_number": "10",
+          "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9",
+          "floor_plan_name": "1 Bedroom 1 Bath",
+          "bedrooms": "1.00",
+          "bathrooms": "1.00",
+          "sqft": "881.00",
+          "building": "",
+          "floor": "",
+          "rent_low": 915,
+          "rent_high": 915,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "betternoi_unit_uuid": "02b41d07-a90a-4e9c-84aa-630645619662",
+            "betternoi_unit_id": "422080",
+            "property_id": "54523ff9-0329-43dd-83b4-3066820f136e",
+            "floor_plan_id": "ca472563-60b0-4cfd-929b-d412135fbdd9"
+          },
+          "source_url": "https://ares.betternoi.com/api/pub/v1/client/building/unit?client_uuid=54523ff9-0329-43dd-83b4-3066820f136e&is_available=true",
+          "availability_status": "available"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 7,
+        "observed_native_unit_count": 7,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "all_rows_exact_client_uuid_and_address": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 60145,
+      "property_name": "Woodmont Mews",
+      "website": "https://www.woodmontmewsapartments.com/",
+      "current_exact_website": "https://www.woodmontmewsapartments.com/",
+      "adapter": "securecafe_rendered_roster",
+      "tier": "TIER_1_CURRENT_CHROME_SECURECAFE_ROSTER",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 10,
+      "plans": 4,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "distinct_native_unit_ids": 10,
+        "distinct_visible_unit_numbers": 10,
+        "property_boundary": "The exact Woodmont Mews marketing site publishes four SecureCafe plan links; all rendered roster rows carry property id 144461 and the page footer confirms 1345 Martin Court, Bethlehem, PA 18018.",
+        "source_urls": [
+          "https://www.woodmontmewsapartments.com/",
+          "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969192",
+          "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969190",
+          "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969191",
+          "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969194"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json": "955ae8f14c6bc891d86b51c2e8da29a5274b329f03d33bd2c5c5fa6b9b7fcd0c"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "1355415",
+          "unit_number": "525",
+          "floor_plan_id": "969192",
+          "floor_plan_name": "Lafayette",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1058",
+          "building": "",
+          "floor": "",
+          "rent_low": 2210,
+          "rent_high": 2955,
+          "availability_date": "8/14/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355415",
+            "securecafe_floorplan_id": "969192",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969192"
+        },
+        {
+          "native_unit_id": "1355404",
+          "unit_number": "234",
+          "floor_plan_id": "969192",
+          "floor_plan_name": "Lafayette",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1058",
+          "building": "",
+          "floor": "",
+          "rent_low": 2200,
+          "rent_high": 3310,
+          "availability_date": "8/31/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355404",
+            "securecafe_floorplan_id": "969192",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969192"
+        },
+        {
+          "native_unit_id": "1355324",
+          "unit_number": "911",
+          "floor_plan_id": "969190",
+          "floor_plan_name": "The Bethlehem",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2455,
+          "rent_high": 3315,
+          "availability_date": "8/25/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355324",
+            "securecafe_floorplan_id": "969190",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969190"
+        },
+        {
+          "native_unit_id": "1355299",
+          "unit_number": "636",
+          "floor_plan_id": "969190",
+          "floor_plan_name": "The Bethlehem",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 3260,
+          "availability_date": "9/8/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355299",
+            "securecafe_floorplan_id": "969190",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969190"
+        },
+        {
+          "native_unit_id": "1355368",
+          "unit_number": "326",
+          "floor_plan_id": "969191",
+          "floor_plan_name": "Bethlehem II",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2370,
+          "rent_high": 3520,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355368",
+            "securecafe_floorplan_id": "969191",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969191"
+        },
+        {
+          "native_unit_id": "1355356",
+          "unit_number": "228",
+          "floor_plan_id": "969191",
+          "floor_plan_name": "Bethlehem II",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2370,
+          "rent_high": 3520,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355356",
+            "securecafe_floorplan_id": "969191",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969191"
+        },
+        {
+          "native_unit_id": "1355393",
+          "unit_number": "531",
+          "floor_plan_id": "969191",
+          "floor_plan_name": "Bethlehem II",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 3260,
+          "availability_date": "9/9/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355393",
+            "securecafe_floorplan_id": "969191",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969191"
+        },
+        {
+          "native_unit_id": "1355491",
+          "unit_number": "927",
+          "floor_plan_id": "969194",
+          "floor_plan_name": "Moravian",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1310",
+          "building": "",
+          "floor": "",
+          "rent_low": 2510,
+          "rent_high": 3370,
+          "availability_date": "8/3/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355491",
+            "securecafe_floorplan_id": "969194",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969194"
+        },
+        {
+          "native_unit_id": "1355467",
+          "unit_number": "427",
+          "floor_plan_id": "969194",
+          "floor_plan_name": "Moravian",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1310",
+          "building": "",
+          "floor": "",
+          "rent_low": 2510,
+          "rent_high": 3370,
+          "availability_date": "8/4/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355467",
+            "securecafe_floorplan_id": "969194",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969194"
+        },
+        {
+          "native_unit_id": "1355482",
+          "unit_number": "712",
+          "floor_plan_id": "969194",
+          "floor_plan_name": "Moravian",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1310",
+          "building": "",
+          "floor": "",
+          "rent_low": 2580,
+          "rent_high": 3440,
+          "availability_date": "8/10/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355482",
+            "securecafe_floorplan_id": "969194",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969194"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "1355415",
+          "unit_number": "525",
+          "floor_plan_id": "969192",
+          "floor_plan_name": "Lafayette",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1058",
+          "building": "",
+          "floor": "",
+          "rent_low": 2210,
+          "rent_high": 2955,
+          "availability_date": "8/14/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355415",
+            "securecafe_floorplan_id": "969192",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969192"
+        },
+        {
+          "native_unit_id": "1355404",
+          "unit_number": "234",
+          "floor_plan_id": "969192",
+          "floor_plan_name": "Lafayette",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1058",
+          "building": "",
+          "floor": "",
+          "rent_low": 2200,
+          "rent_high": 3310,
+          "availability_date": "8/31/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355404",
+            "securecafe_floorplan_id": "969192",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969192"
+        },
+        {
+          "native_unit_id": "1355324",
+          "unit_number": "911",
+          "floor_plan_id": "969190",
+          "floor_plan_name": "The Bethlehem",
+          "bedrooms": "",
+          "bathrooms": "",
+          "sqft": "1173",
+          "building": "",
+          "floor": "",
+          "rent_low": 2455,
+          "rent_high": 3315,
+          "availability_date": "8/25/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "1355324",
+            "securecafe_floorplan_id": "969190",
+            "property_id": "144461"
+          },
+          "source_url": "https://woodmontmewsapartments.securecafe.com/onlineleasing/woodmont-mews/availableunits.aspx?myOlePropertyId=144461&floorPlans=969190"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 10,
+        "observed_native_unit_count": 10,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "single_securecafe_property_id_144461": true,
+        "captcha_used": false
+      },
+      "errors": []
+    },
+    {
+      "property_id": 70255,
+      "property_name": "Coventry Square",
+      "website": "https://coventrysquareapartments.com/",
+      "current_exact_website": "https://coventrysquareapartments.com/",
+      "adapter": "spherexx_html_roster",
+      "tier": "TIER_1_PUBLIC_SPHEREXX_AVAILABILITY",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 8,
+      "plans": 4,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 8,
+        "rows_with_native_identity_and_positive_rent": 8,
+        "distinct_native_unit_ids": 8,
+        "distinct_visible_unit_numbers": 5,
+        "property_boundary": "Coventry Square's exact current marketing floor-plan page publishes the opaque Spherexx availability id=noegpbnd; every admitted roster row carries the same property data-id 6566 and a native data-unitid.",
+        "source_urls": [
+          "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "https://coventrysquareapartments.com/floor-plans/"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/live/70255_7bef6f324eba.html"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/live/70255_7bef6f324eba.html": "7c1d416aea8b3dccc3a3364522d7cf1d4c02eadb73f1ae3b86ad135570ae806c"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "522319",
+          "unit_number": "2C",
+          "floor_plan_id": "63373",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "044",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 2400,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "522319",
+            "spherexx_floorplan_id": "63373",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "549100",
+          "unit_number": "1C",
+          "floor_plan_id": "63372",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "034",
+          "floor": "",
+          "rent_low": 2645,
+          "rent_high": 2645,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "549100",
+            "spherexx_floorplan_id": "63372",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "555620",
+          "unit_number": "3B",
+          "floor_plan_id": "63373",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "046",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 2400,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "555620",
+            "spherexx_floorplan_id": "63373",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "556140",
+          "unit_number": "2C",
+          "floor_plan_id": "63373",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "032",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 2400,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "556140",
+            "spherexx_floorplan_id": "63373",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "564163",
+          "unit_number": "1B",
+          "floor_plan_id": "63372",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "034",
+          "floor": "",
+          "rent_low": 2315,
+          "rent_high": 2315,
+          "availability_date": "9/7/2026",
+          "source_ids": {
+            "spherexx_unit_id": "564163",
+            "spherexx_floorplan_id": "63372",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "9/7/2026"
+        },
+        {
+          "native_unit_id": "529700",
+          "unit_number": "1A",
+          "floor_plan_id": "64619",
+          "floor_plan_name": "",
+          "bedrooms": "2",
+          "bathrooms": "1.5",
+          "sqft": "",
+          "building": "030",
+          "floor": "",
+          "rent_low": 2950,
+          "rent_high": 2950,
+          "availability_date": "9/7/2026",
+          "source_ids": {
+            "spherexx_unit_id": "529700",
+            "spherexx_floorplan_id": "64619",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "9/7/2026"
+        },
+        {
+          "native_unit_id": "550516",
+          "unit_number": "1C",
+          "floor_plan_id": "63375",
+          "floor_plan_name": "",
+          "bedrooms": "2",
+          "bathrooms": "1.5",
+          "sqft": "",
+          "building": "042",
+          "floor": "",
+          "rent_low": 2935,
+          "rent_high": 2935,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "550516",
+            "spherexx_floorplan_id": "63375",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "564175",
+          "unit_number": "1B",
+          "floor_plan_id": "63375",
+          "floor_plan_name": "",
+          "bedrooms": "2",
+          "bathrooms": "1.5",
+          "sqft": "",
+          "building": "042",
+          "floor": "",
+          "rent_low": 2935,
+          "rent_high": 2935,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "564175",
+            "spherexx_floorplan_id": "63375",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "522319",
+          "unit_number": "2C",
+          "floor_plan_id": "63373",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "044",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 2400,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "522319",
+            "spherexx_floorplan_id": "63373",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "549100",
+          "unit_number": "1C",
+          "floor_plan_id": "63372",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "034",
+          "floor": "",
+          "rent_low": 2645,
+          "rent_high": 2645,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "549100",
+            "spherexx_floorplan_id": "63372",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        },
+        {
+          "native_unit_id": "555620",
+          "unit_number": "3B",
+          "floor_plan_id": "63373",
+          "floor_plan_name": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "",
+          "building": "046",
+          "floor": "",
+          "rent_low": 2400,
+          "rent_high": 2400,
+          "availability_date": "2026-08-01",
+          "source_ids": {
+            "spherexx_unit_id": "555620",
+            "spherexx_floorplan_id": "63373",
+            "property_id": "6566"
+          },
+          "source_url": "https://clients.spherexx.com/kamson_availability/availability.asp?id=noegpbnd",
+          "visible_availability": "Immediate"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 8,
+        "observed_native_unit_count": 8,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "single_source_property_id_6566": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 78597,
+      "property_name": "Sentral Union Station",
+      "website": "https://www.sentral.com/denver/union-station",
+      "current_exact_website": "https://sentral.com/denver/union-station",
+      "adapter": "securecafe_rendered_roster",
+      "tier": "TIER_1_CURRENT_CHROME_SECURECAFE_ROSTER",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 51,
+      "plans": 19,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 51,
+        "rows_with_native_identity_and_positive_rent": 51,
+        "distinct_native_unit_ids": 51,
+        "distinct_visible_unit_numbers": 51,
+        "property_boundary": "Sentral's current exact Contentful property entry names Sentral Union Station, 1777 Wewatta St, Denver, CO 80202 and publishes SecureCafe property id 1707719; all 51 admitted roster rows carry that same id.",
+        "source_urls": [
+          "https://sentral.com/denver/union-station",
+          "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "https://cdn.contentful.com/spaces/ech69gzmnnzr/environments/master/entries/entrataPropertyId-731641"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/sentral_union_page.html"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/browser_rows_current_strict.json": "955ae8f14c6bc891d86b51c2e8da29a5274b329f03d33bd2c5c5fa6b9b7fcd0c",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/sentral_union_page.html": "e92d9b3f238d675a16d741efcecc784c793bab29971c33f7a6b29a6ae6611fb3"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "39303746",
+          "unit_number": "W-403",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "514",
+          "building": "",
+          "floor": "",
+          "rent_low": 1712,
+          "rent_high": 2467,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303746",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303786",
+          "unit_number": "W-808",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "517",
+          "building": "",
+          "floor": "",
+          "rent_low": 1777,
+          "rent_high": 2542,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303786",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303434",
+          "unit_number": "E-1012",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "586",
+          "building": "",
+          "floor": "",
+          "rent_low": 1807,
+          "rent_high": 2574,
+          "availability_date": "8/13/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303434",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/13/2026"
+        },
+        {
+          "native_unit_id": "39303828",
+          "unit_number": "W-1008",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "517",
+          "building": "",
+          "floor": "",
+          "rent_low": 1807,
+          "rent_high": 2584,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303828",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303625",
+          "unit_number": "C-1008",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "517",
+          "building": "",
+          "floor": "",
+          "rent_low": 1837,
+          "rent_high": 2360,
+          "availability_date": "9/25/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303625",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/25/2026"
+        },
+        {
+          "native_unit_id": "39303646",
+          "unit_number": "C-1108",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "517",
+          "building": "",
+          "floor": "",
+          "rent_low": 2102,
+          "rent_high": 2959,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303646",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303449",
+          "unit_number": "E-1106",
+          "floor_plan_id": "5070691",
+          "floor_plan_name": "S3",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "464",
+          "building": "",
+          "floor": "",
+          "rent_low": 1749,
+          "rent_high": 2520,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303449",
+            "securecafe_floorplan_id": "5070691",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303407",
+          "unit_number": "E-906",
+          "floor_plan_id": "5070691",
+          "floor_plan_name": "S3",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "464",
+          "building": "",
+          "floor": "",
+          "rent_low": 1772,
+          "rent_high": 2525,
+          "availability_date": "8/11/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303407",
+            "securecafe_floorplan_id": "5070691",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/11/2026"
+        },
+        {
+          "native_unit_id": "39303826",
+          "unit_number": "W-1006",
+          "floor_plan_id": "5070692",
+          "floor_plan_name": "S4",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "529",
+          "building": "",
+          "floor": "",
+          "rent_low": 1825,
+          "rent_high": 2631,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303826",
+            "securecafe_floorplan_id": "5070692",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303784",
+          "unit_number": "W-806",
+          "floor_plan_id": "5070692",
+          "floor_plan_name": "S4",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "529",
+          "building": "",
+          "floor": "",
+          "rent_low": 1860,
+          "rent_high": 2368,
+          "availability_date": "9/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303784",
+            "securecafe_floorplan_id": "5070692",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/2/2026"
+        },
+        {
+          "native_unit_id": "39303436",
+          "unit_number": "E-1014",
+          "floor_plan_id": "5070692",
+          "floor_plan_name": "S4",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "587",
+          "building": "",
+          "floor": "",
+          "rent_low": 2000,
+          "rent_high": 2818,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303436",
+            "securecafe_floorplan_id": "5070692",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303373",
+          "unit_number": "E-711",
+          "floor_plan_id": "5070698",
+          "floor_plan_name": "A1",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "578",
+          "building": "",
+          "floor": "",
+          "rent_low": 1776,
+          "rent_high": 2460,
+          "availability_date": "8/6/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303373",
+            "securecafe_floorplan_id": "5070698",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/6/2026"
+        },
+        {
+          "native_unit_id": "39303776",
+          "unit_number": "W-710",
+          "floor_plan_id": "5070699",
+          "floor_plan_name": "A2",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "654",
+          "building": "",
+          "floor": "",
+          "rent_low": 1936,
+          "rent_high": 2431,
+          "availability_date": "9/8/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303776",
+            "securecafe_floorplan_id": "5070699",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/8/2026"
+        },
+        {
+          "native_unit_id": "39303585",
+          "unit_number": "C-810",
+          "floor_plan_id": "5070699",
+          "floor_plan_name": "A2",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "654",
+          "building": "",
+          "floor": "",
+          "rent_low": 1951,
+          "rent_high": 2484,
+          "availability_date": "10/6/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303585",
+            "securecafe_floorplan_id": "5070699",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/6/2026"
+        },
+        {
+          "native_unit_id": "39303682",
+          "unit_number": "C-1309",
+          "floor_plan_id": "5070699",
+          "floor_plan_name": "A2",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "676",
+          "building": "",
+          "floor": "",
+          "rent_low": 2036,
+          "rent_high": 2812,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303682",
+            "securecafe_floorplan_id": "5070699",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303336",
+          "unit_number": "E-507",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "654",
+          "building": "",
+          "floor": "",
+          "rent_low": 1876,
+          "rent_high": 2385,
+          "availability_date": "10/11/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303336",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/11/2026"
+        },
+        {
+          "native_unit_id": "39303461",
+          "unit_number": "E-1118",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "676",
+          "building": "",
+          "floor": "",
+          "rent_low": 1891,
+          "rent_high": 2608,
+          "availability_date": "8/27/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303461",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/27/2026"
+        },
+        {
+          "native_unit_id": "39303626",
+          "unit_number": "C-1009",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "678",
+          "building": "",
+          "floor": "",
+          "rent_low": 1921,
+          "rent_high": 2416,
+          "availability_date": "9/5/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303626",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/5/2026"
+        },
+        {
+          "native_unit_id": "39303647",
+          "unit_number": "C-1109",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "678",
+          "building": "",
+          "floor": "",
+          "rent_low": 1946,
+          "rent_high": 2470,
+          "availability_date": "9/14/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303647",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/14/2026"
+        },
+        {
+          "native_unit_id": "39303589",
+          "unit_number": "C-814",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "656",
+          "building": "",
+          "floor": "",
+          "rent_low": 1951,
+          "rent_high": 2690,
+          "availability_date": "8/25/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303589",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/25/2026"
+        },
+        {
+          "native_unit_id": "39303758",
+          "unit_number": "W-509",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "678",
+          "building": "",
+          "floor": "",
+          "rent_low": 1976,
+          "rent_high": 2719,
+          "availability_date": "8/24/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303758",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/24/2026"
+        },
+        {
+          "native_unit_id": "39303834",
+          "unit_number": "W-1014",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "656",
+          "building": "",
+          "floor": "",
+          "rent_low": 1981,
+          "rent_high": 2743,
+          "availability_date": "8/6/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303834",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/6/2026"
+        },
+        {
+          "native_unit_id": "39303849",
+          "unit_number": "W-1109",
+          "floor_plan_id": "5070701",
+          "floor_plan_name": "A3",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "678",
+          "building": "",
+          "floor": "",
+          "rent_low": 2054,
+          "rent_high": 2846,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303849",
+            "securecafe_floorplan_id": "5070701",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303549",
+          "unit_number": "C-615",
+          "floor_plan_id": "5070703",
+          "floor_plan_name": "A4",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "659",
+          "building": "",
+          "floor": "",
+          "rent_low": 1901,
+          "rent_high": 2389,
+          "availability_date": "9/8/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303549",
+            "securecafe_floorplan_id": "5070703",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/8/2026"
+        },
+        {
+          "native_unit_id": "39303793",
+          "unit_number": "W-815",
+          "floor_plan_id": "5070703",
+          "floor_plan_name": "A4",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "659",
+          "building": "",
+          "floor": "",
+          "rent_low": 1915,
+          "rent_high": 2713,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303793",
+            "securecafe_floorplan_id": "5070703",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303521",
+          "unit_number": "C-507",
+          "floor_plan_id": "5070707",
+          "floor_plan_name": "A7",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "726",
+          "building": "",
+          "floor": "",
+          "rent_low": 2254,
+          "rent_high": 2864,
+          "availability_date": "9/19/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303521",
+            "securecafe_floorplan_id": "5070707",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/19/2026"
+        },
+        {
+          "native_unit_id": "39303603",
+          "unit_number": "C-907",
+          "floor_plan_id": "5070707",
+          "floor_plan_name": "A7",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "726",
+          "building": "",
+          "floor": "",
+          "rent_low": 2314,
+          "rent_high": 3200,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303603",
+            "securecafe_floorplan_id": "5070707",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303635",
+          "unit_number": "C-1018",
+          "floor_plan_id": "5070707",
+          "floor_plan_name": "A7",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "789",
+          "building": "",
+          "floor": "",
+          "rent_low": 2316,
+          "rent_high": 3293,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303635",
+            "securecafe_floorplan_id": "5070707",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303785",
+          "unit_number": "W-807",
+          "floor_plan_id": "5070707",
+          "floor_plan_name": "A7",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "726",
+          "building": "",
+          "floor": "",
+          "rent_low": 2440,
+          "rent_high": 3365,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303785",
+            "securecafe_floorplan_id": "5070707",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303349",
+          "unit_number": "E-603",
+          "floor_plan_id": "5070709",
+          "floor_plan_name": "A8",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "757",
+          "building": "",
+          "floor": "",
+          "rent_low": 2310,
+          "rent_high": 3195,
+          "availability_date": "8/4/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303349",
+            "securecafe_floorplan_id": "5070709",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/4/2026"
+        },
+        {
+          "native_unit_id": "39303341",
+          "unit_number": "E-516",
+          "floor_plan_id": "5070709",
+          "floor_plan_name": "A8",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "757",
+          "building": "",
+          "floor": "",
+          "rent_low": 2340,
+          "rent_high": 3236,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303341",
+            "securecafe_floorplan_id": "5070709",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303324",
+          "unit_number": "E-416",
+          "floor_plan_id": "5070709",
+          "floor_plan_name": "A8",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "749",
+          "building": "",
+          "floor": "",
+          "rent_low": 2380,
+          "rent_high": 3021,
+          "availability_date": "10/5/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303324",
+            "securecafe_floorplan_id": "5070709",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/5/2026"
+        },
+        {
+          "native_unit_id": "39303638",
+          "unit_number": "C-1022",
+          "floor_plan_id": "5070712",
+          "floor_plan_name": "A10",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "734",
+          "building": "",
+          "floor": "",
+          "rent_low": 2226,
+          "rent_high": 2795,
+          "availability_date": "9/8/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303638",
+            "securecafe_floorplan_id": "5070712",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/8/2026"
+        },
+        {
+          "native_unit_id": "39303840",
+          "unit_number": "W-1022",
+          "floor_plan_id": "5070712",
+          "floor_plan_name": "A10",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "734",
+          "building": "",
+          "floor": "",
+          "rent_low": 2226,
+          "rent_high": 2829,
+          "availability_date": "10/6/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303840",
+            "securecafe_floorplan_id": "5070712",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/6/2026"
+        },
+        {
+          "native_unit_id": "39303342",
+          "unit_number": "E-517",
+          "floor_plan_id": "5070714",
+          "floor_plan_name": "A11",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "751",
+          "building": "",
+          "floor": "",
+          "rent_low": 2214,
+          "rent_high": 3115,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303342",
+            "securecafe_floorplan_id": "5070714",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303883",
+          "unit_number": "W-1310",
+          "floor_plan_id": "5070718",
+          "floor_plan_name": "A14",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "889",
+          "building": "",
+          "floor": "",
+          "rent_low": 2949,
+          "rent_high": 4069,
+          "availability_date": "8/18/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303883",
+            "securecafe_floorplan_id": "5070718",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/18/2026"
+        },
+        {
+          "native_unit_id": "39303474",
+          "unit_number": "E-1210",
+          "floor_plan_id": "5070719",
+          "floor_plan_name": "A15",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "885",
+          "building": "",
+          "floor": "",
+          "rent_low": 3274,
+          "rent_high": 4497,
+          "availability_date": "8/22/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303474",
+            "securecafe_floorplan_id": "5070719",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/22/2026"
+        },
+        {
+          "native_unit_id": "39303863",
+          "unit_number": "W-1203",
+          "floor_plan_id": "5070721",
+          "floor_plan_name": "A17",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1033",
+          "building": "",
+          "floor": "",
+          "rent_low": 2802,
+          "rent_high": 3952,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303863",
+            "securecafe_floorplan_id": "5070721",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303662",
+          "unit_number": "C-1203",
+          "floor_plan_id": "5070721",
+          "floor_plan_name": "A17",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1033",
+          "building": "",
+          "floor": "",
+          "rent_low": 2951,
+          "rent_high": 4067,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303662",
+            "securecafe_floorplan_id": "5070721",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303864",
+          "unit_number": "W-1204",
+          "floor_plan_id": "5070721",
+          "floor_plan_name": "A17",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1047",
+          "building": "",
+          "floor": "",
+          "rent_low": 3089,
+          "rent_high": 3911,
+          "availability_date": "10/3/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303864",
+            "securecafe_floorplan_id": "5070721",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/3/2026"
+        },
+        {
+          "native_unit_id": "39303470",
+          "unit_number": "E-1206",
+          "floor_plan_id": "5070722",
+          "floor_plan_name": "A18",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "1079",
+          "building": "",
+          "floor": "",
+          "rent_low": 3244,
+          "rent_high": 4476,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303470",
+            "securecafe_floorplan_id": "5070722",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303426",
+          "unit_number": "E-1004",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1095",
+          "building": "",
+          "floor": "",
+          "rent_low": 3225,
+          "rent_high": 4365,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303426",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303597",
+          "unit_number": "C-901",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1065",
+          "building": "",
+          "floor": "",
+          "rent_low": 3305,
+          "rent_high": 4791,
+          "availability_date": "8/27/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303597",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/27/2026"
+        },
+        {
+          "native_unit_id": "39303803",
+          "unit_number": "W-904",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1059",
+          "building": "",
+          "floor": "",
+          "rent_low": 3322,
+          "rent_high": 4481,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303803",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303642",
+          "unit_number": "C-1104",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1059",
+          "building": "",
+          "floor": "",
+          "rent_low": 3350,
+          "rent_high": 4532,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303642",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303744",
+          "unit_number": "W-401",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1065",
+          "building": "",
+          "floor": "",
+          "rent_low": 3355,
+          "rent_high": 4187,
+          "availability_date": "10/6/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303744",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/6/2026"
+        },
+        {
+          "native_unit_id": "39303779",
+          "unit_number": "W-801",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1065",
+          "building": "",
+          "floor": "",
+          "rent_low": 3390,
+          "rent_high": 4319,
+          "availability_date": "9/15/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303779",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "9/15/2026"
+        },
+        {
+          "native_unit_id": "39303658",
+          "unit_number": "C-1120",
+          "floor_plan_id": "5070727",
+          "floor_plan_name": "B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1275",
+          "building": "",
+          "floor": "",
+          "rent_low": 3795,
+          "rent_high": 4738,
+          "availability_date": "10/1/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303658",
+            "securecafe_floorplan_id": "5070727",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "10/1/2026"
+        },
+        {
+          "native_unit_id": "39303553",
+          "unit_number": "C-619",
+          "floor_plan_id": "5070729",
+          "floor_plan_name": "B3",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1154",
+          "building": "",
+          "floor": "",
+          "rent_low": 3579,
+          "rent_high": 5142,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303553",
+            "securecafe_floorplan_id": "5070729",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303475",
+          "unit_number": "E-1211",
+          "floor_plan_id": "5070732",
+          "floor_plan_name": "B5",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1311",
+          "building": "",
+          "floor": "",
+          "rent_low": 4006,
+          "rent_high": 5097,
+          "availability_date": "8/21/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303475",
+            "securecafe_floorplan_id": "5070732",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/21/2026"
+        },
+        {
+          "native_unit_id": "39303887",
+          "unit_number": "W-1315",
+          "floor_plan_id": "5070735",
+          "floor_plan_name": "B8",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1520",
+          "building": "",
+          "floor": "",
+          "rent_low": 4915,
+          "rent_high": 7113,
+          "availability_date": "8/20/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303887",
+            "securecafe_floorplan_id": "5070735",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/20/2026"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "39303746",
+          "unit_number": "W-403",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "514",
+          "building": "",
+          "floor": "",
+          "rent_low": 1712,
+          "rent_high": 2467,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303746",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303786",
+          "unit_number": "W-808",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "517",
+          "building": "",
+          "floor": "",
+          "rent_low": 1777,
+          "rent_high": 2542,
+          "availability_date": "8/2/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303786",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "Available"
+        },
+        {
+          "native_unit_id": "39303434",
+          "unit_number": "E-1012",
+          "floor_plan_id": "5070690",
+          "floor_plan_name": "S2",
+          "bedrooms": "0",
+          "bathrooms": "1",
+          "sqft": "586",
+          "building": "",
+          "floor": "",
+          "rent_low": 1807,
+          "rent_high": 2574,
+          "availability_date": "8/13/2026",
+          "source_ids": {
+            "securecafe_apartment_id": "39303434",
+            "securecafe_floorplan_id": "5070690",
+            "property_id": "1707719"
+          },
+          "source_url": "https://sentral.securecafe.com/onlineleasing/union-station/availableunits.aspx?myOlePropertyId=1707719",
+          "visible_availability": "8/13/2026"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 51,
+        "observed_native_unit_count": 51,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "single_securecafe_property_id_1707719": true,
+        "captcha_used": false
+      },
+      "errors": []
+    },
+    {
+      "property_id": 258661,
+      "property_name": "Banyan on Washington",
+      "website": "https://banyanonwashington.com/",
+      "current_exact_website": "https://banyanonwashington.com/",
+      "adapter": "union_resman_chat_bootstrap",
+      "tier": "TIER_1_PUBLIC_UNION_RESMAN_BOOTSTRAP",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 7,
+      "plans": 4,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "distinct_native_unit_ids": 7,
+        "distinct_visible_unit_numbers": 7,
+        "property_boundary": "Public bootstrap validates property 400, names Banyan on Washington, and every admitted AVAILABLE row carries the exact 5353 East Washington Street address.",
+        "source_urls": [
+          "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "https://banyanonwashington.com/"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes/258661_union_chat_settings.json",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes/258661_union_chat_settings.headers"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes/258661_union_chat_settings.json": "2eee6594cdc754a347368f9add7ac9be8ee39c15e555e9a80bcece477c09b5a4",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/probes/258661_union_chat_settings.headers": "cf3f6093c78a880ac7e64e4e88b5dcd74d05d180a9b9fde0188663d9336f0297"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "9686529",
+          "unit_number": "A209",
+          "floor_plan_id": "122870",
+          "floor_plan_name": "B12",
+          "bedrooms": "2.0",
+          "bathrooms": "2.0",
+          "sqft": "1097",
+          "building": "1",
+          "floor": "2",
+          "rent_low": 1924,
+          "rent_high": 1924,
+          "availability_date": "2026-08-15",
+          "source_ids": {
+            "union_resman_unit_id": "9686529",
+            "union_resman_external_unit_id": "1aff6cc2-1c8e-4750-a0ac-c82157cedeab",
+            "property_id": "400",
+            "floor_plan_id": "122870"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:45:38.979091Z"
+        },
+        {
+          "native_unit_id": "9686585",
+          "unit_number": "A519",
+          "floor_plan_id": "122871",
+          "floor_plan_name": "A9",
+          "bedrooms": "1.0",
+          "bathrooms": "1.0",
+          "sqft": "764",
+          "building": "1",
+          "floor": "5",
+          "rent_low": 1784,
+          "rent_high": 1784,
+          "availability_date": "2026-10-13",
+          "source_ids": {
+            "union_resman_unit_id": "9686585",
+            "union_resman_external_unit_id": "f7e9a94e-1a88-4af4-9ac2-deecff5dcbbf",
+            "property_id": "400",
+            "floor_plan_id": "122871"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:06.728186Z"
+        },
+        {
+          "native_unit_id": "9686663",
+          "unit_number": "C105",
+          "floor_plan_id": "122883",
+          "floor_plan_name": "S3",
+          "bedrooms": "",
+          "bathrooms": "1.0",
+          "sqft": "589",
+          "building": "3",
+          "floor": "1",
+          "rent_low": 1444,
+          "rent_high": 1444,
+          "availability_date": "2026-09-08",
+          "source_ids": {
+            "union_resman_unit_id": "9686663",
+            "union_resman_external_unit_id": "b3358df1-8989-4b3c-b008-b76b36803388",
+            "property_id": "400",
+            "floor_plan_id": "122883"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:45.043951Z"
+        },
+        {
+          "native_unit_id": "9686706",
+          "unit_number": "C406",
+          "floor_plan_id": "122883",
+          "floor_plan_name": "S3",
+          "bedrooms": "",
+          "bathrooms": "1.0",
+          "sqft": "589",
+          "building": "3",
+          "floor": "4",
+          "rent_low": 1423,
+          "rent_high": 1423,
+          "availability_date": "2026-09-03",
+          "source_ids": {
+            "union_resman_unit_id": "9686706",
+            "union_resman_external_unit_id": "7d6bf23c-e78a-43fd-a95c-8bd6c6130774",
+            "property_id": "400",
+            "floor_plan_id": "122883"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:47:06.383828Z"
+        },
+        {
+          "native_unit_id": "9686677",
+          "unit_number": "C211",
+          "floor_plan_id": "122886",
+          "floor_plan_name": "B7",
+          "bedrooms": "2.0",
+          "bathrooms": "2.0",
+          "sqft": "1066",
+          "building": "3",
+          "floor": "2",
+          "rent_low": 1881,
+          "rent_high": 1881,
+          "availability_date": "2026-07-27",
+          "source_ids": {
+            "union_resman_unit_id": "9686677",
+            "union_resman_external_unit_id": "a7895a01-c229-4c87-a520-9d6991d5cc68",
+            "property_id": "400",
+            "floor_plan_id": "122886"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:51.847260Z"
+        },
+        {
+          "native_unit_id": "9686618",
+          "unit_number": "B311",
+          "floor_plan_id": "122886",
+          "floor_plan_name": "B7",
+          "bedrooms": "2.0",
+          "bathrooms": "2.0",
+          "sqft": "1066",
+          "building": "2",
+          "floor": "3",
+          "rent_low": 1840,
+          "rent_high": 1840,
+          "availability_date": "2026-08-05",
+          "source_ids": {
+            "union_resman_unit_id": "9686618",
+            "union_resman_external_unit_id": "719bffb9-0305-4649-8ea6-8c90b5a7bcc3",
+            "property_id": "400",
+            "floor_plan_id": "122886"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:22.766886Z"
+        },
+        {
+          "native_unit_id": "9686601",
+          "unit_number": "B211",
+          "floor_plan_id": "122886",
+          "floor_plan_name": "B7",
+          "bedrooms": "2.0",
+          "bathrooms": "2.0",
+          "sqft": "1066",
+          "building": "2",
+          "floor": "2",
+          "rent_low": 1881,
+          "rent_high": 1881,
+          "availability_date": "2026-10-16",
+          "source_ids": {
+            "union_resman_unit_id": "9686601",
+            "union_resman_external_unit_id": "0b398cc9-cc8a-4018-a941-5804168f3ee6",
+            "property_id": "400",
+            "floor_plan_id": "122886"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:14.484800Z"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "9686529",
+          "unit_number": "A209",
+          "floor_plan_id": "122870",
+          "floor_plan_name": "B12",
+          "bedrooms": "2.0",
+          "bathrooms": "2.0",
+          "sqft": "1097",
+          "building": "1",
+          "floor": "2",
+          "rent_low": 1924,
+          "rent_high": 1924,
+          "availability_date": "2026-08-15",
+          "source_ids": {
+            "union_resman_unit_id": "9686529",
+            "union_resman_external_unit_id": "1aff6cc2-1c8e-4750-a0ac-c82157cedeab",
+            "property_id": "400",
+            "floor_plan_id": "122870"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:45:38.979091Z"
+        },
+        {
+          "native_unit_id": "9686585",
+          "unit_number": "A519",
+          "floor_plan_id": "122871",
+          "floor_plan_name": "A9",
+          "bedrooms": "1.0",
+          "bathrooms": "1.0",
+          "sqft": "764",
+          "building": "1",
+          "floor": "5",
+          "rent_low": 1784,
+          "rent_high": 1784,
+          "availability_date": "2026-10-13",
+          "source_ids": {
+            "union_resman_unit_id": "9686585",
+            "union_resman_external_unit_id": "f7e9a94e-1a88-4af4-9ac2-deecff5dcbbf",
+            "property_id": "400",
+            "floor_plan_id": "122871"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:06.728186Z"
+        },
+        {
+          "native_unit_id": "9686663",
+          "unit_number": "C105",
+          "floor_plan_id": "122883",
+          "floor_plan_name": "S3",
+          "bedrooms": "",
+          "bathrooms": "1.0",
+          "sqft": "589",
+          "building": "3",
+          "floor": "1",
+          "rent_low": 1444,
+          "rent_high": 1444,
+          "availability_date": "2026-09-08",
+          "source_ids": {
+            "union_resman_unit_id": "9686663",
+            "union_resman_external_unit_id": "b3358df1-8989-4b3c-b008-b76b36803388",
+            "property_id": "400",
+            "floor_plan_id": "122883"
+          },
+          "source_url": "https://api.union.build/api/v1/chat/settings/?property_id=400",
+          "pms_sync_date": "2026-08-01T06:46:45.043951Z"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 7,
+        "observed_native_unit_count": 7,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "all_available_rows_exact_address": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 260505,
+      "property_name": "Onyx Uptown PHX",
+      "website": "https://broadstoneuptownphx.com/",
+      "current_exact_website": "https://www.onyxuptownphx.com/",
+      "adapter": "apts247",
+      "tier": "TIER_1_API_APTS247_FLOORPLANS",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 15,
+      "plans": 10,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 15,
+        "rows_with_native_identity_and_positive_rent": 15,
+        "distinct_native_unit_ids": 15,
+        "distinct_visible_unit_numbers": 15,
+        "property_boundary": "The configured Broadstone domain is parked, but the exact current official Onyx Uptown PHX site and public apts247 response both identify 500 W Camelback Road, Phoenix, AZ 85013; only its 15 embedded unit rows are admitted.",
+        "source_urls": [
+          "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb",
+          "https://www.onyxuptownphx.com/floorplans/"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans_api.json",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans_api.headers",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans.html"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans_api.json": "c4f6040ac7f5fbeaaf653088cc808fa2eae1ff265f87a5d3099127c6293a8f53",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans_api.headers": "f4f5549761535e3fa844c14fe3898b0f09102a9ecc88cc4b4aa3412a5892a912",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/onyx_floorplans.html": "9b077291fc8c346fdb56049948fda78070808bdf2b6f1bed769fbf8b3da087bc"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "1694133",
+          "unit_number": "513",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "5",
+          "rent_low": 1399,
+          "rent_high": 1399,
+          "availability_date": "2026-07-31",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1694133",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "885cf56ca00e4606882de4c06c81e7b5",
+            "appfolio_listable_uid": "7d5e754a-004e-4cd8-8aea-fdb591aed180"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693993",
+          "unit_number": "316",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "3",
+          "rent_low": 1399,
+          "rent_high": 1399,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1693993",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "6c572a413d9d4d9caf8e7c7669892f86",
+            "appfolio_listable_uid": "07c2bede-8548-4611-af03-87452043ae3c"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694109",
+          "unit_number": "466",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "4",
+          "rent_low": 1700,
+          "rent_high": 1700,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1694109",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "a6ed6e962b464c138a30d7550a13a387",
+            "appfolio_listable_uid": "dbf5d90a-ba38-4541-9569-f916790bbbdc"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694090",
+          "unit_number": "445",
+          "floor_plan_id": "64334",
+          "floor_plan_name": "JR1m2 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "4",
+          "rent_low": 1499,
+          "rent_high": 1499,
+          "availability_date": "2026-07-24",
+          "source_ids": {
+            "apts247_floor_plan_id": "64334",
+            "apts247_unit_id": "1694090",
+            "apts247_slug": "jr1m2-emma",
+            "apts247_unit_uuid": "960f205448794147aaae9fb070d7ed09",
+            "appfolio_listable_uid": "08bd9cc3-b108-4183-86e0-00b15b8f03b2"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693942",
+          "unit_number": "241",
+          "floor_plan_id": "59654",
+          "floor_plan_name": "A2 Glenn",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "742",
+          "building": "",
+          "floor": "2",
+          "rent_low": 1599,
+          "rent_high": 1599,
+          "availability_date": "2026-07-24",
+          "source_ids": {
+            "apts247_floor_plan_id": "59654",
+            "apts247_unit_id": "1693942",
+            "apts247_slug": "a2-glenn",
+            "apts247_unit_uuid": "41579855eaf04674bf781672752e4410",
+            "appfolio_listable_uid": "92f63f3a-580c-4fb3-98b4-bed026547671"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694020",
+          "unit_number": "347",
+          "floor_plan_id": "59770",
+          "floor_plan_name": "A2m3Desk Glenn",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "742",
+          "building": "",
+          "floor": "3",
+          "rent_low": 1599,
+          "rent_high": 1599,
+          "availability_date": "2026-08-21",
+          "source_ids": {
+            "apts247_floor_plan_id": "59770",
+            "apts247_unit_id": "1694020",
+            "apts247_slug": "a2m3desk-glenn",
+            "apts247_unit_uuid": "f935c359dd034e8a82ba8306d4e9c7d0",
+            "appfolio_listable_uid": "43a88027-adc2-4ea5-8d33-7d686c445a26"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693924",
+          "unit_number": "219",
+          "floor_plan_id": "59773",
+          "floor_plan_name": "A3ADA Eden",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "808",
+          "building": "",
+          "floor": "2",
+          "rent_low": 1625,
+          "rent_high": 1625,
+          "availability_date": "2026-07-31",
+          "source_ids": {
+            "apts247_floor_plan_id": "59773",
+            "apts247_unit_id": "1693924",
+            "apts247_slug": "a3ada-eden",
+            "apts247_unit_uuid": "1ca85c1975b9486287a35a23733ba22e",
+            "appfolio_listable_uid": "50efd1b9-7d01-4496-8e99-234710c22e49"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693941",
+          "unit_number": "240",
+          "floor_plan_id": "59799",
+          "floor_plan_name": "B1 Carter",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "963",
+          "building": "",
+          "floor": "2",
+          "rent_low": 1925,
+          "rent_high": 1925,
+          "availability_date": "2026-09-02",
+          "source_ids": {
+            "apts247_floor_plan_id": "59799",
+            "apts247_unit_id": "1693941",
+            "apts247_slug": "b1-carter",
+            "apts247_unit_uuid": "8bbfb3b297314a6ca338d7121329941d",
+            "appfolio_listable_uid": "a92806e1-6902-4c8d-af1f-818ac94b945d"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693989",
+          "unit_number": "312",
+          "floor_plan_id": "59798",
+          "floor_plan_name": "B2 Jonas",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1029",
+          "building": "",
+          "floor": "3",
+          "rent_low": 1999,
+          "rent_high": 1999,
+          "availability_date": "2026-07-28",
+          "source_ids": {
+            "apts247_floor_plan_id": "59798",
+            "apts247_unit_id": "1693989",
+            "apts247_slug": "b2-jonas",
+            "apts247_unit_uuid": "a3d047bc1db74a5184f7fc385b2dcb2c",
+            "appfolio_listable_uid": "303f76a8-010e-4767-a450-837b53ab882f"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694072",
+          "unit_number": "425",
+          "floor_plan_id": "59798",
+          "floor_plan_name": "B2 Jonas",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1029",
+          "building": "",
+          "floor": "4",
+          "rent_low": 2593,
+          "rent_high": 2593,
+          "availability_date": "2026-08-21",
+          "source_ids": {
+            "apts247_floor_plan_id": "59798",
+            "apts247_unit_id": "1694072",
+            "apts247_slug": "b2-jonas",
+            "apts247_unit_uuid": "9a11da0078084e68b591352e734b386c",
+            "appfolio_listable_uid": "76b39b2f-2964-4498-8267-cec0d91c1949"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693916",
+          "unit_number": "208",
+          "floor_plan_id": "59797",
+          "floor_plan_name": "B4 Valletta",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1023",
+          "building": "",
+          "floor": "2",
+          "rent_low": 1999,
+          "rent_high": 1999,
+          "availability_date": "2026-07-22",
+          "source_ids": {
+            "apts247_floor_plan_id": "59797",
+            "apts247_unit_id": "1693916",
+            "apts247_slug": "b4-valletta",
+            "apts247_unit_uuid": "16cd4cb6f3c14936876784c7acbca644",
+            "appfolio_listable_uid": "b219b20a-f023-4f5e-9432-f919c49a1cab"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693982",
+          "unit_number": "302",
+          "floor_plan_id": "59797",
+          "floor_plan_name": "B4 Valletta",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1023",
+          "building": "",
+          "floor": "3",
+          "rent_low": 2153,
+          "rent_high": 2153,
+          "availability_date": "2026-08-28",
+          "source_ids": {
+            "apts247_floor_plan_id": "59797",
+            "apts247_unit_id": "1693982",
+            "apts247_slug": "b4-valletta",
+            "apts247_unit_uuid": "119ad937f8a94b8285f076b5cf280dbd",
+            "appfolio_listable_uid": "697181a5-b282-46ac-b973-b2b3aff9c103"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693939",
+          "unit_number": "238",
+          "floor_plan_id": "59805",
+          "floor_plan_name": "B4ADA Valletta",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1023",
+          "building": "",
+          "floor": "2",
+          "rent_low": 1899,
+          "rent_high": 1899,
+          "availability_date": "2026-05-26",
+          "source_ids": {
+            "apts247_floor_plan_id": "59805",
+            "apts247_unit_id": "1693939",
+            "apts247_slug": "b4ada-valletta",
+            "apts247_unit_uuid": "220ec2c1e4ec44a18cf65d87c22520da",
+            "appfolio_listable_uid": "b74ea5c2-e9d2-4d02-ab90-446e48128286"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694011",
+          "unit_number": "338",
+          "floor_plan_id": "59805",
+          "floor_plan_name": "B4ADA Valletta",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1023",
+          "building": "",
+          "floor": "3",
+          "rent_low": 1973,
+          "rent_high": 1973,
+          "availability_date": "2026-11-02",
+          "source_ids": {
+            "apts247_floor_plan_id": "59805",
+            "apts247_unit_id": "1694011",
+            "apts247_slug": "b4ada-valletta",
+            "apts247_unit_uuid": "aaa6d642ba174af9a9ac90187af94643",
+            "appfolio_listable_uid": "0278248b-a041-4f80-aa4c-ad732407166c"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694183",
+          "unit_number": "576",
+          "floor_plan_id": "59810",
+          "floor_plan_name": "C2 Upgrade Devine",
+          "bedrooms": "3",
+          "bathrooms": "3",
+          "sqft": "1648",
+          "building": "",
+          "floor": "5",
+          "rent_low": 3199,
+          "rent_high": 3199,
+          "availability_date": "2026-08-28",
+          "source_ids": {
+            "apts247_floor_plan_id": "59810",
+            "apts247_unit_id": "1694183",
+            "apts247_slug": "c2-upgrade-devine",
+            "apts247_unit_uuid": "81830cf1af714239bd0b7c19f3cf4535",
+            "appfolio_listable_uid": "ea55084c-0de4-43c7-b848-e1e6458a782b"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "1694133",
+          "unit_number": "513",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "5",
+          "rent_low": 1399,
+          "rent_high": 1399,
+          "availability_date": "2026-07-31",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1694133",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "885cf56ca00e4606882de4c06c81e7b5",
+            "appfolio_listable_uid": "7d5e754a-004e-4cd8-8aea-fdb591aed180"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1693993",
+          "unit_number": "316",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "3",
+          "rent_low": 1399,
+          "rent_high": 1399,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1693993",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "6c572a413d9d4d9caf8e7c7669892f86",
+            "appfolio_listable_uid": "07c2bede-8548-4611-af03-87452043ae3c"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        },
+        {
+          "native_unit_id": "1694109",
+          "unit_number": "466",
+          "floor_plan_id": "64082",
+          "floor_plan_name": "JR1 Emma",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "619",
+          "building": "",
+          "floor": "4",
+          "rent_low": 1700,
+          "rent_high": 1700,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "apts247_floor_plan_id": "64082",
+            "apts247_unit_id": "1694109",
+            "apts247_slug": "jr1-emma",
+            "apts247_unit_uuid": "a6ed6e962b464c138a30d7550a13a387",
+            "appfolio_listable_uid": "dbf5d90a-ba38-4541-9569-f916790bbbdc"
+          },
+          "source_url": "https://www.onyxuptownphx.com/api/v3/floorplans/all/?api_key=815a9f44797f4889a7669070c4f50a7a762cb7bb"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 15,
+        "observed_native_unit_count": 15,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "production_parser": "parse_apts247_floorplans",
+        "distinct_appfolio_listable_uids": 15,
+        "all_rows_exact_community_address": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 263498,
+      "property_name": "The Julington",
+      "website": "https://risejulington.com/",
+      "current_exact_website": "https://thejulington.com/",
+      "adapter": "encoreskyline_template_jonah_resource",
+      "tier": "TIER_1_API_JONAH_RESOURCE",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 27,
+      "plans": 3,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_property_native_rows_only",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 27,
+        "rows_with_native_identity_and_positive_rent": 27,
+        "distinct_native_unit_ids": 27,
+        "distinct_visible_unit_numbers": 27,
+        "property_boundary": "Current exact official site names The Julington at 12397 San Jose Blvd, Jacksonville, FL 32223; its overview contains exactly 27 property-18807 unit records. Production parse_jonah_resource_json reproduces 24; three visibly available one-unit plans carry availability_count=0 and are admitted directly from the exact overview payload. Together they match all 27 SightMap native ids.",
+        "source_urls": [
+          "https://thejulington.com/floorplans/",
+          "https://thejulington.com/floorplans/the-palm/",
+          "https://thejulington.com/floorplans/the-willow/",
+          "https://thejulington.com/floorplans/the-clover/",
+          "https://thejulington.com/floorplans/the-oaks/",
+          "https://thejulington.com/floorplans/the-iris/",
+          "https://thejulington.com/floorplans/the-poplar-b/",
+          "https://thejulington.com/floorplans/the-sage/",
+          "https://thejulington.com/floorplans/the-savannah/",
+          "https://thejulington.com/floorplans/the-birch/",
+          "https://thejulington.com/floorplans/the-poplar-a/",
+          "https://thejulington.com/floorplans/the-grove/",
+          "https://thejulington.com/floorplans/the-elm/"
+        ],
+        "local_artifacts": [
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_floorplans_index.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-palm.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-willow.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-clover.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-oaks.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-iris.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-poplar-b.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-sage.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-savannah.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-birch.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-poplar-a.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-grove.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-elm.html",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_fetch_manifest.json"
+        ],
+        "local_artifact_sha256": {
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_floorplans_index.html": "edb6ec424009a0789da8340a0e34128c58539adc408e4d28f058ecbce8943c6e",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-palm.html": "9940021f7b4ff80160958051c110020300dd2bc7a6b8dc6c1d6449a655061c93",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-willow.html": "eba8c08e109f07dadf871b9dfc0171477419fbae5f415b8760e70222258d93f5",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-clover.html": "b8858c5d818663bfe0dae09b3e7638aab845199ea326489eb5f98c79aa21556a",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-oaks.html": "8f015e2ca5218f845141c5b23fc176aea468406b697cdd0c09fd8685a3fec354",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-iris.html": "a3a1164ed3a22e68031f2f74725aa32ea7307054d65f46bcae906cb69806bb7b",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-poplar-b.html": "fb0940e2cb9d1eaf2057359775f6a259512923346f798e4a1a3da0421cca9512",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-sage.html": "ac0ea5f21fbe2c0dd2b15c8979cefd59ec7d2c6ee829e016e349bbc42d7bbe7a",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-savannah.html": "ff3c5519d2fdccaf99d885a2b83dde5d6c0a6410dacc339dcbeb7592ceba4619",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-birch.html": "c6e1c827f253c853c149bd2d28545a1fc5c22fe4647ff9cf80715d31b35a744a",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-poplar-a.html": "455195d86c44ca212a09a64ed32917fa4e32e06b34c303f571f4b97482f217ee",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-grove.html": "15a817d992ab6342fcaa8cb69e335aca77638c53b8a63ebd4e006d6356065c4d",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_the-elm.html": "e705c67ff8f8959f90c55e387a54c05e68011834681b25e9c66a376939712415",
+          "/private/tmp/propai-fnd-vBkmT9/appfolio_generic_lane/julington_current/263498_fetch_manifest.json": "baef14344bc38f55bacc35415ae47088ec749992f6bc346ae7d2db2c89339460"
+        }
+      },
+      "native_units": [
+        {
+          "native_unit_id": "6524066",
+          "unit_number": "1135",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section D",
+          "floor": "1",
+          "rent_low": 1485,
+          "rent_high": 1485,
+          "availability_date": "2026-06-15",
+          "source_ids": {
+            "sightmap_unit_id": "6524066"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524218",
+          "unit_number": "1356",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section G",
+          "floor": "3",
+          "rent_low": 1480,
+          "rent_high": 1480,
+          "availability_date": "2026-06-15",
+          "source_ids": {
+            "sightmap_unit_id": "6524218"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524079",
+          "unit_number": "1153",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section F",
+          "floor": "1",
+          "rent_low": 1505,
+          "rent_high": 1505,
+          "availability_date": "2026-08-10",
+          "source_ids": {
+            "sightmap_unit_id": "6524079"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524153",
+          "unit_number": "1262",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section G",
+          "floor": "2",
+          "rent_low": 1480,
+          "rent_high": 1480,
+          "availability_date": "2026-09-03",
+          "source_ids": {
+            "sightmap_unit_id": "6524153"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524197",
+          "unit_number": "1335",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section D",
+          "floor": "3",
+          "rent_low": 1460,
+          "rent_high": 1460,
+          "availability_date": "2026-09-12",
+          "source_ids": {
+            "sightmap_unit_id": "6524197"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524292",
+          "unit_number": "1459",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section F",
+          "floor": "4",
+          "rent_low": 1480,
+          "rent_high": 1480,
+          "availability_date": "2026-09-22",
+          "source_ids": {
+            "sightmap_unit_id": "6524292"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524074",
+          "unit_number": "1146",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section E",
+          "floor": "1",
+          "rent_low": 1551,
+          "rent_high": 1551,
+          "availability_date": "2026-07-20",
+          "source_ids": {
+            "sightmap_unit_id": "6524074"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524208",
+          "unit_number": "1346",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section E",
+          "floor": "3",
+          "rent_low": 1525,
+          "rent_high": 1525,
+          "availability_date": "2026-07-20",
+          "source_ids": {
+            "sightmap_unit_id": "6524208"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524253",
+          "unit_number": "1420",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section E",
+          "floor": "4",
+          "rent_low": 1546,
+          "rent_high": 1546,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "sightmap_unit_id": "6524253"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524111",
+          "unit_number": "1220",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section E",
+          "floor": "2",
+          "rent_low": 1525,
+          "rent_high": 1525,
+          "availability_date": "2026-08-12",
+          "source_ids": {
+            "sightmap_unit_id": "6524111"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524105",
+          "unit_number": "1214",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section E",
+          "floor": "2",
+          "rent_low": 1510,
+          "rent_high": 1510,
+          "availability_date": "2026-08-18",
+          "source_ids": {
+            "sightmap_unit_id": "6524105"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524117",
+          "unit_number": "1226",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Willow",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "773",
+          "building": "Section B",
+          "floor": "2",
+          "rent_low": 1505,
+          "rent_high": 1505,
+          "availability_date": "2026-09-22",
+          "source_ids": {
+            "sightmap_unit_id": "6524117"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-willow/"
+        },
+        {
+          "native_unit_id": "6524119",
+          "unit_number": "1228",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Clover",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1096",
+          "building": "Section B",
+          "floor": "2",
+          "rent_low": 1800,
+          "rent_high": 1800,
+          "availability_date": "2026-06-29",
+          "source_ids": {
+            "sightmap_unit_id": "6524119"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-clover/"
+        },
+        {
+          "native_unit_id": "6524190",
+          "unit_number": "1328",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Clover",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1096",
+          "building": "Section B",
+          "floor": "3",
+          "rent_low": 1800,
+          "rent_high": 1800,
+          "availability_date": "2026-07-20",
+          "source_ids": {
+            "sightmap_unit_id": "6524190"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-clover/"
+        },
+        {
+          "native_unit_id": "6524120",
+          "unit_number": "1229",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Clover",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1096",
+          "building": "Section C",
+          "floor": "2",
+          "rent_low": 1792,
+          "rent_high": 1792,
+          "availability_date": "2026-08-15",
+          "source_ids": {
+            "sightmap_unit_id": "6524120"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-clover/"
+        },
+        {
+          "native_unit_id": "6524252",
+          "unit_number": "1419",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Clover",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1096",
+          "building": "Section B",
+          "floor": "4",
+          "rent_low": 1799,
+          "rent_high": 1799,
+          "availability_date": "2026-09-24",
+          "source_ids": {
+            "sightmap_unit_id": "6524252"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-clover/"
+        },
+        {
+          "native_unit_id": "6524233",
+          "unit_number": "1375",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Clover",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1096",
+          "building": "Section A",
+          "floor": "3",
+          "rent_low": 1779,
+          "rent_high": 1779,
+          "availability_date": "2026-09-29",
+          "source_ids": {
+            "sightmap_unit_id": "6524233"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-clover/"
+        },
+        {
+          "native_unit_id": "6524239",
+          "unit_number": "1406",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Oaks",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1156",
+          "building": "Section A",
+          "floor": "4",
+          "rent_low": 1845,
+          "rent_high": 1845,
+          "availability_date": "2026-07-20",
+          "source_ids": {
+            "sightmap_unit_id": "6524239"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-oaks/"
+        },
+        {
+          "native_unit_id": "6524097",
+          "unit_number": "1206",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Oaks",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1156",
+          "building": "Section A",
+          "floor": "2",
+          "rent_low": 1832,
+          "rent_high": 1832,
+          "availability_date": "2026-08-06",
+          "source_ids": {
+            "sightmap_unit_id": "6524097"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-oaks/"
+        },
+        {
+          "native_unit_id": "6524168",
+          "unit_number": "1306",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Oaks",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1156",
+          "building": "Section A",
+          "floor": "3",
+          "rent_low": 1832,
+          "rent_high": 1832,
+          "availability_date": "2026-08-18",
+          "source_ids": {
+            "sightmap_unit_id": "6524168"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-oaks/"
+        },
+        {
+          "native_unit_id": "6524149",
+          "unit_number": "1258",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Poplar B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1057",
+          "building": "Section G",
+          "floor": "2",
+          "rent_low": 1880,
+          "rent_high": 1880,
+          "availability_date": "2026-07-30",
+          "source_ids": {
+            "sightmap_unit_id": "6524149"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-poplar-b/"
+        },
+        {
+          "native_unit_id": "6524265",
+          "unit_number": "1432",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Poplar B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1057",
+          "building": "Section C",
+          "floor": "4",
+          "rent_low": 1902,
+          "rent_high": 1902,
+          "availability_date": "2026-08-06",
+          "source_ids": {
+            "sightmap_unit_id": "6524265"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-poplar-b/"
+        },
+        {
+          "native_unit_id": "6524128",
+          "unit_number": "1237",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Sage",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1171",
+          "building": "Section D",
+          "floor": "2",
+          "rent_low": 1930,
+          "rent_high": 1930,
+          "availability_date": "2026-07-23",
+          "source_ids": {
+            "sightmap_unit_id": "6524128"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-sage/"
+        },
+        {
+          "native_unit_id": "6524270",
+          "unit_number": "1437",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Sage",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1171",
+          "building": "Section D",
+          "floor": "4",
+          "rent_low": 1957,
+          "rent_high": 1957,
+          "availability_date": "2026-08-08",
+          "source_ids": {
+            "sightmap_unit_id": "6524270"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-sage/"
+        },
+        {
+          "native_unit_id": "6524234",
+          "unit_number": "1401",
+          "floor_plan_id": "6",
+          "floor_plan_name": "The Birch",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "1426",
+          "building": "Section A",
+          "floor": "4",
+          "rent_low": 2681,
+          "rent_high": 2681,
+          "availability_date": "2026-08-07",
+          "source_ids": {
+            "sightmap_unit_id": "6524234",
+            "property_id": "18807",
+            "floor_plan_id": "6"
+          },
+          "source_url": "https://thejulington.com/floorplans/",
+          "visible_availability": "Available Aug 07",
+          "source_unit_availability_count": 0,
+          "evidence_note": "visible one-unit plan dropped by current Jonah parser filter"
+        },
+        {
+          "native_unit_id": "6524211",
+          "unit_number": "1349",
+          "floor_plan_id": "12",
+          "floor_plan_name": "The Savannah",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1085",
+          "building": "Section E",
+          "floor": "3",
+          "rent_low": 1932,
+          "rent_high": 1932,
+          "availability_date": "2026-08-08",
+          "source_ids": {
+            "sightmap_unit_id": "6524211",
+            "property_id": "18807",
+            "floor_plan_id": "12"
+          },
+          "source_url": "https://thejulington.com/floorplans/",
+          "visible_availability": "Available Aug 08",
+          "source_unit_availability_count": 0,
+          "evidence_note": "visible one-unit plan dropped by current Jonah parser filter"
+        },
+        {
+          "native_unit_id": "6524139",
+          "unit_number": "1248",
+          "floor_plan_id": "5",
+          "floor_plan_name": "The Iris",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1057",
+          "building": "Section F",
+          "floor": "2",
+          "rent_low": 1874,
+          "rent_high": 1874,
+          "availability_date": "2026-09-29",
+          "source_ids": {
+            "sightmap_unit_id": "6524139",
+            "property_id": "18807",
+            "floor_plan_id": "5"
+          },
+          "source_url": "https://thejulington.com/floorplans/",
+          "visible_availability": "Available Sep 29",
+          "source_unit_availability_count": 0,
+          "evidence_note": "visible one-unit plan dropped by current Jonah parser filter"
+        }
+      ],
+      "identity_samples": [
+        {
+          "native_unit_id": "6524066",
+          "unit_number": "1135",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section D",
+          "floor": "1",
+          "rent_low": 1485,
+          "rent_high": 1485,
+          "availability_date": "2026-06-15",
+          "source_ids": {
+            "sightmap_unit_id": "6524066"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524218",
+          "unit_number": "1356",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section G",
+          "floor": "3",
+          "rent_low": 1480,
+          "rent_high": 1480,
+          "availability_date": "2026-06-15",
+          "source_ids": {
+            "sightmap_unit_id": "6524218"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        },
+        {
+          "native_unit_id": "6524079",
+          "unit_number": "1153",
+          "floor_plan_id": "",
+          "floor_plan_name": "The Palm",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "765",
+          "building": "Section F",
+          "floor": "1",
+          "rent_low": 1505,
+          "rent_high": 1505,
+          "availability_date": "2026-08-10",
+          "source_ids": {
+            "sightmap_unit_id": "6524079"
+          },
+          "source_url": "https://thejulington.com/floorplans/the-palm/"
+        }
+      ],
+      "local_validation": {
+        "expected_native_unit_count": 27,
+        "observed_native_unit_count": 27,
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true,
+        "production_parser": "parse_jonah_resource_json",
+        "production_parser_rows": 24,
+        "visible_one_unit_plan_rows_added_from_overview": 3,
+        "visible_one_unit_plan_native_ids": [
+          "6524139",
+          "6524211",
+          "6524234"
+        ],
+        "overview_units": 27,
+        "overview_property_ids": [
+          "18807"
+        ],
+        "sum_floorplan_availability_count": 27,
+        "production_parser_native_ids_are_strict_subset": true,
+        "admitted_native_ids_match_overview": true
+      },
+      "errors": []
+    },
+    {
+      "property_id": 282381,
+      "property_name": "Mission Ranch",
+      "website": "https://www.missionmanagementlindale.com/",
+      "adapter": "appfolio",
+      "tier": "TIER_1_API_APPFOLIO_DUDA",
+      "outcome": "UNIT_QUALIFIED",
+      "raw_extractor_outcome": "UNITS",
+      "units": 10,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_property_list_membership_and_site_boundary",
+      "counts_toward_strict_207_gate": true,
+      "identity_evidence": {
+        "rows_with_native_identity": 10,
+        "rows_with_native_identity_and_positive_rent": 10,
+        "distinct_unit_numbers": 10,
+        "distinct_native_listable_uids": 10,
+        "excluded_nonphysical_leasing_office_rows": 0,
+        "property_list_membership_all_rows": true,
+        "parser_matches_candidate_uids": true,
+        "property_boundary": "every admitted record belongs to AppFolio property_list `Mission Ranch`",
+        "source_urls": [
+          "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        ],
+        "source_hosts": [
+          "www.missionmanagementlindale.com"
+        ]
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_id": "17037-loring-ln-lindale-tx-75771",
+            "unit_number": "501d3938-dce"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "501d3938-dce7-4938-b43b-55bed06c2dd2",
+            "appfolio_id": "320",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "17037 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "17037 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-08-10",
+          "positive_rent_evidence": {
+            "market_rent_low": 1375,
+            "market_rent_high": 1375
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "18025-loring-ln-lindale-tx-75771",
+            "unit_number": "1125c000-756"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "1125c000-756c-4c99-afb0-10ba022520cd",
+            "appfolio_id": "366",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "18025 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "18025 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-07-09",
+          "positive_rent_evidence": {
+            "market_rent_low": 875,
+            "market_rent_high": 875
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        },
+        {
+          "identity": {
+            "unit_id": "17010-loring-ln-lindale-tx-75771",
+            "unit_number": "3b9898d9-15b"
+          },
+          "source_ids": {
+            "appfolio_listable_uid": "3b9898d9-15b5-4873-8983-c0bfebc1192b",
+            "appfolio_id": "376",
+            "appfolio_database_name": "cross",
+            "appfolio_full_address": "17010 Loring Ln, Lindale, TX 75771"
+          },
+          "unit_name": "17010 Loring Ln, Lindale, TX 75771",
+          "floor_plan_name": "",
+          "availability_date": "2026-08-03",
+          "positive_rent_evidence": {
+            "market_rent_low": 1295,
+            "market_rent_high": 1295
+          },
+          "source_api_url": "https://www.missionmanagementlindale.com/rts/collections/public/0854c71d/runtime/collection/appfolio-listings/query-data?pageSize=100&pageNumber=0&query=()&language=ENGLISH"
+        }
+      ],
+      "local_validation": {
+        "parser": "parse_collection_payload",
+        "unit_has_real_anchor_gate": true,
+        "positive_rent_gate": true,
+        "unique_native_identity_gate": true,
+        "unique_listable_uid_gate": true,
+        "property_boundary_gate": true,
+        "all_passed": true
+      },
+      "errors": []
+    }
+  ],
+  "strict_qualified_property_ids": [
+    15014,
+    38107,
+    46576,
+    55709,
+    60145,
+    70255,
+    78597,
+    258661,
+    260505,
+    263498,
+    282381
+  ],
+  "strict_qualified_properties": 11,
+  "strict_native_positive_rent_units": 167
+}

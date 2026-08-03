@@ -1,0 +1,1906 @@
+{
+  "audit_label": "residual-rentmanager17-strict-audit",
+  "cohort": "Exact 344-property FAILED_NO_DATA cohort from 2026-07-31-fetchfix-5k",
+  "generated_at": "2026-08-01T07:07:32.535768+00:00",
+  "results": [
+    {
+      "classification": "STRICT_E2E_UNIT_QUALIFIED",
+      "counts_toward_strict_207_gate": true,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "pass_property_scoped_native_identity",
+        "errors": [],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 13,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 13,
+          "rows_with_native_identity_and_positive_rent": 13,
+          "same_host": true,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [
+            "finelivingapts.com"
+          ],
+          "source_urls": [
+            "https://finelivingapts.com/"
+          ],
+          "website_host": "finelivingapts.com"
+        },
+        "outcome": "UNIT_QUALIFIED",
+        "plans": 0,
+        "property_identity_match": true,
+        "tier": "TIER_1_DOM_RENTMANAGER_WP_CARDS",
+        "units": 13
+      },
+      "direct_native_rows": [
+        {
+          "availability_date": "2026-10-02",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "The Ruby",
+          "market_rent_high": 1275,
+          "market_rent_low": 1275,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7331"
+          },
+          "sqft": "",
+          "unit_number": "103"
+        },
+        {
+          "availability_date": "2026-07-01",
+          "bathrooms": "1.0",
+          "bedrooms": "2",
+          "floor_plan_name": "The Quartz",
+          "market_rent_high": 1445,
+          "market_rent_low": 1445,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7267"
+          },
+          "sqft": "",
+          "unit_number": "110"
+        },
+        {
+          "availability_date": "2025-08-01",
+          "bathrooms": "1.0",
+          "bedrooms": "2",
+          "floor_plan_name": "The Quartz",
+          "market_rent_high": 1445,
+          "market_rent_low": 1445,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7290"
+          },
+          "sqft": "",
+          "unit_number": "304"
+        },
+        {
+          "availability_date": "2026-09-02",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Emerald",
+          "market_rent_high": 1495,
+          "market_rent_low": 1495,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7346"
+          },
+          "sqft": "",
+          "unit_number": "204"
+        },
+        {
+          "availability_date": "2026-02-01",
+          "bathrooms": "1.0",
+          "bedrooms": "2",
+          "floor_plan_name": "The Quartz",
+          "market_rent_high": 1495,
+          "market_rent_low": 1495,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7295"
+          },
+          "sqft": "",
+          "unit_number": "309"
+        },
+        {
+          "availability_date": "2026-03-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7341"
+          },
+          "sqft": "",
+          "unit_number": "114"
+        },
+        {
+          "availability_date": "2026-06-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7342"
+          },
+          "sqft": "",
+          "unit_number": "115"
+        },
+        {
+          "availability_date": "2026-02-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7372"
+          },
+          "sqft": "",
+          "unit_number": "102"
+        },
+        {
+          "availability_date": "2026-09-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7440"
+          },
+          "sqft": "",
+          "unit_number": "215"
+        },
+        {
+          "availability_date": "2026-09-03",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7273"
+          },
+          "sqft": "",
+          "unit_number": "202"
+        },
+        {
+          "availability_date": "2026-06-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1545,
+          "market_rent_low": 1545,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7300"
+          },
+          "sqft": "",
+          "unit_number": "315"
+        },
+        {
+          "availability_date": "2026-10-02",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1625,
+          "market_rent_low": 1625,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7358"
+          },
+          "sqft": "",
+          "unit_number": "301"
+        },
+        {
+          "availability_date": "2026-10-01",
+          "bathrooms": "1.5",
+          "bedrooms": "2",
+          "floor_plan_name": "The Diamond",
+          "market_rent_high": 1625,
+          "market_rent_low": 1625,
+          "source_api_url": "https://finelivingapts.com/aquila-park-availability/",
+          "source_ids": {
+            "rentmanager_uid": "7411"
+          },
+          "sqft": "",
+          "unit_number": "314"
+        }
+      ],
+      "direct_validation": {
+        "distinct_native_identity_count": 13,
+        "duplicate_native_identities": [],
+        "passes_row_gate": true,
+        "row_count": 13,
+        "rows_with_native_identity": 13,
+        "rows_with_positive_numeric_rent": 13
+      },
+      "exclusion_reason": "",
+      "property_boundary": {
+        "all_links_aquila_scoped": true,
+        "archived_body_sha256": "49c61233053aa3661ac4b0311d3c2afa81bfbc661aa91ed4709d0fd043d68a83",
+        "evidence": [
+          "Exact live and archived page title/canonical identify Aquila Park availability.",
+          "All admitted cards come from the same-origin Aquila availability page.",
+          "Every admitted card links to /aquila-floor-plan-detail/; no Royal Park card was admitted.",
+          "All physical apartment numbers and RentManager uid values are distinct."
+        ],
+        "live_page_sha256": "65e143788772a684072842a1d6c178c2f9c735b3261e22f5507d4bfa4e74718f",
+        "title_contains_property_name": true,
+        "verdict": "pass_exact_same_origin_property_boundary"
+      },
+      "property_id": 26527,
+      "property_name": "Aquila Park",
+      "quality_caveat": "The current RentManager WP-card parser can map visible 'Available Now' rows to the first day of the card's month via data-date. This does not affect native-unit identity, positive-rent qualification, or the strict recovery count.",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 13,
+        "direct_to_rp_native_overlap_ids": [
+          "102",
+          "103",
+          "110",
+          "114",
+          "115",
+          "202",
+          "204",
+          "215",
+          "301",
+          "304",
+          "309",
+          "314",
+          "315"
+        ],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 12,
+        "rp_native_ids": [
+          "102",
+          "103",
+          "110",
+          "114",
+          "115",
+          "202",
+          "204",
+          "215",
+          "301",
+          "304",
+          "309",
+          "314",
+          "315"
+        ],
+        "rp_row_count": 13,
+        "rp_rows_with_nonplaceholder_native_id": 13
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://finelivingapts.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.harborstationtownhomes.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact widget identifies Harbor Station but exposes schedule/contact only; no availability module or native inventory. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 36782,
+      "property_name": "Harbor Station Townhomes",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 2,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://www.harborstationtownhomes.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.lakeviewapartmentsms.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Public floor-plan/pricing pages contain plan rents only and no physical/native unit identity. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 38984,
+      "property_name": "Lakeview Arms",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 4,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "http://www.lakeviewapartmentsms.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.sunresidential.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Iroquois Green is absent from the operator's current public availability listing; RP has zero rows and current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 47444,
+      "property_name": "Iroquois Green",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://www.sunresidential.com/iroquois-green-apartments0/default"
+    },
+    {
+      "classification": "CLEAN_DIRECT_UNIT_EVIDENCE_PIPELINE_GAP",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "tvcproperties.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [
+        {
+          "availability_date": "09/15/2026",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "1 Beds, 1 Bath",
+          "market_rent_high": 1300,
+          "market_rent_low": 1300,
+          "source_api_url": "https://tvcproperties.com/community-detail/pondview-apartments/",
+          "source_ids": {
+            "rentmanager_uid": "13"
+          },
+          "sqft": "760",
+          "unit_number": "104"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2 Beds, 1 Bath",
+          "market_rent_high": 1650,
+          "market_rent_low": 1650,
+          "source_api_url": "https://tvcproperties.com/community-detail/pondview-apartments/",
+          "source_ids": {
+            "rentmanager_uid": "60"
+          },
+          "sqft": "936",
+          "unit_number": "105"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2 Beds, 1 Bath",
+          "market_rent_high": 1650,
+          "market_rent_low": 1650,
+          "source_api_url": "https://tvcproperties.com/community-detail/pondview-apartments/",
+          "source_ids": {
+            "rentmanager_uid": "71"
+          },
+          "sqft": "936",
+          "unit_number": "317"
+        },
+        {
+          "availability_date": "08/01/2026",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "2 Beds, 2 Bath",
+          "market_rent_high": 1795,
+          "market_rent_low": 1795,
+          "source_api_url": "https://tvcproperties.com/community-detail/pondview-apartments/",
+          "source_ids": {
+            "rentmanager_uid": "132"
+          },
+          "sqft": "1003",
+          "unit_number": "102"
+        },
+        {
+          "availability_date": "10/01/2026",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "2 Beds, 2 Bath",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://tvcproperties.com/community-detail/pondview-apartments/",
+          "source_ids": {
+            "rentmanager_uid": "164"
+          },
+          "sqft": "1003",
+          "unit_number": "313"
+        }
+      ],
+      "direct_validation": {
+        "distinct_native_identity_count": 5,
+        "duplicate_native_identities": [],
+        "passes_row_gate": true,
+        "row_count": 5,
+        "rows_with_native_identity": 5,
+        "rows_with_positive_numeric_rent": 5
+      },
+      "exclusion_reason": "",
+      "property_boundary": {
+        "canonical_address_present": true,
+        "card_addresses": [
+          "2575 Ivy Ave E. #104",
+          "2575 Ivy Ave E. #105",
+          "2575 Ivy Ave E. #317",
+          "2585 Ivy Ave E. #102",
+          "2585 Ivy Ave E. #313"
+        ],
+        "evidence": [
+          "The original cohort URL redirects to an exact Pondview Apartments community-detail page.",
+          "The page identifies Pondview and its canonical 2565 Ivy Ave E address.",
+          "All apartment cards are on Ivy Ave E and their detail links remain on tvcproperties.com.",
+          "Physical apartment numbers and native detail uid values are distinct."
+        ],
+        "live_page_sha256": "8f0ba2cc07d3b662aa9e6bc35431d9f4dcb390273f6635a2bc77f822cb883a99",
+        "title_contains_property_name": true,
+        "verdict": "pass_exact_same_origin_property_boundary"
+      },
+      "property_id": 49096,
+      "property_name": "Pondview Apartments",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 4,
+        "direct_to_rp_native_overlap_ids": [
+          "102",
+          "104",
+          "105",
+          "313"
+        ],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 4,
+        "rp_native_ids": [
+          "102",
+          "104",
+          "105",
+          "313"
+        ],
+        "rp_row_count": 4,
+        "rp_rows_with_nonplaceholder_native_id": 4
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://tvcproperties.com/community-detail/?pid=19"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "rookwoodproperties.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "The cohort URL is obsolete/404 and the replacement availability SPA provides no property-scoped Woodgrove native inventory; RP has zero rows and current E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 50114,
+      "property_name": "Woodgrove Point",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist"
+    },
+    {
+      "classification": "CLEAN_DIRECT_UNIT_EVIDENCE_PIPELINE_GAP",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "unknown",
+      "current_local_e2e": {
+        "adapter": "generic",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "GENERIC_VALIDITY_REJECTED: 1 rows from GENERIC_VALIDITY_REJECTED failed unit_validity (no numeric dimension)"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "mgmmgmt.net"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "GENERIC_VALIDITY_REJECTED",
+        "units": 0
+      },
+      "direct_native_rows": [
+        {
+          "availability_date": "Now",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2 / 1",
+          "market_rent_high": 1270,
+          "market_rent_low": 1270,
+          "source_api_url": "https://mgmmgmt.net/property-details/?pid=136",
+          "source_ids": {
+            "rentmanager_uid": "7792"
+          },
+          "sqft": "928",
+          "unit_number": ""
+        },
+        {
+          "availability_date": "Now",
+          "bathrooms": "1",
+          "bedrooms": "2",
+          "floor_plan_name": "2 / 1",
+          "market_rent_high": 1270,
+          "market_rent_low": 1270,
+          "source_api_url": "https://mgmmgmt.net/property-details/?pid=136",
+          "source_ids": {
+            "rentmanager_uid": "7815"
+          },
+          "sqft": "928",
+          "unit_number": ""
+        },
+        {
+          "availability_date": "Now",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "1 / 1",
+          "market_rent_high": 1085,
+          "market_rent_low": 1085,
+          "source_api_url": "https://mgmmgmt.net/property-details/?pid=136",
+          "source_ids": {
+            "rentmanager_uid": "7828"
+          },
+          "sqft": "728",
+          "unit_number": ""
+        },
+        {
+          "availability_date": "Now",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "1 / 1",
+          "market_rent_high": 1095,
+          "market_rent_low": 1095,
+          "source_api_url": "https://mgmmgmt.net/property-details/?pid=136",
+          "source_ids": {
+            "rentmanager_uid": "7874"
+          },
+          "sqft": "728",
+          "unit_number": ""
+        }
+      ],
+      "direct_validation": {
+        "distinct_native_identity_count": 4,
+        "duplicate_native_identities": [],
+        "passes_row_gate": true,
+        "row_count": 4,
+        "rows_with_native_identity": 4,
+        "rows_with_positive_numeric_rent": 4
+      },
+      "exclusion_reason": "",
+      "property_boundary": {
+        "canonical_address_present": true,
+        "evidence": [
+          "Exact pid=136 property-detail page names Lauderdale Hollows and 1622 Carl Street.",
+          "All native uid detail links remain on mgmmgmt.net.",
+          "All four native uid values are distinct and each row has positive rent."
+        ],
+        "live_page_sha256": "2bb995237fd66488b430dcf5e1c3b4b6ed8fb0f81017749ba092ee126dca295d",
+        "property_name_present": true,
+        "verdict": "pass_exact_same_origin_property_boundary"
+      },
+      "property_id": 51143,
+      "property_name": "Lauderdale Hollows",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 4,
+        "direct_to_rp_native_overlap_ids": [
+          "7792",
+          "7815",
+          "7828",
+          "7874"
+        ],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 4,
+        "rp_native_ids": [
+          "7792",
+          "7815",
+          "7828",
+          "7874"
+        ],
+        "rp_row_count": 4,
+        "rp_rows_with_nonplaceholder_native_id": 4
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://mgmmgmt.net/property-details/?pid=136"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "parksideaptsliving.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Public floorplans page is plan-level only with no native apartment identity; RP has zero rows and current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 52854,
+      "property_name": "Parkside",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://parksideaptsliving.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "legacyoaksapts.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Archived evidence is plan-only; the exact live unit-availability path returns a SiteGround CAPTCHA challenge. CAPTCHA solving is prohibited, so no strict native evidence is admitted.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 55165,
+      "property_name": "Legacy Oaks",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 3,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "http://legacyoaksapts.com/"
+    },
+    {
+      "classification": "CLEAN_DIRECT_UNIT_EVIDENCE_PIPELINE_GAP",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no ua.rentmanager.com Search_Result and no supported public availability cards"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.palmbeachgardensapartments.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER_NO_ENDPOINT",
+        "units": 0
+      },
+      "direct_native_rows": [
+        {
+          "availability_date": "5/6/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "Brewster",
+          "market_rent_high": 2819,
+          "market_rent_low": 2819,
+          "source_api_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "source_ids": {},
+          "sqft": "802",
+          "unit_number": "9-109"
+        },
+        {
+          "availability_date": "6/17/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "Brewster",
+          "market_rent_high": 2844,
+          "market_rent_low": 2844,
+          "source_api_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "source_ids": {},
+          "sqft": "828",
+          "unit_number": "3-103"
+        },
+        {
+          "availability_date": "5/4/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "Brewster",
+          "market_rent_high": 2864,
+          "market_rent_low": 2864,
+          "source_api_url": "https://www.iloveleasing.com/pub/wapi/api/availability/",
+          "source_ids": {},
+          "sqft": "828",
+          "unit_number": "4-107"
+        }
+      ],
+      "direct_validation": {
+        "distinct_native_identity_count": 3,
+        "duplicate_native_identities": [],
+        "passes_row_gate": true,
+        "row_count": 3,
+        "rows_with_native_identity": 3,
+        "rows_with_positive_numeric_rent": 3
+      },
+      "exclusion_reason": "",
+      "property_boundary": {
+        "evidence": [
+          "Exact same-origin floorplans page embeds the public iLoveLeasing settings used for the API call.",
+          "Widget metadata identifies Atlantico at Alton Apartments at 13805 Emerson Street, matching canonical cohort metadata.",
+          "Every admitted row has a distinct visible physical apartment number and positive public term rent."
+        ],
+        "inventory_response_sha256": "114fcaa02bd996c006305bf0fd3980391ac667c710d9ddff62ccb10a8d5de161",
+        "page_sha256": "f9af00bf41103d6ea4a8ff3b01704d54b23a8513dfd1cd8da9f6d174bed56e64",
+        "settings_embedded_in_exact_page": true,
+        "verdict": "pass_exact_embedded_public_widget_boundary",
+        "widget_location": {
+          "address": {
+            "city": "Palm Beach Gardens",
+            "province": "",
+            "state": "FL ",
+            "street1": "13805 Emerson Street",
+            "street2": "",
+            "zip": "33418"
+          },
+          "coordinates": [
+            26.880120638157,
+            -80.115956473589
+          ],
+          "name": "Atlantico at Alton Apartments"
+        },
+        "widget_response_sha256": "52c82a4d50c91db1a9a7b2627c5078628b4b88dfc00d62f6ddd0b650ec2bf9fe"
+      },
+      "property_id": 77794,
+      "property_name": "Atlantico at Alton",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 3,
+        "direct_to_rp_native_overlap_ids": [
+          "3-103",
+          "4-107",
+          "9-109"
+        ],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 3,
+        "rp_native_ids": [
+          "2-311",
+          "3-103",
+          "4-107",
+          "4-204",
+          "8-103",
+          "8-109",
+          "9-109",
+          "9-111"
+        ],
+        "rp_row_count": 8,
+        "rp_rows_with_nonplaceholder_native_id": 8
+      },
+      "source_adapter_0731": "",
+      "website": "https://www.palmbeachgardensapartments.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.stewartlangleyproperties.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact Kendall Square page publishes plan-level rents/sizes only, without physical/native unit identity. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 223864,
+      "property_name": "Kendall Square",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 2,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "http://www.stewartlangleyproperties.com/kendall-square/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "availability.sparkleam.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact public RentManager PropertyDetail script confirms the property and a $625-$925 plan range but publishes no native unit rows. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 226383,
+      "property_name": "The Colony Apartments",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "http://availability.sparkleam.com/properties/?rmwebsvc_command=PropertyDetail&rmwebsvc_id=4&rmwebsvc_template=Properties"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.glendalecommunities.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact Alberta Square page publishes plan-level information only and no native apartment identity. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 245993,
+      "property_name": "Alberta Square",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 1,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://www.glendalecommunities.com/property/alberta-square/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": false,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.glendalecommunities.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact Chatsworth page publishes plan-level information only and no native apartment identity. Current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 246351,
+      "property_name": "Chatsworth Village Townhomes",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 2,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://www.glendalecommunities.com/property/chatsworth-townhouses/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "www.rentwatertown.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact Colonial Manor page exposes no property-scoped native availability; RP has zero rows and current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 246468,
+      "property_name": "Colonial Manor",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://www.rentwatertown.com/colonial-manor"
+    },
+    {
+      "classification": "CLEAN_DIRECT_UNIT_EVIDENCE_PIPELINE_GAP",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": true,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "irondaleatwharton.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [
+        {
+          "availability_date": "11/8/2026",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 2325,
+          "market_rent_low": 2325,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480051"
+          },
+          "sqft": "",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "11/30/2026",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 2375,
+          "market_rent_low": 2375,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480062"
+          },
+          "sqft": "",
+          "unit_number": "401"
+        },
+        {
+          "availability_date": "Immediate",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 2495,
+          "market_rent_low": 2495,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480017"
+          },
+          "sqft": "",
+          "unit_number": "101"
+        },
+        {
+          "availability_date": "10/1/2026",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 2495,
+          "market_rent_low": 2495,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480055"
+          },
+          "sqft": "",
+          "unit_number": "309"
+        },
+        {
+          "availability_date": "Immediate",
+          "bathrooms": "1",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "market_rent_high": 2495,
+          "market_rent_low": 2495,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480076"
+          },
+          "sqft": "",
+          "unit_number": "415"
+        },
+        {
+          "availability_date": "Immediate",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "floor_plan_name": "",
+          "market_rent_high": 2945,
+          "market_rent_low": 2945,
+          "source_api_url": "https://clients.spherexx.com/adkast_availability_2/availability/mgoelqnd/rose/BE9B77",
+          "source_ids": {
+            "spherexx_unit_id": "480034"
+          },
+          "sqft": "",
+          "unit_number": "204"
+        }
+      ],
+      "direct_validation": {
+        "distinct_native_identity_count": 6,
+        "duplicate_native_identities": [],
+        "passes_row_gate": true,
+        "row_count": 6,
+        "rows_with_native_identity": 6,
+        "rows_with_positive_numeric_rent": 6
+      },
+      "exclusion_reason": "",
+      "property_boundary": {
+        "evidence": [
+          "Exact Irondale availability page embeds this unguessable Spherexx iframe URL.",
+          "Every native-unit row is labeled Irondale at Wharton Apartments.",
+          "Visible apartment numbers, Spherexx unit ids, and positive rents are distinct and property-scoped."
+        ],
+        "iframe_embedded_in_exact_parent": true,
+        "iframe_response_sha256": "553aa6d5895d2ed183f5aa0397729017e2cead3532aca71afb681a8962439a7e",
+        "parent_page_sha256": "7479b2aeabc7729cdb129fe68c4333e972904a4ad268e3b1d4cc835485a1eb7d",
+        "row_property_labels": [
+          "Irondale at Wharton Apartments - 101",
+          "Irondale at Wharton Apartments - 204",
+          "Irondale at Wharton Apartments - 305",
+          "Irondale at Wharton Apartments - 309",
+          "Irondale at Wharton Apartments - 401",
+          "Irondale at Wharton Apartments - 415"
+        ],
+        "verdict": "pass_exact_embedded_public_iframe_boundary"
+      },
+      "property_id": 281149,
+      "property_name": "Irondale at Wharton",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "",
+      "website": "http://irondaleatwharton.com/"
+    },
+    {
+      "classification": "EXCLUDED_NO_STRICT_NATIVE_UNIT_RECOVERY",
+      "counts_toward_strict_207_gate": false,
+      "current_detected_adapter": "rentmanager",
+      "current_local_e2e": {
+        "adapter": "rentmanager",
+        "contamination_verdict": "no_native_units",
+        "errors": [
+          "RENTMANAGER: no units parsed from Search_Result"
+        ],
+        "identity_evidence": {
+          "address_conflict": false,
+          "address_matches": false,
+          "applicant_base_harvested": false,
+          "applicant_property_match": false,
+          "applicant_query_ids": [],
+          "applicant_tenant_link_harvested": false,
+          "distinct_unit_numbers": 0,
+          "exact_street_matches": [],
+          "onesite_api_ids": [],
+          "onesite_marketing_property_match": true,
+          "onesite_portal_hosts": [],
+          "onesite_property_match": false,
+          "onesite_provenance": [],
+          "onesite_published_id_proof": false,
+          "onesite_published_portal_proof": false,
+          "onesite_relaxed_name_match": false,
+          "property_name_consistent": false,
+          "row_addresses": [],
+          "row_property_ids": [],
+          "row_property_names": [],
+          "rows_with_native_identity": 0,
+          "rows_with_native_identity_and_positive_rent": 0,
+          "same_host": false,
+          "securecafe_exact_base_harvested": false,
+          "securecafe_property_match": false,
+          "source_hosts": [],
+          "source_urls": [],
+          "website_host": "krcapartments.com"
+        },
+        "outcome": "EMPTY",
+        "plans": 0,
+        "property_identity_match": false,
+        "tier": "TIER_1_API_RENTMANAGER",
+        "units": 0
+      },
+      "direct_native_rows": [],
+      "direct_validation": {
+        "distinct_native_identity_count": 0,
+        "duplicate_native_identities": [],
+        "passes_row_gate": false,
+        "row_count": 0,
+        "rows_with_native_identity": 0,
+        "rows_with_positive_numeric_rent": 0
+      },
+      "exclusion_reason": "Exact Ashland property page explicitly says there are no available units; RP has zero rows and current local E2E is empty.",
+      "property_boundary": {
+        "evidence": [],
+        "verdict": "no_qualifying_native_unit_boundary_evidence"
+      },
+      "property_id": 294493,
+      "property_name": "Ashland",
+      "quality_caveat": "",
+      "rp_oracle_comparison": {
+        "direct_to_rp_native_overlap_count": 0,
+        "direct_to_rp_native_overlap_ids": [],
+        "note": "RP is validation oracle only and was never used as extraction input.",
+        "positive_rent_matches_on_overlap": 0,
+        "rp_native_ids": [],
+        "rp_row_count": 0,
+        "rp_rows_with_nonplaceholder_native_id": 0
+      },
+      "source_adapter_0731": "rentmanager",
+      "website": "https://krcapartments.com/property-detail/?propid=587&propname=Ashland%20Apartments"
+    }
+  ],
+  "scope_count": 17,
+  "scope_note": "17 rather than 16 because property 51143 was RentManager on 07-31 but currently detects as unknown.",
+  "scope_rule": "Currently unrecovered properties where source_adapter_0731 == rentmanager OR current_detected_adapter == rentmanager",
+  "source_artifacts": {
+    "current_e2e_replay": "/private/tmp/propai-fnd-vBkmT9/evidence_residual_rentmanager17_current_e2e.json",
+    "failed344": "/private/tmp/propai-fnd-vBkmT9/failed344.csv",
+    "live_probe_directory": "/private/tmp/propai-fnd-vBkmT9/live_rentmanager",
+    "residual_classification": "/private/tmp/propai-fnd-vBkmT9/strict99_residual245_classification.csv",
+    "rp_oracle": "/Users/ankur/Downloads/rp_unit_detail_0731.csv"
+  },
+  "strict_gate": {
+    "canary": "No paid canary was run.",
+    "captcha_policy": "No CAPTCHA solving. The Legacy Oaks challenge was not bypassed or solved.",
+    "llm": "Disabled/unavailable in local E2E replay; no LLM recovery was counted.",
+    "requirements": [
+      "Current local end-to-end outcome is UNIT_QUALIFIED.",
+      "Every admitted row has a physical apartment number or stable native source id.",
+      "Every admitted row has positive numeric rent.",
+      "Exact or same-origin property-boundary evidence passes contamination checks.",
+      "No duplicate/conflicting native identities."
+    ],
+    "rp_role": "Validation oracle only; never an extraction source."
+  },
+  "summary": {
+    "clean_direct_but_not_recovered_property_ids": [
+      49096,
+      51143,
+      77794,
+      281149
+    ],
+    "clean_direct_pipeline_gap_count": 4,
+    "disjoint_complete_partition_verified": true,
+    "excluded_count": 12,
+    "excluded_property_ids": [
+      36782,
+      38984,
+      47444,
+      50114,
+      52854,
+      55165,
+      223864,
+      226383,
+      245993,
+      246351,
+      246468,
+      294493
+    ],
+    "strict_e2e_qualified_count": 1,
+    "strict_e2e_qualifying_property_ids": [
+      26527
+    ]
+  },
+  "tested_source_state": {
+    "branch": "codex/plan-level-unit-recovery",
+    "head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "note": "Audit made no source edits; current uncommitted local source state was treated as authoritative.",
+    "working_tree_dirty": true,
+    "worktree": "/Users/ankur/PropAi-codex-plan-level"
+  }
+}

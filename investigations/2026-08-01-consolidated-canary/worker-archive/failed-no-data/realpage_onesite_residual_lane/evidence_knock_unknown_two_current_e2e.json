@@ -1,0 +1,175 @@
+{
+  "cohort": {
+    "ledger_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "ledger_csv_sha256": "fdf82e2b4db693da776944ac58927e071559a726522a353cd94f207efd7cfd60",
+    "ledger_rows": 183,
+    "remaining_csv": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+    "remaining_csv_sha256": "7f9accc11cd2d3d315e37a1f2c8c9ccda3852cf316ddda9d4077d7d8b0cbe5bd"
+  },
+  "generated_at_utc": "2026-08-01T10:39:29.665530+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "production_source_modified_by_lane": false,
+    "shared_ledger_modified": false,
+    "web_unlocker": false
+  },
+  "lane": "knock_unknown_current_source_e2e",
+  "results": [
+    {
+      "adapter": "knock",
+      "community_payload_address": " 4117 124th Ave SE Bellevue WA 98006",
+      "community_payload_name": "Tenzen Apartments",
+      "configured_final_url": "https://tenzenapartments.com/",
+      "contamination_verdict": "pass_exact_configured_page_published_knock_init_native_community_name_address_and_units_property_id",
+      "errors": [],
+      "identity_evidence": {
+        "rows_with_native_identity": 2,
+        "rows_with_native_identity_and_positive_rent": 2,
+        "source_property_ids": [
+          "2022654"
+        ],
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2022654/units"
+        ]
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "2X1",
+          "identity": {
+            "knock_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+            "unit_number": "104"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2650,
+            "market_rent_low": 2650
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "source_property_id": "2022654"
+        },
+        {
+          "floor_plan_name": "1X1",
+          "identity": {
+            "knock_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+            "unit_number": "504"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2050,
+            "market_rent_low": 2050
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "source_property_id": "2022654"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 19245,
+      "property_identity_match": true,
+      "property_name": "Tenzen",
+      "published_community_hash": "5d11eef5c367a4b5",
+      "resolved_numeric_property_id": "2022654",
+      "strict_gates": {
+        "all_output_rows_native_and_positive_rent": true,
+        "community_payload_address_matches": true,
+        "community_payload_hash_matches": true,
+        "community_payload_name_matches": true,
+        "community_route_matches_published_hash": true,
+        "configured_page_http_200": true,
+        "configured_page_name_and_address_visible": true,
+        "output_property_ids_match_resolved_property": true,
+        "output_source_urls_match_units_route": true,
+        "payload_property_ids_match_resolved_property": true,
+        "sole_published_knock_init": true,
+        "units_route_matches_resolved_numeric_property_id": true
+      },
+      "tier": "TIER_1_KNOCK_API",
+      "units": 2,
+      "website": "http://www.tenzenapartments.com/"
+    },
+    {
+      "adapter": "knock",
+      "community_payload_address": " 151 Sea Street Quincy MA 02169",
+      "community_payload_name": "Towne House",
+      "configured_final_url": "https://www.townehousequincy.com/",
+      "contamination_verdict": "pass_exact_configured_page_published_knock_init_native_community_name_address_and_units_property_id",
+      "errors": [],
+      "identity_evidence": {
+        "rows_with_native_identity": 2,
+        "rows_with_native_identity_and_positive_rent": 2,
+        "source_property_ids": [
+          "2023031"
+        ],
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2023031/units"
+        ]
+      },
+      "native_samples": [
+        {
+          "floor_plan_name": "2 Bed",
+          "identity": {
+            "knock_unit_id": "c883d35e-a9b7-4056-afa1-73d22d053b86",
+            "unit_number": "200"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2500,
+            "market_rent_low": 2500
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+          "source_property_id": "2023031"
+        },
+        {
+          "floor_plan_name": "2 Bed (1st Flr)",
+          "identity": {
+            "knock_unit_id": "72de9f8a-61c5-4d3f-84ce-fc831d9b0b58",
+            "unit_number": "108"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2400,
+            "market_rent_low": 2400
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2023031/units",
+          "source_property_id": "2023031"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 71962,
+      "property_identity_match": true,
+      "property_name": "Towne House",
+      "published_community_hash": "07a497e4cab311ee",
+      "resolved_numeric_property_id": "2023031",
+      "strict_gates": {
+        "all_output_rows_native_and_positive_rent": true,
+        "community_payload_address_matches": true,
+        "community_payload_hash_matches": true,
+        "community_payload_name_matches": true,
+        "community_route_matches_published_hash": true,
+        "configured_page_http_200": true,
+        "configured_page_name_and_address_visible": true,
+        "output_property_ids_match_resolved_property": true,
+        "output_source_urls_match_units_route": true,
+        "payload_property_ids_match_resolved_property": true,
+        "sole_published_knock_init": true,
+        "units_route_matches_resolved_numeric_property_id": true
+      },
+      "tier": "TIER_1_KNOCK_API",
+      "units": 2,
+      "website": "https://www.townehousequincy.com/"
+    }
+  ],
+  "summary": {
+    "authoritative_ledger_delta": 0,
+    "current_source_full_pipeline_qualified_ids": [
+      19245,
+      71962
+    ],
+    "current_source_net_new_ids_vs_current_ledger": [
+      19245,
+      71962
+    ],
+    "strict_native_priced_rows": 4,
+    "strict_property_count": 2
+  }
+}

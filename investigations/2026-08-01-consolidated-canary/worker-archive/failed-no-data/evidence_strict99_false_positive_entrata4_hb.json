@@ -1,0 +1,96 @@
+{
+  "results": [
+    {
+      "attempted": true,
+      "complete": false,
+      "contamination_verdict": "no_native_units",
+      "elapsed_session_seconds": 25.21,
+      "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+      "matched_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/",
+      "native_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 6,
+      "property_id": 7980,
+      "property_identity_match": true,
+      "property_name": "Tesota Morningside",
+      "session_calls": 1,
+      "source_urls": [],
+      "units": 0,
+      "website": "https://www.tesotamorningside.com/",
+      "winning_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/"
+    },
+    {
+      "attempted": true,
+      "complete": true,
+      "contamination_verdict": "pass_strict_property_boundary_and_native_positive_rent",
+      "elapsed_session_seconds": 16.91,
+      "failure_reason": "",
+      "matched_url": "https://www.leasewestwindapartments.com/fort-worth/west-wind-apartments/conventional/",
+      "native_samples": [
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "The Cypress",
+          "identity": {
+            "floor_plan_id": "9ef4cb5fea3b",
+            "unit_number": "98"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 825,
+            "market_rent_low": 825
+          },
+          "source_api_url": "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=234520&cached_rate_available=1&min_rent=$800&max_rent=$825&min_advertised_base_rent=825&max_advertised_base_rent=825&min_deposit=250.0000&max_deposit=250.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "2026-10-30",
+          "floor_plan_name": "The Cypress",
+          "identity": {
+            "floor_plan_id": "9ef4cb5fea3b",
+            "unit_number": "133"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 825,
+            "market_rent_low": 825
+          },
+          "source_api_url": "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=234520&cached_rate_available=1&min_rent=$800&max_rent=$825&min_advertised_base_rent=825&max_advertised_base_rent=825&min_deposit=250.0000&max_deposit=250.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 7,
+      "property_id": 11543,
+      "property_identity_match": true,
+      "property_name": "Westwind Apartments",
+      "session_calls": 1,
+      "source_urls": [
+        "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&cached_rate_available=1&min_rent=$1,085&max_rent=$1,095&min_advertised_base_rent=1095&max_advertised_base_rent=1095&min_deposit=350.0000&max_deposit=350.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&property_floorplan[id]=234530&move_in_date=2026-08-01&occupancy_type=conventional",
+        "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=234520&cached_rate_available=1&min_rent=$800&max_rent=$825&min_advertised_base_rent=825&max_advertised_base_rent=825&min_deposit=250.0000&max_deposit=250.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+        "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=234526&cached_rate_available=1&min_rent=$850&max_rent=$875&min_advertised_base_rent=875&max_advertised_base_rent=875&min_deposit=250.0000&max_deposit=250.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+        "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=763392&cached_rate_available=1&min_rent=$925&max_rent=$985&min_advertised_base_rent=985&max_advertised_base_rent=985&min_deposit=250.0000&max_deposit=250.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=1",
+        "https://www.leasewestwindapartments.com/?module=check_availability&is_secure=1&property[id]=36179&action=view_unit_spaces&property_floorplan[id]=767725&cached_rate_available=1&min_rent=$1,300&max_rent=$1,300&min_advertised_base_rent=1300&max_advertised_base_rent=1300&min_deposit=350.0000&max_deposit=350.0000&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional&unit_count=2"
+      ],
+      "units": 7,
+      "website": "http://www.leasewestwindapartments.com/",
+      "winning_url": "https://www.leasewestwindapartments.com/fort-worth/west-wind-apartments/conventional/"
+    },
+    {
+      "attempted": true,
+      "complete": false,
+      "contamination_verdict": "no_native_units",
+      "elapsed_session_seconds": 13.92,
+      "failure_reason": "CROSS_ORIGIN_REDIRECT_REJECTED",
+      "matched_url": "https://alistermontclair.prospectportal.com/montclair/alister-montclair/conventional/",
+      "native_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 228073,
+      "property_identity_match": true,
+      "property_name": "Alister Montclair",
+      "session_calls": 1,
+      "source_urls": [],
+      "units": 0,
+      "website": "https://www.alistermontclair.com/",
+      "winning_url": ""
+    }
+  ]
+}

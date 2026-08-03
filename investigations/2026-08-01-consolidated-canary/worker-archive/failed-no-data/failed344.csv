@@ -1,0 +1,345 @@
+"shard","property_id","proj_name","address","city","state","zip_code","website","verdict_reason","adapter","detected_pms","winning_tier","fetch_outcome","fetch_status","fetch_body_bytes"
+0,"231355","Murphy Varnish Lofts","225-239 McWhorter St","Newark","NJ","07105","https://murphyvarnishlofts.com/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,263542
+0,"67598",,,,,,"http://www.loftsatlittlecreek.com/","no extract result",,,,,,
+1,"228341","The Commons at Cowan Boulevard","2352 Cowan Blvd","Fredericksburg","VA","22401","http://commonsatcowanboulevard.com/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,126247
+2,"257761","The Emory","1345 14th St","Plano","TX","75074","https://www.theemoryplano.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,153408
+3,"299847","Mirabella","4224 N McColl Rd","McAllen","TX","78504","https://www.mirabellamcallen.com/","no records extracted","generic","generic_plan_text","GENERIC_VALIDITY_REJECTED","OK",,218073
+3,"69912","Creekwood","22294 City Center Dr","Hayward","CA","94541","http://www.creekwoodapartmenthomes.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,156862
+4,"37798","Covington Place","1247 Covington Manor Ln","St Louis","MO","63125","http://www.covingtonplace.com/","no records extracted","resman","resman","TIER_1_API_RESMAN_NO_PORTAL","OK",,69993
+5,"223248","Royal Oaks","701 Royal Oaks Ct","Monmouth Junction","NJ","08852","http://www.metroplexapts.com","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,1494048
+5,"291774","Gallatin Village","20190 Murphy Rd","Bend","OR","97702","https://www.123taylor.com/gallatin-village","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,213627
+5,"60125","Cumberland Links","130 Cumberland Way","Pataskala","OH","43062","https://www.cumberlandlinksapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,145484
+7,"29970","Delane Glen","1315 Delane Ave","Charlotte","NC","28211","https://www.lernerapartments.com/Delane-Glen-Apartments","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,93300
+8,"71345","Westgate Village Townhouses","680 Pinckney Ct","Comstock Park","MI","49321","https://www.westgate-village-townhouses.com/","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,458610
+10,"251597",,,,,,"https://www.wyndhamridgecolumbus.com/","no extract result",,,,,,
+11,"36530","The Point at Monroe Place","2300 Woodland Crossing Dr","Herndon","VA","20171","https://www.thepointatmonroeplace.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_EMPTY","OK",,167185
+12,"18389","Westgate Village","333 Lancaster Ave","Malvern","PA","19355","https://www.fmgnj.com/apartments/pa/malvern/westgate-village/","no records extracted","g5","g5","TIER_1_API_G5_API_ERROR","OK",,352154
+12,"71534",,,,,,"https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/","no extract result",,,,,,
+13,"42371",,,,,,"http://meetinghouseapartments.com/","no extract result",,,,,,
+16,"254973","Oakwood Hills","2451 Oakwood Hills Dr","Mechanicsburg","PA","17055","https://www.oakwoodhillsapts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,147578
+19,"247179","Lerner Parc at Gatlin Commons","1900 SW Aledo Ln","Port St Lucie","FL","34953","https://livelerner.com/lerner-parc-at-gatlin-commons/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,34006
+20,"289338","201 Walnut","201 Walnut Ave","Cranford","NJ","07016","https://www.201walnut.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,163869
+21,"246962","Portola Bridge Creek","9211 NE 15th Ave","Vancouver","WA","98665","http://www.bridgecreekapthomes.com/","no records extracted","generic","unknown","TIER_1_API","OK",,25196
+21,"25489","Cortland North Dallas","17811 Vail St","Dallas","TX","75287","https://cortland.com/apartments/cortland-north-dallas/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,145385
+22,"35347","717 Olympic","717 W Olympic Blvd","Los Angeles","CA","90015","https://www.717olympic.com/","no records extracted","generic_plan_text","generic_plan_text","TIER_1_DOM_GENERIC_PLAN_TEXT","OK",,11846
+22,"61979","Villa Milano","13740 Howe Ln","Leawood","KS","66224","https://www.villamilano.us/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,62145
+25,"247119","Riverside Place","2800 NE Green Oaks Blvd","Grand Prairie","TX","75050","https://www.riversidegp.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,147198
+28,"218786",,,,,,"https://www.landcoapartments.com/coopers-landing-apartments/","no extract result",,,,,,
+28,"40733","Country Club","8400 Country Club Way","Knoxville","TN","37923","https://www.smdproperty.com/resident-properties/country-club-apartments/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,55566
+29,"218378","The Terraces Apartments","1330 Bush St","San Francisco","CA","94109","http://www.equityapartments.com/california/san-francisco-bay-apartments/lower-nob-hill/the-terraces-apartments.aspx","no records extracted","equity","equity","TIER_1_API_EQUITY_NO_RESPONSE","OK",,349459
+29,"32793",,,,,,"https://www.reserveatevanston.com","no extract result",,,,,,
+31,"22552",,,,,,"https://www.lavinaapts.com/","no extract result",,,,,,
+32,"232583","Custer Crossing Apartments","1763 Carroll St","Dickinson","ND","58601","https://princetonmanagement.com/communities/custer-crossing-apartments/","no records extracted","generic","unknown","TIER_1_API","OK",,129291
+32,"234945","IMT Belasera at Superior","17720 Superior St","Northridge","CA","91325","https://www.imtresidential.com/imtbelaseraatsuperior/","no records extracted","sightmap","sightmap","TIER_1_API_SIGHTMAP_NO_RESPONSE","OK",,10141346
+33,"52541",,,,,,"https://princetonmanagement.com/communities/woodbridge-manor-apartments/","no extract result",,,,,,
+34,"53567","Trafalgar Square Apartments","33210 Trafalgar Square","Westland","MI","48186","https://princetonmanagement.com/communities/trafalgar-square-apartments/","no records extracted","generic","unknown","TIER_1_API","OK",,125280
+34,"60145","Woodmont Mews","1345 Martin Ct","Bethlehem","PA","18018","https://www.woodmontmewsapartments.com/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,124023
+35,"22962","Fox Lane","45600 Fox Ln W","Shelby Township","MI","48317","https://princetonmanagement.com/communities/fox-lane-apartments/","no records extracted","generic","unknown","TIER_1_API","OK",,127355
+35,"52182","Woodside Village Apartments","21821 Woodruff Rd","Rockwood","MI","48173","http://www.woodsideapartments.net","no records extracted","generic_plan_text","generic_plan_text","TIER_1_DOM_GENERIC_PLAN_TEXT","OK",,127716
+36,"240193","Sepulveda Manhattan Apartments","8031 Sepulveda Blvd","Panorama City","CA","91402","http://www.manhattansepulveda.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,154343
+36,"258661",,,,,,"https://banyanonwashington.com/","no extract result",,,,,,
+36,"34785",,,,,,"http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55","no extract result",,,,,,
+37,"15358","Mountain View","13135 Heacock St","Moreno Valley","CA","92553","http://www.mountainviewapartmenthomes.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,263868
+39,"295542","Enclave Crystal Lake","111 E Crystal Lake Ave","Crystal Lake","IL","60014","https://www.liveenclavecrystallake.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,209730
+39,"301417","Marlowe Live Oak","5476 Angel Way St","St. Cloud","FL","34771","https://www.marloweliveoak.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,149808
+40,"230598","The Ridge","17940 Garden Ln","Hagerstown","MD","21740","https://www.theridgehagerstown.com/","no records extracted","repli360","repli360","TIER_1_API_REPLI360_NO_FLOORPLANS","OK",,298705
+40,"24139",,,,,,"https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/","no extract result",,,,,,
+40,"273828",,,,,,"https://www.pointegrandsouthlake.com/","no extract result",,,,,,
+40,"32996","TGM Ridge","10901 Wild Ginger Cir","Manassas","VA","20109","https://tgmridge.com/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,204228
+40,"46915","Barberton","605 Barberton Dr","Virginia Beach","VA","23451","https://www.barbertonapt.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,98422
+42,"234385","Townhomes at Spring Valley","2149 B Elder St","Reading","PA","19604","http://www.mmgapts.com/spring-valley.htm","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,94464
+42,"53932","Misty Hollow","2826 Misty Ln","Bossier City","LA","71111","http://www.landmarkrealty.org/misty-hollow/","no records extracted","generic","unknown","TIER_1_API","OK",,246726
+42,"63191","Avenir on Fifteenth","42 S 15th St","Philadelphia","PA","19102","http://avenirphilly.com/","no records extracted","sightmap","sightmap","TIER_1_API_SIGHTMAP_SHAPE_REJECTED","OK",,272631
+43,"16509",,,,,,"http://brooklawngardensapts.com/property/brooklawn/","no extract result",,,,,,
+43,"39995",,,,,,"https://www.southpointehanahan.com/","no extract result",,,,,,
+43,"78593","Estes Park","306 Estes Dr Ext","Carrboro","NC","27510","http://www.gscapts.com/apartments/Carrboro_NC/zip_27510/gsc/4510","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,129424
+45,"12398",,,,,,"https://www.courtneyparkapthomes.com/","no extract result",,,,,,
+45,"1765","Annaberg","2905 Arrowhead Dr","Augusta","GA","30909","https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,1317560
+45,"3788",,,,,,"http://www.citadelvillageco.com/","no extract result",,,,,,
+46,"540",,,,,,"https://www.hgliving.com/apartments/fl/jacksonville/bridgepoint/#/","no extract result",,,,,,
+47,"75912","TGM Creekside Village","303 Maple Tree Dr","Glen Burnie","MD","21060","www.tgmcreeksidevillage.com","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,174660
+48,"24982","Fisher Building","343 S Dearborn St","Chicago","IL","60604","https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940","no records extracted","generic","unknown","TIER_1_API","OK",,958
+48,"27080","Easton North","1126 J Easton Ave","Somerset","NJ","08873","http://www.oxfordrealtygroup.com/properties/new-jersey/easton-north/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,243982
+48,"64545","The Lofts at White Furniture","201 E Center St","Mebane","NC","27302","https://www.whitefurniturelofts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,143070
+50,"49921","Legacy At Abbington Place","1025 Kensington Dr","Jacksonville","NC","28546","https://www.pedcorliving.com/apartments/legacy-at-abbington-place","no records extracted","generic","generic_plan_text","GENERIC_VALIDITY_REJECTED","OK",,186849
+53,"18194","Parke Place Townhomes","44 New Zealand Rd","Seabrook","NH","03874","https://www.forestproperties.net/property/availabilities/parke-place-village","no records extracted","realpage_oll","realpage_oll","TIER_1_API_REALPAGE_OLL","OK",,10469
+54,"23572",,,,,,"https://www.riveroaksmgmt.com/vacancies-sommerset-la-costa","no extract result",,,,,,
+54,"26527","Aquila Park","8150 W 30 1/2 St","St Louis Park","MN","55426","https://finelivingapts.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER_NO_ENDPOINT","OK",,67369
+55,"12586","Avondale at Warner Center","22222 Victory Blvd","Woodland Hills","CA","91367","https://www.essexapartmenthomes.com/apartments/woodland-hills/avondale-at-warner-center","no records extracted","essex","essex","TIER_1_API_ESSEX","OK",,668234
+56,"221995","Booker Creek Townhouse Apartments","2525 Booker Creek Rd","Chapel Hill","NC","27514","http://www.gscapts.com/apartments/Chapel_Hill_NC/zip_27514/gsc/4508","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,142654
+56,"277774","Redwood Superior Township","1725 Cardiff Row","Superior Charter Township","MI","48198","https://www.byredwood.com/apartments/mi/superior-township/redwood-superior-township/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,309542
+58,"30101","Apartments at Bel Air","1001 Todd Rd","Bel Air","MD","21015","https://www.seasonsbelair.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,157026
+58,"34303","Duke Manor","311 S Lasalle St","Durham","NC","27705","http://www.gscapts.com/apartments/Durham_NC/zip_27705/gsc/4506","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,142842
+58,"61459",,,,,,"http://www.thiestalle.com/properties/oakstreet-st-cloud.html","no extract result",,,,,,
+58,"76138","Covey Chase","601 Lee Cir SW","Cullman","AL","35055","https://morrowapartments.net/wdk-listing/covey-chase-apartments/","no records extracted","generic_plan_text","generic_plan_text","TIER_1_DOM_GENERIC_PLAN_TEXT","OK",,156329
+59,"217738",,,,,,"http://www.thedistrictatcypresswaters.com/","no extract result",,,,,,
+59,"49096","Pondview Apartments","2565 Ivy Ave E","Maplewood","MN","55119","https://tvcproperties.com/community-detail/?pid=19","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,66812
+60,"68497","Maya","535 S Kingsley Dr","Los Angeles","CA","90020","http://www.liveatmaya.com/","no records extracted","knock","knock","TIER_1_KNOCK_API","OK",,40303
+61,"75314","Village Park at Paladin","101 Clifton Park Cir","Wilmington","DE","19802","https://pettinaro.com/village-park-paladin/","no records extracted","generic","unknown","TIER_1_API","OK",,254523
+62,"27594","Midland Falls","6029 Flat Rock Rd","Columbus","GA","31907","https://www.midlandfallsapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,160990
+62,"74488","St. Johns Wood","901 St John's Wood Dr N","Richmond","VA","23225","http://www.gscapts.com/apartments/Richmond_VA/zip_23225/gsc/4497","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,142654
+63,"261116","Copper Pointe","6410 S New Braunfels Ave","San Antonio","TX","78223","https://copperpointeapts.com/","no records extracted","realpage_oll","knock","TIER_1_API_REALPAGE_OLL","OK",,145428
+63,"26736","The Boro - Phipps","3460 Kingsboro Rd NE","Atlanta","GA","30326","https://www.theboroapartments.com/?switch_cls%5Bid%5D=64893&utm_source=gmb&utm_medium=organic&oll_switch_cls%5Bid%5D=64893&oll_utm_source=gmb&oll_utm_medium=organic","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,135827
+63,"2844","TGM Danada","2 Sterling Cir","Wheaton","IL","60189","www.tgmdanada.com","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,198838
+64,"56182",,,,,,"https://www.liveatacornacres.com/","no extract result",,,,,,
+64,"74900","Fox Lake","505 Fox Crossing Blvd","Knoxville","TN","37923","https://www.foxlakeonline.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,563236
+65,"19245","Tenzen","4117 124th Ave SE","Bellevue","WA","98006","http://www.tenzenapartments.com/","no records extracted","generic","unknown","TIER_1_API","OK",,7018
+65,"2239","TGM Autumn Woods","9075 Autumn Woods Dr","Indianapolis","IN","46250","http://www.tgmautumnwoods.com","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,189819
+65,"27349",,,,,,"https://www.countryvillageapthomes.com/","no extract result",,,,,,
+65,"58939",,,,,,"http://www.thelandingsatbrookscity-base.com/","no extract result",,,,,,
+66,"34362","Tamarron","4410 N 99th Ave","Phoenix","AZ","85037","www.thetamarronapts.com","no records extracted","generic","unknown","TIER_1_API","OK",,11816
+67,"50114","Woodgrove Point","3318 Galbraith Rd","Cincinnati","OH","45239","https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,76405
+68,"260697",,,,,,"https://www.linqatsouthmountain.com/","no extract result",,,,,,
+70,"17984","Alessio","5700 W Centinela Ave","Los Angeles","CA","90045","https://www.essexapartmenthomes.com/apartments/los-angeles/alessio","no records extracted","essex","essex","TIER_1_API_ESSEX","OK",,639197
+70,"300327","Flats on 10th","3300 Schlosser Farm Way","Jeffersonville","IN","47130","https://flatson10th.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,140355
+71,"277913",,,,,,"https://www.byredwood.com/apartments/oh/perrysburg/redwood-perrysburg-oregon-road/index.aspx","no extract result",,,,,,
+71,"68465","The Morgan Sandy Springs","6125 Roswell Rd","Atlanta","GA","30328","https://www.themorgansandysprings.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,151538
+72,"2282","City View","25200 Carlos Bee Blvd","Hayward","CA","94542","https://www.essexapartmenthomes.com/california/san-francisco-bay-area-apartments/hayward-apartments/city-view","no records extracted","essex","essex","TIER_1_API_ESSEX","OK",,643093
+72,"69558","Spring Hill Apartments","767 Springfield Ave","Summit","NJ","07901","https://www.goldberg-realty.com/spring-hill-apartments/default.aspx?_yTrackUser=NjYxMjI5OTY5IzE0NTQ0NTc5MTc=-lDwvxVr1Jx8=&_yTrackVisit=MTQ4NjYyNzQ2OCM2NDQ2Nzc2ODg%3d-W7HwJRKaxxE%3d&_yTrackReqDT=05551420201206","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,294088
+76,"273790","Pointe Grand Augusta","1400 Pointe Grand Dr","Augusta","GA","30909","https://www.pointegrandaugusta.com/","no records extracted","funnel","funnel","TIER_1_API_FUNNEL_SHAPE_REJECTED","OK",,271591
+76,"30663","Revello - Living at Santa Monica","1234 6th St","Santa Monica","CA","90401","https://www.livingatsantamonica.com/properties/revello/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,175850
+77,"56567","Park Forest Apartments","901 W Aaron Dr","State College","PA","16803","https://www.apartmentsstatecollege.com/park-forest-apartments","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,163684
+77,"6701","Park on Riley","99 Cable Cir","Folsom","CA","95630","https://www.theparkonriley.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,170375
+77,"8654","Riverfalls at Bellmar","10570 Stone Canyon Rd","Dallas","TX","75230","https://www.riverfallsdallas.com/","no records extracted","apts247","apts247","TIER_1_API_APTS247_NO_KEY","OK",,4616
+78,"1375","Lakewood","11000 Gatesden Dr","Tomball","TX","77377","http://www.lakewood-apartments.net/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,148932
+78,"16831","Agora at Port Richey","8228 Chasco Woods Blvd","Port Richey","FL","34668","https://agoraatportrichey.prospectportal.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,145500
+78,"300689","Valley Ridge","10 Draught St","Rossville","GA","30741","https://www.livevalleyridgeapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,163799
+79,"36782","Harbor Station Townhomes","4901 Randall Pkwy","Wilmington","NC","28403","https://www.harborstationtownhomes.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,215434
+80,"266766","101 Oxford","101 W Oxford St","Philadelphia","PA","19122","https://www.101oxford.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,151344
+82,"27245","Halston Shiloh Valley","2100 Shiloh Valley Dr","Kennesaw","GA","30144","https://www.halstonshilohvalley.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,87841
+82,"42586","Birchstone Northlake","13900 Chadwick Pkwy","Northlake","TX","76262","https://www.birchstonenorthlake.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_EMPTY","OK",,183803
+84,"25443","Lee Square","126 Chanel Terrace","Falls Church","VA","22046","http://www.leesquareapartments.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,97810
+86,"18379",,,,,,"https://www.lindyproperty.com/property/bromley-house/","no extract result",,,,,,
+87,"78597","Sentral Union Station","1770 Chestnut Pl","Denver","CO","80202","https://www.sentral.com/denver/union-station","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,175789
+88,"268888","Artthaus Jack London","233 Broadway","Oakland","CA","94607","https://arthaus.mov/building-community.php?slug=arthaus-jack-london","no records extracted","generic","unknown","TIER_1_API","OK",,0
+91,"249998","Canvas","5300 Baltimore Ave","Hyattsville","MD","20781","https://www.canvas-apts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,349419
+92,"15014","Wildwood Park","5550 Columbia Pike","Arlington","VA","22204","http://www.rentdittmar.com/apartment-communities/wildwood-park","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,127609
+92,"282696","Allen Ranch Estates","1893 SW Hungry Hill Dr","Grants Pass","OR","97527","https://www.ishranchestates.com/allen-ranch","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,524509
+92,"33993","City Club Apartments MDA","63 E Lake St","Chicago","IL","60601","https://www.cityclubapartments.com/","no records extracted","generic","unknown","TIER_1_API","OK",,958
+92,"74523","Charter Club","1040 Windward Dr","London","OH","43140","http://www.charterclubapts.com/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,140785
+94,"41175","Fusion Encore Hollywood","1714 N McCadden Pl","Hollywood","CA","90028","https://www.fusionencore.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,176278
+95,"217796","Old Shell Lofts","1706 Old Shell Rd","Mobile","AL","36604","https://themobilelofts.com/apartments/al/mobile/the-old-shell-lofts/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_UNITS","OK",,427366
+95,"218177","Mill & Main","501 SE Main St","Minneapolis","MN","55414","www.millandmain.com","no records extracted","funnel","funnel","TIER_1_API_FUNNEL_NO_RESPONSE","OK",,105838
+95,"263732","Hoyt Tower","50-54 Sussex Ave","Newark","NJ","07103","https://www.hoyttowernewark.com/","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,1060902
+96,"284199","501 Brady","501 Brady St","Davenport","IA","52801","https://www.501brady.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,473769
+98,"38737",,,,,,"http://www.rentatstonegateapartments.com/","no extract result",,,,,,
+99,"272772","Hawkeye Village","1422 Irish Dr","Waterloo","IA","50701","http://hawkeyevillageapartments.com/","no records extracted","generic","unknown","TIER_1_API","OK",,13952
+99,"42576","Fenway Triangle","180 Brookline Ave","Boston","MA","02215","https://fenwaytriangle.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,93244
+100,"60141","Bridgeview","701 Harrison St","Allentown","PA","18103","http://www.scullycompany.com/bridgeview-14.html","no records extracted","sightmap","sightmap","TIER_1_API_SIGHTMAP_SHAPE_REJECTED","OK",,268335
+101,"240111","ReNew Logan Square","1 Franklin Town Blvd","Philadelphia","PA","19103","https://www.renewlogansquare.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,141437
+101,"282381","Mission Ranch","FM Rd 16","Lindale","TX","75771","https://www.missionmanagementlindale.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,125734
+101,"55729","Cherry Court","113 Cherry Ct","Greenville","NC","27858","https://www.keystonemanagement.com/apartments/nc/cherry-court-apartments","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,768482
+103,"8789",,,,,,"https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com","no extract result",,,,,,
+104,"18736","Central Park","2400 Central Pkwy","Montgomery","AL","36106","www.centralparkmontgomery.com","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,147204
+104,"22986","Tuscany Hills","715 Ash Ln","San Marcos","CA","92069","http://www.tuscanyhillsapartments.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,151089
+105,"17186","The Park at Tivoli","12903 Sugar Ridge Blvd","Stafford","TX","77477","https://www.theparkattivoli.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,128601
+108,"55709","Vista Pointe Apartments","2981 Ridge Ave","Macon","GA","31204","https://ridgepointeblueridgeapts.com/en/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,49998
+110,"26733","Parc 85","2620 N Berkeley Lake Rd NW","Duluth","GA","30096","https://www.parc85.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,150068
+110,"42977","Elms at Stoney Run","7581 Stoney Run Dr","Hanover","MD","21076","https://stoneyrunelmsliving.com/home#","no records extracted","realpage_oll","knock","TIER_1_API_REALPAGE_OLL","OK",,10291
+111,"72766","Fox Ridge","601 Lakeview Dr","Royersford","PA","19468","https://www.liveatfoxridge.com/?utm_source=GBP&utm_medium=organic&utm_knock=gbp","no records extracted","repli360","repli360","TIER_1_API_REPLI360_NO_FLOORPLANS","OK",,773689
+112,"567","Ridgewood","3863 Memorial Dr","Decatur","GA","30032","http://www.ridgewoodgabyelon.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,52882
+113,"40743","Met Spires","233 St Helens Ave","Tacoma","WA","98402","https://www.metspires.com/","no records extracted","rentcafe","repli360","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,297355
+113,"68956","266 Lofts","266 S Front St","Memphis","TN","38103","https://www.266lofts.com/","no records extracted","g5","g5","TIER_1_API_G5_API_ERROR","OK",,296171
+114,"251120","The Foundry","998 Riverfront St","West Sacramento","CA","95691","https://www.thefoundry-tbd.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,156204
+115,"35683","Parkcrest at the Lakes","13621 Parkcrest Blvd","Fort Myers","FL","33912","www.parkcrestatthelakesapts.com","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,144568
+115,"74384",,,,,,"https://www.fountainparksouth.com/","no extract result",,,,,,
+116,"252891",,,,,,"https://www.livebellrock.com/apartments/tx/katy/bellrock-market-station/","no extract result",,,,,,
+116,"70993","Modera Mosaic","2920 District Ave","Fairfax","VA","22031","https://www.moderamosaic.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,172845
+117,"46576",,,,,,"https://www.proresidential.com/oklahoma-properties/campus-pointe-","no extract result",,,,,,
+118,"40398","Canyon Springs","6185 N Figarden Dr","Fresno","CA","93722","https://www.canyonspringsfresno.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,156035
+120,"270672","Pointe Grand Warner Robins","1601 Leverette Rd","Warner Robins","GA","31088","https://www.pointegrandwarnerrobins.com/","no records extracted","funnel","funnel","TIER_1_API_FUNNEL_SHAPE_REJECTED","OK",,261253
+120,"47909","Westerville Park Apartment Homes","4565 Northland Square Dr E","Columbus","OH","43231","https://www.capcityapartments.com/westerville-park","no records extracted","wix_floor_plans","wix_floor_plans","TIER_1_DOM_WIX_FLOOR_PLANS","OK",,552741
+122,"240595","Stockbridge Trails","319 E Hill Pkwy","Madison","WI","53718","https://www.stockbridgetrailsapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,84329
+122,"251514","LC SoBro I","209 Elm St","Nashville","TN","37210","https://lifestylecommunities.com/community/lc-sobro","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_EMPTY","OK",,185584
+122,"32097","Clemmons Trace Village","114 Willow Trace Cir","Clemmons","NC","27012","http://www.clemmonstracevillage.com/","no records extracted","resman","resman","TIER_1_API_RESMAN_NO_PORTAL","OK",,358967
+124,"253966","Aventura at Maryland Oaks","2100 E Aventura Way","St Louis","MO","63146","https://www.avmarylandoaks.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,200142
+125,"220907","Reserve At Bradbury Place","560 W New Hope Rd","Goldsboro","NC","27534","https://www.keystonemanagement.com/apartments/nc/reserve-at-bradbury-place","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,814700
+125,"227354",,,,,,"https://www.sandstoneapartmenthomes.com/","no extract result",,,,,,
+126,"46257","Advenir at Mayfield","3200 Bromley Pl","Midland","TX","79705","https://www.adveniratmayfield.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,135945
+127,"219752","Lamphouse","203 E Main St","Waunakee","WI","53597","https://lamphouseapts.com/","no records extracted","generic","unknown","TIER_1_API","OK",,0
+127,"223547","Redwood Delta Township II","8156 Roslyn Hill","Lansing","MI","48917","https://www.byredwood.com/apartments/mi/lansing/redwood-delta-township/index.aspx","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,277606
+128,"36158","Allen Meadows","5562 Bear Rd","Syracuse","NY","13212","https://allenmeadows.prospectportal.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,143869
+131,"58390",,,,,,"https://live30lancaster.com/","no extract result",,,,,,
+132,"224720","Optima Old Orchard Woods","9739 Woods Dr","Skokie","IL","60077","http://www.optimaoldorchardwoods.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,274399
+132,"241538","Block 88","1304 NE 88th St","Vancouver","WA","98665","http://www.block88apts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,198517
+132,"56903","The Landmark","550 Washington St","Braintree","MA","02184","https://www.fxmessina.com/the-landmark?rq=The%20Landmark","no records extracted","squarespace_nopms","squarespace_nopms","SYNDICATION_ONLY_SQUARESPACE","OK",,140945
+133,"11543","Westwind Apartments","4300 Old Benbrook Rd","Fort Worth","TX","76116","http://www.leasewestwindapartments.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,140006
+133,"27125","Tudor Place","5801 Peabody St","Hyattsville","MD","20783","https://www.tudorplaceapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,94596
+134,"74872","Heather Ridge","454 Heather Dr N","Mantua","NJ","08051","http://heatherridgeapts.net/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,140418
+135,"19877","Advenir at Magnolia","210 Welcome Way","Fern Park","FL","32730","http://www.adveniratmagnolia.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,136883
+136,"239094","Zander Place","1300 Main St","Cross Plains","WI","53528","http://www.zanderplace.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,56787
+136,"48092","Edgewater Village","5500 Weslo Willow Dr","Greensboro","NC","27409","https://www.edgewatervillageapts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,149143
+137,"11089","Village Green of Bear Creek","1800 Fuller Wiser Rd","Euless","TX","76039","http://www.villagegreenofbearcreekapts.com/home/","no records extracted","resman","resman","TIER_1_API_RESMAN_NO_PORTAL","OK",,78405
+137,"44955",,,,,,"https://www.kjaxproperty.com/fulton-woods","no extract result",,,,,,
+138,"37071","Summerwood on Towne Line","2520 Summer Dr","Indianapolis","IN","46268","www.summerwoodindy.com","no records extracted","generic","unknown","TIER_1_API","OK",,159432
+138,"60303",,,,,,"http://ironworksindy.com/","no extract result",,,,,,
+139,"293741",,,,,,"https://www.hudsonbishopscreek.com/","no extract result",,,,,,
+139,"6477","Harbour Pointe","4501 71st St W","Bradenton","FL","34210","http://www.gscapts.com/apartments/Bradenton_FL/zip_34210/gsc/15388","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,142842
+142,"251974",,,,,,"https://www.domainatfoundersparc.com/","no extract result",,,,,,
+142,"52854","Parkside","1408 Brookview Dr","Toledo","OH","43615","https://parksideaptsliving.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,183512
+143,"28174","Pinewoods Circle","34200 Pinewoods Cir","Romulus","MI","48174","http://www.pinewoodsvillage.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,86685
+144,"262964","The Bellagio","1384 Empire Blvd","Rochester","NY","14609","https://www.bellagio1384.com/","no records extracted","wix_floor_plans","wix_floor_plans","TIER_1_DOM_WIX_FLOOR_PLANS","OK",,556043
+144,"38378","Park Northside","1601 Roane St","Richmond","VA","23222","https://www.parknorthsiderva.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,819496
+144,"64673","River's Edge Apartments","1701 Island Home Ave","Knoxville","TN","37920","http://riversedgeknox.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,186513
+145,"40309","1750 on First","1750 First St","Simi Valley","CA","93065","https://www.1750-onfirstapartments.com/","no records extracted","onsite_apply","onsite_apply","TIER_1_API_ONSITE_APPLY_NO_DATA","OK",,120567
+145,"63558","Pearl Dadeland","7440 N Kendall Dr","Kendall","FL","33156","http://pearldadeland.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,149810
+147,"267117","Azure Carnes Crossroads","900 Conway Circle","Summerville","SC","29486","https://www.azurecarnescrossroads.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,188141
+148,"22934","Westwood Village Galleria","1441 Veteran Ave","Los Angeles","CA","90024","https://westwoodvillagegalleria.bhprop.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,100063
+148,"57195","Tribeca","720 W 3rd Ave","Columbus","OH","43212","https://tribecacolumbus.com/","no records extracted","squarespace_nopms","squarespace_nopms","SYNDICATION_ONLY_SQUARESPACE","OK",,470244
+149,"39198","Vista De Palmas Apartments","1415 W Freddy Gonzalez Dr","Edinburg","TX","78539","http://www.vistadepalmasapartments.com/","no records extracted","generic","unknown","TIER_1_API","OK",,2164358
+149,"72391","Lumina","301 Washington St","Conshohocken","PA","19428","https://liveatlumina.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,410384
+149,"7980","Tesota Morningside","3958 Montgomery Blvd NE","Albuquerque","NM","87109","https://www.tesotamorningside.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,140439
+150,"238508","Centennial","506 W Centennial Blvd","Springfield","OR","97477","https://www.liveatcentennialapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,190017
+150,"298586","Gateway Lofts Lexington","380 Virginia Ave","Lexington","KY","40504","https://gatewayloftslexington.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,619400
+150,"52949","Woodlands at Nashua","3 Sapling Cir","Nashua","NH","03062","https://www.livewoodlandsatnashua.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,149019
+150,"594","Harbinwood","1295 Harbins Rd NW","Norcross","GA","30093","www.harbinwoodbyelon.com","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,52799
+151,"1617",,,,,,"https://www.crossingatriverlake.com","no extract result",,,,,,
+151,"22658","Country Ridge Townhomes","6710 Shady Pine Ln","Saginaw","MI","48603","https://www.countryridge.com","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,87463
+151,"258789","Luxe 88","1025 Luxe Ave","Columbus","OH","43220","https://luxe88apts.com/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,682774
+151,"261580",,,,,,"https://www.1515parkplace.com/","no extract result",,,,,,
+151,"54936","Brentwood Square","13433 Greenwood Ave N","Seattle","WA","98133","https://brentwoodsquareapts.prospectportal.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,132193
+152,"47845","Casa De Caro","5240 E Bellevue St","Tucson","AZ","85712","https://www.equilibriumprops.com/casa-de-caro-apartments","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,227487
+152,"59649",,,,,,"https://801polaris.com/","no extract result",,,,,,
+153,"120193","Parks Residential - Richardson","2220 N Glenville Dr","Richardson","TX","75082","https://www.parksrichardson.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,291180
+153,"225914","Fox Glen","6301 Fox Glen Dr","Saginaw","MI","48638","www.foxglen-apts.com","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,64428
+153,"38677","Tor View Village","1 Kensington Cir","Garnerville","NY","10923","www.torviewvillageapts.com","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,119686
+154,"3912","Stratford Village","2000 London Town Ln","Montgomery","AL","36117","https://www.stratfordvillageapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,134879
+155,"231543","Autumn Hills","400 Hoover Way","Woodbridge","NJ","07095","https://bestrentnj.com/Communities/Autumn-Hills/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,224516
+155,"246351","Chatsworth Village Townhomes","17 Chatsworth Ave","Buffalo","NY","14217","https://www.glendalecommunities.com/property/chatsworth-townhouses/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,316079
+155,"281767","YO","3201 Morgan Ford Rd","St. Louis","MO","63116","https://www.yo-stl.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,122507
+156,"17586","Natick Park","4701 Natick Ave","Sherman Oaks","CA","91403","https://www.natickpark.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,132900
+156,"48946",,,,,,"https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb","no extract result",,,,,,
+156,"72732",,,,,,"http://www.centralmngt.com/Search?Community=15","no extract result",,,,,,
+157,"262174","Star Deluxe Branford","375 E Main St","Branford","CT","06405","https://metrostarapartments.com/star-deluxe-branford/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,79916
+157,"3169","Avana Court","3800 Club Dr","Duluth","GA","30096","https://www.avanacourt.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,152456
+157,"42085","Revive Apartments","2341 58th Ave E","Fife","WA","98424","https://www.reviveapartments.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_EMPTY","OK",,188355
+157,"54798","The Point at Abington","12 Forsyth Dr","Abington","MA","02351","https://www.thepointatabington.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,142870
+158,"46179",,,,,,"https://www.hayloftapartmenthomes.com/east-hampton-estates","no extract result",,,,,,
+159,"35192","Enclave on Golden Triangle","5001 Golden Triangle Boulevard","Fort Worth","TX","76244","http://www.enclaveongoldentriangle.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,172862
+162,"12989",,,,,,"https://www.thegrandatwestchase.com/","no extract result",,,,,,
+163,"38797","Peppertree Village Apartments","153 Peppertree Dr","Buffalo","NY","14228","www.peppertreevillageapartments.com","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,167856
+163,"43995","Hamilton Hall","449 Hamilton St","Norristown","PA","19401","http://www.scullycompany.com/hamilton-hall-18.html","no records extracted","sightmap","sightmap","TIER_1_API_SIGHTMAP_SHAPE_REJECTED","OK",,222125
+163,"45755","The Landings","2248 Hudson Landings Dr","Gastonia","NC","28054","https://www.pedcorliving.com/apartments/the-landings","no records extracted","generic","generic_plan_text","GENERIC_VALIDITY_REJECTED","OK",,151909
+164,"4554",,,,,,"https://www.parkatcanyonridge.com/","no extract result",,,,,,
+165,"43908","ReNew Johnson Creek","12435 SE Linwood Ave","Milwaukie","OR","97222","https://www.renewjohnsoncreek.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,141691
+167,"35590","Stonepost Ranch","12801 W 136th St","Overland Park","KS","66221","https://www.stonepostranchapts.com","no records extracted","rentcafe","knock","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,344392
+169,"18764","Americana Palos Verdes","4050 Palos Verdes St","Las Vegas","NV","89119","https://www.americana-apts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,143245
+169,"269346","Ashford Apartment Homes","1200 Rockmont Cir SW","Conyers","GA","30094","https://rjamesproperties.com/ashford-brook/","no records extracted","generic","unknown","TIER_1_API","OK",,147714
+172,"260505","Onyx Uptown PHX","500 W Camelback Rd","Phoenix","AZ","85013","https://broadstoneuptownphx.com/","no records extracted","generic","unknown","TIER_1_API","OK",,24695
+173,"263498","The Julington","12397 San Jose Blvd","Jacksonville","FL","32223","https://risejulington.com/","no records extracted","generic","unknown","TIER_1_API","OK",,24301
+173,"9128","Kingswood","3400 Joyce Ln","Denton","TX","76207","https://www.kingswoodenton.com/","no records extracted","resman","resman","TIER_1_API_RESMAN_NO_PORTAL","OK",,191088
+174,"253646","Tapestry Westland Village","6505 Collins Rd","Jacksonville","FL","32244","https://www.alapts.com/apartments/fl/jacksonville/tapestry-westland-village/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,173745
+174,"27725","The Gardens of Pinecrest","8800 SW 68th Ct","Miami","FL","33156","https://www.gardensofpinecrestapartments.com/?rcstdid=MzI%3d-GJOvflXLv8M%3d&_yTrackUser=ODc4MjE0MDU4IzE4OTE0MjUzNDM%3d-q3%2b9PtfoQ%2bo%3d&_yTrackVisit=MTU4OTQ5NDE0MyMxODI1ODI1MTU3-j1vbMVdjJw8%3d&_yTrackReqDT=22311420200708","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,55725
+175,"38107",,,,,,"https://www.livefountainplaceapts.com/","no extract result",,,,,,
+175,"42554",,,,,,"http://summerwindaptsfl.com/","no extract result",,,,,,
+175,"42571",,,,,,"https://westwoodvillageapthomes.com/en/","no extract result",,,,,,
+176,"246468","Colonial Manor","22479 Colonial Manor Rd","Watertown","NY","13601","https://www.rentwatertown.com/colonial-manor","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,343120
+177,"275898","Bradley Pointe","1355 Bradley Blvd","Savannah","GA","31419","https://www.liveatbradleypointe.com/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,73346
+177,"293923",,,,,,"https://www.woodsatcountrysidecrossing.com/","no extract result",,,,,,
+177,"56762","Seventh West","1427 7th St","Santa Monica","CA","90401","https://www.seventhwestapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,187863
+178,"4330",,,,,,"https://www.invitationalapartments.com/","no extract result",,,,,,
+181,"251908",,,,,,"https://www.posthouseevv.com/","no extract result",,,,,,
+181,"77794",,,,,,"https://www.palmbeachgardensapartments.com/","no extract result",,,,,,
+182,"20959","Dove Valley Apartment Homes","7550 S Blackhawk St","Englewood","CO","80112","https://www.dovevalleyapts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,147593
+182,"235473",,,,,,"http://www.rooftop252.com/","no extract result",,,,,,
+183,"234772","The Pointe at Harpers Mill","600 Harpers Mill Rd","Glen Burnie","MD","21108","http://www.liveattp.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,147979
+183,"32978","Camden Vineyards","24323 Jackson Ave","Murrieta","CA","92562","https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards","no records extracted","camden","camden","TIER_1_DOM_CAMDEN","OK",,147458
+184,"253326","The Point at Reston","1925 Roland Clarke Pl","Reston","VA","20191","https://www.thepointatreston.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,145009
+184,"34708","Camden Main & Jamboree","2801 Main St","Irvine","CA","92614","https://www.camdenliving.com/apartments/irvine-ca/camden-main-and-jamboree","no records extracted","camden","camden","TIER_1_DOM_CAMDEN","OK",,147450
+184,"5735","Aventura Apartments","5300 Cinderlane Pkwy","Orlando","FL","32808","https://aventuraorlandoapartments.prospectportal.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,141231
+187,"69378","Redwood Akron","1738 Northampton Rd","Akron","OH","44313","https://www.byredwood.com/apartments/oh/akron/redwood-akron/index.aspx","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,153228
+188,"4124",,,,,,"https://tramor.com/property/tramor-cannon-place/","no extract result",,,,,,
+188,"44339","Pronghorn Apartments","1700 W 25th St","Casper","WY","82604","https://www.pronghorncasper.com/?utm_source=GMB&utm_medium=organic","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,143200
+188,"72743",,,,,,"https://brandywinecommunities.com/properties/della-plaza/","no extract result",,,,,,
+190,"226383","The Colony Apartments","1041 Dabney St","Corpus Christi","TX","78411","http://availability.sparkleam.com/properties/?rmwebsvc_command=PropertyDetail&rmwebsvc_id=4&rmwebsvc_template=Properties","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,18474
+190,"2948","Crystal Woods of Alexandria","4905 Southland Ave","Alexandria","VA","22312","www.crystalwoodsapts.com","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,124769
+190,"67684",,,,,,"http://twolightkc.com/","no extract result",,,,,,
+191,"48075",,,,,,"https://www.edgefieldaptsva.com/","no extract result",,,,,,
+192,"22382","4418 Spruce Street","4418 Spruce St","Philadelphia","PA","19104","https://www.livecampusapts.com/property/4418-spruce-street/?search-parameters=1&start_date=0&end_date=9999999999&price_min=0&price_max=10000","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_SHAPE_REJECTED","OK",,106478
+194,"228073","Alister Montclair","11 Pine St","Montclair","NJ","07042","https://www.alistermontclair.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,170968
+195,"225886","Casa Baywood","212 S El Camino Real","San Mateo","CA","94401","https://www.casabaywoodapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,134384
+196,"14295","Timber Ridge Apartment Homes","1025 Adams Cir","Boulder","CO","80303","www.myboulderapartment.com","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,170110
+197,"24337","Colonial House","1560 San Tomas Aquino Rd","San Jose","CA","95130","https://residential.eprodesse.com/colonial-house-apartments/index.aspx","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,108619
+198,"72631","Linden Lane","2505 E Main Ave","Puyallup","WA","98372","http://www.lindenlaneapartmenthomes.com/","no records extracted","generic_plan_text","generic_plan_text","TIER_1_DOM_GENERIC_PLAN_TEXT","OK",,98764
+198,"8119","St. Andrews of Palm Aire","1000 SW 46th Ave","Pompano Beach","FL","33069","https://www.scullycompany.com/apartments/florida/broward-county/pompano-beach/st-andrews-palm-aire/","no records extracted","sightmap","sightmap","TIER_1_API_SIGHTMAP_SHAPE_REJECTED","OK",,217411
+199,"55165","Legacy Oaks","675 White Oak Cir","Independence","OR","97351","http://legacyoaksapts.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,180682
+200,"17674","Hollywood Terrace","6550 Yucca St","Los Angeles","CA","90028","http://hpgmanagement.com/property/6550yucca/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,30588
+201,"294493","Ashland","657 Ashland Ave","St Paul","MN","55104","https://krcapartments.com/property-detail/?propid=587&propname=Ashland%20Apartments","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,233472
+201,"47444","Iroquois Green","100 Lawson Ln","Louisville","KY","40214","https://www.sunresidential.com/iroquois-green-apartments0/default","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,229086
+201,"67383","The Standard at Leander Station","1680 Hero Way","Leander","TX","78641","http://www.lifeatthestandard.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,113675
+203,"29566",,,,,,"https://heatherwoodfl.com/","no extract result",,,,,,
+204,"16172",,,,,,"http://www.townecrest.com/","no extract result",,,,,,
+205,"47182",,,,,,"https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta","no extract result",,,,,,
+205,"47750",,,,,,"https://www.theridgeatchestnuthillapts.com/","no extract result",,,,,,
+205,"72542",,,,,,"http://www.rentandresidehere.net/","no extract result",,,,,,
+206,"254122",,,,,,"https://www.pedcorliving.com/apartments/avril-cambridge-village","no extract result",,,,,,
+207,"15693","Yorba Linda Pines","18700 Yorba Linda Blvd","Yorba Linda","CA","92886","http://www.yorbalindapines.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,164189
+208,"220109","Melrose Station Apartments","902 Valley Rd","Elkins Park","PA","19027","https://www.fmgnj.com/apartments/pa/elkins-park/melrose-station/floor-plans","no records extracted","g5","g5","TIER_1_API_G5_API_ERROR","OK",,226113
+209,"67154","Southern Pine Apartments","2520 Allie Nicole Cir","Virginia Beach","VA","23456","www.southernpineapts.com","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,203681
+211,"8740",,,,,,"https://livebh.com/apartments/parc-plaza-apartments/","no extract result",,,,,,
+214,"223864","Kendall Square","209 Old Graves Mill Rd","Lynchburg","VA","24502","http://www.stewartlangleyproperties.com/kendall-square/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,691993
+215,"20262","Kings Mill","8917 N Davis Hwy","Pensacola","FL","32514","https://www.pedcorliving.com/apartments/kings-mill-apartment-homes","no records extracted","generic","generic_plan_text","GENERIC_VALIDITY_REJECTED","OK",,151265
+216,"2198","Lincoln Green","4000 Presidential Blvd","Philadelphia","PA","19131","www.lincolngreenapartments.com","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER_NO_ENDPOINT","OK",,173261
+217,"239274","Strata on California","6312 California Ave SW","Seattle","WA","98136","http://www.strataoncalifornia.com","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,136334
+217,"4756","Clear Run","5300 New Centre Dr","Wilmington","NC","28403","https://www.clearrunaptswilmington.com/","no records extracted","knock","knock","TIER_1_KNOCK_API","OK",,691680
+218,"234581","Georgetown Crossing","100 Georgetown Rd","Mechanicsburg","PA","17050","https://www.triplecrowncorp.com/company/locations/georgetown-crossing/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,127638
+220,"242976","Kelly Farms","1280 Cinnamon Hill Ln","Columbia","MO","65201","http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,158842
+220,"281149",,,,,,"http://irondaleatwharton.com/","no extract result",,,,,,
+220,"50172",,,,,,"https://www.countrysideest.com","no extract result",,,,,,
+221,"276162","Modera Academical Village I","3440 SW 76 Ter","Davie","FL","33328","https://www.moderaacademicalvillage.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,171285
+222,"244756","Town Commons","1600 Town Commons Dr","Howell","MI","48855","https://harvest-properties.com/project/town-commons-apartments/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,456038
+222,"254556","Park Place","305 W Jack Finney Blvd","Greenville","TX","75402","https://www.parkplacegreenville.com/","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,572938
+222,"74519","The Jamestown","127 Yeardley Dr","Newport News","VA","23601","https://www.thejamestownapartments.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,72612
+223,"20672","Quiet Waters Landing","1293 Thom Ct","Annapolis","MD","21403","https://www.quietwaterslanding.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,142277
+224,"245993","Alberta Square","450 Alberta Dr","Buffalo","NY","14226","https://www.glendalecommunities.com/property/alberta-square/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,328872
+224,"260564","Union @ Roosevelt II","888 N 1st Ave","Phoenix","AZ","85003","https://www.unionatroosevelt.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,256569
+224,"38314","Coppermill","2217 Edenborn Ave","Metairie","LA","70001","https://www.coppermillaptsbytonti.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,137402
+225,"58546","Lake Park Estates","1265 Pershing Rd","De Pere","WI","54115","https://wright-weber.com/property/LakePark","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,118547
+225,"9473",,,,,,"https://www.thevillagedallas.com/properties/the-village-cliffs/","no extract result",,,,,,
+226,"265143","The Point at Kingston","1 Kingston Collection Way","Kingston","MA","02364","https://www.thepointatkingston.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,143294
+227,"262717",,,,,,"https://www.aviareedycreek.com/","no extract result",,,,,,
+227,"44148","Glacier View","3000 SW Corbeth Ln","Troutdale","OR","97060","https://glacierview.tokolaproperties.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,133080
+227,"6274","The Village at Voorhees","10 Lucas Ln","Voorhees Township","NJ","08043","https://www.fmgnj.com/apartments/nj/voorhees/the-village-apartments/","no records extracted","g5","g5","TIER_1_API_G5_API_ERROR","OK",,350586
+227,"70255","Coventry Square","20 Charles St","Westwood","NJ","07675","https://coventrysquareapartments.com/","no records extracted","generic","generic_plan_text","TIER_1_API","OK",,99515
+228,"118965","16 Bennett","16 Bennett St","Jersey City","NJ","07304","https://www.16bennett.com","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,568779
+229,"297708","Argento at Sugarloaf","80 Lawrenceville-Suwanee Rd","Lawrenceville","GA","30044","https://www.argentoatsugarloaf.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,304115
+229,"41644","West Mall Terrace","4720 S Pine St","Tacoma","WA","98409","www.rentatwestmallterrace.com","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,145589
+230,"23760","Ashton Glen","8850 Golden Oak Dr","Manassas","VA","20109","http://www.ashtonglen.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,34906
+230,"237787",,,,,,"http://heritagepropertyrentals.com/heritage-amity-commons-overview/","no extract result",,,,,,
+230,"262799","220 East 72nd","220 E 72nd St","New York","NY","10021","https://www.dermotcompany.com/building/220-east-72nd-street#availability","no records extracted","rentcafe","onsite_apply","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,325870
+230,"46036","Serengeti Springs","7898 Serenera Way","West Jordan","UT","84081","http://www.serengetisprings.com","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,147533
+231,"270367","Boulevard 45","4540 Helm Dr","Virginia Beach","VA","23452","https://blvd45apts.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,652276
+231,"295643","Walnut River Residences","925 SE River Rd","El Dorado","KS","67042","https://walnutriverresidences.com/","no records extracted","generic_plan_text","generic_plan_text","TIER_1_DOM_GENERIC_PLAN_TEXT","OK",,119240
+231,"39710","Ashton Judiciary Square","750 3rd St NW","Washington","DC","20001","http://www.ashtonjs.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,590615
+232,"271721","The Millennium on Monroe","2002 N Monroe St","Spokane","WA","99205","https://www.millenniumnw.com/","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,416904
+232,"51143","Lauderdale Hollows","1622 Carl St","Lauderdale","MN","55108","https://mgmmgmt.net/property-details/?pid=136","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER_NO_ENDPOINT","OK",,63750
+233,"263127","Hickory Grove","11907 Apache Ave","Savannah","GA","31419","https://www.hickorygrovega.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER_NO_ENDPOINT","OK",,112884
+233,"44513","Tranquility Pointe","4345 N 126th Ct","Omaha","NE","68154","https://www.tranquilitypointeapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,175883
+234,"19538","Stadium Apartments","2999 Woodway Dr SW","Huntsville","AL","35805","http://www.stadiumapartmentshuntsville.com/","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,430783
+234,"9297","Park Creek Manor","2520 Coombs Creek Dr","Dallas","TX","75211","https://www.parkcreekmanor.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,140535
+235,"23494","Indian Village","930 Old Goddard Rd","Lincoln Park","MI","48146","https://indianvillageapt.wixsite.com/home/apartments","no records extracted","wix_nopms","wix_nopms","SYNDICATION_ONLY_WIX","OK",,375059
+235,"241145",,,,,,"https://www.midtownwestdetroit.com/single-family","no extract result",,,,,,
+235,"48389","Village Gate Apartments","3311 Turtle Point Dr","Fayetteville","NC","28304","http://www.villagegatenc.com/","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,55462
+237,"71962","Towne House","151 Sea St","Quincy","MA","02169","https://www.townehousequincy.com/","no records extracted","onesite","knock","TIER_1_API_ONESITE_NO_RESPONSE","OK",,126951
+238,"274886",,,,,,"https://parkplace380.com/listings/aster-village-two/","no extract result",,,,,,
+239,"258584","The Encore at Ingram Manor","7307 Park Heights Ave","Pikesville","MD","21208","https://www.theencoreatingrammanorapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,146806
+239,"64068","Riverplace","201 Deann Dr","Independence","OR","97351","www.riverplacecr.com","no records extracted","generic","unknown","TIER_1_API","OK",,24257
+240,"283566","The Standard at Franz","24300 Franz Rd","Katy","TX","77493","https://www.hpifranz.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,144922
+240,"43520","Park at Blanding","222 Blairmore Blvd E","Orange Park","FL","32073","http://www.parkatblanding.com/","no records extracted","realpage_oll","onesite","TIER_1_API_REALPAGE_OLL","OK",,243199
+241,"22964","Tropicana Village Apartments","4995 S Maryland Pkwy","Las Vegas","NV","89119","https://www.tropicanavillageapartments.com/","no records extracted","generic","unknown","TIER_1_API","OK",,129358
+241,"260761","Westridge Lofts","2311 SE 192nd Ave","Camas","WA","98607","http://www.westridgelofts.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,273953
+241,"38984","Lakeview Arms","800 Magee Dr","Brookhaven","MS","39601","http://www.lakeviewapartmentsms.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,166075
+242,"230802","ReNew Little Creek II","6450 Crescent Way","Norfolk","VA","23513","https://www.renewlittlecreek.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_NO_RESPONSE","OK",,140960
+242,"32134","Crowders View Townhomes","1926 Hartford Dr","Gastonia","NC","28052","https://crowdersviewtownhomes.com/","no records extracted","rentmanager","rentmanager","TIER_1_API_RENTMANAGER","OK",,214427
+243,"19785","Cottonwood Creek Apartments","3149 E Desert Inn Rd","Las Vegas","NV","89121","www.cottonwoodcreekapartments.com","no records extracted","onesite","onesite","TIER_1_API_ONESITE_NO_RESPONSE","OK",,169946
+243,"5782","Springfield","10815 SE 184th Ln","Renton","WA","98055","https://www.springfieldrenton.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_SHAPE_REJECTED","OK",,215435
+243,"68952",,,,,,"https://www.livewyeast.com/","no extract result",,,,,,
+244,"252116","Emerson Park","6735 Brookline Gardens Rd","Westerville","OH","43081","https://www.liveemersonpark.com/","no records extracted","encoreskyline_template","encoreskyline_template","ENCORESKYLINE_NO_PLAN_LINKS","OK",,549919
+244,"32716","Porto Bella","10853 Firestone Blvd","Norwalk","CA","90650","https://portobellaapts.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,161728
+244,"38345",,,,,,"http://www.monarchatdosvientos.com/","no extract result",,,,,,
+247,"224888",,,,,,"http://www.coveatoverlakeapts.com/","no extract result",,,,,,
+248,"35778","Brazos Ranch","7404 Town Center Blvd","Rosenberg","TX","77471","https://www.brazosranch-apts.com/","no records extracted","entrata","entrata","TIER_1_API_ENTRATA_EMPTY","OK",,191242
+248,"61285",,,,,,"http://www.allezliving.com/","no extract result",,,,,,
+249,"67697","Central Island Square","50 Central Island St","Charleston","SC","29492","https://www.cr-centralislandsquareapts.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,196815
+249,"68691","The District at Rosemary","710 N Lemon Ave","Sarasota","FL","34236","https://www.thedistrictatrosemary.com/","no records extracted","rentcafe","rentcafe","TIER_1_API_RENTCAFE_NO_RESPONSE","OK",,239143
+249,"69282","Vista Del Plaza","272 S Poplar Ave","Brea","CA","92821","http://www.vistadelplaza.com/","no records extracted","appfolio","appfolio","TIER_1_API_APPFOLIO_EMPTY","OK",,76392

@@ -1,0 +1,1019 @@
+{
+  "archived_hyperbrowser_identity": {
+    "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/hb_oakrow_identity_probe.json",
+    "artifact_checks": [
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_0.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "08740e539fd37e510fa4aad7c714dd09e89c68ec92a0989962083da7efbde3b0",
+        "body_hash_matches": true,
+        "body_sha256": "870efd9c0159ff0b1ff58501d39f8ef8d12dd7f03517fe26b303ea15980b9b1c",
+        "index": 0
+      },
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_1.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "7bd5467d2dd4f1faf109aab55074ceaa4ebeed95a00fc1e9abd373fa05a613ff",
+        "body_hash_matches": true,
+        "body_sha256": "b176b1dc1bb7438c6a69702decee8e2db9dfed8d198a17f303f2f3f3c6f2681f",
+        "index": 1
+      },
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_2.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "12d4b96bf6c293e51755d96416e6c7312862acdd75fe35bb7f0413efbc225c62",
+        "body_hash_matches": true,
+        "body_sha256": "ef632eaaa18abb46b7980fa1aaef500347cf4246593fd2a4431d573ad624b45d",
+        "index": 2
+      },
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_3.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "1609c0bb4d2dc0e5df7f611b5b34c6b7c023a3f0a2ceb65a70c517486a079e20",
+        "body_hash_matches": true,
+        "body_sha256": "433e481e23005c803fdb1eaefedcb8f033e20de393e5fe5c0b27f32e77c8eaed",
+        "index": 3
+      },
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_4.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "644eabdf2f801dd6f1b74987255c28d80a201fd3bb91edb8d353bf646989fa46",
+        "body_hash_matches": true,
+        "body_sha256": "000572944eead69f04a15e429b245bfb0d3ce948d530bb0ed0857c3bab5ff5c0",
+        "index": 4
+      },
+      {
+        "artifact": "/private/tmp/propai-fnd-vBkmT9/cortland_oakrow_lane/25489_hb_page_5.html.gz",
+        "artifact_hash_matches": true,
+        "artifact_sha256": "19ce511610beaf3e9329a008c256832489b16e640cc75b13aed83e22ea4b5049",
+        "body_hash_matches": true,
+        "body_sha256": "c293b05bd5f791bf8e23e7ce5e525788a349ea06e746add17c1201bcb884488c",
+        "index": 5
+      }
+    ],
+    "artifact_sha256": "efa1920aa588f6b5fb262b55cf6e3c662e1c4b2eac0d802cd7c8b0511af71634",
+    "exact_root_identity": true,
+    "strict_pass": true,
+    "three_diverse_plan_pages_exact": true
+  },
+  "authoritative_ledger_eligible": false,
+  "authoritative_ledger_hold_reason": "parent must independently inspect and admit this evidence",
+  "canary_mutation": "none",
+  "cohort": {
+    "boundary": "exact_2026-07-31_FAILED_NO_DATA_344",
+    "state_after": {
+      "ledger_rows": 238,
+      "ledger_sha256": "5e3aa1bb2edb61fd1860eb3d9cf23f234dbf7435c600b87524683271645fb712",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 106,
+      "remaining_sha256": "442a03d16a91c1f95f1d87341174e406c269094969bd0ef1a58069fe03cb9ec9",
+      "summary_sha256": "97a45bdfc4a864e11323810763e5cf644360d84b55f1d861a9ea398dca974ca0"
+    },
+    "state_before": {
+      "ledger_rows": 238,
+      "ledger_sha256": "5e3aa1bb2edb61fd1860eb3d9cf23f234dbf7435c600b87524683271645fb712",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 106,
+      "remaining_sha256": "442a03d16a91c1f95f1d87341174e406c269094969bd0ef1a58069fe03cb9ec9",
+      "summary_sha256": "97a45bdfc4a864e11323810763e5cf644360d84b55f1d861a9ea398dca974ca0"
+    }
+  },
+  "commit": "none",
+  "configured_identity": {
+    "address": "17811 Vail St",
+    "apartmentid": "25489",
+    "city": "Dallas",
+    "name": "Cortland North Dallas",
+    "state": "TX",
+    "website": "https://cortland.com/apartments/cortland-north-dallas/",
+    "zip": "75287"
+  },
+  "configured_redirect_probe": {
+    "body_sha256": "a6dfd4c5c310dae04631fc724ec2b6c94cfab910c8ee888c85a16836954f7993",
+    "final_url": "https://www.oakrowdallas.com/",
+    "outcome": "OK",
+    "status": 200
+  },
+  "current_identity": {
+    "address": "17811 Vail St",
+    "city": "Dallas",
+    "name": "Oak Row North Dallas",
+    "root_url": "https://www.oakrowdallas.com/",
+    "state": "TX",
+    "zip": "75287"
+  },
+  "generated_at_utc": "2026-08-01T16:49:49.504064+00:00",
+  "guardrails": {
+    "archived_identity_hyperbrowser_sessions": 1,
+    "archived_identity_solve_captchas": false,
+    "archived_identity_use_stealth": false,
+    "captcha_solving": false,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_HYPERBROWSER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": ""
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_live_replay_calls": 0,
+    "llm": false,
+    "paid_canary": false,
+    "web_unlocker_calls": 0
+  },
+  "lane": "oakrow_25489_rebrand_exact_property_configured_e2e",
+  "ledger_mutation": "none",
+  "property_id": 25489,
+  "push": "none",
+  "source_snapshot_after": {
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "sha256": {
+      "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+      "ma_poc/pms/adapters/entrata.py": "4411f671a76877ff2257ee2a93540ffd11d71a0318d4877b877b457b097e61d6",
+      "ma_poc/pms/scraper.py": "17f8c4398cd4c10f8d776970a564f10b6fa858532accbe85dc61d44a9dba32cd",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py": "c062ed24b645de98160da99f59f804c7ecaa7127d84d65e3ddc9f2bc2a52a7ab"
+    }
+  },
+  "source_snapshot_before": {
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "sha256": {
+      "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+      "ma_poc/pms/adapters/entrata.py": "4411f671a76877ff2257ee2a93540ffd11d71a0318d4877b877b457b097e61d6",
+      "ma_poc/pms/scraper.py": "17f8c4398cd4c10f8d776970a564f10b6fa858532accbe85dc61d44a9dba32cd",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py": "c062ed24b645de98160da99f59f804c7ecaa7127d84d65e3ddc9f2bc2a52a7ab"
+    }
+  },
+  "verification": {
+    "all_repeats_pass": false,
+    "checks": [
+      {
+        "command": [
+          "ruff",
+          "check",
+          "ma_poc/pms/adapters/entrata.py",
+          "ma_poc/pms/scraper.py",
+          "ma_poc/core/identity.py",
+          "ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py"
+        ],
+        "elapsed_ms": 27,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "All checks passed!\n"
+      },
+      {
+        "command": [
+          "pytest",
+          "-q",
+          "ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py"
+        ],
+        "elapsed_ms": 1214,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": ".....................                                                    [100%]\n21 passed in 0.23s\n"
+      }
+    ],
+    "configured_pipeline_repeats": [
+      {
+        "adapter": "entrata",
+        "assertions": {
+          "adapter_entrata": true,
+          "detected_entrata": true,
+          "entrata_uids_unique": true,
+          "fallback_chain_exact": true,
+          "multiple_exact_plan_sources": true,
+          "native_positive_units_only": true,
+          "natural_unit_numbers_unique": true,
+          "no_pipeline_errors": true,
+          "no_plan_level_rows": true,
+          "unit_tier_exact": true
+        },
+        "distinct_entrata_uids": 38,
+        "distinct_unit_numbers": 38,
+        "entrata_uids": [
+          "5121597",
+          "5121598",
+          "5121599",
+          "5121672",
+          "5121683",
+          "5121689",
+          "5121725",
+          "5121727",
+          "5121729",
+          "5121749",
+          "5121753",
+          "5121785",
+          "5121792",
+          "5121797",
+          "5121834",
+          "5121839",
+          "5121850",
+          "5121888",
+          "5121890",
+          "5121903",
+          "5121905",
+          "5121960",
+          "5121962",
+          "5121988",
+          "5121992",
+          "5122000",
+          "5122009",
+          "5122024",
+          "5122035",
+          "5122060",
+          "5122081",
+          "5122108",
+          "5122114",
+          "5122131",
+          "5122133",
+          "5122137",
+          "5122164",
+          "5122176"
+        ],
+        "fallback_chain": [
+          "entrata"
+        ],
+        "plans": 0,
+        "raw_api_metadata": [
+          {
+            "status": 200,
+            "url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/b3-1157673-1/",
+            "via": "entrata_pp_unit_card_drill"
+          }
+        ],
+        "repeat": 1,
+        "source_urls": [
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a11-1157671-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a4-1157670-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a7-1157672-1/",
+          "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/"
+        ],
+        "strict_native_positive_rent_rows": 38,
+        "strict_pass": true,
+        "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+        "units": 38,
+        "units_compact": [
+          {
+            "availability_date": "2026-08-15",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-15",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1151,
+            "market_rent_low": 1151,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5121834"
+            },
+            "sqft": "620",
+            "unit_number": "10208"
+          },
+          {
+            "availability_date": "2026-09-13",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-13",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1176,
+            "market_rent_low": 1176,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5121839"
+            },
+            "sqft": "620",
+            "unit_number": "10214"
+          },
+          {
+            "availability_date": "2026-10-13",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-10-13",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1161,
+            "market_rent_low": 1161,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5121850"
+            },
+            "sqft": "620",
+            "unit_number": "10308"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A4",
+            "market_rent_high": 1367,
+            "market_rent_low": 1367,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a4-1157670-1/",
+            "source_ids": {
+              "entrata_fpid": "1157670",
+              "entrata_uid": "5121597"
+            },
+            "sqft": "585",
+            "unit_number": "1204"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A11",
+            "market_rent_high": 1587,
+            "market_rent_low": 1587,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a11-1157671-1/",
+            "source_ids": {
+              "entrata_fpid": "1157671",
+              "entrata_uid": "5121598"
+            },
+            "sqft": "710",
+            "unit_number": "1205"
+          },
+          {
+            "availability_date": "2026-09-04",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-04",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A7",
+            "market_rent_high": 1275,
+            "market_rent_low": 1275,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a7-1157672-1/",
+            "source_ids": {
+              "entrata_fpid": "1157672",
+              "entrata_uid": "5121599"
+            },
+            "sqft": "595",
+            "unit_number": "1206"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1248,
+            "market_rent_low": 1248,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5121888"
+            },
+            "sqft": "580",
+            "unit_number": "15304"
+          },
+          {
+            "availability_date": "2026-09-11",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-11",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1186,
+            "market_rent_low": 1186,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5121890"
+            },
+            "sqft": "580",
+            "unit_number": "15306"
+          },
+          {
+            "availability_date": "2026-10-08",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-10-08",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1330,
+            "market_rent_low": 1330,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121903"
+            },
+            "sqft": "706",
+            "unit_number": "17106"
+          },
+          {
+            "availability_date": "2026-08-08",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-08",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1330,
+            "market_rent_low": 1330,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121905"
+            },
+            "sqft": "706",
+            "unit_number": "17108"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1223,
+            "market_rent_low": 1223,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5121960"
+            },
+            "sqft": "580",
+            "unit_number": "18307"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1223,
+            "market_rent_low": 1223,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5121962"
+            },
+            "sqft": "580",
+            "unit_number": "18309"
+          },
+          {
+            "availability_date": "2026-09-06",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-06",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1240,
+            "market_rent_low": 1240,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121988"
+            },
+            "sqft": "706",
+            "unit_number": "20205"
+          },
+          {
+            "availability_date": "2026-10-04",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-10-04",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1250,
+            "market_rent_low": 1250,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121992"
+            },
+            "sqft": "706",
+            "unit_number": "20301"
+          },
+          {
+            "availability_date": "2026-09-08",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-08",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1355,
+            "market_rent_low": 1355,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5122000"
+            },
+            "sqft": "706",
+            "unit_number": "21101"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1314,
+            "market_rent_low": 1314,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5122009"
+            },
+            "sqft": "706",
+            "unit_number": "21302"
+          },
+          {
+            "availability_date": "2026-09-01",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-01",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1330,
+            "market_rent_low": 1330,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5122024"
+            },
+            "sqft": "706",
+            "unit_number": "23107"
+          },
+          {
+            "availability_date": "2026-08-11",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-11",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1250,
+            "market_rent_low": 1250,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5122035"
+            },
+            "sqft": "706",
+            "unit_number": "23302"
+          },
+          {
+            "availability_date": "2026-08-06",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-06",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1176,
+            "market_rent_low": 1176,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5122060"
+            },
+            "sqft": "580",
+            "unit_number": "24203"
+          },
+          {
+            "availability_date": "2026-08-19",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-19",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1186,
+            "market_rent_low": 1186,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5122081"
+            },
+            "sqft": "580",
+            "unit_number": "24308"
+          },
+          {
+            "availability_date": "2026-08-15",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-15",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1151,
+            "market_rent_low": 1151,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122108"
+            },
+            "sqft": "620",
+            "unit_number": "25203"
+          },
+          {
+            "availability_date": "2026-08-05",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-08-05",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1151,
+            "market_rent_low": 1151,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122114"
+            },
+            "sqft": "620",
+            "unit_number": "25209"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1196,
+            "market_rent_low": 1196,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122131"
+            },
+            "sqft": "620",
+            "unit_number": "25310"
+          },
+          {
+            "availability_date": "2026-09-04",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-04",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1161,
+            "market_rent_low": 1161,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122133"
+            },
+            "sqft": "620",
+            "unit_number": "25312"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1196,
+            "market_rent_low": 1196,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122137"
+            },
+            "sqft": "620",
+            "unit_number": "25317"
+          },
+          {
+            "availability_date": "2026-09-10",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-10",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A3",
+            "market_rent_high": 1176,
+            "market_rent_low": 1176,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a3-1157678-1/",
+            "source_ids": {
+              "entrata_fpid": "1157678",
+              "entrata_uid": "5122164"
+            },
+            "sqft": "580",
+            "unit_number": "30204"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A8",
+            "market_rent_high": 1196,
+            "market_rent_low": 1196,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a8-1157679-1/",
+            "source_ids": {
+              "entrata_fpid": "1157679",
+              "entrata_uid": "5122176"
+            },
+            "sqft": "620",
+            "unit_number": "30308"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 996,
+            "market_rent_low": 996,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121672"
+            },
+            "sqft": "395",
+            "unit_number": "3303"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 996,
+            "market_rent_low": 996,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121683"
+            },
+            "sqft": "395",
+            "unit_number": "3315"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 996,
+            "market_rent_low": 996,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121689"
+            },
+            "sqft": "395",
+            "unit_number": "3321"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 1027,
+            "market_rent_low": 1027,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121725"
+            },
+            "sqft": "395",
+            "unit_number": "5112"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 1001,
+            "market_rent_low": 1001,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121727"
+            },
+            "sqft": "395",
+            "unit_number": "5115"
+          },
+          {
+            "availability_date": "2026-09-17",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-17",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 971,
+            "market_rent_low": 971,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121729"
+            },
+            "sqft": "395",
+            "unit_number": "5117"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 985,
+            "market_rent_low": 985,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121749"
+            },
+            "sqft": "395",
+            "unit_number": "5217"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A2",
+            "market_rent_high": 1011,
+            "market_rent_low": 1011,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a2-1157677-1/",
+            "source_ids": {
+              "entrata_fpid": "1157677",
+              "entrata_uid": "5121753"
+            },
+            "sqft": "395",
+            "unit_number": "5221"
+          },
+          {
+            "availability_date": "2026-09-04",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "2026-09-04",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1240,
+            "market_rent_low": 1240,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121785"
+            },
+            "sqft": "706",
+            "unit_number": "6204"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1288,
+            "market_rent_low": 1288,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121792"
+            },
+            "sqft": "706",
+            "unit_number": "6303"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": null,
+            "availability_status": "AVAILABLE",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "1",
+            "floor_plan_name": "A10",
+            "market_rent_high": 1288,
+            "market_rent_low": 1288,
+            "source_api_url": "https://www.oakrowdallas.com/floorplans/dallas-TX/oak-row-north-dallas/a10-1157680-1/",
+            "source_ids": {
+              "entrata_fpid": "1157680",
+              "entrata_uid": "5121797"
+            },
+            "sqft": "706",
+            "unit_number": "6308"
+          }
+        ]
+      },
+      {
+        "adapter": "entrata",
+        "assertions": {
+          "adapter_entrata": true,
+          "detected_entrata": true,
+          "entrata_uids_unique": true,
+          "fallback_chain_exact": false,
+          "multiple_exact_plan_sources": false,
+          "native_positive_units_only": false,
+          "natural_unit_numbers_unique": true,
+          "no_pipeline_errors": false,
+          "no_plan_level_rows": true,
+          "unit_tier_exact": false
+        },
+        "distinct_entrata_uids": 0,
+        "distinct_unit_numbers": 0,
+        "entrata_uids": [],
+        "fallback_chain": [
+          "entrata",
+          "retry:cortland",
+          "generic"
+        ],
+        "plans": 0,
+        "raw_api_metadata": [],
+        "repeat": 2,
+        "source_urls": [],
+        "strict_native_positive_rent_rows": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_API_ENTRATA_NO_RESPONSE",
+        "units": 0,
+        "units_compact": []
+      },
+      {
+        "adapter": "entrata",
+        "assertions": {
+          "adapter_entrata": true,
+          "detected_entrata": true,
+          "entrata_uids_unique": true,
+          "fallback_chain_exact": false,
+          "multiple_exact_plan_sources": false,
+          "native_positive_units_only": false,
+          "natural_unit_numbers_unique": true,
+          "no_pipeline_errors": false,
+          "no_plan_level_rows": true,
+          "unit_tier_exact": false
+        },
+        "distinct_entrata_uids": 0,
+        "distinct_unit_numbers": 0,
+        "entrata_uids": [],
+        "fallback_chain": [
+          "entrata",
+          "retry:cortland",
+          "generic"
+        ],
+        "plans": 0,
+        "raw_api_metadata": [],
+        "repeat": 3,
+        "source_urls": [],
+        "strict_native_positive_rent_rows": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_API_ENTRATA_NO_RESPONSE",
+        "units": 0,
+        "units_compact": []
+      }
+    ],
+    "stable_uid_set_across_repeats": false
+  }
+}

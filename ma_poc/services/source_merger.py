@@ -17,8 +17,8 @@ Identity-link rules (strict precedence):
 from __future__ import annotations
 
 import copy
-from collections.abc import Iterable
-from typing import Any, Callable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from ma_poc.models.source import (
     ExtractedSource,
@@ -157,15 +157,26 @@ def merge_sources(
             k: v.value for k, v in unit.items() if isinstance(v, FieldValue)
         }
         try:
-            from ma_poc.core.identity import compute_fallback_unit_id
-            fb = compute_fallback_unit_id(legacy, property_id)
+            from ma_poc.core.identity import assign_fallback_unit_id
+
+            fb = assign_fallback_unit_id(legacy, property_id)
         except Exception:
             fb = None
         if fb:
+            natural_number = unit.get("unit_number")
+            natural_won = (
+                isinstance(natural_number, FieldValue)
+                and str(natural_number.value or "").strip() == str(fb)
+            )
             unit["unit_id"] = FieldValue(
                 value=fb,
-                source=SourceId.IDENTITY_FALLBACK,
-                confidence=0.65,
+                source=(
+                    natural_number.source
+                    if natural_won
+                    else SourceId.IDENTITY_FALLBACK
+                ),
+                confidence=(natural_number.confidence if natural_won else 0.65),
+                source_url=(natural_number.source_url if natural_won else ""),
             )
 
     out_units.sort(key=_unit_sort_key)

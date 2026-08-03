@@ -1,0 +1,40 @@
+{
+  "property_id": 68497,
+  "configured_property": {
+    "name": "Maya",
+    "address": "535 S Kingsley Dr",
+    "city": "Los Angeles",
+    "state": "CA",
+    "zip": "90020"
+  },
+  "url": "https://liveatmaya.securecafe.com/onlineleasing/maya-apartments0/oleapplication.aspx?stepname=floorplan&myOlePropertyId=1805916",
+  "rentcafe_property_id": "1805916",
+  "status": 200,
+  "body_bytes": 87318,
+  "title": "Maya Apartments | Apartments in LOS ANGELES, CA | RENTCafe",
+  "identity_markers": {
+    "maya": true,
+    "street": false,
+    "zip": false,
+    "rentcafe_property_id": true
+  },
+  "challenge_markers": true,
+  "parser_counts": {
+    "securecafe_availableunits": 0,
+    "rentcafe_hosted_table": 0,
+    "rentcafe_ysi_unitslist": 0
+  },
+  "strongest_parser": "securecafe_availableunits",
+  "strongest_rows": 0,
+  "native_positive_rent_rows": 0,
+  "distinct_native_ids": 0,
+  "sample_rows": [],
+  "text_prefix": "Maya Apartments | Apartments in LOS ANGELES, CA | RENTCafe Skip Navigation Online Leasing Workflow Floor Plan Rental Options Applicant Info Additional Applicants Application Charges Identity Verification Additional Applicant Info Lease Summary Print Lease Floor Plans Email Property Utility Invoices All advertised rates reflect any advertised specials and concessions. Refine: 1 Bed 2 Beds Update Move-In Date List View 1 Bedroom 1 Bathroom A1 1 Bedroom 1 Bathroom A2 1 Bedroom 1 Bathroom A3 1 Bedro",
+  "hyperbrowser_sessions": 1,
+  "guardrails": {
+    "solve_captchas": false,
+    "llm_enabled": false,
+    "paid_canary": false
+  },
+  "raw_path": "/private/tmp/propai-fnd-vBkmT9/maya_current_hb_probe/securecafe_floorplan.html"
+}

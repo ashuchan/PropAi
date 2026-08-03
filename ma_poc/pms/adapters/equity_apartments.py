@@ -44,7 +44,6 @@ from typing import TYPE_CHECKING
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     make_unit_dict,
-    money_to_int,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
@@ -143,25 +142,44 @@ def parse_equity_apartments(units: list[dict], url: str) -> list[dict]:
             rent: int | None = int(rent_str) if rent_str else None
         except (TypeError, ValueError):
             rent = None
-        out.append(
-            make_unit_dict(
-                floor_plan_name="",  # Equity doesn't expose a plan code on the card
-                bed_label=bed_label_from(beds_int, ""),
-                bedrooms=beds_str,
-                bathrooms=parsed.get("baths", ""),
-                sqft=parsed.get("sqft", ""),
-                floor=parsed.get("floor", ""),
-                building=parsed.get("building_id", ""),
-                unit_number=parsed.get("unit_number", ""),
-                rent_low=rent,
-                rent_high=rent,
-                availability_status="AVAILABLE",
-                available_units="1",
-                availability_date=parsed.get("availability_date", ""),
-                source_api_url=url,
-                extraction_tier="TIER_1_DOM_EQUITY_APARTMENTS",
-            )
+        property_id = parsed.get("property_id", "")
+        building_id = parsed.get("building_id", "")
+        unit_number = parsed.get("unit_number", "")
+        composite_id = f"{building_id}:{unit_number}" if building_id and unit_number else ""
+        source_ids: dict[str, str] = {}
+        if composite_id:
+            source_ids["equity_building_unit_id"] = composite_id
+        if unit_number:
+            source_ids["equity_unit_id"] = unit_number
+        if building_id:
+            source_ids["equity_building_id"] = building_id
+        if property_id:
+            source_ids["equity_property_id"] = property_id
+        row = make_unit_dict(
+            floor_plan_name="",  # Equity doesn't expose a plan code on the card
+            bed_label=bed_label_from(beds_int, ""),
+            bedrooms=beds_str,
+            bathrooms=parsed.get("baths", ""),
+            sqft=parsed.get("sqft", ""),
+            floor=parsed.get("floor", ""),
+            building=building_id,
+            unit_number=unit_number,
+            rent_low=rent,
+            rent_high=rent,
+            availability_status="AVAILABLE",
+            available_units="1",
+            availability_date=parsed.get("availability_date", ""),
+            source_api_url=url,
+            extraction_tier="TIER_1_DOM_EQUITY_APARTMENTS",
+            source_ids=source_ids or None,
         )
+        if composite_id:
+            row["unit_id"] = composite_id
+        if property_id:
+            row["source_property_id"] = property_id
+            row["source_property_provenance"] = "equity_unitfees_href.property_id"
+        row["source_response_provenance"] = "equity_visible_unit_card"
+        out.append(row)
     return out
 
 
@@ -202,9 +220,7 @@ class EquityApartmentsAdapter:
         rows = parse_equity_apartments(units, winning)
         if not rows:
             result.confidence = 0.0
-            result.errors.append(
-                f"equity_apartments: parser produced no rows from {len(units)} cards"
-            )
+            result.errors.append(f"equity_apartments: parser produced no rows from {len(units)} cards")
             return result
         from ma_poc.extraction.post_process import post_process
 
@@ -214,11 +230,18 @@ class EquityApartmentsAdapter:
             result.plan_summaries = pp.plan_summaries
             result.winning_url = winning
             result.confidence = min(0.93, 0.7 + 0.02 * pp.n_admitted)
+            result.api_responses.append(
+                {
+                    "url": winning,
+                    "status": 200,
+                    "body": "<equity-visible-unit-cards>",
+                    "via": "equity_apartments_dom",
+                    "rows": pp.n_admitted,
+                }
+            )
             return result
         result.confidence = 0.0
-        result.errors.append(
-            f"equity_apartments: {len(rows)} rows failed unit_validity post-process"
-        )
+        result.errors.append(f"equity_apartments: {len(rows)} rows failed unit_validity post-process")
         return result
 
     @staticmethod

@@ -4,12 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from ma_poc.models.source import (
     ExtractedSource,
     FieldValue,
-    ProvenancedUnit,
     SourceId,
     to_legacy_unit,
 )
@@ -204,6 +201,29 @@ def test_identity_fallback_when_missing() -> None:
     if uid_fv is not None:  # fallback may or may not generate one depending on inputs
         assert isinstance(uid_fv, FieldValue)
         assert uid_fv.value  # non-empty
+
+
+def test_identity_fallback_promotes_retained_natural_unit_number() -> None:
+    """A natural number surviving the merge outranks a plan phenotype hash."""
+    src = ExtractedSource(
+        source_id=SourceId.DOM_CASCADE,
+        source_url="dom",
+        envelope_hash="natural-1",
+        units=[{
+            "unit_number": _fv("1001", SourceId.DOM_CASCADE, 0.9),
+            "floor_plan_name": _fv("A1", SourceId.DOM_CASCADE, 0.9),
+            "beds": _fv(1, SourceId.DOM_CASCADE, 0.9),
+            "baths": _fv(1, SourceId.DOM_CASCADE, 0.9),
+            "sqft": _fv(750, SourceId.DOM_CASCADE, 0.9),
+        }],
+        has_unit_ids=False,
+        is_floor_plan_level=False,
+    )
+
+    out = merge_sources([src], "prop-natural")
+
+    assert out[0]["unit_id"].value == "1001"
+    assert out[0]["unit_id"].source == SourceId.DOM_CASCADE
 
 
 def test_serialization_back_to_legacy() -> None:

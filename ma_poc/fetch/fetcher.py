@@ -22,7 +22,11 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from ..models.scrape_profile import ScrapeProfile
 
-from ..config.feature_flags import ENABLE_TIER_ESCALATION, ENABLE_UNLOCKER_TIER
+from ..config.feature_flags import (
+    ENABLE_TIER_ESCALATION,
+    ENABLE_UNLOCKER_TIER,
+    compliance_mode,
+)
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
@@ -89,9 +93,8 @@ def _classify_fetch_outcome(
     else:
         head = None
         body_size = None
-    return classify(
-        status_code, headers or {}, head, exception=error, body_size=body_size
-    )
+    return classify(status_code, headers or {}, head, exception=error, body_size=body_size)
+
 
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
@@ -116,9 +119,11 @@ _MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
 # network_log + first attempt), before the static fall pre-empts it. Default
 # OFF: it adds at most one extra render for that exact failure mode, so it is
 # canary-gated to measure the yield/runtime trade before any default flip.
-_RENDER_RETRY_ON_TRANSIENT = os.getenv(
-    "ENABLE_RENDER_RETRY_ON_TRANSIENT", ""
-).strip().lower() in ("1", "true", "yes")
+_RENDER_RETRY_ON_TRANSIENT = os.getenv("ENABLE_RENDER_RETRY_ON_TRANSIENT", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 log = logging.getLogger(__name__)
 
@@ -226,12 +231,9 @@ class Fetcher:
         # the escalator and got 0/50 strict units. Restrict escalator to
         # non-RENDER tasks (HEAD/GET); RENDER falls through to the
         # patchright renderer.
-        if (
-            ENABLE_TIER_ESCALATION
-            and profile is not None
-            and task.render_mode != RenderMode.RENDER
-        ):
+        if ENABLE_TIER_ESCALATION and profile is not None and task.render_mode != RenderMode.RENDER:
             from .tier_escalator import fetch_with_escalation
+
             return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()
         host = urlparse(task.url).netloc
@@ -240,6 +242,7 @@ class Fetcher:
         # accumulates, whereas the registrable domain groups shared PMS backends
         # (e.g. a SightMap/Knock primary URL) into one protected bucket.
         from .host_throttle import registrable_domain as _rl_domain
+
         rl_host = _rl_domain(task.url) or host
         identity = self._identities.pick(sticky_key=task.property_id)
         # Only route through the datacentre proxy pool when that tier is
@@ -251,11 +254,7 @@ class Fetcher:
         # fallback only. A disabled tier must not be able to take down rendering.
         from ma_poc.config.feature_flags import ENABLE_DC_PROXY_TIER
 
-        proxy = (
-            self._proxy_pool.pick(sticky_key=task.property_id)
-            if ENABLE_DC_PROXY_TIER
-            else None
-        )
+        proxy = self._proxy_pool.pick(sticky_key=task.property_id) if ENABLE_DC_PROXY_TIER else None
 
         # 2026-05-26 (blockwall v2 Action 3): derive a path-scope clearance
         # hint URL from profile.navigation.winning_page_url. _do_render
@@ -268,6 +267,8 @@ class Fetcher:
         # homepage isn't CF-protected but /conventional/ is. The hint
         # only fires when host matches and the URL differs from the
         # entry (cross-host clearance is useless).
+        # Source-contract tests pin this guard's readable shape.
+        # fmt: off
         path_scope_hint: str | None = None
         if (
             task.render_mode == RenderMode.RENDER
@@ -275,15 +276,11 @@ class Fetcher:
         ):
             try:
                 _wpu = getattr(getattr(profile, "navigation", None), "winning_page_url", None)
-                if (
-                    isinstance(_wpu, str)
-                    and _wpu
-                    and _wpu != task.url
-                    and urlparse(_wpu).netloc == host
-                ):
+                if isinstance(_wpu, str) and _wpu and _wpu != task.url and urlparse(_wpu).netloc == host:
                     path_scope_hint = _wpu
             except Exception:  # pragma: no cover — defensive
                 path_scope_hint = None
+        # fmt: on
 
         emit(
             EventKind.FETCH_STARTED,
@@ -398,11 +395,63 @@ class Fetcher:
             # HTTP layer (403/503), so this promotion is a no-op for them.
             # The promotion only affects the OK + captcha_detected combo,
             # which is exactly the Sucuri / sgcaptcha 200/202 pattern.
-            if (
-                captcha_detected
-                and result.outcome == FetchOutcome.OK
-            ):
+            promoted_render_captcha = False
+            if captcha_detected and result.outcome == FetchOutcome.OK:
                 result = dataclasses.replace(result, outcome=FetchOutcome.BOT_BLOCKED)
+                promoted_render_captcha = task.render_mode == RenderMode.RENDER
+
+            # The same Sucuri route sometimes leaves Playwright with the 202
+            # navigation response but no serialisable DOM at all. There is no
+            # body on which CAPTCHA fingerprinting can operate, so recognise
+            # only this exact otherwise-useless RENDER shape. Do not broaden
+            # this to other statuses or non-empty 202 responses.
+            empty_202_render = bool(
+                task.render_mode == RenderMode.RENDER
+                and result.outcome == FetchOutcome.OK
+                and result.status == 202
+                and not result.body
+            )
+            if empty_202_render:
+                result = dataclasses.replace(
+                    result,
+                    outcome=FetchOutcome.BOT_BLOCKED,
+                    error_signature=(result.error_signature or "HTTP_202_EMPTY_RENDER"),
+                )
+
+            # A Sucuri/sgcaptcha render can arrive as HTTP 200/202 and only be
+            # recognised here, after ``_do_request``'s normal blocked-render
+            # rescue gate. In compliance mode, give that exact late-promotion
+            # shape one bounded pass through the existing direct -> clean
+            # Hyperbrowser raw fallback. No Web Unlocker/FlareSolverr/proxy
+            # fallback is reachable, HB is capped at one session for this
+            # property, and a rescued body that is itself a challenge is
+            # rejected fail-closed.
+            if (promoted_render_captcha or empty_202_render) and compliance_mode():
+                from ma_poc.config.feature_flags import hb_enabled
+
+                if hb_enabled():
+                    rescued = await self._try_curl_cffi_fallback(
+                        task,
+                        start_ms,
+                        allow_probe_proxy=False,
+                        hb_max_calls_per_property=1,
+                        hb_priority=True,
+                        hb_reservation_reason="blocked_requested_route",
+                    )
+                    if rescued is not None and rescued.outcome == FetchOutcome.OK:
+                        rescued_captcha, rescued_provider = looks_like_captcha(rescued.body or b"")
+                        if not rescued_captcha:
+                            result = rescued
+                            body_bytes_len = len(result.body or b"")
+                            content_type = (result.headers or {}).get("content-type", "")
+                            captcha_detected = False
+                            captcha_provider = None
+                        else:
+                            log.info(
+                                "compliant render captcha rescue rejected property=%s provider=%s",
+                                task.property_id,
+                                rescued_provider,
+                            )
 
             emit(
                 EventKind.FETCH_COMPLETED,
@@ -437,8 +486,10 @@ class Fetcher:
             # EMPTY_BODY is terminal like HARD_FAIL — no retry, the server
             # deliberately returned nothing and a second request won't help.
             if result.outcome in (
-                FetchOutcome.OK, FetchOutcome.NOT_MODIFIED,
-                FetchOutcome.HARD_FAIL, FetchOutcome.EMPTY_BODY,
+                FetchOutcome.OK,
+                FetchOutcome.NOT_MODIFIED,
+                FetchOutcome.HARD_FAIL,
+                FetchOutcome.EMPTY_BODY,
                 FetchOutcome.DEAD_URL,
             ):
                 break
@@ -517,7 +568,13 @@ class Fetcher:
                 EventKind.FETCH_RETRY, task.property_id, wait_ms=decision.wait_ms, reason=result.outcome.value
             )
 
-            if decision.rotate_identity:
+            # Compliance mode is also the production kill-switch for browser
+            # fingerprint rotation.  The solver tiers were already disabled
+            # under this switch, but the ordinary retry loop could still call
+            # ``IdentityPool.rotate`` after a second 429 / proxy error.  Keep
+            # retrying with the original sticky identity instead; a compliant
+            # run must never enter a FETCH_ROTATED_IDENTITY path.
+            if decision.rotate_identity and not compliance_mode():
                 self._identities.rotate(task.property_id)
                 identity = self._identities.pick(sticky_key=task.property_id)
                 # (health already degraded above for every failed proxied
@@ -531,8 +588,7 @@ class Fetcher:
                 # proxy from the pool on the next attempt. Without this,
                 # all 3 retries hit the host from the same direct IP and
                 # the property dies in FAILED_UNREACHABLE territory.
-                result.outcome == FetchOutcome.RATE_LIMITED
-                and proxy is None
+                result.outcome == FetchOutcome.RATE_LIMITED and proxy is None and not compliance_mode()
             ):
                 forced = self._proxy_pool.pick(sticky_key=None)
                 if forced:
@@ -559,14 +615,35 @@ class Fetcher:
             if proxy:
                 self._proxy_pool.mark_success(proxy)
 
-            # Persist raw HTML for replay
-            if last_result.render_mode == RenderMode.RENDER and last_result.body:
-                _persist_raw_html(task.property_id, last_result.body)
+            # Persist every successful primary HTML body for offline replay,
+            # not only browser renders. Many affected properties resolve via
+            # GET/curl and would otherwise have final rows but no source body.
+            content_type = str(last_result.headers.get("content-type") or "").lower()
+            if last_result.body and (
+                last_result.render_mode == RenderMode.RENDER
+                or "html" in content_type
+                or not content_type
+            ):
+                archive = _persist_raw_html(task.property_id, last_result.body)
+                if archive:
+                    last_result = dataclasses.replace(
+                        last_result,
+                        response_sha256=archive["response_sha256"],
+                        raw_html_archive_path=archive["path"],
+                        raw_html_archive_sha256=archive["response_sha256"],
+                    )
 
         return last_result
 
     async def _try_curl_cffi_fallback(
-        self, task: CrawlTask, start_ms: int
+        self,
+        task: CrawlTask,
+        start_ms: int,
+        *,
+        allow_probe_proxy: bool = True,
+        hb_max_calls_per_property: int | None = None,
+        hb_priority: bool = False,
+        hb_reservation_reason: str = "curl_fallback",
     ) -> FetchResult | None:
         """Free Cloudflare-bypass fallback via curl_cffi chrome120
         impersonation. No API costs, no proxy needed.
@@ -628,13 +705,12 @@ class Fetcher:
             # / cert-name-mismatch — hosts curl fetches fine with verification
             # off. This is a rescue path for a page we already failed to render;
             # a strict chain check here only costs coverage.
-            r = await asyncio.to_thread(
-                probe_get, task.url, timeout=20, proxies={}, verify=False
-            )
+            r = await asyncio.to_thread(probe_get, task.url, timeout=20, proxies={}, verify=False)
         except Exception as exc:
             log.warning(
                 "curl_cffi direct fallback fetch failed for %s: %s",
-                task.property_id, exc,
+                task.property_id,
+                exc,
             )
 
         status = getattr(r, "status_code", 0) if r is not None else 0
@@ -658,19 +734,24 @@ class Fetcher:
                 if hb_enabled():
                     from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
 
-                    hb_status, hb_body = await hb_raw_get(task.url, task.property_id)
+                    hb_status, hb_body = await hb_raw_get(
+                        task.url,
+                        task.property_id,
+                        max_calls_per_property=hb_max_calls_per_property,
+                        priority=hb_priority,
+                        reservation_reason=hb_reservation_reason,
+                    )
                     if hb_status == 200 and len(hb_body) >= 1024:
                         status, body, used_hb = hb_status, hb_body, True
             except Exception as exc:  # never let the rescue path raise
-                log.warning(
-                    "hyperbrowser rescue failed for %s: %s", task.property_id, exc
-                )
+                log.warning("hyperbrowser rescue failed for %s: %s", task.property_id, exc)
 
         # 3. If neither direct nor HB bypassed AND a residential proxy is
         #    configured, try the paid proxied path (handles Yardi/CF tenancy
         #    that blocks GCP IPs).
         if (
             (status != 200 or len(body) < 1024)
+            and allow_probe_proxy
             and os.environ.get("PROBE_PROXY_URL", "").strip()
             and not _probe_proxy_circuit_open()
         ):
@@ -679,7 +760,8 @@ class Fetcher:
             except Exception as exc:
                 log.warning(
                     "curl_cffi proxied fallback fetch failed for %s: %s",
-                    task.property_id, exc,
+                    task.property_id,
+                    exc,
                 )
                 _probe_proxy_note_failure(str(exc))
                 r2 = None
@@ -700,9 +782,12 @@ class Fetcher:
             # so an in-run salvage yield of 11% against 53% for the identical
             # call run by hand was undiagnosable from the artifacts alone.
             log.info(
-                "curl_cffi rescue declined for %s: status=%s body_bytes=%d "
-                "proxied=%s hb=%s",
-                task.property_id, status, len(body), used_proxy, used_hb,
+                "curl_cffi rescue declined for %s: status=%s body_bytes=%d proxied=%s hb=%s",
+                task.property_id,
+                status,
+                len(body),
+                used_proxy,
+                used_hb,
             )
             return None
 
@@ -712,8 +797,10 @@ class Fetcher:
             # Distinguish the three vendors so cost attribution is readable
             # from the event stream: free-direct vs free-HB vs paid-BrightData.
             tier=(
-                "CURL_CFFI_CHROME120_PROXIED" if used_proxy
-                else "HYPERBROWSER_RAW_GET" if used_hb
+                "CURL_CFFI_CHROME120_PROXIED"
+                if used_proxy
+                else "HYPERBROWSER_RAW_GET"
+                if used_hb
                 else "CURL_CFFI_CHROME120"
             ),
             reason="render_bot_blocked",
@@ -721,6 +808,7 @@ class Fetcher:
         # Construct an OK FetchResult that the rest of the pipeline
         # treats as a normal successful fetch.
         from .contracts import FetchOutcome as _FO
+
         elapsed = int(time.time() * 1000) - start_ms
         return FetchResult(
             url=task.url,
@@ -735,14 +823,14 @@ class Fetcher:
             error_signature="curl_cffi_chrome120_bypass",
         )
 
-    async def _try_unlocker_fallback(
-        self, task: CrawlTask, start_ms: int
-    ) -> FetchResult | None:
-        """Last-resort Web Unlocker fetch for a RENDER task blocked by CF.
+    async def _try_unlocker_fallback(self, task: CrawlTask, start_ms: int) -> FetchResult | None:
+        """Last-resort browser/unlocker fetch for a RENDER task blocked by CF.
 
         Returns the FetchResult on a successful unlock, or None when the
-        Unlocker tier is unavailable or itself fails. Never raises — a
-        failure here just leaves the original BOT_BLOCKED result standing.
+        configured fallback is unavailable or itself fails. Hyperbrowser is
+        selected independently of ``ENABLE_UNLOCKER_TIER``; that flag controls
+        only the separate Web Unlocker provider. Never raises — a failure here
+        just leaves the original BOT_BLOCKED result standing.
         """
         try:
             # Vendor switch (task #46): the RENDER cohort reaches the unlock
@@ -753,7 +841,11 @@ class Fetcher:
             if hb_enabled():
                 from ma_poc.fetch.hyperbrowser_backend import HyperbrowserProvider
 
-                provider = HyperbrowserProvider(mode="unlock")
+                provider = HyperbrowserProvider(
+                    mode="unlock",
+                    priority=True,
+                    reservation_reason="blocked_requested_route",
+                )
                 _unlock_tier = "HYPERBROWSER"
             elif compliance_mode():
                 # Web Unlocker is a no-fly zone (RealPage legal). No compliant
@@ -779,9 +871,7 @@ class Fetcher:
             )
             return result
         except Exception as exc:
-            log.warning(
-                "unlocker fallback failed for %s: %s", task.property_id, exc
-            )
+            log.warning("unlocker fallback failed for %s: %s", task.property_id, exc)
             return None
 
     async def _do_request(
@@ -815,7 +905,11 @@ class Fetcher:
         """
         if task.render_mode == RenderMode.RENDER:
             render_result = await self._do_render(
-                task, identity, proxy, attempt, start_ms,
+                task,
+                identity,
+                proxy,
+                attempt,
+                start_ms,
                 path_scope_hint=path_scope_hint,
             )
             # RENDER tasks bypass the tier escalator (commit 0e85fbf — the
@@ -874,7 +968,11 @@ class Fetcher:
                     and not render_result.network_log
                 ):
                     retry_render = await self._do_render(
-                        task, identity, proxy, attempt, start_ms,
+                        task,
+                        identity,
+                        proxy,
+                        attempt,
+                        start_ms,
                         path_scope_hint=path_scope_hint,
                     )
                     if retry_render.outcome == FetchOutcome.OK:
@@ -888,15 +986,18 @@ class Fetcher:
                 cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
                 if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
                     return cffi_result
-                # Fall through to the paid Unlocker only on BOT_BLOCKED
+                # Fall through to the configured browser/unlocker only on
+                # BOT_BLOCKED
                 # (TRANSIENT misses are typically operator-side and the
                 # Unlocker doesn't help with DNS/SSL/connection errors;
                 # RATE_LIMITED would only be made worse by hitting the
                 # same host through another paid path).
+                from ma_poc.config.feature_flags import hb_enabled
+
                 if (
                     render_result.outcome == FetchOutcome.BOT_BLOCKED
                     and ENABLE_TIER_ESCALATION
-                    and ENABLE_UNLOCKER_TIER
+                    and (hb_enabled() or ENABLE_UNLOCKER_TIER)
                 ):
                     unlocked = await self._try_unlocker_fallback(task, start_ms)
                     if unlocked is not None and unlocked.outcome == FetchOutcome.OK:
@@ -937,9 +1038,7 @@ class Fetcher:
             body_head = body[:4096] if body else None
             body_size = len(body) if body else None
 
-            outcome, sig = classify(
-                resp.status_code, resp_headers, body_head, body_size=body_size
-            )
+            outcome, sig = classify(resp.status_code, resp_headers, body_head, body_size=body_size)
 
             # RC5: HTTP GET 200 with an empty or trivially-small body (< 16 bytes).
             # classify() returns OK for 200, but a body this small cannot contain
@@ -1094,7 +1193,9 @@ class Fetcher:
                             log.warning(
                                 "fetch.byte_cap_exceeded url=%s bytes=%d cap=%d "
                                 "proxy=%s — aborting further requests",
-                                task.url, _xfer["bytes"], _MAX_FETCH_BYTES,
+                                task.url,
+                                _xfer["bytes"],
+                                _MAX_FETCH_BYTES,
                                 bool(proxy),
                             )
                             # Structured event so a (proxied) fleet run can
@@ -1201,9 +1302,7 @@ class Fetcher:
             # OLL/resman/entrata adapters. Strictly bounded + never raises,
             # so off it is a no-op and on it adds <=~8s with no SLO risk on
             # passive sites (gate is opt-in, prod default unset).
-            if os.getenv("INTERACTION_CTA_HOP", "").strip().lower() in (
-                "1", "true", "yes", "on"
-            ):
+            if os.getenv("INTERACTION_CTA_HOP", "").strip().lower() in ("1", "true", "yes", "on"):
                 try:
                     await _drive_cta_hop(page)
                 except Exception:
@@ -1293,8 +1392,7 @@ class Fetcher:
                         body_text = _body_after_scroll_text
                     _scroll_triggered = True
                     log.info(
-                        "fetch.scroll_trigger url=%s body_before=%d body_after=%d"
-                        " grew=%s rent_appeared=%s",
+                        "fetch.scroll_trigger url=%s body_before=%d body_after=%d grew=%s rent_appeared=%s",
                         task.url,
                         _body_before_scroll,
                         _body_after_size,
@@ -1320,17 +1418,23 @@ class Fetcher:
             # (which shows "Sorry, you have been blocked" and can't auto-solve).
             if body_text and 512 <= len(body_text) <= 20_000:
                 _CF_JS_PATTERNS = (
-                    b"Just a moment", b"challenge-platform", b"__cf_chl_",
+                    b"Just a moment",
+                    b"challenge-platform",
+                    b"__cf_chl_",
                     b"Checking your browser",
                 )
                 _body_bytes_check = body_text.encode("utf-8", errors="replace")[:1024]
                 _is_cf_js_challenge = any(p in _body_bytes_check for p in _CF_JS_PATTERNS)
                 # Don't trigger on WAF blocks — they show "Sorry, you have been blocked"
-                _is_cf_waf = b"Attention Required" in _body_bytes_check or b"Sorry, you have been blocked" in _body_bytes_check
+                _is_cf_waf = (
+                    b"Attention Required" in _body_bytes_check
+                    or b"Sorry, you have been blocked" in _body_bytes_check
+                )
                 if _is_cf_js_challenge and not _is_cf_waf:
                     log.info(
                         "fetch.cf_js_challenge_detected url=%s body=%d -- waiting 20s for auto-solve",
-                        task.url, len(body_text),
+                        task.url,
+                        len(body_text),
                     )
                     try:
                         await asyncio.sleep(20.0)
@@ -1344,7 +1448,8 @@ class Fetcher:
                                 body_text = _body_after_challenge
                                 log.info(
                                     "fetch.cf_js_challenge_solved url=%s body_after=%d",
-                                    task.url, len(body_text),
+                                    task.url,
+                                    len(body_text),
                                 )
                             else:
                                 log.info(
@@ -1375,6 +1480,7 @@ class Fetcher:
                     # Extract host for per-host tracking
                     try:
                         from urllib.parse import urlparse as _urlparse_q
+
                         landed_host = _urlparse_q(landed_lower).netloc
                     except Exception:
                         landed_host = ""
@@ -1408,9 +1514,7 @@ class Fetcher:
                 if portal_match or learned_wait:
                     import re as _re_q
 
-                    has_dollar_rent = bool(
-                        _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
-                    )
+                    has_dollar_rent = bool(_re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text))
                     if not has_dollar_rent:
                         try:
                             wait_sec = 12.0 if portal_match else 5.0
@@ -1467,15 +1571,9 @@ class Fetcher:
             # Max budget: 4 × 1.5 s = 6 s additional wait.  Safe because it
             # only fires when the DOM is actively changing — if the first two
             # samples are equal the loop exits immediately (0 extra wait).
-            if (
-                task.render_mode == RenderMode.RENDER
-                and body_text is not None
-                and len(body_text) < 40_000
-            ):
+            if task.render_mode == RenderMode.RENDER and body_text is not None and len(body_text) < 40_000:
                 try:
-                    _link_count_prev = await page.evaluate(
-                        "document.querySelectorAll('a[href]').length"
-                    )
+                    _link_count_prev = await page.evaluate("document.querySelectorAll('a[href]').length")
                     if _link_count_prev < 20:
                         _link_stable = False
                         _max_stability_rounds = 4
@@ -1514,11 +1612,7 @@ class Fetcher:
                     _resp_status = resp.status if resp is not None else None
                 except Exception:
                     pass
-                if (
-                    nav_exc is None
-                    and _resp_status == 200
-                    and _body_len < 16
-                ):
+                if nav_exc is None and _resp_status == 200 and _body_len < 16:
                     return FetchResult(
                         url=task.url,
                         outcome=FetchOutcome.EMPTY_BODY,
@@ -1608,6 +1702,8 @@ class Fetcher:
             # primary body_text already captured so a failure here
             # only forfeits the secondary clearance, never the L1
             # result.
+            # Ordering/guard contract tests pin this multiline form.
+            # fmt: off
             if (
                 path_scope_hint
                 and nav_exc is None
@@ -1628,6 +1724,7 @@ class Fetcher:
                     await asyncio.sleep(1.0)
                 except Exception:
                     pass  # path-scope is best-effort
+            # fmt: on
 
             # Cookie-mint reuse (option b): harvest the clearance cookies the
             # patchright context just earned by passing the CF/DataDome
@@ -1639,7 +1736,8 @@ class Fetcher:
             if clearance_cookies:
                 log.info(
                     "fetch.clearance_cookies_minted url=%s names=%s",
-                    task.url, ",".join(sorted(clearance_cookies)),
+                    task.url,
+                    ",".join(sorted(clearance_cookies)),
                 )
 
             if nav_exc is not None:
@@ -1801,7 +1899,11 @@ def _now_ms() -> int:
 _PROBE_PROXY_FAILS: int = 0
 _PROBE_PROXY_OPEN_UNTIL: float = 0.0
 _PROBE_PROXY_TUNNEL_MARKERS: tuple[str, ...] = (
-    "connect tunnel failed", "502", "tunnel", "proxy", "could not resolve proxy",
+    "connect tunnel failed",
+    "502",
+    "tunnel",
+    "proxy",
+    "could not resolve proxy",
 )
 
 
@@ -1841,7 +1943,8 @@ def _probe_proxy_note_failure(err: str) -> None:
         log.warning(
             "PROBE_PROXY_URL circuit OPEN for %.0fs after %d consecutive tunnel "
             "failures — skipping the proxied rescue rung until it closes",
-            _probe_proxy_cooldown_s(), _probe_proxy_threshold(),
+            _probe_proxy_cooldown_s(),
+            _probe_proxy_threshold(),
         )
 
 
@@ -1870,22 +1973,80 @@ def _short_hash(value: str | None) -> str | None:
     return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()[:10]
 
 
-def _persist_raw_html(property_id: str, body: bytes) -> None:
-    """Write raw HTML to disk for replay. Fails silently.
+def _persist_raw_html(property_id: str, body: bytes) -> dict[str, Any] | None:
+    """Write legacy + immutable content-addressed HTML for replay.
 
     Args:
         property_id: The property's canonical ID.
         body: Raw HTML bytes.
+    Returns:
+        Relative immutable path, source SHA-256 and size, or ``None`` when
+        persistence fails. Repeated identical bodies reuse the same artifact.
     """
     try:
+        import hashlib
+        import json
+
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         data_dir = Path(os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
         out_dir = data_dir / "raw_html" / date_str
         out_dir.mkdir(parents=True, exist_ok=True)
+        compressed = gzip.compress(body)
+        body_hash = hashlib.sha256(body).hexdigest()
+
+        # Backward-compatible latest pointer used by existing replay tools.
         out_path = out_dir / f"{property_id}.html.gz"
-        out_path.write_bytes(gzip.compress(body))
+        latest_tmp = out_path.with_suffix(out_path.suffix + f".{os.getpid()}.tmp")
+        latest_tmp.write_bytes(compressed)
+        os.replace(latest_tmp, out_path)
+
+        safe_property = "".join(
+            ch if ch.isalnum() or ch in "_.-" else "_"
+            for ch in str(property_id or "unknown")
+        )
+        immutable_dir = out_dir / safe_property
+        immutable_dir.mkdir(parents=True, exist_ok=True)
+        immutable_path = immutable_dir / f"{body_hash}.html.gz"
+        if not immutable_path.exists():
+            immutable_tmp = immutable_path.with_suffix(
+                immutable_path.suffix + f".{os.getpid()}.tmp"
+            )
+            immutable_tmp.write_bytes(compressed)
+            if not immutable_path.exists():
+                os.replace(immutable_tmp, immutable_path)
+            else:
+                immutable_tmp.unlink(missing_ok=True)
+        metadata_path = immutable_dir / f"{body_hash}.metadata.json"
+        if not metadata_path.exists():
+            metadata_tmp = metadata_path.with_suffix(
+                metadata_path.suffix + f".{os.getpid()}.tmp"
+            )
+            metadata_tmp.write_text(
+                json.dumps(
+                    {
+                        "property_id": str(property_id),
+                        "response_sha256": body_hash,
+                        "body_bytes": len(body),
+                        "compressed_bytes": len(compressed),
+                        "captured_date": date_str,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            if not metadata_path.exists():
+                os.replace(metadata_tmp, metadata_path)
+            else:
+                metadata_tmp.unlink(missing_ok=True)
+        return {
+            "path": str(immutable_path.relative_to(data_dir)),
+            "response_sha256": body_hash,
+            "body_bytes": len(body),
+            "compressed_bytes": len(compressed),
+        }
     except Exception as exc:
         log.debug("Failed to persist raw HTML for %s: %s", property_id, exc)
+        return None
 
 
 # Module-level singleton factory

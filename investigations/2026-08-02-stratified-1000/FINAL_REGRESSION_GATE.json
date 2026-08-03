@@ -1,0 +1,70 @@
+{
+  "branch": "codex/recovery-replay-hardening-2026-08-02",
+  "executed_on": "2026-08-03",
+  "focused_supervisor_gate": {
+    "command": "cd ma_poc && pytest -q tests/triggers/test_shard_entry.py",
+    "failed": 0,
+    "passed": 12,
+    "result": "PASS",
+    "skipped": 0,
+    "wall_time_seconds": 0.19
+  },
+  "final_timeout_and_hyperbrowser_gate": {
+    "command": "cd ma_poc && pytest -q tests/fetch/test_hyperbrowser_backend.py tests/triggers/test_shard_entry.py",
+    "failed": 0,
+    "passed": 29,
+    "result": "PASS",
+    "skipped": 0,
+    "wall_time_seconds": 0.42
+  },
+  "prior_post_canary_gates": {
+    "adapter_and_output": {
+      "passed": 4188,
+      "skipped": 4
+    },
+    "narrowed_post_fix": {
+      "passed": 271,
+      "skipped": 0
+    },
+    "supervisor_timeout_combined": {
+      "passed": 68,
+      "skipped": 0
+    }
+  },
+  "supported_repository_gate": {
+    "command": "cd ma_poc && pytest -q tests",
+    "failed": 3,
+    "failure_class": "known scripts-layout policy debt",
+    "failure_ids": [
+      "tests/structure/test_scripts_layout.py::test_no_unexpected_files_in_scripts_root",
+      "tests/structure/test_scripts_layout.py::test_scripts_files_have_main_guard",
+      "tests/structure/test_scripts_layout.py::test_move_table_covers_scripts_root"
+    ],
+    "passed": 9981,
+    "result": "PASS_WITH_KNOWN_BASE_LAYOUT_FAILURES",
+    "skipped": 49,
+    "warnings": 2,
+    "wall_time_seconds": 89.73
+  },
+  "disproved_change_disposition": {
+    "commit": "ed945250",
+    "final_tree_diff_against_parent_for_its_two_files": "clean",
+    "reason": "The isolated GCP retry proved the in-process cleanup change was not reached by the Clearview wedge. It was removed from the final tree so only the independently live-verified parent-process supervisor boundary ships.",
+    "result": "REMOVED_FROM_FINAL_TREE"
+  },
+  "known_failure_evidence": {
+    "base_commit": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "explanation": "The base commit already contains all eight scripts whose presence at scripts/ root violates the structure policy, the unchanged local_canary_attribution.py without a main guard, and the same structure tests. This branch changes build_excel_report.py output fields but does not introduce that file or the root-layout condition.",
+    "main_guard_file": "ma_poc/scripts/diagnostics/local_canary_attribution.py",
+    "unexpected_root_files": [
+      "ma_poc/scripts/ab_render_tier.py",
+      "ma_poc/scripts/backfill_winning_url_from_events.py",
+      "ma_poc/scripts/build_excel_report.py",
+      "ma_poc/scripts/demo_induce_parser.py",
+      "ma_poc/scripts/rediscover_dead_urls.py",
+      "ma_poc/scripts/resurface_profiles.py",
+      "ma_poc/scripts/seed_profiles_from_confirmation.py",
+      "ma_poc/scripts/seed_profiles_from_probes.py"
+    ]
+  }
+}

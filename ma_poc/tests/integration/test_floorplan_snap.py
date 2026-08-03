@@ -63,6 +63,29 @@ def test_snap_falls_back_to_canonical_when_operator_published_no_name(catalog) -
     assert out[0]["floor_plan_id"] == "P1_1"
 
 
+def test_snap_does_not_invent_name_for_documented_provider_gap(catalog) -> None:
+    """A provider-proven name gap keeps the CSV description audit-only."""
+    units = [
+        {
+            "unit_id": "101",
+            "floor_plan_name": "",
+            "beds": 1,
+            "baths": 1.0,
+            "sqft": 750,
+            "data_gaps": ["floor_plan_name", "availability_date"],
+            "floor_plan_name_provenance": (
+                "provider_roster_does_not_publish_floor_plan_name"
+            ),
+        }
+    ]
+    out = snap_units(units, "P1", catalog)
+
+    assert out[0]["floor_plan_name"] == ""
+    assert out[0]["floor_plan_name_catalog"] == "Aspen"
+    assert out[0]["floor_plan_id"] == "P1_1"
+    assert out[0]["floor_plan_snap_name_suppressed"] is True
+
+
 def test_snap_preserves_extracted_name_in_audit_field(catalog) -> None:
     units = [
         {

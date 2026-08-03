@@ -1,0 +1,1014 @@
+[
+  {
+    "property_id": "1617",
+    "property_name": "",
+    "website": "https://www.crossingatriverlake.com",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "3",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/1617.html.gz",
+    "archived_bytes": 0,
+    "read_error": "FileNotFoundError:[Errno 2] No such file or directory: '/private/tmp/propai-fnd-vBkmT9/raw_all/1617.html.gz'",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "1765",
+    "property_name": "Annaberg",
+    "website": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/1765.html.gz",
+    "archived_bytes": 712288,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "2239",
+    "property_name": "TGM Autumn Woods",
+    "website": "http://www.tgmautumnwoods.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "47",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/2239.html.gz",
+    "archived_bytes": 182262,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "2844",
+    "property_name": "TGM Danada",
+    "website": "www.tgmdanada.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "40",
+    "rp_oracle_distinct_floorplans": "5",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/2844.html.gz",
+    "archived_bytes": 160186,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "4124",
+    "property_name": "",
+    "website": "https://tramor.com/property/tramor-cannon-place/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "3",
+    "rp_oracle_distinct_floorplans": "3",
+    "prior_disposition": "strict99_false_positive_reintroduced",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/4124.html.gz",
+    "archived_bytes": 121165,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "4330",
+    "property_name": "",
+    "website": "https://www.invitationalapartments.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "11",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/4330.html.gz",
+    "archived_bytes": 142363,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "4756",
+    "property_name": "Clear Run",
+    "website": "https://www.clearrunaptswilmington.com/",
+    "source_adapter_0731": "knock",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "44",
+    "rp_oracle_distinct_floorplans": "18",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/4756.html.gz",
+    "archived_bytes": 6030,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "sightmap": [
+        "sightmap"
+      ],
+      "engrain": [
+        "engrain"
+      ]
+    }
+  },
+  {
+    "property_id": "16509",
+    "property_name": "",
+    "website": "http://brooklawngardensapts.com/property/brooklawn/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/16509.html.gz",
+    "archived_bytes": 0,
+    "read_error": "FileNotFoundError:[Errno 2] No such file or directory: '/private/tmp/propai-fnd-vBkmT9/raw_all/16509.html.gz'",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "19245",
+    "property_name": "Tenzen",
+    "website": "http://www.tenzenapartments.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "2",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/19245.html.gz",
+    "archived_bytes": 7049,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "22962",
+    "property_name": "Fox Lane",
+    "website": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "3",
+    "rp_oracle_distinct_floorplans": "3",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/22962.html.gz",
+    "archived_bytes": 99494,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "oll\\."
+      ],
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "22964",
+    "property_name": "Tropicana Village Apartments",
+    "website": "https://www.tropicanavillageapartments.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "17",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/22964.html.gz",
+    "archived_bytes": 129358,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "24139",
+    "property_name": "",
+    "website": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "14",
+    "rp_oracle_distinct_floorplans": "3",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/24139.html.gz",
+    "archived_bytes": 1224353,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "24982",
+    "property_name": "Fisher Building",
+    "website": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "4",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/24982.html.gz",
+    "archived_bytes": 958,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "27349",
+    "property_name": "",
+    "website": "https://www.countryvillageapthomes.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "11",
+    "rp_oracle_distinct_floorplans": "11",
+    "prior_disposition": "strict99_false_positive_reintroduced",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/27349.html.gz",
+    "archived_bytes": 101128,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "32978",
+    "property_name": "Camden Vineyards",
+    "website": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards",
+    "source_adapter_0731": "camden",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/32978.html.gz",
+    "archived_bytes": 743814,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "realpage"
+      ],
+      "funnel_nestio": [
+        "funnelleasing"
+      ]
+    }
+  },
+  {
+    "property_id": "32996",
+    "property_name": "TGM Ridge",
+    "website": "https://tgmridge.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "34",
+    "rp_oracle_distinct_floorplans": "7",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/32996.html.gz",
+    "archived_bytes": 75030,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "33993",
+    "property_name": "City Club Apartments MDA",
+    "website": "https://www.cityclubapartments.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/33993.html.gz",
+    "archived_bytes": 958,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "34362",
+    "property_name": "Tamarron",
+    "website": "www.thetamarronapts.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "25",
+    "rp_oracle_distinct_floorplans": "5",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/34362.html.gz",
+    "archived_bytes": 11816,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "34708",
+    "property_name": "Camden Main & Jamboree",
+    "website": "https://www.camdenliving.com/apartments/irvine-ca/camden-main-and-jamboree",
+    "source_adapter_0731": "camden",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/34708.html.gz",
+    "archived_bytes": 737478,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "realpage"
+      ],
+      "funnel_nestio": [
+        "funnelleasing"
+      ]
+    }
+  },
+  {
+    "property_id": "34785",
+    "property_name": "",
+    "website": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "15",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/34785.html.gz",
+    "archived_bytes": 59485,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "37071",
+    "property_name": "Summerwood on Towne Line",
+    "website": "www.summerwoodindy.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "15",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/37071.html.gz",
+    "archived_bytes": 159432,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "39198",
+    "property_name": "Vista De Palmas Apartments",
+    "website": "http://www.vistadepalmasapartments.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "7",
+    "rp_oracle_distinct_floorplans": "4",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/39198.html.gz",
+    "archived_bytes": 2164358,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "40733",
+    "property_name": "Country Club",
+    "website": "https://www.smdproperty.com/resident-properties/country-club-apartments/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/40733.html.gz",
+    "archived_bytes": 46977,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "42554",
+    "property_name": "",
+    "website": "http://summerwindaptsfl.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/42554.html.gz",
+    "archived_bytes": 0,
+    "read_error": "FileNotFoundError:[Errno 2] No such file or directory: '/private/tmp/propai-fnd-vBkmT9/raw_all/42554.html.gz'",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "42977",
+    "property_name": "Elms at Stoney Run",
+    "website": "https://stoneyrunelmsliving.com/home#",
+    "source_adapter_0731": "realpage_oll",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "22",
+    "rp_oracle_distinct_floorplans": "7",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/42977.html.gz",
+    "archived_bytes": 10292,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "realpage"
+      ]
+    }
+  },
+  {
+    "property_id": "48075",
+    "property_name": "",
+    "website": "https://www.edgefieldaptsva.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/48075.html.gz",
+    "archived_bytes": 89538,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "48389",
+    "property_name": "Village Gate Apartments",
+    "website": "http://www.villagegatenc.com/",
+    "source_adapter_0731": "onesite",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "18",
+    "rp_oracle_distinct_floorplans": "12",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/48389.html.gz",
+    "archived_bytes": 18432,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "51143",
+    "property_name": "Lauderdale Hollows",
+    "website": "https://mgmmgmt.net/property-details/?pid=136",
+    "source_adapter_0731": "rentmanager",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "4",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/51143.html.gz",
+    "archived_bytes": 76711,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "rentmanager": [
+        "rentmanager"
+      ]
+    }
+  },
+  {
+    "property_id": "52541",
+    "property_name": "",
+    "website": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "7",
+    "rp_oracle_distinct_floorplans": "7",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/52541.html.gz",
+    "archived_bytes": 99487,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "oll\\."
+      ],
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "53567",
+    "property_name": "Trafalgar Square Apartments",
+    "website": "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "3",
+    "rp_oracle_distinct_floorplans": "3",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/53567.html.gz",
+    "archived_bytes": 99494,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "oll\\."
+      ],
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "53932",
+    "property_name": "Misty Hollow",
+    "website": "http://www.landmarkrealty.org/misty-hollow/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "3",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/53932.html.gz",
+    "archived_bytes": 245018,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "61285",
+    "property_name": "",
+    "website": "http://www.allezliving.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "4",
+    "rp_oracle_distinct_floorplans": "4",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/61285.html.gz",
+    "archived_bytes": 0,
+    "read_error": "FileNotFoundError:[Errno 2] No such file or directory: '/private/tmp/propai-fnd-vBkmT9/raw_all/61285.html.gz'",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "64068",
+    "property_name": "Riverplace",
+    "website": "www.riverplacecr.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "15",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/64068.html.gz",
+    "archived_bytes": 24675,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "71962",
+    "property_name": "Towne House",
+    "website": "https://www.townehousequincy.com/",
+    "source_adapter_0731": "onesite",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/71962.html.gz",
+    "archived_bytes": 4885,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "72732",
+    "property_name": "",
+    "website": "http://www.centralmngt.com/Search?Community=15",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "2",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/72732.html.gz",
+    "archived_bytes": 2276,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "74523",
+    "property_name": "Charter Club",
+    "website": "http://www.charterclubapts.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "0",
+    "rp_oracle_distinct_floorplans": "0",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/74523.html.gz",
+    "archived_bytes": 20400,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "75314",
+    "property_name": "Village Park at Paladin",
+    "website": "https://pettinaro.com/village-park-paladin/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/75314.html.gz",
+    "archived_bytes": 189666,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "75912",
+    "property_name": "TGM Creekside Village",
+    "website": "www.tgmcreeksidevillage.com",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "24",
+    "rp_oracle_distinct_floorplans": "6",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/75912.html.gz",
+    "archived_bytes": 79846,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "78597",
+    "property_name": "Sentral Union Station",
+    "website": "https://www.sentral.com/denver/union-station",
+    "source_adapter_0731": "encoreskyline_template",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "51",
+    "rp_oracle_distinct_floorplans": "19",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/78597.html.gz",
+    "archived_bytes": 117501,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "232583",
+    "property_name": "Custer Crossing Apartments",
+    "website": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "4",
+    "rp_oracle_distinct_floorplans": "4",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/232583.html.gz",
+    "archived_bytes": 87256,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "oll\\."
+      ],
+      "realpage_cws": [
+        "propertyid"
+      ]
+    }
+  },
+  {
+    "property_id": "235473",
+    "property_name": "",
+    "website": "http://www.rooftop252.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "4",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/235473.html.gz",
+    "archived_bytes": 145884,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "246962",
+    "property_name": "Portola Bridge Creek",
+    "website": "http://www.bridgecreekapthomes.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "13",
+    "rp_oracle_distinct_floorplans": "9",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/246962.html.gz",
+    "archived_bytes": 25196,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "251597",
+    "property_name": "",
+    "website": "https://www.wyndhamridgecolumbus.com/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "6",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/251597.html.gz",
+    "archived_bytes": 5705,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "260505",
+    "property_name": "Onyx Uptown PHX",
+    "website": "https://broadstoneuptownphx.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "274",
+    "rp_oracle_distinct_floorplans": "10",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/260505.html.gz",
+    "archived_bytes": 24695,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "263498",
+    "property_name": "The Julington",
+    "website": "https://risejulington.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "27",
+    "rp_oracle_distinct_floorplans": "9",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/263498.html.gz",
+    "archived_bytes": 24682,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "268888",
+    "property_name": "Artthaus Jack London",
+    "website": "https://arthaus.mov/building-community.php?slug=arthaus-jack-london",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "1",
+    "rp_oracle_distinct_floorplans": "1",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/268888.html.gz",
+    "archived_bytes": 89479,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "269346",
+    "property_name": "Ashford Apartment Homes",
+    "website": "https://rjamesproperties.com/ashford-brook/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "4",
+    "rp_oracle_distinct_floorplans": "2",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/269346.html.gz",
+    "archived_bytes": 63833,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "272772",
+    "property_name": "Hawkeye Village",
+    "website": "http://hawkeyevillageapartments.com/",
+    "source_adapter_0731": "generic",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "5",
+    "rp_oracle_distinct_floorplans": "5",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/272772.html.gz",
+    "archived_bytes": 13952,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {}
+  },
+  {
+    "property_id": "274886",
+    "property_name": "",
+    "website": "https://parkplace380.com/listings/aster-village-two/",
+    "source_adapter_0731": "",
+    "current_detected_adapter": "unknown",
+    "rp_oracle_native_unit_rows": "11",
+    "rp_oracle_distinct_floorplans": "11",
+    "prior_disposition": "residual_unconverted",
+    "archived_path": "/private/tmp/propai-fnd-vBkmT9/raw_all/274886.html.gz",
+    "archived_bytes": 341719,
+    "read_error": "",
+    "redetected_pms": "unknown",
+    "redetected_confidence": 0.0,
+    "redetected_evidence": [
+      "no URL/HTML/mgmt signal"
+    ],
+    "marker_clusters": {
+      "onesite": [
+        "oll\\."
+      ]
+    }
+  }
+]

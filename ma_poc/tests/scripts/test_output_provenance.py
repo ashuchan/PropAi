@@ -78,6 +78,15 @@ def test_provenance_block_fields_and_quality():
         "extraction_tier_used": "TIER_1_DOM_ENTRATA_PP_JD_FP",
         "_fallback_chain": ["api", "dom"],
         "api_calls_intercepted": [1, 2, 3],
+        "_unit_source_provenance": [
+            {
+                "provider": "entrata",
+                "source_url": "https://api.example.test/units",
+                "response_sha256": "abc123",
+                "unit_count": 3,
+                "identity": {"status": "MATCH"},
+            }
+        ],
     }
     prov = _provenance_block(result, {"type": "LEASE_UP"}, _FakeFetch(), "OK")
     assert prov["unit_count"] == 3
@@ -86,12 +95,19 @@ def test_provenance_block_fields_and_quality():
     assert prov["detected_pms"] == "entrata"
     assert prov["tiers_attempted"] == ["api", "dom"]
     assert prov["api_calls_intercepted"] == 3
+    assert prov["unit_source"] == result["_unit_source_provenance"]
     assert prov["is_lease_up"] is True
     assert prov["fetch"] == {
         "outcome": "OK",
         "render_mode": "RENDER",
         "proxied": True,
         "page_load_ms": 4200,
+        "status_code": None,
+        "error_signature": None,
+        "body_bytes": 0,
+        "response_sha256": None,
+        "raw_html_archive_path": None,
+        "raw_html_archive_sha256": None,
     }
     dq = prov["data_quality"]
     assert dq["real_id_units"] == 2          # N115 + plan1 (plan1 has a real id)

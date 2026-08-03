@@ -106,14 +106,7 @@ from data_provider import (  # noqa: E402
     LedgerEntry,
     PostgresDataProvider,
 )
-from data_provider.sql.provider import SqlDataProvider  # noqa: E402
 from data_provider.sql.engine import dialect_insert  # noqa: E402
-from data_provider.sql.resilience import (  # noqa: E402
-    PERMANENT_ROW_ERRORS,
-    TRANSIENT_DB_ERRORS,
-    isolate_row_writes,
-    with_db_retry,
-)
 from data_provider.sql.models import (  # noqa: E402
     DlqEntryRow,
     LlmDiagnosticRow,
@@ -124,7 +117,12 @@ from data_provider.sql.models import (  # noqa: E402
     RunLedgerRow,
     RunReportRow,
     RunRow,
-    ScrapeEventRow,
+)
+from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from data_provider.sql.resilience import (  # noqa: E402
+    PERMANENT_ROW_ERRORS,
+    isolate_row_writes,
+    with_db_retry,
 )
 from models.extraction_result import (  # noqa: E402
     ExtractionResult,
@@ -436,9 +434,7 @@ def _sum_totals(dicts: Iterable[dict[str, Any]]) -> dict[str, Any]:
             except (TypeError, ValueError):
                 continue
     if out["properties"] > 0:
-        out["success_rate_pct"] = round(
-            100.0 * out["succeeded"] / out["properties"], 2
-        )
+        out["success_rate_pct"] = round(100.0 * out["succeeded"] / out["properties"], 2)
     return out
 
 
@@ -746,12 +742,7 @@ def _sync_run_ledger_from_snapshots(
         meta = p.get("_meta") or {}
         verdict = str(meta.get("verdict") or "").upper()
         units_count = len(p.get("units") or [])
-        url = (
-            p.get("website")
-            or p.get("Website")
-            or meta.get("url")
-            or meta.get("scrape_url")
-        )
+        url = p.get("website") or p.get("Website") or meta.get("url") or meta.get("scrape_url")
         errors = meta.get("scrape_errors") or meta.get("errors") or []
         failed = _is_failure_meta(meta)
         status = verdict or ("FAILED" if failed else _RUN_LEDGER_STATUS_FALLBACK)
@@ -936,6 +927,12 @@ def _sync_extraction_results_from_snapshots(
         except (TypeError, ValueError):
             confidence = 0.0
         confidence = max(0.0, min(confidence, 1.0))
+        provenance = meta.get("provenance")
+        provenance = provenance if isinstance(provenance, dict) else {}
+        units = [unit for unit in (p.get("units") or []) if isinstance(unit, dict)]
+        source_hashes = sorted(
+            {str(unit.get("source_response_sha256")) for unit in units if unit.get("source_response_sha256")}
+        )
         result = ExtractionResult(
             property_id=cid,
             tier=tier_enum,
@@ -944,7 +941,25 @@ def _sync_extraction_results_from_snapshots(
             raw_fields={
                 "tier_used": extract.get("tier_used"),
                 "llm_cost_usd": extract.get("llm_cost_usd"),
-                "units_count": len(p.get("units") or []),
+                "units_count": len(units),
+                "floor_plan_count": len(p.get("floor_plans") or []),
+                "verdict": meta.get("verdict"),
+                "verdict_reason": meta.get("verdict_reason") or meta.get("reason"),
+                "provenance": provenance,
+                "raw_source_archive": provenance.get("raw_source_archive"),
+                "raw_api_archive": provenance.get("raw_api_archive"),
+                "source_response_sha256": source_hashes,
+                "area_range_units": sum(unit.get("area_value_type") == "range" for unit in units),
+                "rent_range_units": sum(unit.get("rent_is_range") is True for unit in units),
+                "rent_provenance_counts": {
+                    value: sum(unit.get("rent_provenance") == value for unit in units)
+                    for value in sorted(
+                        {str(unit.get("rent_provenance")) for unit in units if unit.get("rent_provenance")}
+                    )
+                },
+                "synthetic_id_units": sum(
+                    str(unit.get("unit_id") or "").startswith(("inferred_", "unkeyable_")) for unit in units
+                ),
             },
             error_message=(
                 "; ".join(str(e) for e in (meta.get("scrape_errors") or meta.get("errors") or []))[:2000]
@@ -1075,9 +1090,7 @@ def _upsert_llm_report(
         payload={"shards": {}},
         written_at=now,
     )
-    insert_stmt = insert_stmt.on_conflict_do_nothing(
-        index_elements=[LlmReportRow.run_date]
-    )
+    insert_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[LlmReportRow.run_date])
 
     with engine.begin() as conn:
         conn.execute(insert_stmt)
@@ -1093,18 +1106,10 @@ def _upsert_llm_report(
 
         # Recompute aggregates across shards. Keys here mirror the
         # shape produced by ma_poc.llm.interaction_logger.write_run_summary.
-        body["calls"] = sum(
-            _coerce_int(s.get("calls")) for s in shards.values()
-        )
-        body["total_cost_usd"] = sum(
-            _coerce_float(s.get("total_cost_usd")) for s in shards.values()
-        )
-        body["total_tokens_in"] = sum(
-            _coerce_int(s.get("total_tokens_in")) for s in shards.values()
-        )
-        body["total_tokens_out"] = sum(
-            _coerce_int(s.get("total_tokens_out")) for s in shards.values()
-        )
+        body["calls"] = sum(_coerce_int(s.get("calls")) for s in shards.values())
+        body["total_cost_usd"] = sum(_coerce_float(s.get("total_cost_usd")) for s in shards.values())
+        body["total_tokens_in"] = sum(_coerce_int(s.get("total_tokens_in")) for s in shards.values())
+        body["total_tokens_out"] = sum(_coerce_int(s.get("total_tokens_out")) for s in shards.values())
         merged_props: dict[str, Any] = {}
         for s_payload in shards.values():
             by_prop = s_payload.get("by_property") if isinstance(s_payload, dict) else None
@@ -1243,9 +1248,7 @@ def _sync_dlq(engine: Any, path: Path) -> dict[str, int]:
 
         to_delete = db_ids - set(live.keys())
         if to_delete:
-            conn.execute(
-                delete(DlqEntryRow).where(DlqEntryRow.property_id.in_(to_delete))
-            )
+            conn.execute(delete(DlqEntryRow).where(DlqEntryRow.property_id.in_(to_delete)))
             deleted = len(to_delete)
 
     return {"upserted": upserted, "deleted": deleted}
@@ -1496,9 +1499,7 @@ def sync_run_to_postgres(
                 # disk; Jugnu never writes those. The derive-from-snapshots
                 # helper populates extraction_results directly from each
                 # property's ``_extract_result`` field instead.
-                summary["extractions_legacy"] = _copy_extractions(
-                    src, dst, run_date, fs_canonical_ids
-                )
+                summary["extractions_legacy"] = _copy_extractions(src, dst, run_date, fs_canonical_ids)
                 summary["extractions_from_snapshots"] = _sync_extraction_results_from_snapshots(
                     dst, run_date, run_properties
                 )
@@ -1572,22 +1573,34 @@ def sync_run_to_postgres(
             summary["report"] = 1
         else:
             summary["report"] = 0
-        summary["property_reports"] = _run_stage2(
-            "property_reports",
-            lambda: _upsert_property_reports(engine, run_date, run_dir / "property_reports"),
-        ) or 0
-        summary["llm_reports"] = _run_stage2(
-            "llm_reports",
-            lambda: _upsert_llm_report(engine, run_date, run_dir / "llm_report.json", shard_id=shard_id),
-        ) or 0
-        summary["llm_property_details"] = _run_stage2(
-            "llm_property_details",
-            lambda: _upsert_llm_property_details(engine, run_date, run_dir / "llm_report"),
-        ) or 0
-        summary["llm_diagnostics"] = _run_stage2(
-            "llm_diagnostics",
-            lambda: _upsert_llm_diagnostics(engine, run_date, run_dir / "llm_diagnostics"),
-        ) or 0
+        summary["property_reports"] = (
+            _run_stage2(
+                "property_reports",
+                lambda: _upsert_property_reports(engine, run_date, run_dir / "property_reports"),
+            )
+            or 0
+        )
+        summary["llm_reports"] = (
+            _run_stage2(
+                "llm_reports",
+                lambda: _upsert_llm_report(engine, run_date, run_dir / "llm_report.json", shard_id=shard_id),
+            )
+            or 0
+        )
+        summary["llm_property_details"] = (
+            _run_stage2(
+                "llm_property_details",
+                lambda: _upsert_llm_property_details(engine, run_date, run_dir / "llm_report"),
+            )
+            or 0
+        )
+        summary["llm_diagnostics"] = (
+            _run_stage2(
+                "llm_diagnostics",
+                lambda: _upsert_llm_diagnostics(engine, run_date, run_dir / "llm_diagnostics"),
+            )
+            or 0
+        )
         # DLQ is cross-run global state — lives under state/, not runs/.
         # Without this mirror, Cloud Run's ephemeral /tmp loses every
         # parked property the moment the container exits.
@@ -1599,10 +1612,13 @@ def sync_run_to_postgres(
         # block a successful run from reporting completion; _run_stage2
         # already records the error in summary["retention_error"] if it
         # fails so the daily report still surfaces it.
-        summary["retention"] = _run_stage2(
-            "retention",
-            lambda: _apply_retention(engine),
-        ) or {}
+        summary["retention"] = (
+            _run_stage2(
+                "retention",
+                lambda: _apply_retention(engine),
+            )
+            or {}
+        )
     finally:
         try:
             src.close()

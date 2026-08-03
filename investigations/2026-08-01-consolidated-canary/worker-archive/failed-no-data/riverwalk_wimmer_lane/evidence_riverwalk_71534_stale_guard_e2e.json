@@ -1,0 +1,201 @@
+{
+  "cohort": "exact_2026-07-31_FAILED_NO_DATA_344",
+  "commit": "none",
+  "configured_route": {
+    "body_bytes": 84730,
+    "body_sha256": "507dc1ba2263a6ea4214491f38b53ea2ca644ca2484b72bfba726fc6032c57e7",
+    "final_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+    "status": 404
+  },
+  "configured_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+  "expected_exact_floorplans_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+  "generated_at_utc": "2026-08-01T20:13:31.258198+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "direct_public_http_only": true,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER5_VISION": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "PROBE_PROXY_URL": "",
+      "WEB_UNLOCKER_KEY": ""
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr_calls": 0,
+    "hyperbrowser_calls": 0,
+    "llm_calls": 0,
+    "proxy_calls": 0,
+    "web_unlocker_calls": 0
+  },
+  "lane": "wimmer_stale_missing_state_fail_closed_e2e",
+  "ledger_mutation": "none",
+  "materializer": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/riverwalk_wimmer_lane/materialize_riverwalk_71534_stale_guard_e2e.py",
+    "sha256": "3c1489be27c44d6e620cd0a6b8c47ebd8a4fa749e3f03c9350a25492bba0362f"
+  },
+  "outcome": "UNIT_QUALIFIED",
+  "paid_canary": false,
+  "property_id": 71534,
+  "property_name": "Riverwalk on the Falls I",
+  "push": "none",
+  "same_eight_units_each_repeat": true,
+  "source_snapshot_after": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/sightmap.py": "afcbed2637ac3aa44113fb973726c3afb780208c37de55c4bb984749b420e3fa",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  },
+  "source_snapshot_before": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/sightmap.py": "afcbed2637ac3aa44113fb973726c3afb780208c37de55c4bb984749b420e3fa",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  },
+  "three_full_configured_url_repeats": [
+    {
+      "adapter": "sightmap",
+      "candidate_requests": [
+        "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans"
+      ],
+      "checks": {
+        "all_availability_dates": true,
+        "all_floorplan_names": true,
+        "eight_distinct_strict_units": true,
+        "exact_guard_anchor": true,
+        "exact_source_api": true,
+        "guard_identity_match": true,
+        "guard_portfolio_fallbacks_disabled": true,
+        "link_hop_succeeded": true,
+        "only_exact_candidate_fetched": true,
+        "sightmap_adapter": true,
+        "soft_404_entered_pipeline": true,
+        "tier_1_sightmap": true
+      },
+      "emitted_rows": 8,
+      "entry_page_diagnostics": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "guard": {
+        "entry_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+        "exact_floorplans_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+        "identity_match": true,
+        "portfolio_fallbacks_disabled": true
+      },
+      "repeat": 1,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "unit_numbers": [
+        "103",
+        "305",
+        "310",
+        "324",
+        "201",
+        "403",
+        "417",
+        "419"
+      ]
+    },
+    {
+      "adapter": "sightmap",
+      "candidate_requests": [
+        "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans"
+      ],
+      "checks": {
+        "all_availability_dates": true,
+        "all_floorplan_names": true,
+        "eight_distinct_strict_units": true,
+        "exact_guard_anchor": true,
+        "exact_source_api": true,
+        "guard_identity_match": true,
+        "guard_portfolio_fallbacks_disabled": true,
+        "link_hop_succeeded": true,
+        "only_exact_candidate_fetched": true,
+        "sightmap_adapter": true,
+        "soft_404_entered_pipeline": true,
+        "tier_1_sightmap": true
+      },
+      "emitted_rows": 8,
+      "entry_page_diagnostics": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "guard": {
+        "entry_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+        "exact_floorplans_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+        "identity_match": true,
+        "portfolio_fallbacks_disabled": true
+      },
+      "repeat": 2,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "unit_numbers": [
+        "103",
+        "305",
+        "310",
+        "324",
+        "201",
+        "403",
+        "417",
+        "419"
+      ]
+    },
+    {
+      "adapter": "sightmap",
+      "candidate_requests": [
+        "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans"
+      ],
+      "checks": {
+        "all_availability_dates": true,
+        "all_floorplan_names": true,
+        "eight_distinct_strict_units": true,
+        "exact_guard_anchor": true,
+        "exact_source_api": true,
+        "guard_identity_match": true,
+        "guard_portfolio_fallbacks_disabled": true,
+        "link_hop_succeeded": true,
+        "only_exact_candidate_fetched": true,
+        "sightmap_adapter": true,
+        "soft_404_entered_pipeline": true,
+        "tier_1_sightmap": true
+      },
+      "emitted_rows": 8,
+      "entry_page_diagnostics": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "guard": {
+        "entry_url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/",
+        "exact_floorplans_url": "https://www.wimmercommunities.com/apartments/wi/menomonee-falls/riverwalk-on-the-falls/floorplans",
+        "identity_match": true,
+        "portfolio_fallbacks_disabled": true
+      },
+      "repeat": 3,
+      "source_urls": [
+        "https://sightmap.com/app/api/v1/y8px5ljmv19/sightmaps/100325"
+      ],
+      "strict_native_positive_rent_rows": 8,
+      "tier": "TIER_1_API_SIGHTMAP_IFRAME",
+      "unit_numbers": [
+        "103",
+        "305",
+        "310",
+        "324",
+        "201",
+        "403",
+        "417",
+        "419"
+      ]
+    }
+  ]
+}

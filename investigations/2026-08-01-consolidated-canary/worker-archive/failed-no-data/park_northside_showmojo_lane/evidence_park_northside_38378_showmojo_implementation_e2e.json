@@ -1,0 +1,2952 @@
+{
+  "authoritative_ledger_eligible": false,
+  "authoritative_ledger_hold_reason": "Implementation and local configured E2E pass; parent requested independent replay before any ledger admission.",
+  "canonical_identity": {
+    "address": "1601 Roane St",
+    "city": "Richmond",
+    "configured_url": "https://www.parknorthsiderva.com/",
+    "name": "Park Northside",
+    "state": "VA",
+    "zip": "23222"
+  },
+  "cohort": {
+    "after": {
+      "ledger_rows": 232,
+      "ledger_sha256": "f7327b8bb4433b76ca00fe1ac0adb322e2dc39dcad17b82d75b3f2b347a98ee0",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 112,
+      "remaining_sha256": "0fc13a088d2a048e35e86ad9740410bb16665c1fc03e10a736192502545839e1",
+      "summary_sha256": "84b9fb36cd8f17b32d50114c51f21ec601fe85c4a6b6b3e2759d84953db8f096"
+    },
+    "before": {
+      "ledger_rows": 232,
+      "ledger_sha256": "f7327b8bb4433b76ca00fe1ac0adb322e2dc39dcad17b82d75b3f2b347a98ee0",
+      "property_in_ledger": false,
+      "property_in_remaining": true,
+      "remaining_rows": 112,
+      "remaining_sha256": "0fc13a088d2a048e35e86ad9740410bb16665c1fc03e10a736192502545839e1",
+      "summary_sha256": "84b9fb36cd8f17b32d50114c51f21ec601fe85c4a6b6b3e2759d84953db8f096"
+    },
+    "boundary": "exact_2026-07-31_FAILED_NO_DATA_344",
+    "ledger_mutation": "none"
+  },
+  "generated_at_utc": "2026-08-01T15:56:26.226371+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_ENTRATA_PLAN_RENDER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_PLAN_UNIT_RENDER": "false",
+      "ENABLE_RENDER_ON_EMPTY": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "brightdata",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": "",
+      "RENDER_BACKEND": "local"
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "hyperbrowser_call_count": 0,
+    "llm": false,
+    "ordinary_direct_get_only": true,
+    "paid_canary": false,
+    "proxy": false,
+    "web_unlocker": false,
+    "web_unlocker_call_count": 0
+  },
+  "implementation": {
+    "canary_run": false,
+    "git_commit_created": false,
+    "git_push": false,
+    "source_files": [
+      "ma_poc/pms/adapters/_showmojo_public.py",
+      "ma_poc/pms/scraper.py",
+      "ma_poc/services/floorplan_snap.py"
+    ],
+    "source_snapshot_after": {
+      "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+      "sha256": {
+        "ma_poc/pms/adapters/_showmojo_public.py": "8e31aa490d735db3228df6cf15e03bd9fc8a7930a416c56be3b3531bf25cd56d",
+        "ma_poc/pms/scraper.py": "4e39fd871486c0f592d1b59023534a6eef032bee71ec9aab918e50f912ff1923",
+        "ma_poc/services/floorplan_snap.py": "e41fc435b25d431ff8db2e044690fcda39fa45bae977c813d2da53aa1b990f06",
+        "ma_poc/tests/integration/test_floorplan_snap.py": "bf54fdfcc21f25325b4c36483d7988ccce53c048d531fe5c600e4307eefe61e1",
+        "ma_poc/tests/pms/adapters/test_betternoi_public.py": "362b61590aaa93f5ab8a438a83ede0436f942c22177b6739a30fc6b42a1e0c81",
+        "ma_poc/tests/pms/adapters/test_showmojo_public.py": "ee3cf42b2c7c24030f968db15a20db9bf494471118095eee4a3b31ffbdbba848"
+      }
+    },
+    "source_snapshot_before": {
+      "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+      "sha256": {
+        "ma_poc/pms/adapters/_showmojo_public.py": "8e31aa490d735db3228df6cf15e03bd9fc8a7930a416c56be3b3531bf25cd56d",
+        "ma_poc/pms/scraper.py": "4e39fd871486c0f592d1b59023534a6eef032bee71ec9aab918e50f912ff1923",
+        "ma_poc/services/floorplan_snap.py": "e41fc435b25d431ff8db2e044690fcda39fa45bae977c813d2da53aa1b990f06",
+        "ma_poc/tests/integration/test_floorplan_snap.py": "bf54fdfcc21f25325b4c36483d7988ccce53c048d531fe5c600e4307eefe61e1",
+        "ma_poc/tests/pms/adapters/test_betternoi_public.py": "362b61590aaa93f5ab8a438a83ede0436f942c22177b6739a30fc6b42a1e0c81",
+        "ma_poc/tests/pms/adapters/test_showmojo_public.py": "ee3cf42b2c7c24030f968db15a20db9bf494471118095eee4a3b31ffbdbba848"
+      }
+    },
+    "test_files": [
+      "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+      "ma_poc/tests/integration/test_floorplan_snap.py",
+      "ma_poc/tests/pms/adapters/test_betternoi_public.py"
+    ]
+  },
+  "lane": "park_northside_showmojo_official_manager_chain_implementation_e2e",
+  "materializer": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/park_northside_showmojo_lane/materialize_park_northside_showmojo_implementation.py",
+    "sha256": "29cb0ed9d3b579158cf7e7526a9d00da0820768698ad6e678e4d14c0c3e5830b"
+  },
+  "prior_discovery": {
+    "evidence": "/private/tmp/propai-fnd-vBkmT9/park_northside_showmojo_lane/evidence_park_northside_38378_showmojo_discovery.json",
+    "evidence_sha256": "71c0dd5d3863c0f3aa94b04f783114625060c769a173e4f28f7074da03334687",
+    "proposal": "/private/tmp/propai-fnd-vBkmT9/park_northside_showmojo_lane/park_northside_showmojo_implementation_proposal.md",
+    "proposal_sha256": "9b12368991579065f2856d71506d6c6f0123cb7dfa91c15aabbc2abceb364166"
+  },
+  "property_id": 38378,
+  "verification": {
+    "all_repeats_pass": true,
+    "checks": [
+      {
+        "command": [
+          "ruff",
+          "check",
+          "ma_poc/pms/adapters/_showmojo_public.py",
+          "ma_poc/pms/scraper.py",
+          "ma_poc/services/floorplan_snap.py",
+          "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+          "ma_poc/tests/integration/test_floorplan_snap.py",
+          "ma_poc/tests/pms/adapters/test_betternoi_public.py"
+        ],
+        "elapsed_ms": 49,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "All checks passed!\n"
+      },
+      {
+        "command": [
+          "pytest",
+          "-q",
+          "ma_poc/tests/pms/adapters/test_showmojo_public.py",
+          "ma_poc/tests/pms/adapters/test_betternoi_public.py",
+          "ma_poc/tests/integration/test_floorplan_snap.py"
+        ],
+        "elapsed_ms": 1036,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "........................                                                 [100%]\n24 passed in 0.17s\n"
+      },
+      {
+        "command": [
+          "pytest",
+          "-q",
+          "ma_poc/tests/pms/test_scraper.py",
+          "ma_poc/tests/pms/test_universal_recovery_plan_level_gate.py",
+          "ma_poc/tests/pms/test_page_local_static_recovery.py"
+        ],
+        "elapsed_ms": 853,
+        "exit_code": 0,
+        "stderr": "",
+        "stdout": "...............................................                          [100%]\n47 passed in 0.22s\n"
+      }
+    ],
+    "configured_pipeline_repeats": [
+      {
+        "adapter": "showmojo_public",
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "rentmanager",
+          "generic",
+          "page_published_native:showmojo_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 13,
+        "native_rows": 13,
+        "official_chain": {
+          "accepted_rows": 13,
+          "application_site_id": "44261A",
+          "attempted": true,
+          "configured_url": "https://www.parknorthsiderva.com/",
+          "failure_reason": "",
+          "manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+          "manager_url": "https://dobrinpropertymanagement.com/",
+          "native_listing_ids": [
+            "e7c39f1061",
+            "f9a10da061",
+            "02193fd097",
+            "6cdb90d053",
+            "61ac367085",
+            "4cb3ea70bd",
+            "32d531e0d8",
+            "2b1030a0f4",
+            "c338072019",
+            "ac0583204b",
+            "2fb50de04d",
+            "5ac2969071",
+            "0b5bfa5039"
+          ],
+          "pages": [
+            {
+              "cards": 20,
+              "page": 1,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1"
+            },
+            {
+              "cards": 20,
+              "page": 2,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2"
+            },
+            {
+              "cards": 12,
+              "page": 3,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=3"
+            },
+            {
+              "cards": 0,
+              "page": 4,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=4"
+            }
+          ],
+          "portfolio_rows": 52,
+          "rejected_rows": [
+            {
+              "city_state_zip": "Richmond, VA 23224",
+              "provider_listing_uid": "2ae5ea2026",
+              "provider_unit_address": "2200 Lynhaven Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5fe942409b",
+              "provider_unit_address": "1923 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "097b680090",
+              "provider_unit_address": "1919 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "deaaa720f3",
+              "provider_unit_address": "1915 Lakeview Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "d55020e08b",
+              "provider_unit_address": "1721 Blair St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5565ba0090",
+              "provider_unit_address": "1728 Claiborne St - B",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3da37d1090",
+              "provider_unit_address": "1721 Blair St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7031b380f5",
+              "provider_unit_address": "1913 Lakeview Ave - F",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23222",
+              "provider_listing_uid": "68cf877053",
+              "provider_unit_address": "1700 Roane St",
+              "reasons": [
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e3afa4f0bf",
+              "provider_unit_address": "1826 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "b0431840a8",
+              "provider_unit_address": "1707 Colorado Ave - L",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "07294ac078",
+              "provider_unit_address": "1703 Colorado Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "c19105b09d",
+              "provider_unit_address": "1707 Colorado Ave - H",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5dc8bdc0fe",
+              "provider_unit_address": "1701 Colorado Ave - E",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5e94e6f0fe",
+              "provider_unit_address": "1707 Colorado Ave - D",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e9031d2052",
+              "provider_unit_address": "1701 Colorado Ave - K",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "2e7c93c052",
+              "provider_unit_address": "1703 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8c76206052",
+              "provider_unit_address": "1705 Colorado Ave - M",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "4d8a294052",
+              "provider_unit_address": "1707 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3cf4a34061",
+              "provider_unit_address": "1821 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "896279a061",
+              "provider_unit_address": "1819 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7be0aa5061",
+              "provider_unit_address": "2001 Lakeview Ave - X",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "df2857b0f3",
+              "provider_unit_address": "1424 Winder St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "6111d8705d",
+              "provider_unit_address": "1422 Winder St - 4",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "f13b03f076",
+              "provider_unit_address": "2914 Idlewood Ave - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "8b7302a069",
+              "provider_unit_address": "2914 Idlewood Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "0e7c8bc091",
+              "provider_unit_address": "2914 Idlewood Ave - 6",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8ab98870aa",
+              "provider_unit_address": "2000 Lakeview Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "efcc7fc06c",
+              "provider_unit_address": "1904 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e0e2ad805d",
+              "provider_unit_address": "2317 W Main St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "90a4f36017",
+              "provider_unit_address": "2914 Idlewood Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3ff4be20dd",
+              "provider_unit_address": "1906 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "9b2edb4006",
+              "provider_unit_address": "1108 Dinneen Street - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "ff353e90aa",
+              "provider_unit_address": "510 N Monroe St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3089001068",
+              "provider_unit_address": "23 S Morris St - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "cca546f070",
+              "provider_unit_address": "1729.5 Winder St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "50e9a39090",
+              "provider_unit_address": "1514 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "a83e5e9071",
+              "provider_unit_address": "1120 S Randolph St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "96402cf017",
+              "provider_unit_address": "5 S Morris St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            }
+          ],
+          "showmojo_account": "fea92db007",
+          "showmojo_embed_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+        },
+        "plan_rows": 0,
+        "repeat": 1,
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "unit_rows": 13,
+        "units": [
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available September 7th",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1617 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "e7c39f1061"
+            },
+            "source_listing_url": "https://showmojo.com/l/e7c39f1061/1617-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1617 Brookfield St",
+            "unit_number": "1617 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1708 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "f9a10da061"
+            },
+            "source_listing_url": "https://showmojo.com/l/f9a10da061/1708-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1708 Tyler St",
+            "unit_number": "1708 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "2BD/1BR-2",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1395,
+            "market_rent_low": 1395,
+            "provider_unit_address": "1600 C Fendall Ave",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "02193fd097"
+            },
+            "source_listing_url": "https://showmojo.com/l/02193fd097/1600-c-fendall-ave-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "825",
+            "unit_name": "1600 C Fendall Ave",
+            "unit_number": "1600 C Fendall Ave"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1611 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "6cdb90d053"
+            },
+            "source_listing_url": "https://showmojo.com/l/6cdb90d053/1611-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1611 Tyler St",
+            "unit_number": "1611 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "525 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "61ac367085"
+            },
+            "source_listing_url": "https://showmojo.com/l/61ac367085/525-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "525 Fritz St",
+            "unit_number": "525 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1500 Roane St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "4cb3ea70bd"
+            },
+            "source_listing_url": "https://showmojo.com/l/4cb3ea70bd/1500-roane-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1500 Roane St",
+            "unit_number": "1500 Roane St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "405 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "32d531e0d8"
+            },
+            "source_listing_url": "https://showmojo.com/l/32d531e0d8/405-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "1000",
+            "unit_name": "405 Fritz St",
+            "unit_number": "405 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1513 Hickory St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2b1030a0f4"
+            },
+            "source_listing_url": "https://showmojo.com/l/2b1030a0f4/1513-hickory-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1513 Hickory St",
+            "unit_number": "1513 Hickory St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "528 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "c338072019"
+            },
+            "source_listing_url": "https://showmojo.com/l/c338072019/528-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "528 Bacon St",
+            "unit_number": "528 Bacon St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "510 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "ac0583204b"
+            },
+            "source_listing_url": "https://showmojo.com/l/ac0583204b/510-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "510 Fritz St",
+            "unit_number": "510 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "517 Fells St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2fb50de04d"
+            },
+            "source_listing_url": "https://showmojo.com/l/2fb50de04d/517-fells-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "517 Fells St",
+            "unit_number": "517 Fells St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1700 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "5ac2969071"
+            },
+            "source_listing_url": "https://showmojo.com/l/5ac2969071/1700-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1700 Brookfield St",
+            "unit_number": "1700 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "514 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "0b5bfa5039"
+            },
+            "source_listing_url": "https://showmojo.com/l/0b5bfa5039/514-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "514 Bacon St",
+            "unit_number": "514 Bacon St"
+          }
+        ],
+        "winning_page_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+      },
+      {
+        "adapter": "showmojo_public",
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "rentmanager",
+          "generic",
+          "page_published_native:showmojo_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 13,
+        "native_rows": 13,
+        "official_chain": {
+          "accepted_rows": 13,
+          "application_site_id": "44261A",
+          "attempted": true,
+          "configured_url": "https://www.parknorthsiderva.com/",
+          "failure_reason": "",
+          "manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+          "manager_url": "https://dobrinpropertymanagement.com/",
+          "native_listing_ids": [
+            "e7c39f1061",
+            "f9a10da061",
+            "02193fd097",
+            "6cdb90d053",
+            "61ac367085",
+            "4cb3ea70bd",
+            "32d531e0d8",
+            "2b1030a0f4",
+            "c338072019",
+            "ac0583204b",
+            "2fb50de04d",
+            "5ac2969071",
+            "0b5bfa5039"
+          ],
+          "pages": [
+            {
+              "cards": 20,
+              "page": 1,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1"
+            },
+            {
+              "cards": 20,
+              "page": 2,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2"
+            },
+            {
+              "cards": 12,
+              "page": 3,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=3"
+            },
+            {
+              "cards": 0,
+              "page": 4,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=4"
+            }
+          ],
+          "portfolio_rows": 52,
+          "rejected_rows": [
+            {
+              "city_state_zip": "Richmond, VA 23224",
+              "provider_listing_uid": "2ae5ea2026",
+              "provider_unit_address": "2200 Lynhaven Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5fe942409b",
+              "provider_unit_address": "1923 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "097b680090",
+              "provider_unit_address": "1919 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "deaaa720f3",
+              "provider_unit_address": "1915 Lakeview Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "d55020e08b",
+              "provider_unit_address": "1721 Blair St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5565ba0090",
+              "provider_unit_address": "1728 Claiborne St - B",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3da37d1090",
+              "provider_unit_address": "1721 Blair St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7031b380f5",
+              "provider_unit_address": "1913 Lakeview Ave - F",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23222",
+              "provider_listing_uid": "68cf877053",
+              "provider_unit_address": "1700 Roane St",
+              "reasons": [
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e3afa4f0bf",
+              "provider_unit_address": "1826 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "b0431840a8",
+              "provider_unit_address": "1707 Colorado Ave - L",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "07294ac078",
+              "provider_unit_address": "1703 Colorado Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "c19105b09d",
+              "provider_unit_address": "1707 Colorado Ave - H",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5dc8bdc0fe",
+              "provider_unit_address": "1701 Colorado Ave - E",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5e94e6f0fe",
+              "provider_unit_address": "1707 Colorado Ave - D",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e9031d2052",
+              "provider_unit_address": "1701 Colorado Ave - K",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "2e7c93c052",
+              "provider_unit_address": "1703 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8c76206052",
+              "provider_unit_address": "1705 Colorado Ave - M",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "4d8a294052",
+              "provider_unit_address": "1707 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3cf4a34061",
+              "provider_unit_address": "1821 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "896279a061",
+              "provider_unit_address": "1819 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7be0aa5061",
+              "provider_unit_address": "2001 Lakeview Ave - X",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "df2857b0f3",
+              "provider_unit_address": "1424 Winder St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "6111d8705d",
+              "provider_unit_address": "1422 Winder St - 4",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "f13b03f076",
+              "provider_unit_address": "2914 Idlewood Ave - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "8b7302a069",
+              "provider_unit_address": "2914 Idlewood Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "0e7c8bc091",
+              "provider_unit_address": "2914 Idlewood Ave - 6",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8ab98870aa",
+              "provider_unit_address": "2000 Lakeview Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "efcc7fc06c",
+              "provider_unit_address": "1904 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e0e2ad805d",
+              "provider_unit_address": "2317 W Main St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "90a4f36017",
+              "provider_unit_address": "2914 Idlewood Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3ff4be20dd",
+              "provider_unit_address": "1906 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "9b2edb4006",
+              "provider_unit_address": "1108 Dinneen Street - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "ff353e90aa",
+              "provider_unit_address": "510 N Monroe St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3089001068",
+              "provider_unit_address": "23 S Morris St - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "cca546f070",
+              "provider_unit_address": "1729.5 Winder St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "50e9a39090",
+              "provider_unit_address": "1514 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "a83e5e9071",
+              "provider_unit_address": "1120 S Randolph St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "96402cf017",
+              "provider_unit_address": "5 S Morris St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            }
+          ],
+          "showmojo_account": "fea92db007",
+          "showmojo_embed_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+        },
+        "plan_rows": 0,
+        "repeat": 2,
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "unit_rows": 13,
+        "units": [
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available September 7th",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1617 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "e7c39f1061"
+            },
+            "source_listing_url": "https://showmojo.com/l/e7c39f1061/1617-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1617 Brookfield St",
+            "unit_number": "1617 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1708 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "f9a10da061"
+            },
+            "source_listing_url": "https://showmojo.com/l/f9a10da061/1708-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1708 Tyler St",
+            "unit_number": "1708 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "2BD/1BR-2",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1395,
+            "market_rent_low": 1395,
+            "provider_unit_address": "1600 C Fendall Ave",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "02193fd097"
+            },
+            "source_listing_url": "https://showmojo.com/l/02193fd097/1600-c-fendall-ave-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "825",
+            "unit_name": "1600 C Fendall Ave",
+            "unit_number": "1600 C Fendall Ave"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1611 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "6cdb90d053"
+            },
+            "source_listing_url": "https://showmojo.com/l/6cdb90d053/1611-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1611 Tyler St",
+            "unit_number": "1611 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "525 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "61ac367085"
+            },
+            "source_listing_url": "https://showmojo.com/l/61ac367085/525-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "525 Fritz St",
+            "unit_number": "525 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1500 Roane St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "4cb3ea70bd"
+            },
+            "source_listing_url": "https://showmojo.com/l/4cb3ea70bd/1500-roane-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1500 Roane St",
+            "unit_number": "1500 Roane St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "405 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "32d531e0d8"
+            },
+            "source_listing_url": "https://showmojo.com/l/32d531e0d8/405-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "1000",
+            "unit_name": "405 Fritz St",
+            "unit_number": "405 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1513 Hickory St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2b1030a0f4"
+            },
+            "source_listing_url": "https://showmojo.com/l/2b1030a0f4/1513-hickory-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1513 Hickory St",
+            "unit_number": "1513 Hickory St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "528 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "c338072019"
+            },
+            "source_listing_url": "https://showmojo.com/l/c338072019/528-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "528 Bacon St",
+            "unit_number": "528 Bacon St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "510 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "ac0583204b"
+            },
+            "source_listing_url": "https://showmojo.com/l/ac0583204b/510-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "510 Fritz St",
+            "unit_number": "510 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "517 Fells St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2fb50de04d"
+            },
+            "source_listing_url": "https://showmojo.com/l/2fb50de04d/517-fells-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "517 Fells St",
+            "unit_number": "517 Fells St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1700 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "5ac2969071"
+            },
+            "source_listing_url": "https://showmojo.com/l/5ac2969071/1700-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1700 Brookfield St",
+            "unit_number": "1700 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "514 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "0b5bfa5039"
+            },
+            "source_listing_url": "https://showmojo.com/l/0b5bfa5039/514-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "514 Bacon St",
+            "unit_number": "514 Bacon St"
+          }
+        ],
+        "winning_page_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+      },
+      {
+        "adapter": "showmojo_public",
+        "assertions": {
+          "account_and_application_exact": true,
+          "adapter_exact": true,
+          "availability_dates_not_invented": true,
+          "availability_text_preserved": true,
+          "configured_fetch_200": true,
+          "exact_13_native_priced_rows": true,
+          "fallback_provenance_present": true,
+          "floor_plan_names_remain_blank": true,
+          "llm_not_used": true,
+          "mixed_roster_explicitly_filtered": true,
+          "native_listing_ids_exact": true,
+          "native_listing_ids_unique": true,
+          "official_chain_urls_exact": true,
+          "provider_name_gap_documented": true,
+          "source_uid_detail_binding": true,
+          "three_same_roster_controls_excluded": true,
+          "tier_exact": true,
+          "unit_addresses_unique": true
+        },
+        "configured_fetch": {
+          "body_bytes": 797163,
+          "final_url": "https://www.parknorthsiderva.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "fallback_chain": [
+          "rentmanager",
+          "generic",
+          "page_published_native:showmojo_public"
+        ],
+        "llm_interactions": [],
+        "native_positive_rent_rows": 13,
+        "native_rows": 13,
+        "official_chain": {
+          "accepted_rows": 13,
+          "application_site_id": "44261A",
+          "attempted": true,
+          "configured_url": "https://www.parknorthsiderva.com/",
+          "failure_reason": "",
+          "manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+          "manager_url": "https://dobrinpropertymanagement.com/",
+          "native_listing_ids": [
+            "e7c39f1061",
+            "f9a10da061",
+            "02193fd097",
+            "6cdb90d053",
+            "61ac367085",
+            "4cb3ea70bd",
+            "32d531e0d8",
+            "2b1030a0f4",
+            "c338072019",
+            "ac0583204b",
+            "2fb50de04d",
+            "5ac2969071",
+            "0b5bfa5039"
+          ],
+          "pages": [
+            {
+              "cards": 20,
+              "page": 1,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1"
+            },
+            {
+              "cards": 20,
+              "page": 2,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2"
+            },
+            {
+              "cards": 12,
+              "page": 3,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=3"
+            },
+            {
+              "cards": 0,
+              "page": 4,
+              "url": "https://showmojo.com/fea92db007/listings/mapsearch?page=4"
+            }
+          ],
+          "portfolio_rows": 52,
+          "rejected_rows": [
+            {
+              "city_state_zip": "Richmond, VA 23224",
+              "provider_listing_uid": "2ae5ea2026",
+              "provider_unit_address": "2200 Lynhaven Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5fe942409b",
+              "provider_unit_address": "1923 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "097b680090",
+              "provider_unit_address": "1919 Lakeview Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "deaaa720f3",
+              "provider_unit_address": "1915 Lakeview Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "d55020e08b",
+              "provider_unit_address": "1721 Blair St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5565ba0090",
+              "provider_unit_address": "1728 Claiborne St - B",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3da37d1090",
+              "provider_unit_address": "1721 Blair St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7031b380f5",
+              "provider_unit_address": "1913 Lakeview Ave - F",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23222",
+              "provider_listing_uid": "68cf877053",
+              "provider_unit_address": "1700 Roane St",
+              "reasons": [
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e3afa4f0bf",
+              "provider_unit_address": "1826 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "b0431840a8",
+              "provider_unit_address": "1707 Colorado Ave - L",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "07294ac078",
+              "provider_unit_address": "1703 Colorado Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "c19105b09d",
+              "provider_unit_address": "1707 Colorado Ave - H",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5dc8bdc0fe",
+              "provider_unit_address": "1701 Colorado Ave - E",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "5e94e6f0fe",
+              "provider_unit_address": "1707 Colorado Ave - D",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e9031d2052",
+              "provider_unit_address": "1701 Colorado Ave - K",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "2e7c93c052",
+              "provider_unit_address": "1703 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8c76206052",
+              "provider_unit_address": "1705 Colorado Ave - M",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "4d8a294052",
+              "provider_unit_address": "1707 Colorado Ave - C",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3cf4a34061",
+              "provider_unit_address": "1821 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "896279a061",
+              "provider_unit_address": "1819 Thomas St",
+              "reasons": [
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "7be0aa5061",
+              "provider_unit_address": "2001 Lakeview Ave - X",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "df2857b0f3",
+              "provider_unit_address": "1424 Winder St - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "6111d8705d",
+              "provider_unit_address": "1422 Winder St - 4",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "f13b03f076",
+              "provider_unit_address": "2914 Idlewood Ave - 3",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "8b7302a069",
+              "provider_unit_address": "2914 Idlewood Ave - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "0e7c8bc091",
+              "provider_unit_address": "2914 Idlewood Ave - 6",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "8ab98870aa",
+              "provider_unit_address": "2000 Lakeview Ave - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "efcc7fc06c",
+              "provider_unit_address": "1904 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "e0e2ad805d",
+              "provider_unit_address": "2317 W Main St - 2",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23221",
+              "provider_listing_uid": "90a4f36017",
+              "provider_unit_address": "2914 Idlewood Ave - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3ff4be20dd",
+              "provider_unit_address": "1906 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "9b2edb4006",
+              "provider_unit_address": "1108 Dinneen Street - 1",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "no_explicit_provider_availability",
+                "unit_dimensions_absent"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "ff353e90aa",
+              "provider_unit_address": "510 N Monroe St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "3089001068",
+              "provider_unit_address": "23 S Morris St - A",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "cca546f070",
+              "provider_unit_address": "1729.5 Winder St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "50e9a39090",
+              "provider_unit_address": "1514 Lakeview Ave",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch",
+                "application_site_id_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "a83e5e9071",
+              "provider_unit_address": "1120 S Randolph St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            },
+            {
+              "city_state_zip": "Richmond, VA 23220",
+              "provider_listing_uid": "96402cf017",
+              "provider_unit_address": "5 S Morris St",
+              "reasons": [
+                "canonical_property_name_absent",
+                "canonical_city_state_zip_mismatch"
+              ]
+            }
+          ],
+          "showmojo_account": "fea92db007",
+          "showmojo_embed_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+        },
+        "plan_rows": 0,
+        "repeat": 3,
+        "tier": "TIER_1_PUBLIC_SHOWMOJO_OFFICIAL_MANAGER_CHAIN",
+        "unit_rows": 13,
+        "units": [
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available September 7th",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1617 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "e7c39f1061"
+            },
+            "source_listing_url": "https://showmojo.com/l/e7c39f1061/1617-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1617 Brookfield St",
+            "unit_number": "1617 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1295,
+            "market_rent_low": 1295,
+            "provider_unit_address": "1708 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "f9a10da061"
+            },
+            "source_listing_url": "https://showmojo.com/l/f9a10da061/1708-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1708 Tyler St",
+            "unit_number": "1708 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "2BD/1BR-2",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1395,
+            "market_rent_low": 1395,
+            "provider_unit_address": "1600 C Fendall Ave",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "02193fd097"
+            },
+            "source_listing_url": "https://showmojo.com/l/02193fd097/1600-c-fendall-ave-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "825",
+            "unit_name": "1600 C Fendall Ave",
+            "unit_number": "1600 C Fendall Ave"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1611 Tyler St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "6cdb90d053"
+            },
+            "source_listing_url": "https://showmojo.com/l/6cdb90d053/1611-tyler-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1611 Tyler St",
+            "unit_number": "1611 Tyler St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "525 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "61ac367085"
+            },
+            "source_listing_url": "https://showmojo.com/l/61ac367085/525-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "525 Fritz St",
+            "unit_number": "525 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1500 Roane St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "4cb3ea70bd"
+            },
+            "source_listing_url": "https://showmojo.com/l/4cb3ea70bd/1500-roane-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1500 Roane St",
+            "unit_number": "1500 Roane St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "405 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "32d531e0d8"
+            },
+            "source_listing_url": "https://showmojo.com/l/32d531e0d8/405-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "1000",
+            "unit_name": "405 Fritz St",
+            "unit_number": "405 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1513 Hickory St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2b1030a0f4"
+            },
+            "source_listing_url": "https://showmojo.com/l/2b1030a0f4/1513-hickory-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1513 Hickory St",
+            "unit_number": "1513 Hickory St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "528 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "c338072019"
+            },
+            "source_listing_url": "https://showmojo.com/l/c338072019/528-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "528 Bacon St",
+            "unit_number": "528 Bacon St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "510 Fritz St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "ac0583204b"
+            },
+            "source_listing_url": "https://showmojo.com/l/ac0583204b/510-fritz-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "510 Fritz St",
+            "unit_number": "510 Fritz St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "517 Fells St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=1",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "2fb50de04d"
+            },
+            "source_listing_url": "https://showmojo.com/l/2fb50de04d/517-fells-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "517 Fells St",
+            "unit_number": "517 Fells St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "1700 Brookfield St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "5ac2969071"
+            },
+            "source_listing_url": "https://showmojo.com/l/5ac2969071/1700-brookfield-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "1700 Brookfield St",
+            "unit_number": "1700 Brookfield St"
+          },
+          {
+            "availability_date": "",
+            "availability_date_provenance": "provider_relative_text_preserved_no_year_invented",
+            "availability_status": "AVAILABLE",
+            "availability_text": "Available now",
+            "available_date": "",
+            "bathrooms": "1",
+            "bedrooms": "2",
+            "data_gaps": [
+              "floor_plan_name",
+              "availability_date"
+            ],
+            "data_quality_flag": "SHOWMOJO_PLAN_NAME_AND_EXACT_DATE_NOT_PUBLISHED",
+            "floor_plan_name": "",
+            "floor_plan_name_catalog": "TH",
+            "floor_plan_name_provenance": "provider_roster_does_not_publish_floor_plan_name",
+            "floor_plan_snap_name_suppressed": true,
+            "market_rent_high": 1450,
+            "market_rent_low": 1450,
+            "provider_unit_address": "514 Bacon St",
+            "source_api_url": "https://showmojo.com/fea92db007/listings/mapsearch?page=2",
+            "source_ids": {
+              "rhr_application_site_id": "44261A",
+              "showmojo_account": "fea92db007",
+              "showmojo_listing_uid": "0b5bfa5039"
+            },
+            "source_listing_url": "https://showmojo.com/l/0b5bfa5039/514-bacon-st-richmond-va-23222?g=1",
+            "source_manager_listings_url": "https://dobrinpropertymanagement.com/richmond-va-property-listings/",
+            "source_manager_url": "https://dobrinpropertymanagement.com/",
+            "source_portal_url": "https://showmojo.com/fea92db007/listings/mapsearch",
+            "source_property_name": "Park Northside",
+            "source_property_provenance": "exact_configured_identity_managed_by_reciprocal_manager_showmojo_iframe_name_city_state_zip_filter",
+            "sqft": "725",
+            "unit_name": "514 Bacon St",
+            "unit_number": "514 Bacon St"
+          }
+        ],
+        "winning_page_url": "https://showmojo.com/fea92db007/listings/mapsearch"
+      }
+    ],
+    "repeat_count": 3,
+    "strict_native_positive_rent_counts": [
+      13,
+      13,
+      13
+    ]
+  }
+}

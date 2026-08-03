@@ -10,16 +10,21 @@ parses ``Workflow.ActivityGroups[*].GroupActivities[*].Floorplans[]``.
 Live fixture from 2026-05-24 HAR capture of
 www.thepointatabington.com (SiteId 4777974, 3 floorplans).
 """
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from ma_poc.pms.adapters.onesite import (
     _collapse_huge_rent_range,
     _extract_onesite_site_ids,
     _generate_xyz_token,
     _onesite_workflowstartup_url,
+    _probe_onesite_workflowstartup,
     _xyz_md5_upper,
     parse_onesite_workflowstartup,
 )
@@ -36,7 +41,7 @@ def test_extract_siteid_from_widget_loader() -> None:
     body = (
         '<html><body><script src="https://property.onesite.realpage.com/ollr/'
         'widgetLoader.js?siteId=4646505&amp;ContainerId=OllrDiv"></script>'
-        '</body></html>'
+        "</body></html>"
     )
     ids = _extract_onesite_site_ids(body, "https://x.onlineleasing.realpage.com/")
     assert ids == ["4646505"]
@@ -84,6 +89,12 @@ def test_extract_siteid_from_welcomehome_with_extra_query_params() -> None:
     assert ids == ["5061093"]
 
 
+def test_extract_siteid_from_welcomehome_with_trailing_slash() -> None:
+    """The live Central Park surface includes ``welcomehome/?siteId=``."""
+    body = '<a href="https://property.onesite.realpage.com/welcomehome/?siteId=4898130">Apply</a>'
+    assert _extract_onesite_site_ids(body, "") == ["4898130"]
+
+
 def test_extract_siteid_welcomehome_and_widget_both_present_dedupe() -> None:
     """Same SiteId reached via widgetLoader and welcomehome dedupes to one."""
     body = (
@@ -109,11 +120,9 @@ def test_xyz_md5_upper_is_standard_md5_uppercase_hex() -> None:
     (1732584193, 4023233417, 2562383102, 271733878) as standard MD5
     init values. Confirm our port matches stdlib MD5."""
     import hashlib
+
     sample = "hello world"
-    assert (
-        _xyz_md5_upper(sample)
-        == hashlib.md5(sample.encode()).hexdigest().upper()
-    )
+    assert _xyz_md5_upper(sample) == hashlib.md5(sample.encode()).hexdigest().upper()
 
 
 def test_xyz_token_structure_matches_har_template() -> None:
@@ -122,6 +131,7 @@ def test_xyz_token_structure_matches_har_template() -> None:
        + charGen(5) + base64(timestamp_ms) + charGen(7)
     Pin the structure so any future bundle update breaks this test."""
     import base64
+
     token = _generate_xyz_token("4646505", "test-ua", ts_ms=1779444064132)
     decoded = base64.b64decode(token).decode("latin-1")
     # decoded[0] = charGen(1) — 1 alphanumeric
@@ -135,6 +145,7 @@ def test_xyz_token_structure_matches_har_template() -> None:
     # decoded[36:68] = md5(UA)
     assert len(decoded[36:68]) == 32
     import hashlib
+
     assert decoded[36:68] == hashlib.md5(b"test-ua").hexdigest().upper()
     # decoded[68:73] = charGen(5)
     assert all(c.isalnum() for c in decoded[68:73])
@@ -144,6 +155,7 @@ def test_xyz_token_structure_matches_har_template() -> None:
     tail = decoded[73:]
     # Take up to the first 20-char base64 sequence (16 chars + ==)
     import re
+
     m = re.search(r"([A-Za-z0-9+/]+={1,2})", tail)
     assert m, f"expected base64 timestamp in tail: {tail!r}"
     ts_b64 = m.group(1)
@@ -161,6 +173,7 @@ def test_xyz_token_is_different_on_each_call_due_to_random_chars() -> None:
 def test_xyz_token_is_base64_encoded() -> None:
     """Final output is base64 — must be decodeable."""
     import base64
+
     token = _generate_xyz_token("12345", "ua")
     # Will raise on bad padding/chars
     decoded = base64.b64decode(token)
@@ -174,6 +187,7 @@ def test_xyz_token_full_example_reproduces_known_har_md5_chunks() -> None:
 
     # SiteId 4777974 → its MD5
     import hashlib
+
     expected_md5 = hashlib.md5(b"4777974").hexdigest().upper()
     # Our token-generator should embed this exact MD5
     token = _generate_xyz_token(
@@ -202,15 +216,165 @@ def test_workflowstartup_url_carries_siteid_and_fresh_uuid() -> None:
     assert u1 != u2  # different UUIDs
 
 
+@pytest.mark.asyncio
+async def test_workflow_probe_does_not_rotate_fingerprint_in_compliance_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blocked request gets one stable fingerprint, never the legacy chain."""
+    from curl_cffi import requests as curl_requests
+
+    calls: list[str] = []
+
+    class _Blocked:
+        status_code = 403
+        text = "blocked"
+
+    def _get(*_args: object, **kwargs: object) -> _Blocked:
+        calls.append(str(kwargs.get("impersonate") or ""))
+        return _Blocked()
+
+    monkeypatch.setenv("COMPLIANCE_MODE", "1")
+    monkeypatch.setattr(curl_requests, "get", _get)
+    ctx = SimpleNamespace(
+        base_url="https://example.com/",
+        property_id="compliance-test",
+        fetch_result=SimpleNamespace(
+            body=(
+                b'<script src="https://property.onesite.realpage.com/ollr/'
+                b'widgetLoader.js?siteId=4898130"></script>'
+            ),
+            final_url="https://example.com/",
+        ),
+    )
+
+    assert await _probe_onesite_workflowstartup(ctx) == []
+    assert calls == ["chrome116"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_probe_uses_one_bounded_hb_shell_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exact published portal can disclose SiteId through one HB session."""
+    from curl_cffi import requests as curl_requests
+
+    from ma_poc.fetch import hyperbrowser_backend
+    from ma_poc.pms.adapters import _probe
+
+    direct_calls: list[dict[str, object]] = []
+    hb_calls: list[tuple[str, str]] = []
+
+    class _Blocked:
+        status_code = 403
+        text = "blocked"
+
+    def _direct(_url: str, **kwargs: object) -> _Blocked:
+        direct_calls.append(kwargs)
+        return _Blocked()
+
+    async def _hb(url: str, property_id: str) -> tuple[int, str]:
+        hb_calls.append((url, property_id))
+        return (
+            200,
+            '<script src="https://property.onesite.realpage.com/ollr/'
+            'widgetLoader.js?siteId=5100087"></script>',
+        )
+
+    workflow = {
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "A1",
+                                    "Name": "A1",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                    "AvailableUnits": 1,
+                                    "UnitIds": ["101"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+    class _WorkflowResponse:
+        status_code = 200
+        text = json.dumps(workflow)
+
+    monkeypatch.setenv("COMPLIANCE_MODE", "1")
+    monkeypatch.setenv("FETCH_BACKEND", "hyperbrowser")
+    monkeypatch.setattr(_probe, "probe_get", _direct)
+    monkeypatch.setattr(hyperbrowser_backend, "hb_raw_get", _hb)
+    monkeypatch.setattr(
+        curl_requests,
+        "get",
+        lambda *_args, **_kwargs: _WorkflowResponse(),
+    )
+    ctx = SimpleNamespace(
+        base_url="https://example.com/",
+        property_id="270367",
+        fetch_result=SimpleNamespace(
+            body=(b'<a href="https://8967358.onlineleasing.realpage.com/">Apply</a>'),
+            final_url="https://example.com/",
+        ),
+    )
+
+    rows = await _probe_onesite_workflowstartup(ctx)
+
+    assert [row["unit_number"] for row in rows] == ["101"]
+    assert {row["source_property_id"] for row in rows} == {"5100087"}
+    assert {row["source_property_provenance"] for row in rows} == {"published_portal_shell"}
+    assert {row["source_portal_url"] for row in rows} == {"https://8967358.onlineleasing.realpage.com/"}
+    assert direct_calls == [{"timeout": 15, "unlocker": False, "retries": 1}]
+    assert hb_calls == [("https://8967358.onlineleasing.realpage.com/", "270367")]
+
+
+@pytest.mark.asyncio
+async def test_workflow_probe_rejects_ambiguous_portfolio_portals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two distinct OneSite tenants on one page are not property evidence."""
+    from ma_poc.pms.adapters import _probe
+
+    direct_calls: list[str] = []
+
+    def _direct(url: str, **_kwargs: object) -> object:
+        direct_calls.append(url)
+        raise AssertionError("ambiguous portal page must not be probed")
+
+    monkeypatch.setattr(_probe, "probe_get", _direct)
+    ctx = SimpleNamespace(
+        base_url="https://portfolio.example/",
+        property_id="portfolio",
+        fetch_result=SimpleNamespace(
+            body=(
+                b'<a href="https://1111111.onlineleasing.realpage.com/">A</a>'
+                b'<a href="https://2222222.onlineleasing.realpage.com/">B</a>'
+            ),
+            final_url="https://portfolio.example/",
+        ),
+    )
+
+    assert await _probe_onesite_workflowstartup(ctx) == []
+    assert direct_calls == []
+
+
 # ----- parse_onesite_workflowstartup -----------------------------------
 
 
 def test_parse_workflowstartup_extracts_from_live_fixture() -> None:
     """Live HAR from www.thepointatabington.com — SiteId 4777974, 3
     floorplans (Whitman, Pembroke, plus one more)."""
-    body = json.loads(
-        (FIXTURES / "onesite_workflowstartup_thepointatabington.json").read_text()
-    )
+    body = json.loads((FIXTURES / "onesite_workflowstartup_thepointatabington.json").read_text())
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) >= 2, f"expected ≥2 plans, got {len(units)}"
 
@@ -228,17 +392,52 @@ def test_parse_workflowstartup_extracts_from_live_fixture() -> None:
     assert whitman.get("available_units") == "1"
 
 
+def test_workflow_payload_site_id_must_match_requested_property() -> None:
+    body = {
+        "Workflow": {
+            "SiteId": "2222222",
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "A1",
+                                    "Name": "A1",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                    "AvailableUnits": 1,
+                                    "UnitIds": ["101"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+        }
+    }
+    requested = (
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/"
+        "workflowstartup/v1/1111111/English?BpmId=OLL.WorkflowStartUp"
+    )
+
+    assert parse_onesite_workflowstartup(body, requested) == []
+
+    body["Workflow"]["SiteId"] = "1111111"
+    rows = parse_onesite_workflowstartup(body, requested)
+    assert [row["unit_number"] for row in rows] == ["101"]
+    assert {row["source_property_id"] for row in rows} == {"1111111"}
+
+
 def test_parse_workflowstartup_strict_pass_units() -> None:
     """Every emitted unit from the live fixture should be strict-pass
     (rent + sqft both present)."""
-    body = json.loads(
-        (FIXTURES / "onesite_workflowstartup_thepointatabington.json").read_text()
-    )
+    body = json.loads((FIXTURES / "onesite_workflowstartup_thepointatabington.json").read_text())
     units = parse_onesite_workflowstartup(body, "u")
-    strict = sum(
-        1 for u in units
-        if u.get("market_rent_low") and u.get("sqft")
-    )
+    strict = sum(1 for u in units if u.get("market_rent_low") and u.get("sqft"))
     assert strict >= 2, f"expected ≥2 strict-pass, got {strict}/{len(units)}"
 
 
@@ -247,33 +446,37 @@ def test_parse_workflowstartup_skips_zero_rent_zero_sqft_rows() -> None:
     — skip them so they don't trip the validity gate as bare names."""
     body = {
         "Workflow": {
-            "ActivityGroups": [{
-                "GroupActivities": [{
-                    "__type": "FloorplanSearchLeaseMgmtActivity",
-                    "Floorplans": [
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
                         {
-                            "Id": "1",
-                            "Name": "Real Plan",
-                            "Bedrooms": 1,
-                            "Bathrooms": 1,
-                            "Squarefeet": 700,
-                            "MinPriceRange": 1500,
-                            "MaxPriceRange": 1500,
-                            "AvailableUnits": 2,
-                        },
-                        {
-                            "Id": "2",
-                            "Name": "Empty Plan",
-                            "Bedrooms": 2,
-                            "Bathrooms": 2,
-                            "Squarefeet": 0,
-                            "MinPriceRange": 0,
-                            "MaxPriceRange": 0,
-                            "AvailableUnits": 0,
-                        },
-                    ],
-                }]
-            }]
+                            "__type": "FloorplanSearchLeaseMgmtActivity",
+                            "Floorplans": [
+                                {
+                                    "Id": "1",
+                                    "Name": "Real Plan",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                    "AvailableUnits": 2,
+                                },
+                                {
+                                    "Id": "2",
+                                    "Name": "Empty Plan",
+                                    "Bedrooms": 2,
+                                    "Bathrooms": 2,
+                                    "Squarefeet": 0,
+                                    "MinPriceRange": 0,
+                                    "MaxPriceRange": 0,
+                                    "AvailableUnits": 0,
+                                },
+                            ],
+                        }
+                    ]
+                }
+            ]
         }
     }
     units = parse_onesite_workflowstartup(body, "u")
@@ -288,20 +491,38 @@ def test_parse_workflowstartup_dedupes_repeated_floorplan_ids() -> None:
         "Workflow": {
             "ActivityGroups": [
                 {
-                    "GroupActivities": [{
-                        "Floorplans": [{
-                            "Id": "X", "Name": "A", "Bedrooms": 1, "Bathrooms": 1,
-                            "Squarefeet": 700, "MinPriceRange": 1500, "MaxPriceRange": 1500,
-                        }],
-                    }]
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "X",
+                                    "Name": "A",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                }
+                            ],
+                        }
+                    ]
                 },
                 {
-                    "GroupActivities": [{
-                        "Floorplans": [{
-                            "Id": "X", "Name": "A", "Bedrooms": 1, "Bathrooms": 1,
-                            "Squarefeet": 700, "MinPriceRange": 1500, "MaxPriceRange": 1500,
-                        }],
-                    }]
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "X",
+                                    "Name": "A",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                }
+                            ],
+                        }
+                    ]
                 },
             ]
         }
@@ -321,14 +542,27 @@ def test_parse_workflowstartup_falls_back_min_squarefeet() -> None:
     """Some Floorplan entries use ``MinSquareFeet`` instead of
     ``Squarefeet`` — parser must check both."""
     body = {
-        "Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
-            {
-                "Id": "Y", "Name": "B",
-                "Bedrooms": 1, "Bathrooms": 1.5,
-                "MinSquareFeet": 850,  # not "Squarefeet"
-                "MinPriceRange": 1800, "MaxPriceRange": 1800,
-            }
-        ]}]}]}
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "Y",
+                                    "Name": "B",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1.5,
+                                    "MinSquareFeet": 850,  # not "Squarefeet"
+                                    "MinPriceRange": 1800,
+                                    "MaxPriceRange": 1800,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     }
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) == 1
@@ -394,9 +628,7 @@ def test_parse_workflowstartup_clamps_huge_rent_range_from_bridgewater_live() ->
     3590166, 2026-05-25 probe). 3 of 6 plans have $1630-$8687+ ranges —
     short-term-lease leak in OneSite OLL. Post-fix: rent_high clamped
     to rent_low for those plans, normal-spread plans untouched."""
-    body = json.loads(
-        (FIXTURES / "onesite_workflowstartup_bridgewater.json").read_text()
-    )
+    body = json.loads((FIXTURES / "onesite_workflowstartup_bridgewater.json").read_text())
     units = parse_onesite_workflowstartup(body, "u")
     by_name = {u["floor_plan_name"]: u for u in units}
 
@@ -422,20 +654,64 @@ def test_workflowstartup_unit_id_expansion_three_branches() -> None:
     """The three emission branches: available+ids → per-unit rows;
     available+no-ids → one AVAILABLE plan row; priced+0-avail → one
     UNAVAILABLE plan row (never falsely AVAILABLE)."""
-    body = {"Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
-        {"Id": "a", "Name": "A2", "Bedrooms": 1, "Bathrooms": 1,
-         "Squarefeet": 700, "MinPriceRange": 2295, "MaxPriceRange": 2295,
-         "AvailableUnits": 1, "UnitIds": ["8"]},
-        {"Id": "c", "Name": "C2", "Bedrooms": 2, "Bathrooms": 2,
-         "Squarefeet": 1100, "MinPriceRange": 3902, "MaxPriceRange": 3952,
-         "AvailableUnits": 4, "UnitIds": ["119", "130", "131", "125"]},
-        {"Id": "noavail", "Name": "B1", "Bedrooms": 1, "Bathrooms": 1,
-         "Squarefeet": 800, "MinPriceRange": 1800, "MaxPriceRange": 1800,
-         "AvailableUnits": 0, "UnitIds": []},
-        {"Id": "noids", "Name": "D1", "Bedrooms": 0, "Bathrooms": 1,
-         "Squarefeet": 500, "MinPriceRange": 1200, "MaxPriceRange": 1200,
-         "AvailableUnits": 2, "UnitIds": []},
-    ]}]}]}}
+    body = {
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "a",
+                                    "Name": "A2",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 2295,
+                                    "MaxPriceRange": 2295,
+                                    "AvailableUnits": 1,
+                                    "UnitIds": ["8"],
+                                },
+                                {
+                                    "Id": "c",
+                                    "Name": "C2",
+                                    "Bedrooms": 2,
+                                    "Bathrooms": 2,
+                                    "Squarefeet": 1100,
+                                    "MinPriceRange": 3902,
+                                    "MaxPriceRange": 3952,
+                                    "AvailableUnits": 4,
+                                    "UnitIds": ["119", "130", "131", "125"],
+                                },
+                                {
+                                    "Id": "noavail",
+                                    "Name": "B1",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 800,
+                                    "MinPriceRange": 1800,
+                                    "MaxPriceRange": 1800,
+                                    "AvailableUnits": 0,
+                                    "UnitIds": [],
+                                },
+                                {
+                                    "Id": "noids",
+                                    "Name": "D1",
+                                    "Bedrooms": 0,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 500,
+                                    "MinPriceRange": 1200,
+                                    "MaxPriceRange": 1200,
+                                    "AvailableUnits": 2,
+                                    "UnitIds": [],
+                                },
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
     units = parse_onesite_workflowstartup(body, "u")
     by_num = {u["unit_number"]: u for u in units if u.get("unit_number")}
     # A2 → 1 unit, C2 → 4 units
@@ -457,9 +733,7 @@ def test_parse_workflowstartup_expands_unit_ids_bridgewater() -> None:
     unit-level rows; the 1 zero-availability plan (The Marshall, avail=0,
     priced) becomes a single UNAVAILABLE plan row — so no plan is dropped by
     the placeholder guard, and none is falsely marked AVAILABLE."""
-    body = json.loads(
-        (FIXTURES / "onesite_workflowstartup_bridgewater.json").read_text()
-    )
+    body = json.loads((FIXTURES / "onesite_workflowstartup_bridgewater.json").read_text())
     units = parse_onesite_workflowstartup(body, "u")
     unit_level = [u for u in units if u.get("unit_number")]
     unavail = [u for u in units if u.get("availability_status") == "UNAVAILABLE"]
@@ -467,10 +741,7 @@ def test_parse_workflowstartup_expands_unit_ids_bridgewater() -> None:
     assert len(unavail) == 1  # The Marshall — priced but 0 available
     assert len(units) == 24
     # every available plan's real unit numbers survive to unit-level rows
-    beeson = {
-        u["unit_number"] for u in unit_level
-        if u["floor_plan_name"] == "The Beeson"
-    }
+    beeson = {u["unit_number"] for u in unit_level if u["floor_plan_name"] == "The Beeson"}
     assert beeson == {"156", "169", "142", "155", "126"}
 
 
@@ -479,23 +750,42 @@ def test_parse_workflowstartup_widens_sqft_cascade_to_max_keys() -> None:
     ``MaxSquareFeet`` / ``MaxUnitSquareFeet`` when the lower bounds are 0,
     so the row doesn't fall through to sqft=-1 downstream."""
     body = {
-        "Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
-            {
-                "Id": "max-only-1", "Name": "Plan MaxSqft",
-                "Bedrooms": 1, "Bathrooms": 1,
-                "Squarefeet": 0, "MinSquareFeet": 0,
-                "MaxSquareFeet": 925,  # upper bound only
-                "MinPriceRange": 1400, "MaxPriceRange": 1400,
-            },
-            {
-                "Id": "max-unit-only-2", "Name": "Plan MaxUnitSqft",
-                "Bedrooms": 2, "Bathrooms": 2,
-                "Squarefeet": 0, "MinSquareFeet": 0,
-                "MaxSquareFeet": 0, "MinUnitSquareFeet": 0,
-                "MaxUnitSquareFeet": 1180,  # deepest fallback
-                "MinPriceRange": 1900, "MaxPriceRange": 1900,
-            },
-        ]}]}]}
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "max-only-1",
+                                    "Name": "Plan MaxSqft",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 0,
+                                    "MinSquareFeet": 0,
+                                    "MaxSquareFeet": 925,  # upper bound only
+                                    "MinPriceRange": 1400,
+                                    "MaxPriceRange": 1400,
+                                },
+                                {
+                                    "Id": "max-unit-only-2",
+                                    "Name": "Plan MaxUnitSqft",
+                                    "Bedrooms": 2,
+                                    "Bathrooms": 2,
+                                    "Squarefeet": 0,
+                                    "MinSquareFeet": 0,
+                                    "MaxSquareFeet": 0,
+                                    "MinUnitSquareFeet": 0,
+                                    "MaxUnitSquareFeet": 1180,  # deepest fallback
+                                    "MinPriceRange": 1900,
+                                    "MaxPriceRange": 1900,
+                                },
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     }
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) == 2
@@ -510,21 +800,38 @@ def test_parse_workflowstartup_skips_placeholder_when_no_avail_and_no_rent() -> 
     leaked into the workflow-tier zero-rent residue (e.g. Reserve at
     City Place observed 28 zero-rent rows). Drop them outright."""
     body = {
-        "Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
-            {
-                "Id": "real-1", "Name": "Real Plan",
-                "Bedrooms": 1, "Bathrooms": 1,
-                "Squarefeet": 700, "MinPriceRange": 1500, "MaxPriceRange": 1500,
-                "AvailableUnits": 2,
-            },
-            {
-                "Id": "placeholder-1", "Name": "Phantom Plan",
-                "Bedrooms": 2, "Bathrooms": 2,
-                "Squarefeet": 1100,  # has sqft but...
-                "MinPriceRange": 0, "MaxPriceRange": 0,  # no rent
-                "AvailableUnits": 0,                       # not available
-            },
-        ]}]}]}
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "real-1",
+                                    "Name": "Real Plan",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700,
+                                    "MinPriceRange": 1500,
+                                    "MaxPriceRange": 1500,
+                                    "AvailableUnits": 2,
+                                },
+                                {
+                                    "Id": "placeholder-1",
+                                    "Name": "Phantom Plan",
+                                    "Bedrooms": 2,
+                                    "Bathrooms": 2,
+                                    "Squarefeet": 1100,  # has sqft but...
+                                    "MinPriceRange": 0,
+                                    "MaxPriceRange": 0,  # no rent
+                                    "AvailableUnits": 0,  # not available
+                                },
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     }
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) == 1
@@ -537,14 +844,28 @@ def test_parse_workflowstartup_keeps_zero_avail_with_priced_plan() -> None:
     real signal even without immediate inventory. Reserve at City Place
     has plans like A2A ($1258-$1476, avail=0) we want to keep."""
     body = {
-        "Workflow": {"ActivityGroups": [{"GroupActivities": [{"Floorplans": [
-            {
-                "Id": "priced-no-avail", "Name": "A2A",
-                "Bedrooms": 1, "Bathrooms": 1,
-                "Squarefeet": 854, "MinPriceRange": 1258, "MaxPriceRange": 1476,
-                "AvailableUnits": 0,
-            }
-        ]}]}]}
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "Floorplans": [
+                                {
+                                    "Id": "priced-no-avail",
+                                    "Name": "A2A",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 854,
+                                    "MinPriceRange": 1258,
+                                    "MaxPriceRange": 1476,
+                                    "AvailableUnits": 0,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     }
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) == 1
@@ -558,16 +879,30 @@ def test_parse_workflowstartup_reserve_at_city_place_live_no_huge_range() -> Non
     untouched — guard against over-zealous clamping."""
     # Inline mini-fixture mirroring Reserve at City Place's structure
     body = {
-        "Workflow": {"ActivityGroups": [{"GroupActivities": [{
-            "__type": "FloorplanSearchLeaseMgmtActivity",
-            "Floorplans": [
-                {"Id": str(i), "Name": f"X{i}", "Bedrooms": 1, "Bathrooms": 1,
-                 "Squarefeet": 700 + i, "MinPriceRange": 1169 + 50*i,
-                 "MaxPriceRange": 1169 + 50*i + (100 if i % 2 else 0),
-                 "AvailableUnits": (i % 3)}
-                for i in range(14)
-            ],
-        }]}]}
+        "Workflow": {
+            "ActivityGroups": [
+                {
+                    "GroupActivities": [
+                        {
+                            "__type": "FloorplanSearchLeaseMgmtActivity",
+                            "Floorplans": [
+                                {
+                                    "Id": str(i),
+                                    "Name": f"X{i}",
+                                    "Bedrooms": 1,
+                                    "Bathrooms": 1,
+                                    "Squarefeet": 700 + i,
+                                    "MinPriceRange": 1169 + 50 * i,
+                                    "MaxPriceRange": 1169 + 50 * i + (100 if i % 2 else 0),
+                                    "AvailableUnits": (i % 3),
+                                }
+                                for i in range(14)
+                            ],
+                        }
+                    ]
+                }
+            ]
+        }
     }
     units = parse_onesite_workflowstartup(body, "u")
     assert len(units) == 14

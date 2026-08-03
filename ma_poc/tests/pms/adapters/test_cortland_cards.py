@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ma_poc.pms.adapters.cortland import parse_cortland_cards
+from ma_poc.pms.adapters.cortland import parse_cortland_cards, parse_cortland_units
 
 # Anchor on this file, not the process CWD — ``pytest tests/pms`` from inside
 # ma_poc/ must resolve fixtures the same way a repo-root run does.
@@ -166,6 +166,62 @@ def test_parses_two_synthetic_cards() -> None:
     assert units[1]["floor_plan_name"] == "Birch"
     assert units[1]["bedrooms"] == "2"
     assert units[1]["market_rent_low"] == 2200
+
+
+def test_current_card_prefers_base_rent_and_preserves_native_building_identity() -> None:
+    html = '''
+    <div class="apartments__card" data-apartment-id="215991314"
+         data-unit-id="904971"
+         data-event-extra='{"building_number":"14","apartment_number":"211"}'>
+      <a class="apartments__card-link">Apt #211</a>
+      <span class="apartments__card-columns">
+        A1<br>Apt #211<br>
+        Starting at $1,342 incl. fees<br>
+        Base Rent $1,265<br>
+        Building 14 | Floor 2<br>
+        1 Bed | 1 Bath | 740 sq. ft.<br>
+        Available starting 9/15/2026
+      </span>
+    </div>
+    '''
+
+    [row] = parse_cortland_cards(html, "https://www.cortland.com/example")
+
+    assert row["unit_number"] == "211"
+    assert row["unit_name"] == "211"
+    assert row["unit_id"] == "215991314"
+    assert row["building"] == "14"
+    assert row["market_rent_low"] == 1265
+    assert row["market_rent_high"] == 1265
+    assert row["rent_including_fees"] == 1342
+    assert row["source_ids"] == {
+        "cortland_apartment_id": "215991314",
+        "cortland_unit_id": "904971",
+    }
+
+
+def test_legacy_availprice_map_key_prevents_short_number_collapse() -> None:
+    floorplans = {
+        "A1": {
+            "title": "A1",
+            "bedroom": 1,
+            "bathroom": 1,
+            "square_feet": 700,
+            "availprice": {
+                "215994910": {"apartment_number": "305", "price": 1500},
+                "215994941": {"apartment_number": "305", "price": 1550},
+            },
+        }
+    }
+
+    rows = parse_cortland_units(floorplans, "https://www.cortland.com/legacy")
+
+    assert len(rows) == 2
+    assert {row["unit_number"] for row in rows} == {"305"}
+    assert {row["unit_id"] for row in rows} == {"215994910", "215994941"}
+    assert {
+        row["source_ids"]["cortland_apartment_id"] for row in rows
+    } == {"215994910", "215994941"}
 
 
 def test_returns_empty_on_no_cards() -> None:

@@ -1,8 +1,8 @@
 """Tests for the universal embed-recovery chain.
 
 Covers:
-  - Priority order: AppFolio → LeaseLeads → PMS-portal → generic-DOM,
-    first non-empty wins.
+  - Priority order: unit-capable recoveries run before generic DOM; the first
+    result with a canonical apartment identity wins.
   - Idempotency: ``recover_universal_embed`` sets
     ``ctx._embed_recovery_attempted = True`` on every invocation, so a
     second caller (e.g. scraper Step 8b after the syndication adapter
@@ -56,7 +56,7 @@ def _sample_unit(extra: dict[str, str] | None = None) -> dict[str, str]:
         "bedrooms": "1",
         "bathrooms": "1",
         "sqft": "800",
-        "unit_number": "",
+        "unit_number": "101",
         "rent_range": "$1,500",
         "market_rent_low": 1500,
         "market_rent_high": 1500,
@@ -80,7 +80,7 @@ def test_mark_and_already_attempted() -> None:
     assert getattr(ctx, "_embed_recovery_winner") == "appfolio_embed"
 
 
-# ── Priority order: first non-empty wins ──────────────────────────────────
+# ── Priority order: first canonical unit roster wins ──────────────────────
 
 
 @pytest.mark.asyncio
@@ -159,7 +159,7 @@ async def test_pms_portal_runs_when_first_two_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generic_dom_runs_when_first_three_empty() -> None:
+async def test_generic_dom_runs_after_unit_recoveries_are_empty() -> None:
     gdu = [_sample_unit({"extraction_tier": "TIER_3_DOM_GENERIC"})]
     with patch(
         "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
@@ -169,6 +169,18 @@ async def test_generic_dom_runs_when_first_three_empty() -> None:
         return_value=[],
     ), patch(
         "ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._avail_table_recovery.recover_avail_table",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters.rently.recover_rently",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._g5_recovery.recover_g5",
         return_value=[],
     ), patch(
         "ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
@@ -198,7 +210,7 @@ async def test_flag_set_on_win() -> None:
 
 @pytest.mark.asyncio
 async def test_flag_set_on_total_miss() -> None:
-    """When all four recoveries return empty, the flag still flips True so a
+    """When every recovery returns empty, the flag still flips True so a
     subsequent caller (scraper Step 8b) can short-circuit on the SAME ctx.
     """
     ctx = _ctx()
@@ -210,6 +222,18 @@ async def test_flag_set_on_total_miss() -> None:
         return_value=[],
     ), patch(
         "ma_poc.pms.adapters._pms_portal_hop.recover_pms_portal",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._avail_table_recovery.recover_avail_table",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._sightmap_subpage_recovery.recover_sightmap_subpage",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters.rently.recover_rently",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters._g5_recovery.recover_g5",
         return_value=[],
     ), patch(
         "ma_poc.pms.adapters._generic_dom_floorplans.recover_generic_floorplans",
@@ -274,10 +298,12 @@ def test_get_blocks_returns_copy() -> None:
 
 
 @pytest.mark.asyncio
-async def test_exception_inside_chain_is_swallowed() -> None:
-    """A raise from a recovery shouldn't propagate; the helper marks the
-    chain as attempted and returns empty (defensive)."""
+async def test_exception_inside_one_arm_does_not_abort_chain() -> None:
+    """A raise from one recovery should not hide a later unit-level result."""
     ctx = _ctx()
+    leaseleads_units = [
+        _sample_unit({"unit_number": "L1", "extraction_tier": "TIER_1_API_LEASELEADS"})
+    ]
 
     async def _boom(*_a: object, **_k: object) -> list[dict[str, str]]:
         raise RuntimeError("simulated")
@@ -285,10 +311,12 @@ async def test_exception_inside_chain_is_swallowed() -> None:
     with patch(
         "ma_poc.pms.adapters._appfolio_embed.recover_appfolio_embed",
         side_effect=_boom,
+    ), patch(
+        "ma_poc.pms.adapters._leaseleads_embed.recover_leaseleads_embed",
+        return_value=leaseleads_units,
     ):
         units, tier, winner = await recover_universal_embed(_StubPage(), ctx)  # type: ignore[arg-type]
-    assert units == []
-    assert tier == ""
-    assert winner == ""
-    # Still marks attempted so scraper Step 8b doesn't re-run uselessly.
+    assert units == leaseleads_units
+    assert tier == "TIER_1_API_LEASELEADS"
+    assert winner == "leaseleads_embed"
     assert already_attempted(ctx) is True

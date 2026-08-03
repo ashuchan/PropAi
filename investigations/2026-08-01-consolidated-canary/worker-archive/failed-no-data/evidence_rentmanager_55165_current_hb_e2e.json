@@ -1,0 +1,175 @@
+{
+  "batch_label": "rentmanager-legacy-oaks-current-hb-e2e",
+  "filters": {
+    "property_ids": [
+      55165
+    ]
+  },
+  "results": [
+    {
+      "property_id": 55165,
+      "property_name": "Legacy Oaks",
+      "website": "https://legacyoaksapts.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "rentmanager",
+      "tier": "TIER_1_DOM_RENTMANAGER_WP_CARDS",
+      "units": 9,
+      "plans": 0,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_same_origin_current_hb_native_identity",
+      "identity_evidence": {
+        "rows_with_native_identity": 9,
+        "rows_with_native_identity_and_positive_rent": 9,
+        "distinct_unit_numbers": 9,
+        "source_urls": [
+          "https://legacyoaksapts.com/"
+        ],
+        "source_hosts": [
+          "legacyoaksapts.com"
+        ],
+        "published_inventory_url": "https://legacyoaksapts.com/unit-availability/",
+        "title": "Unit Availability - Legacy Oaks Apartments",
+        "canonical_address_in_current_body": true
+      },
+      "identity_samples": [
+        {
+          "identity": {
+            "unit_number": "243"
+          },
+          "source_ids": {
+            "rentmanager_uid": "928"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-07-20",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "249"
+          },
+          "source_ids": {
+            "rentmanager_uid": "934"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-08-14",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "252"
+          },
+          "source_ids": {
+            "rentmanager_uid": "937"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-07-20",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "262"
+          },
+          "source_ids": {
+            "rentmanager_uid": "947"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1475,
+            "market_rent_high": 1475
+          },
+          "availability_date": "2026-07-20",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "331"
+          },
+          "source_ids": {
+            "rentmanager_uid": "984"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-07-20",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "342"
+          },
+          "source_ids": {
+            "rentmanager_uid": "995"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-08-31",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "345"
+          },
+          "source_ids": {
+            "rentmanager_uid": "998"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-09-01",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "347"
+          },
+          "source_ids": {
+            "rentmanager_uid": "1000"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-06-23",
+          "source_api_url": "https://legacyoaksapts.com/"
+        },
+        {
+          "identity": {
+            "unit_number": "348"
+          },
+          "source_ids": {
+            "rentmanager_uid": "1001"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1700,
+            "market_rent_high": 1700
+          },
+          "availability_date": "2026-06-23",
+          "source_api_url": "https://legacyoaksapts.com/"
+        }
+      ],
+      "fetch": {
+        "outcome": "OK",
+        "status": 200,
+        "final_url": "https://legacyoaksapts.com/unit-availability/",
+        "body_bytes": 261245,
+        "hyperbrowser_session_count": 1,
+        "captcha_solving": false
+      },
+      "validation_scope": "current_live_hyperbrowser_provider_plus_actual_scraper",
+      "llm_enabled": false,
+      "paid_canary_run": false
+    }
+  ]
+}

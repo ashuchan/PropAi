@@ -1,0 +1,278 @@
+{
+  "adapter_summary": [
+    {
+      "adapter_variant": "ASPENSQUARE_OPERATOR",
+      "classification_counts_json": "{\"ambiguous\": 1, \"native_future_preserved\": 2}",
+      "defect_property_ids": "",
+      "family": "AspenSquare",
+      "future_defect_properties": 0,
+      "future_defect_rate": 0.0,
+      "future_oracle_properties": 2,
+      "future_preserved_rows": 24,
+      "historical_exact_tier_properties": 3,
+      "identity_proven_properties": 3,
+      "inventory_properties": 3,
+      "native_future_rows": 24,
+      "probed_properties": 3,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 0
+    },
+    {
+      "adapter_variant": "ENTRATA_API",
+      "classification_counts_json": "{\"native_future_preserved\": 3}",
+      "defect_property_ids": "",
+      "family": "Entrata API",
+      "future_defect_properties": 0,
+      "future_defect_rate": 0.0,
+      "future_oracle_properties": 3,
+      "future_preserved_rows": 29,
+      "historical_exact_tier_properties": 3,
+      "identity_proven_properties": 3,
+      "inventory_properties": 3,
+      "native_future_rows": 29,
+      "probed_properties": 3,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 8
+    },
+    {
+      "adapter_variant": "ONESITE_API",
+      "classification_counts_json": "{\"ambiguous\": 2, \"native_future_lost/defaulted_to_scrape_date\": 2, \"no_inventory\": 1}",
+      "defect_property_ids": "7886;25395",
+      "family": "OneSite / OneSite Workflow",
+      "future_defect_properties": 2,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 2,
+      "future_preserved_rows": 0,
+      "historical_exact_tier_properties": 5,
+      "identity_proven_properties": 5,
+      "inventory_properties": 4,
+      "native_future_rows": 23,
+      "probed_properties": 5,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 0
+    },
+    {
+      "adapter_variant": "ONESITE_WORKFLOW",
+      "classification_counts_json": "{\"native_future_lost/defaulted_to_scrape_date\": 1, \"no_native_date\": 2}",
+      "defect_property_ids": "283561",
+      "family": "OneSite / OneSite Workflow",
+      "future_defect_properties": 1,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 1,
+      "future_preserved_rows": 0,
+      "historical_exact_tier_properties": 2,
+      "identity_proven_properties": 3,
+      "inventory_properties": 3,
+      "native_future_rows": 2,
+      "probed_properties": 3,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 26
+    },
+    {
+      "adapter_variant": "REALPAGE_OLL",
+      "classification_counts_json": "{\"native_future_lost/defaulted_to_scrape_date\": 3, \"no_inventory\": 1}",
+      "defect_property_ids": "2114;263081;263789",
+      "family": "RealPage OLL API",
+      "future_defect_properties": 3,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 3,
+      "future_preserved_rows": 0,
+      "historical_exact_tier_properties": 4,
+      "identity_proven_properties": 4,
+      "inventory_properties": 3,
+      "native_future_rows": 20,
+      "probed_properties": 4,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 0
+    },
+    {
+      "adapter_variant": "SQUARESPACE_SHELL_APPFOLIO",
+      "classification_counts_json": "{\"native_future_preserved\": 2}",
+      "defect_property_ids": "",
+      "family": "Squarespace",
+      "future_defect_properties": 0,
+      "future_defect_rate": 0.0,
+      "future_oracle_properties": 2,
+      "future_preserved_rows": 10,
+      "historical_exact_tier_properties": 0,
+      "identity_proven_properties": 2,
+      "inventory_properties": 2,
+      "native_future_rows": 10,
+      "probed_properties": 2,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 0
+    },
+    {
+      "adapter_variant": "SQUARESPACE_UNIT_BLOCK",
+      "classification_counts_json": "{\"native_future_lost/defaulted_to_scrape_date\": 1}",
+      "defect_property_ids": "241432",
+      "family": "Squarespace",
+      "future_defect_properties": 1,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 1,
+      "future_preserved_rows": 0,
+      "historical_exact_tier_properties": 1,
+      "identity_proven_properties": 1,
+      "inventory_properties": 1,
+      "native_future_rows": 3,
+      "probed_properties": 1,
+      "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+      "scrape_date_default_rows": 8
+    }
+  ],
+  "artifact_generated_at_utc": "2026-08-01T10:06:13Z",
+  "artifacts": {
+    "adapter_summary_csv": "adapter_summary.csv",
+    "adapter_summary_json": "adapter_summary.json",
+    "property_csv": "property_level_audit.csv",
+    "property_json": "property_level_audit.json",
+    "summary_markdown": "SUMMARY.md",
+    "unit_csv": "unit_level_evidence.csv",
+    "unit_json": "unit_level_evidence.json"
+  },
+  "capture_date": "2026-08-01",
+  "capture_timestamp_utc": "2026-08-01T10:06:13Z",
+  "classification_counts": {
+    "ambiguous": 3,
+    "native_future_lost/defaulted_to_scrape_date": 7,
+    "native_future_preserved": 7,
+    "no_inventory": 2,
+    "no_native_date": 2
+  },
+  "evidence_capture_window_utc": {
+    "distinct_capture_batches": 2,
+    "end": "2026-08-01T10:06:13Z",
+    "start": "2026-08-01T09:06:23Z"
+  },
+  "family_summary": [
+    {
+      "adapter_variants": [
+        "ASPENSQUARE_OPERATOR"
+      ],
+      "classification_counts": {
+        "ambiguous": 1,
+        "native_future_preserved": 2
+      },
+      "defect_property_ids": [],
+      "family": "AspenSquare",
+      "future_defect_properties": 0,
+      "future_defect_rate": 0.0,
+      "future_oracle_properties": 2,
+      "identity_proven_properties": 3,
+      "probed_properties": 3
+    },
+    {
+      "adapter_variants": [
+        "ENTRATA_API"
+      ],
+      "classification_counts": {
+        "native_future_preserved": 3
+      },
+      "defect_property_ids": [],
+      "family": "Entrata API",
+      "future_defect_properties": 0,
+      "future_defect_rate": 0.0,
+      "future_oracle_properties": 3,
+      "identity_proven_properties": 3,
+      "probed_properties": 3
+    },
+    {
+      "adapter_variants": [
+        "ONESITE_API",
+        "ONESITE_WORKFLOW"
+      ],
+      "classification_counts": {
+        "ambiguous": 2,
+        "native_future_lost/defaulted_to_scrape_date": 3,
+        "no_inventory": 1,
+        "no_native_date": 2
+      },
+      "defect_property_ids": [
+        "7886",
+        "25395",
+        "283561"
+      ],
+      "family": "OneSite / OneSite Workflow",
+      "future_defect_properties": 3,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 3,
+      "identity_proven_properties": 8,
+      "probed_properties": 8
+    },
+    {
+      "adapter_variants": [
+        "REALPAGE_OLL"
+      ],
+      "classification_counts": {
+        "native_future_lost/defaulted_to_scrape_date": 3,
+        "no_inventory": 1
+      },
+      "defect_property_ids": [
+        "2114",
+        "263081",
+        "263789"
+      ],
+      "family": "RealPage OLL API",
+      "future_defect_properties": 3,
+      "future_defect_rate": 1.0,
+      "future_oracle_properties": 3,
+      "identity_proven_properties": 4,
+      "probed_properties": 4
+    },
+    {
+      "adapter_variants": [
+        "SQUARESPACE_SHELL_APPFOLIO",
+        "SQUARESPACE_UNIT_BLOCK"
+      ],
+      "classification_counts": {
+        "native_future_lost/defaulted_to_scrape_date": 1,
+        "native_future_preserved": 2
+      },
+      "defect_property_ids": [
+        "241432"
+      ],
+      "family": "Squarespace",
+      "future_defect_properties": 1,
+      "future_defect_rate": 0.333333,
+      "future_oracle_properties": 3,
+      "identity_proven_properties": 3,
+      "probed_properties": 3
+    }
+  ],
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "llm_enabled": false,
+    "new_hyperbrowser_sessions": 0,
+    "paid_canary": false,
+    "production_code_edits": false,
+    "reused_base_audit_hyperbrowser_sessions": 3,
+    "web_unlocker": false
+  },
+  "inputs": {
+    "base_property_evidence": "/Users/ankur/PropAi-codex-availability-date/investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/current_live_property_audit.csv",
+    "base_property_evidence_sha256": "6041344708de0a7e42162ad9c35c5b8b8936d89bca03483b905b0727e9ef4d5b",
+    "base_unit_evidence": "/Users/ankur/PropAi-codex-availability-date/investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/current_live_unit_evidence.csv",
+    "base_unit_evidence_sha256": "53de17673f8ffa0386590706633093b1b034e0f7a2624fdfa3a8ab8e527be2f8",
+    "properties": "/Users/ankur/PropAi-codex-availability-date/properties.csv",
+    "properties_sha256": "086d922b6b41ac5c6b881b3509486feb1846b61812c14e89a3fcf794b4465628",
+    "trace_code": "current availability-date worktree including existing uncommitted parent changes"
+  },
+  "proven_future_date_defect_properties": 7,
+  "result_type": "local_current_live_scrape_date_only_tier_audit_not_canary",
+  "scope": {
+    "adapter_variants": 7,
+    "families": 5,
+    "historical_denominator_note": "The July Squarespace unit-block tier has one property and the July OneSite Workflow tier has two. Supplemental exact configured properties satisfy live-probe sample size but never enlarge those historical tier denominators.",
+    "minimum_exact_configured_properties_per_family": 3,
+    "observed_properties_by_family": {
+      "AspenSquare": 3,
+      "Entrata API": 3,
+      "OneSite / OneSite Workflow": 8,
+      "RealPage OLL API": 4,
+      "Squarespace": 3
+    },
+    "properties": 21
+  }
+}

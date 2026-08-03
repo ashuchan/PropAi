@@ -29,8 +29,10 @@ _BASE = "https://www.gardengateokc.com/"
 
 
 def test_absolute_href_is_found() -> None:
-    html = ('<a href="https://www.gardengateokc.com/oklahoma-city-oklahoma-city/'
-            'garden-gate/conventional/">Floor Plans</a>')
+    html = (
+        '<a href="https://www.gardengateokc.com/oklahoma-city-oklahoma-city/'
+        'garden-gate/conventional/">Floor Plans</a>'
+    )
     assert _find_pp_conventional_index(html, _BASE) == [
         "https://www.gardengateokc.com/oklahoma-city-oklahoma-city/garden-gate/conventional/"
     ]
@@ -43,6 +45,29 @@ def test_root_relative_href_is_resolved() -> None:
     ]
 
 
+def test_absolute_form_action_is_found() -> None:
+    """Some live homepages publish the grid only as a CTA form target."""
+    html = (
+        '<form action="https://www.gardengateokc.com/oklahoma-city-oklahoma-city/'
+        'garden-gate/conventional/" method="post"></form>'
+    )
+    assert _find_pp_conventional_index(html, _BASE) == [
+        "https://www.gardengateokc.com/oklahoma-city-oklahoma-city/garden-gate/conventional/"
+    ]
+
+
+def test_root_relative_form_action_is_resolved() -> None:
+    html = '<form action="/pittsburgh/bryn-mawr/conventional/"></form>'
+    assert _find_pp_conventional_index(html, _BASE) == [
+        "https://www.gardengateokc.com/pittsburgh/bryn-mawr/conventional/"
+    ]
+
+
+def test_foreign_form_action_is_rejected() -> None:
+    html = '<form action="https://sibling.example/x/y/conventional/"></form>'
+    assert _find_pp_conventional_index(html, _BASE) == []
+
+
 def test_trailing_slash_is_optional() -> None:
     """Observed both ways in the wild."""
     html = '<a href="/corvallis-corvallis/grand-oaks-grand-oaks/conventional">Plans</a>'
@@ -52,8 +77,9 @@ def test_trailing_slash_is_optional() -> None:
 def test_prospectportal_twin_host_is_allowed() -> None:
     """Vanity sites routinely hand off to their *.prospectportal.com twin —
     that is the same property, so it must not be filtered as foreign."""
-    html = ('<a href="https://flatson12.prospectportal.com/college-station/'
-            'flats-on-12/conventional/">Plans</a>')
+    html = (
+        '<a href="https://flatson12.prospectportal.com/college-station/flats-on-12/conventional/">Plans</a>'
+    )
     assert _find_pp_conventional_index(html, _BASE) == [
         "https://flatson12.prospectportal.com/college-station/flats-on-12/conventional/"
     ]

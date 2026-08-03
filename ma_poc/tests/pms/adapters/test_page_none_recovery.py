@@ -92,6 +92,26 @@ async def test_appfolio_recover_page_none_from_body(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
+async def test_appfolio_recover_page_none_protocol_relative_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Squarespace commonly serializes ``//tenant.appfolio.com`` URLs.
+    They are still operator-published HTTPS inventory surfaces."""
+    calls: list[str] = []
+
+    def _get(url: str, **kw: object) -> object:
+        calls.append(url)
+        return types.SimpleNamespace(status_code=200, text=_APPFOLIO_SSR)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _get)
+    body = "<html><body><iframe src='//illumepm.appfolio.com/listings'></iframe></body></html>"
+    units = await recover_appfolio_embed(None, _ctx_with_body(body))  # type: ignore[arg-type]
+
+    assert len(units) == 2
+    assert calls.count("https://illumepm.appfolio.com/listings") == 1
+
+
+@pytest.mark.asyncio
 async def test_appfolio_recover_page_none_no_marker_no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """A plain body with no AppFolio marker must NOT fire any curl_cffi probe
     (the blanket sub-path probe is page-only) → clean [] with zero network."""

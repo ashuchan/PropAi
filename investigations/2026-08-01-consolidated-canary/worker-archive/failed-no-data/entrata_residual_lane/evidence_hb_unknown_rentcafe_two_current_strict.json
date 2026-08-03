@@ -1,0 +1,276 @@
+{
+  "generated_at_utc": "2026-08-01T12:02:53.904134+00:00",
+  "guardrails": {
+    "authoritative_recoveries": false,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions_max_per_property": 1,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "hb_unknown_rentcafe_two_current_source_strict",
+  "results": [
+    {
+      "adapter": "onesite",
+      "configured_final_url": "https://villagegatenc.com/",
+      "contamination_verdict": "pass_exact_configured_identity_realpage_workflow_property_3943980",
+      "identity_evidence": {
+        "rows_with_native_identity": 13,
+        "rows_with_native_identity_and_positive_rent": 13,
+        "source_property_ids": [
+          "3943980"
+        ],
+        "source_property_names": [],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Cedar",
+          "identity": {
+            "unit_number": "68"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1300,
+            "market_rent_low": 1150
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Maple",
+          "identity": {
+            "unit_number": "84"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1300,
+            "market_rent_low": 1150
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Maple",
+          "identity": {
+            "unit_number": "88"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1300,
+            "market_rent_low": 1150
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Sweetgum",
+          "identity": {
+            "unit_number": "230"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1425,
+            "market_rent_low": 1275
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Magnolia",
+          "identity": {
+            "unit_number": "105"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1450,
+            "market_rent_low": 1300
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Magnolia",
+          "identity": {
+            "unit_number": "108"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1450,
+            "market_rent_low": 1300
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/3943980/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=f70772f6-cdea-4823-9689-5b6e51eabaae",
+          "source_property_id": "3943980",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 48389,
+      "property_identity_match": true,
+      "property_name": "Village Gate Apartments",
+      "strict_gates": {
+        "all_emitted_rows_native_and_positive_rent": true,
+        "configured_name_street_zip_visible": true,
+        "configured_render_http_200": true,
+        "current_full_pipeline_unit_candidate": true,
+        "current_pipeline_selected_onesite_workflow": true,
+        "native_samples_have_unit_rent_and_same_property_id": true,
+        "one_native_source_property_id": true,
+        "single_clean_hyperbrowser_session": true,
+        "sole_realpage_workflow_property_id_3943980": true,
+        "source_urls_present": true
+      },
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 13,
+      "website": "http://www.villagegatenc.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "configured_final_url": "https://lamphouseapts.com/",
+      "contamination_verdict": "pass_exact_configured_identity_securecafe_applicant_property_1674518",
+      "identity_evidence": {
+        "rows_with_native_identity": 11,
+        "rows_with_native_identity_and_positive_rent": 11,
+        "source_property_ids": [
+          "1674518"
+        ],
+        "source_property_names": [
+          "Lamphouse Apartments"
+        ],
+        "source_urls": [
+          "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "10/01/2026",
+          "floor_plan_name": "A2",
+          "identity": {
+            "securecafe_apartment_id": "35898569",
+            "securecafe_floorplan_id": "5502580",
+            "unit_number": "343"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2685,
+            "market_rent_low": 1575
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        },
+        {
+          "availability_date": "10/01/2026",
+          "floor_plan_name": "A5",
+          "identity": {
+            "securecafe_apartment_id": "35898594",
+            "securecafe_floorplan_id": "5502597",
+            "unit_number": "329"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2850,
+            "market_rent_low": 1495
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        },
+        {
+          "availability_date": "08/01/2026",
+          "floor_plan_name": "B2",
+          "identity": {
+            "securecafe_apartment_id": "35898558",
+            "securecafe_floorplan_id": "5502600",
+            "unit_number": "140"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2905,
+            "market_rent_low": 1805
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "floor_plan_name": "B2",
+          "identity": {
+            "securecafe_apartment_id": "35898560",
+            "securecafe_floorplan_id": "5502600",
+            "unit_number": "340"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2880,
+            "market_rent_low": 1780
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "floor_plan_name": "B3",
+          "identity": {
+            "securecafe_apartment_id": "35898515",
+            "securecafe_floorplan_id": "5502605",
+            "unit_number": "105"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2835,
+            "market_rent_low": 1735
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "floor_plan_name": "C10",
+          "identity": {
+            "securecafe_apartment_id": "35898497",
+            "securecafe_floorplan_id": "5502617",
+            "unit_number": "101"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3570,
+            "market_rent_low": 2400
+          },
+          "source_api_url": "https://203-main-llc-rentcafewebsite.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1674518&RequestBeforeLogin=true&isPropertyList=false",
+          "source_property_id": "1674518",
+          "source_property_name": "Lamphouse Apartments"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 219752,
+      "property_identity_match": true,
+      "property_name": "Lamphouse",
+      "strict_gates": {
+        "all_emitted_rows_native_and_positive_rent": true,
+        "applicant_payload_names_lamphouse": true,
+        "configured_name_street_zip_visible": true,
+        "configured_render_http_200": true,
+        "current_full_pipeline_unit_candidate": true,
+        "current_pipeline_selected_securecafe_applicant": true,
+        "native_samples_have_unit_rent_and_same_property_id": true,
+        "one_native_source_property_id": true,
+        "sample_native_securecafe_ids_present": true,
+        "single_clean_hyperbrowser_session": true,
+        "sole_applicant_property_id_1674518": true,
+        "source_urls_present": true
+      },
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 11,
+      "website": "https://lamphouseapts.com/"
+    }
+  ],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_unknown_rentcafe_high_value3_current_full.json",
+  "source_artifact_sha256": "6b05fbdbdfba53dc5786dea3c05b0cc6b92b30296bc9c9ea8044cd65cd5e2468"
+}

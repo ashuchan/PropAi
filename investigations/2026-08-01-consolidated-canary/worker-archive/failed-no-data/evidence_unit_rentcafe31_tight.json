@@ -1,0 +1,1893 @@
+{
+  "batch_label": "rentcafe31-tight",
+  "filters": {
+    "evidence_lane": "rentcafe_direct_e2e",
+    "ledger_level": "unit",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)",
+        "generic_plan_text: lifted via subpage /floorplans/ (5 rows)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.ridgewoodgabyelon.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 5,
+      "property_id": 567,
+      "property_identity_match": false,
+      "property_name": "Ridgewood",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "http://www.ridgewoodgabyelon.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 8,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 8,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.stratfordvillageapartments.com"
+        ],
+        "source_urls": [
+          "https://www.stratfordvillageapartments.com/floorplans/london",
+          "https://www.stratfordvillageapartments.com/floorplans/nottingham",
+          "https://www.stratfordvillageapartments.com/floorplans/oxford"
+        ],
+        "website_host": "www.stratfordvillageapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "London",
+          "identity": {
+            "floor_plan_id": "ad3170676396",
+            "unit_number": "1948"
+          },
+          "source_api_url": "https://www.stratfordvillageapartments.com/floorplans/london",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "London",
+          "identity": {
+            "floor_plan_id": "ad3170676396",
+            "unit_number": "1815"
+          },
+          "source_api_url": "https://www.stratfordvillageapartments.com/floorplans/london",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 3912,
+      "property_identity_match": true,
+      "property_name": "Stratford Village",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "London",
+        "Nottingham",
+        "Oxford"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 8,
+      "website": "https://www.stratfordvillageapartments.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "theparkonriley.securecafe.com"
+        ],
+        "source_urls": [
+          "https://theparkonriley.securecafe.com/onlineleasing/the-park-on-riley/availableunits.aspx"
+        ],
+        "website_host": "www.theparkonriley.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1Bed1Bath-A",
+          "identity": {
+            "floor_plan_id": "7ecef106ed88",
+            "unit_number": "55"
+          },
+          "source_api_url": "https://theparkonriley.securecafe.com/onlineleasing/the-park-on-riley/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "505179"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 6701,
+      "property_identity_match": true,
+      "property_name": "Park on Riley",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1Bed1Bath-A"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 1,
+      "website": "https://www.theparkonriley.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "natickpark.securecafe.com"
+        ],
+        "source_urls": [
+          "https://natickpark.securecafe.com/onlineleasing/natick-park/availableunits.aspx"
+        ],
+        "website_host": "www.natickpark.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "8/25/2026",
+          "floor_plan_name": "2 Bedroom, 2 Bath",
+          "identity": {
+            "floor_plan_id": "223b81c91fe9",
+            "unit_number": "310"
+          },
+          "source_api_url": "https://natickpark.securecafe.com/onlineleasing/natick-park/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "1018849"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 17586,
+      "property_identity_match": true,
+      "property_name": "Natick Park",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "2 Bedroom, 2 Bath"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 1,
+      "website": "https://www.natickpark.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "securecafe-sqft-not-published: flagged 10 units \u2014 operator does not publish sqft (3 enrichment paths exhausted)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 10,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 10,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "westwoodvillagegalleria-bhprop.securecafe.com"
+        ],
+        "source_urls": [
+          "https://westwoodvillagegalleria-bhprop.securecafe.com/onlineleasing/westwood-village-galleria/availableunits.aspx"
+        ],
+        "website_host": "westwoodvillagegalleria.bhprop.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bed 1 Bath",
+          "identity": {
+            "floor_plan_id": "58993413f773",
+            "unit_number": "201"
+          },
+          "source_api_url": "https://westwoodvillagegalleria-bhprop.securecafe.com/onlineleasing/westwood-village-galleria/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "identity": {
+            "floor_plan_id": "929bf0e127ca",
+            "unit_number": "211"
+          },
+          "source_api_url": "https://westwoodvillagegalleria-bhprop.securecafe.com/onlineleasing/westwood-village-galleria/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 22934,
+      "property_identity_match": true,
+      "property_name": "Westwood Village Galleria",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bed 1 Bath",
+        "2 Bed 2 Bath",
+        "Studio"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 10,
+      "website": "https://westwoodvillagegalleria.bhprop.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 37,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 37,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "midlandfallsapartments.securecafe.com"
+        ],
+        "source_urls": [
+          "https://midlandfallsapartments.securecafe.com/onlineleasing/whisperwood-apartments-0/availableunits.aspx"
+        ],
+        "website_host": "www.midlandfallsapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "The Azalea",
+          "identity": {
+            "floor_plan_id": "c089c28c437d",
+            "unit_number": "0389"
+          },
+          "source_api_url": "https://midlandfallsapartments.securecafe.com/onlineleasing/whisperwood-apartments-0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2208160"
+          }
+        },
+        {
+          "availability_date": "8/23/2026",
+          "floor_plan_name": "The Azalea",
+          "identity": {
+            "floor_plan_id": "c089c28c437d",
+            "unit_number": "0413"
+          },
+          "source_api_url": "https://midlandfallsapartments.securecafe.com/onlineleasing/whisperwood-apartments-0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2208160"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 27594,
+      "property_identity_match": true,
+      "property_name": "Midland Falls",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "The Azalea",
+        "The Bradford",
+        "The Chestnut",
+        "The Cottonwood",
+        "The Dogwood",
+        "The Hickory",
+        "The Holly",
+        "The Magnolia"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 37,
+      "website": "https://www.midlandfallsapartments.com/"
+    },
+    {
+      "adapter": "knock",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "knock-adapter: no knockDoorway.init() call in HTML"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.stonepostranchapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 35590,
+      "property_identity_match": false,
+      "property_name": "Stonepost Ranch",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_KNOCK_API",
+      "units": 0,
+      "website": "https://www.stonepostranchapts.com"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 2,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 2,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "coppermillaptsbytonti.securecafe.com"
+        ],
+        "source_urls": [
+          "https://coppermillaptsbytonti.securecafe.com/onlineleasing/coppermill-1/availableunits.aspx"
+        ],
+        "website_host": "www.coppermillaptsbytonti.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "bccd3e74994f",
+            "unit_number": "214"
+          },
+          "source_api_url": "https://coppermillaptsbytonti.securecafe.com/onlineleasing/coppermill-1/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2520278"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "bccd3e74994f",
+            "unit_number": "305"
+          },
+          "source_api_url": "https://coppermillaptsbytonti.securecafe.com/onlineleasing/coppermill-1/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2520278"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 38314,
+      "property_identity_match": true,
+      "property_name": "Coppermill",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Studio"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 2,
+      "website": "https://www.coppermillaptsbytonti.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "peppertreevillageapartments.securecafe.com"
+        ],
+        "source_urls": [
+          "https://peppertreevillageapartments.securecafe.com/onlineleasing/peppertree-village-apartments/availableunits.aspx"
+        ],
+        "website_host": ""
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "Peppertree Village",
+          "identity": {
+            "floor_plan_id": "ad8fa2ac0da4",
+            "unit_number": "195-10"
+          },
+          "source_api_url": "https://peppertreevillageapartments.securecafe.com/onlineleasing/peppertree-village-apartments/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "8/7/2026",
+          "floor_plan_name": "Peppertree Village",
+          "identity": {
+            "floor_plan_id": "ad8fa2ac0da4",
+            "unit_number": "135-12"
+          },
+          "source_api_url": "https://peppertreevillageapartments.securecafe.com/onlineleasing/peppertree-village-apartments/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 38797,
+      "property_identity_match": true,
+      "property_name": "Peppertree Village Apartments",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Peppertree Village"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 5,
+      "website": "www.peppertreevillageapartments.com"
+    },
+    {
+      "adapter": "repli360",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "REPLI360: site_id/floorPlanID not resolvable (static script chain + rendered onclick both empty)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.metspires.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 40743,
+      "property_identity_match": false,
+      "property_name": "Met Spires",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_REPLI360_NO_FLOORPLANS",
+      "units": 0,
+      "website": "https://www.metspires.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 11,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 11,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.fusionencore.com"
+        ],
+        "source_urls": [
+          "https://www.fusionencore.com/floorplans/1%2f1-large",
+          "https://www.fusionencore.com/floorplans/1%2f1-w%2floft-large",
+          "https://www.fusionencore.com/floorplans/1%2f1-w%2floft-medium",
+          "https://www.fusionencore.com/floorplans/1%2f1-x-large",
+          "https://www.fusionencore.com/floorplans/2%2f2-%2b-office"
+        ],
+        "website_host": "www.fusionencore.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1/1 Large",
+          "identity": {
+            "floor_plan_id": "2892abf701ed",
+            "unit_number": "1106"
+          },
+          "source_api_url": "https://www.fusionencore.com/floorplans/1%2f1-large",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1/1 X-Large",
+          "identity": {
+            "floor_plan_id": "49affd5b7fa2",
+            "unit_number": "3125"
+          },
+          "source_api_url": "https://www.fusionencore.com/floorplans/1%2f1-x-large",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 41175,
+      "property_identity_match": true,
+      "property_name": "Fusion Encore Hollywood",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1/1 Large",
+        "1/1 X-Large",
+        "1/1 w/ Loft Large",
+        "1/1 w/ Loft Medium",
+        "2/2 &#x2B; Office",
+        "2/2 Large",
+        "2/2 Medium",
+        "2/2 Standard"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 11,
+      "website": "https://www.fusionencore.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.tranquilitypointeapts.com"
+        ],
+        "source_urls": [
+          "https://www.tranquilitypointeapts.com/floorplans/1-bed-1-bath-b",
+          "https://www.tranquilitypointeapts.com/floorplans/2-bed-2-bath-b",
+          "https://www.tranquilitypointeapts.com/floorplans/3-bed-2-bath"
+        ],
+        "website_host": "www.tranquilitypointeapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "10/24/2026",
+          "floor_plan_name": "1 Bed 1 Bath B",
+          "identity": {
+            "floor_plan_id": "fd28ab999692",
+            "unit_number": "02-308"
+          },
+          "source_api_url": "https://www.tranquilitypointeapts.com/floorplans/1-bed-1-bath-b",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "8/24/2026",
+          "floor_plan_name": "2 Bed 2 Bath B",
+          "identity": {
+            "floor_plan_id": "1d276ea800c7",
+            "unit_number": "02-309"
+          },
+          "source_api_url": "https://www.tranquilitypointeapts.com/floorplans/2-bed-2-bath-b",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 44513,
+      "property_identity_match": true,
+      "property_name": "Tranquility Pointe",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bed 1 Bath B",
+        "2 Bed 2 Bath B",
+        "3 Bed 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 5,
+      "website": "https://www.tranquilitypointeapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "rentcafe-wp-probe-error: prop_id='1282213' ConnectTimeout: "
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "cherry-court-apartments-rentcafewebsite.securecafe.com"
+        ],
+        "source_urls": [
+          "https://cherry-court-apartments-rentcafewebsite.securecafe.com/onlineleasing/cherry-court-apartments/availableunits.aspx"
+        ],
+        "website_host": "www.keystonemanagement.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom",
+          "identity": {
+            "floor_plan_id": "fb32495cbfa1",
+            "unit_number": "102O"
+          },
+          "source_api_url": "https://cherry-court-apartments-rentcafewebsite.securecafe.com/onlineleasing/cherry-court-apartments/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bedroom",
+          "identity": {
+            "floor_plan_id": "fb32495cbfa1",
+            "unit_number": "104C"
+          },
+          "source_api_url": "https://cherry-court-apartments-rentcafewebsite.securecafe.com/onlineleasing/cherry-court-apartments/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 55729,
+      "property_identity_match": true,
+      "property_name": "Cherry Court",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bedroom",
+        "2 Bedroom"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 7,
+      "website": "https://www.keystonemanagement.com/apartments/nc/cherry-court-apartments"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 2,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 2,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "cumberlandlinksapts.securecafe.com"
+        ],
+        "source_urls": [
+          "https://cumberlandlinksapts.securecafe.com/onlineleasing/cumberland-links0/availableunits.aspx"
+        ],
+        "website_host": "www.cumberlandlinksapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "C4",
+          "identity": {
+            "floor_plan_id": "45f8c7684f64",
+            "unit_number": "168CW"
+          },
+          "source_api_url": "https://cumberlandlinksapts.securecafe.com/onlineleasing/cumberland-links0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5480354"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "C4",
+          "identity": {
+            "floor_plan_id": "45f8c7684f64",
+            "unit_number": "184PV"
+          },
+          "source_api_url": "https://cumberlandlinksapts.securecafe.com/onlineleasing/cumberland-links0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5480354"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 60125,
+      "property_identity_match": true,
+      "property_name": "Cumberland Links",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "C4"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 2,
+      "website": "https://www.cumberlandlinksapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "rentcafe-wp-probe-error: prop_id='1624096' ConnectTimeout: "
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 10,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 10,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "riversedgeknox.securecafe.com"
+        ],
+        "source_urls": [
+          "https://riversedgeknox.securecafe.com/onlineleasing/1701-island-home-drive-river-s-edge/availableunits.aspx"
+        ],
+        "website_host": "riversedgeknox.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "9/5/2026",
+          "floor_plan_name": "The Holston",
+          "identity": {
+            "floor_plan_id": "3ea785aa3ab6",
+            "unit_number": "C106"
+          },
+          "source_api_url": "https://riversedgeknox.securecafe.com/onlineleasing/1701-island-home-drive-river-s-edge/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "4671061"
+          }
+        },
+        {
+          "availability_date": "9/9/2026",
+          "floor_plan_name": "The Holston",
+          "identity": {
+            "floor_plan_id": "3ea785aa3ab6",
+            "unit_number": "B205"
+          },
+          "source_api_url": "https://riversedgeknox.securecafe.com/onlineleasing/1701-island-home-drive-river-s-edge/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "4671061"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 64673,
+      "property_identity_match": true,
+      "property_name": "River's Edge Apartments",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "The French Broad",
+        "The Holston",
+        "The Tennessee"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 10,
+      "website": "http://riversedgeknox.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 18,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 18,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "cr-centralislandsquareapts.securecafe.com"
+        ],
+        "source_urls": [
+          "https://cr-centralislandsquareapts.securecafe.com/onlineleasing/central-island-square/availableunits.aspx"
+        ],
+        "website_host": "www.cr-centralislandsquareapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "8/30/2026",
+          "floor_plan_name": "A1 Studio",
+          "identity": {
+            "floor_plan_id": "785bfc4c0511",
+            "unit_number": "3153"
+          },
+          "source_api_url": "https://cr-centralislandsquareapts.securecafe.com/onlineleasing/central-island-square/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3354199"
+          }
+        },
+        {
+          "availability_date": "8/16/2026",
+          "floor_plan_name": "A2 Studio",
+          "identity": {
+            "floor_plan_id": "4cfa9ba4db16",
+            "unit_number": "2305"
+          },
+          "source_api_url": "https://cr-centralislandsquareapts.securecafe.com/onlineleasing/central-island-square/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3354200"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 67697,
+      "property_identity_match": true,
+      "property_name": "Central Island Square",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1 Studio",
+        "A2 Studio",
+        "B1 1 Bedroom 1 Bath",
+        "B2 1 Bedroom 1 Bath",
+        "C1 2 Bedroom 2 Bath",
+        "C2 2 Bedroom 2 Bath",
+        "D1 3 Bedroom 2 Bath",
+        "D4 3 Bedroom 2 Bath"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 18,
+      "website": "https://www.cr-centralislandsquareapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 24,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 24,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "thedistrictatrosemary.securecafe.com"
+        ],
+        "source_urls": [
+          "https://thedistrictatrosemary.securecafe.com/onlineleasing/the-district-at-rosemary/availableunits.aspx"
+        ],
+        "website_host": "www.thedistrictatrosemary.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "S1",
+          "identity": {
+            "floor_plan_id": "407452251b37",
+            "unit_number": "147"
+          },
+          "source_api_url": "https://thedistrictatrosemary.securecafe.com/onlineleasing/the-district-at-rosemary/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3478896"
+          }
+        },
+        {
+          "availability_date": "9/8/2026",
+          "floor_plan_name": "S1",
+          "identity": {
+            "floor_plan_id": "407452251b37",
+            "unit_number": "417"
+          },
+          "source_api_url": "https://thedistrictatrosemary.securecafe.com/onlineleasing/the-district-at-rosemary/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3478896"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 68691,
+      "property_identity_match": true,
+      "property_name": "The District at Rosemary",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A6",
+        "A7",
+        "A8",
+        "A9S",
+        "B2",
+        "B9"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 24,
+      "website": "https://www.thedistrictatrosemary.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 2,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 2,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "byredwood.securecafe.com"
+        ],
+        "source_urls": [
+          "https://byredwood.securecafe.com/onlineleasing/redwood-akron/availableunits.aspx"
+        ],
+        "website_host": "www.byredwood.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "2 Bedrooms, 1 Bathroom",
+          "identity": {
+            "floor_plan_id": "bf8b7e9857a9",
+            "unit_number": "A9"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-akron/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3159522"
+          }
+        },
+        {
+          "availability_date": "9/19/2026",
+          "floor_plan_name": "2 Bedrooms, 2 Bathrooms",
+          "identity": {
+            "floor_plan_id": "44a1d4cb39a6",
+            "unit_number": "F1"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-akron/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3159523"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 69378,
+      "property_identity_match": true,
+      "property_name": "Redwood Akron",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "2 Bedrooms, 1 Bathroom",
+        "2 Bedrooms, 2 Bathrooms"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 2,
+      "website": "https://www.byredwood.com/apartments/oh/akron/redwood-akron/index.aspx"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 9,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "parksrichardson.securecafe.com"
+        ],
+        "source_urls": [
+          "https://parksrichardson.securecafe.com/onlineleasing/parks-residential/availableunits.aspx"
+        ],
+        "website_host": "www.parksrichardson.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "One Bedroom, One Bathroom",
+          "identity": {
+            "floor_plan_id": "8bbd283757f2",
+            "unit_number": "2115"
+          },
+          "source_api_url": "https://parksrichardson.securecafe.com/onlineleasing/parks-residential/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5117598"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "One Bedroom, One Bathroom",
+          "identity": {
+            "floor_plan_id": "8bbd283757f2",
+            "unit_number": "2319"
+          },
+          "source_api_url": "https://parksrichardson.securecafe.com/onlineleasing/parks-residential/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5117598"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 120193,
+      "property_identity_match": true,
+      "property_name": "Parks Residential - Richardson",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "One Bedroom, One Bathroom",
+        "Three Bedroom, Two Bathroom",
+        "Two Bedroom, Two Bathroom"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 9,
+      "website": "https://www.parksrichardson.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 3,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "byredwood.securecafe.com"
+        ],
+        "source_urls": [
+          "https://byredwood.securecafe.com/onlineleasing/redwood-delta-township/availableunits.aspx"
+        ],
+        "website_host": "www.byredwood.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Capewood",
+          "identity": {
+            "floor_plan_id": "30a442fb3b22",
+            "unit_number": "1896"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-delta-township/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2541001"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Ledgewood",
+          "identity": {
+            "floor_plan_id": "cd1029b3ed63",
+            "unit_number": "1977"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-delta-township/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2541000"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 223547,
+      "property_identity_match": true,
+      "property_name": "Redwood Delta Township II",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Capewood",
+        "Ledgewood",
+        "Willowood"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 3,
+      "website": "https://www.byredwood.com/apartments/mi/lansing/redwood-delta-township/index.aspx"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 18,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 18,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "optimaoldorchardwoods.securecafe.com"
+        ],
+        "source_urls": [
+          "https://optimaoldorchardwoods.securecafe.com/onlineleasing/optima-old-orchard-woods-0/availableunits.aspx"
+        ],
+        "website_host": "www.optimaoldorchardwoods.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "9/3/2026",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "d87bcde81404",
+            "unit_number": "0514"
+          },
+          "source_api_url": "https://optimaoldorchardwoods.securecafe.com/onlineleasing/optima-old-orchard-woods-0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5841423"
+          }
+        },
+        {
+          "availability_date": "8/8/2026",
+          "floor_plan_name": "A2",
+          "identity": {
+            "floor_plan_id": "786bf244a700",
+            "unit_number": "1014"
+          },
+          "source_api_url": "https://optimaoldorchardwoods.securecafe.com/onlineleasing/optima-old-orchard-woods-0/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5841424"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 224720,
+      "property_identity_match": true,
+      "property_name": "Optima Old Orchard Woods",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "B1",
+        "B10",
+        "B11",
+        "B3"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 18,
+      "website": "http://www.optimaoldorchardwoods.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "manhattansepulveda.securecafe.com"
+        ],
+        "source_urls": [
+          "https://manhattansepulveda.securecafe.com/onlineleasing/sepulveda-manhattan-apartments/availableunits.aspx"
+        ],
+        "website_host": "www.manhattansepulveda.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "d48271007178",
+            "unit_number": "05"
+          },
+          "source_api_url": "https://manhattansepulveda.securecafe.com/onlineleasing/sepulveda-manhattan-apartments/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 240193,
+      "property_identity_match": true,
+      "property_name": "Sepulveda Manhattan Apartments",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Studio"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 1,
+      "website": "http://www.manhattansepulveda.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "avmarylandoaks.securecafe.com"
+        ],
+        "source_urls": [
+          "https://avmarylandoaks.securecafe.com/onlineleasing/aventura-at-maryland-oaks/availableunits.aspx"
+        ],
+        "website_host": "www.avmarylandoaks.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "9/17/2026",
+          "floor_plan_name": "B1",
+          "identity": {
+            "floor_plan_id": "0635f2a4eb5c",
+            "unit_number": "05313"
+          },
+          "source_api_url": "https://avmarylandoaks.securecafe.com/onlineleasing/aventura-at-maryland-oaks/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2303367"
+          }
+        },
+        {
+          "availability_date": "10/2/2026",
+          "floor_plan_name": "B1",
+          "identity": {
+            "floor_plan_id": "0635f2a4eb5c",
+            "unit_number": "05312"
+          },
+          "source_api_url": "https://avmarylandoaks.securecafe.com/onlineleasing/aventura-at-maryland-oaks/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2303367"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 253966,
+      "property_identity_match": true,
+      "property_name": "Aventura at Maryland Oaks",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "B1",
+        "C1"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 5,
+      "website": "https://www.avmarylandoaks.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 4,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 4,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.theencoreatingrammanorapts.com"
+        ],
+        "source_urls": [
+          "https://www.theencoreatingrammanorapts.com/floorplans/the-hampton",
+          "https://www.theencoreatingrammanorapts.com/floorplans/the-lancaster",
+          "https://www.theencoreatingrammanorapts.com/floorplans/the-york"
+        ],
+        "website_host": "www.theencoreatingrammanorapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "The York",
+          "identity": {
+            "floor_plan_id": "3e1825295f00",
+            "unit_number": "104"
+          },
+          "source_api_url": "https://www.theencoreatingrammanorapts.com/floorplans/the-york",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "The York",
+          "identity": {
+            "floor_plan_id": "3e1825295f00",
+            "unit_number": "105"
+          },
+          "source_api_url": "https://www.theencoreatingrammanorapts.com/floorplans/the-york",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 258584,
+      "property_identity_match": true,
+      "property_name": "The Encore at Ingram Manor",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "The Hampton",
+        "The Lancaster",
+        "The York"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 4,
+      "website": "https://www.theencoreatingrammanorapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 26,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 26,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.unionatroosevelt.com"
+        ],
+        "source_urls": [
+          "https://www.unionatroosevelt.com/floorplans/a1-1x1---phase-ii",
+          "https://www.unionatroosevelt.com/floorplans/a2-1x1---phase-ii",
+          "https://www.unionatroosevelt.com/floorplans/a3-1x1---phase-ii",
+          "https://www.unionatroosevelt.com/floorplans/a3-alternate-1x1---phase-ii",
+          "https://www.unionatroosevelt.com/floorplans/a4-1x1---phase-ii"
+        ],
+        "website_host": "www.unionatroosevelt.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Studio - Phase I",
+          "identity": {
+            "floor_plan_id": "c01638d8aa86",
+            "unit_number": "228"
+          },
+          "source_api_url": "https://www.unionatroosevelt.com/floorplans/studio---phase-i",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "One Bedroom - Phase I",
+          "identity": {
+            "floor_plan_id": "14517b960fc2",
+            "unit_number": "226"
+          },
+          "source_api_url": "https://www.unionatroosevelt.com/floorplans/one-bedroom---phase-i",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 260564,
+      "property_identity_match": true,
+      "property_name": "Union @ Roosevelt II",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1 1x1 - Phase II",
+        "A2 1x1 - Phase II",
+        "A3 1x1 - Phase II",
+        "A3 Alternate 1x1 - Phase II",
+        "A4 1x1 - Phase II",
+        "B1 2x2 - Phase II",
+        "B2 2x2 - Phase II",
+        "One Bedroom - Phase I"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 26,
+      "website": "https://www.unionatroosevelt.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 17,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 17,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "metrostarapartments.securecafe.com"
+        ],
+        "source_urls": [
+          "https://metrostarapartments.securecafe.com/onlineleasing/star-deluxe-branford/availableunits.aspx"
+        ],
+        "website_host": "metrostarapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "10/6/2026",
+          "floor_plan_name": "Affordable Unit Call for Details",
+          "identity": {
+            "floor_plan_id": "5cb0da93d2e7",
+            "unit_number": "90-375D"
+          },
+          "source_api_url": "https://metrostarapartments.securecafe.com/onlineleasing/star-deluxe-branford/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "8/7/2026",
+          "floor_plan_name": "One Bedroom",
+          "identity": {
+            "floor_plan_id": "c7bb336db6a9",
+            "unit_number": "172-375F"
+          },
+          "source_api_url": "https://metrostarapartments.securecafe.com/onlineleasing/star-deluxe-branford/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 262174,
+      "property_identity_match": true,
+      "property_name": "Star Deluxe Branford",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Affordable Unit Call for Details",
+        "One Bedroom",
+        "One Bedroom Plus",
+        "Two Bed Two Bath"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 17,
+      "website": "https://metrostarapartments.com/star-deluxe-branford/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 4,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 4,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "byredwood.securecafe.com"
+        ],
+        "source_urls": [
+          "https://byredwood.securecafe.com/onlineleasing/redwood-superior-township/availableunits.aspx"
+        ],
+        "website_host": "www.byredwood.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Forestwood",
+          "identity": {
+            "floor_plan_id": "b380bdb467aa",
+            "unit_number": "1657"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-superior-township/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2718279"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Forestwood",
+          "identity": {
+            "floor_plan_id": "b380bdb467aa",
+            "unit_number": "1707"
+          },
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-superior-township/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "2718279"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 277774,
+      "property_identity_match": true,
+      "property_name": "Redwood Superior Township",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Forestwood",
+        "Meadowood",
+        "Willowood"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 4,
+      "website": "https://www.byredwood.com/apartments/mi/superior-township/redwood-superior-township/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 2,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 2,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.yo-stl.com"
+        ],
+        "source_urls": [
+          "https://www.yo-stl.com/floorplans/grand-1%2bden"
+        ],
+        "website_host": "www.yo-stl.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Grand 1&#x2B;Den",
+          "identity": {
+            "floor_plan_id": "f996b3c705ad",
+            "unit_number": "305"
+          },
+          "source_api_url": "https://www.yo-stl.com/floorplans/grand-1%2bden",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Grand 1&#x2B;Den",
+          "identity": {
+            "floor_plan_id": "f996b3c705ad",
+            "unit_number": "205"
+          },
+          "source_api_url": "https://www.yo-stl.com/floorplans/grand-1%2bden",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 281767,
+      "property_identity_match": true,
+      "property_name": "YO",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Grand 1&#x2B;Den"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 2,
+      "website": "https://www.yo-stl.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 110,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 110,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "argentoatsugarloaf.securecafe.com"
+        ],
+        "source_urls": [
+          "https://argentoatsugarloaf.securecafe.com/onlineleasing/argento-at-sugarloaf/availableunits.aspx"
+        ],
+        "website_host": "www.argentoatsugarloaf.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "8/10/2026",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "2c5b66682162",
+            "unit_number": "1317"
+          },
+          "source_api_url": "https://argentoatsugarloaf.securecafe.com/onlineleasing/argento-at-sugarloaf/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5984534"
+          }
+        },
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "A2",
+          "identity": {
+            "floor_plan_id": "d80db6c67ab0",
+            "unit_number": "1315"
+          },
+          "source_api_url": "https://argentoatsugarloaf.securecafe.com/onlineleasing/argento-at-sugarloaf/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5993292"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 297708,
+      "property_identity_match": true,
+      "property_name": "Argento at Sugarloaf",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 110,
+      "website": "https://www.argentoatsugarloaf.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "flats-on-10th-rentcafewebsite.securecafe.com"
+        ],
+        "source_urls": [
+          "https://flats-on-10th-rentcafewebsite.securecafe.com/onlineleasing/flats-on-10th/availableunits.aspx"
+        ],
+        "website_host": "flatson10th.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "2 Bed 2 Bath A3",
+          "identity": {
+            "floor_plan_id": "1eba21ccbf38",
+            "unit_number": "822-A3"
+          },
+          "source_api_url": "https://flats-on-10th-rentcafewebsite.securecafe.com/onlineleasing/flats-on-10th/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "2 Bed 2 Bath A3",
+          "identity": {
+            "floor_plan_id": "1eba21ccbf38",
+            "unit_number": "233-A3"
+          },
+          "source_api_url": "https://flats-on-10th-rentcafewebsite.securecafe.com/onlineleasing/flats-on-10th/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 300327,
+      "property_identity_match": true,
+      "property_name": "Flats on 10th",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "2 Bed 2 Bath A3",
+        "2 Bed 2 Bath B1",
+        "2 Bed 2 Bath B2",
+        "2 Bed 2 Bath B3"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 7,
+      "website": "https://flatson10th.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "rentcafe31-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 15,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 15,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "livevalleyridgeapts.securecafe.com"
+        ],
+        "source_urls": [
+          "https://livevalleyridgeapts.securecafe.com/onlineleasing/valley-ridge4/availableunits.aspx"
+        ],
+        "website_host": "www.livevalleyridgeapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "Lula",
+          "identity": {
+            "floor_plan_id": "243a8e3ecb15",
+            "unit_number": "0044"
+          },
+          "source_api_url": "https://livevalleyridgeapts.securecafe.com/onlineleasing/valley-ridge4/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5348288"
+          }
+        },
+        {
+          "availability_date": "8/20/2026",
+          "floor_plan_name": "Lula",
+          "identity": {
+            "floor_plan_id": "243a8e3ecb15",
+            "unit_number": "0006"
+          },
+          "source_api_url": "https://livevalleyridgeapts.securecafe.com/onlineleasing/valley-ridge4/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5348288"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 300689,
+      "property_identity_match": true,
+      "property_name": "Valley Ridge",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Lula",
+        "Ridgeland",
+        "Valley"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 15,
+      "website": "https://www.livevalleyridgeapts.com/"
+    }
+  ]
+}

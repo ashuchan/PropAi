@@ -31,7 +31,7 @@ import json
 import re
 from datetime import date
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -53,6 +53,7 @@ from ma_poc.pms.signal_engine.floor_plan_signals import (
 from ma_poc.pms.signal_engine.floor_plan_signals import (
     has_floor_plan_signals as _has_fp_signals,
 )
+from ma_poc.pms.source_provenance import response_sha256, sanitise_source_url
 
 # Mirrors scripts/entrata.py::_EMBEDDED_JS_GLOBALS so both pipelines search
 # the same set of SSR framework globals.
@@ -1467,6 +1468,306 @@ def extract_units_from_html_tables(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ManageBuilding public-rentals index
+# ───────────────────────────────────────────────────────────────────────────────
+#
+# ManageBuilding's public ``/Resident/public/rentals`` route renders one
+# ``a.featured-listing`` per currently published rental. The anchor carries
+# all transactional/physical fields in data-* attributes, and its numeric
+# detail path is unique within the property:
+#
+#   <a class="featured-listing"
+#      href="/Resident/public/rentals/76796"
+#      data-bedrooms="2" data-bathrooms="2"
+#      data-rent="1229.00" data-square-feet="844">...</a>
+#
+# The generic data-attribute reader recovers the dimensions but drops the href
+# identity, turning a real listing roster into plan summaries. Keep this path
+# deliberately narrower than the generic reader:
+#
+#   * only a tenant subdomain of ``managebuilding.com``;
+#   * only the COMPLETE rentals index (never ``/home``, which shows a featured
+#     subset and would stop the cascade before it follows the index link);
+#   * only same-host numeric detail URLs with all four required data fields.
+#
+# A ManageBuilding listing id has not been measured for cross-run stability,
+# so it is emitted only in ``source_ids``. ``core.source_ids`` registers it as
+# UNIT_VOLATILE: evidence that this row is one listing, but never a daily-join
+# ``unit_id``.
+
+_MANAGEBUILDING_HOST_SUFFIX = ".managebuilding.com"
+_MANAGEBUILDING_RENTALS_PATH_RE = re.compile(
+    r"^/resident/public/rentals/?$", re.IGNORECASE
+)
+_MANAGEBUILDING_LISTING_PATH_RE = re.compile(
+    r"^/resident/public/rentals/(?P<listing_id>\d+)/?$", re.IGNORECASE
+)
+
+
+def is_managebuilding_rentals_index_url(url: str) -> bool:
+    """Return whether *url* is a ManageBuilding tenant's full rentals index.
+
+    Matching is case-insensitive and tolerates one trailing slash. Query
+    parameters do not change the route's path, but ``/home`` and detail pages
+    never qualify.
+    """
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+    except (TypeError, ValueError):
+        return False
+    return (
+        parsed.scheme.lower() in {"http", "https"}
+        and host.endswith(_MANAGEBUILDING_HOST_SUFFIX)
+        and bool(_MANAGEBUILDING_RENTALS_PATH_RE.fullmatch(parsed.path or ""))
+    )
+
+
+def extract_managebuilding_rentals_index(
+    html: str,
+    source_url: str,
+    *,
+    property_name: str = "",
+    city: str = "",
+    state: str = "",
+    zip_code: str = "",
+    listing_id_whitelist: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Extract one unit-level row per ManageBuilding featured listing.
+
+    The listing id is intentionally retained as classify-only source evidence,
+    not copied into ``unit_id`` or ``unit_number``. This lets verdict and
+    post-processing recognise a concrete listing without claiming an
+    unmeasured listing record is a stable physical-apartment identifier.
+    """
+    if not html or not is_managebuilding_rentals_index_url(source_url):
+        return []
+
+    try:
+        parsed_source = urlparse(source_url)
+        source_host = (parsed_source.hostname or "").lower().rstrip(".")
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            parsed_source = urlparse(source_url)
+            source_host = (parsed_source.hostname or "").lower().rstrip(".")
+        except Exception:
+            return []
+
+    # The direct-index parser above is also used when the property's configured
+    # URL already resolves to ManageBuilding.  Cross-origin route promotion is
+    # stricter: an account can publish dozens of unrelated properties, so a
+    # marketing-site caller supplies all four CSV boundary fields.  Partial
+    # scope is never useful and must fail closed.
+    scoped = any((property_name, city, state, zip_code)) or listing_id_whitelist is not None
+    if scoped and not all((property_name, city, state, zip_code)):
+        return []
+
+    def _label_key(value: str) -> str:
+        return "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+
+    def _zip5(value: str) -> str:
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        if len(digits) == 4:
+            return digits.zfill(5)
+        return digits[:5]
+
+    def _location_parts(value: str) -> tuple[str, str, str]:
+        left, sep, raw_zip = str(value or "").partition("|")
+        if not sep or "," not in left:
+            return "", "", ""
+        raw_city, raw_state = left.rsplit(",", 1)
+        return _label_key(raw_city), raw_state.strip().upper(), _zip5(raw_zip)
+
+    whitelist = {
+        str(value).strip()
+        for value in (listing_id_whitelist or set())
+        if str(value).strip()
+    }
+    if scoped and not whitelist:
+        account_labels = [
+            str(img.get("alt") or "").strip()
+            for img in soup.select("header img[alt]")
+            if str(img.get("alt") or "").strip()
+        ]
+        # Some themes omit the header logo but retain the account/property
+        # label in the footer heading.  Exact punctuation-insensitive equality
+        # is still required; token-overlap is intentionally insufficient.
+        account_labels.extend(
+            heading.get_text(" ", strip=True)
+            for heading in soup.select("h2")
+            if heading.get_text(" ", strip=True)
+        )
+        target_label = _label_key(property_name)
+        if not target_label or target_label not in {
+            _label_key(label) for label in account_labels
+        }:
+            return []
+
+    target_location = (
+        _label_key(city),
+        str(state or "").strip().upper(),
+        _zip5(zip_code),
+    )
+    if scoped and (not all(target_location) or len(target_location[1]) != 2):
+        return []
+
+    def _scoped_unit_number(anchor: Any) -> str:
+        """Return only an explicitly labelled physical apartment identity."""
+
+        title_node = anchor.select_one(".featured-listing__title")
+        title = title_node.get_text(" ", strip=True) if title_node else ""
+        if title:
+            title_parts = [part.strip() for part in re.split(r"\s+-\s+", title)]
+            # Multifamily titles use ``street address - apartment - qualifier``.
+            # Keep every suffix component ("1105 - ADA" -> "1105-ADA").
+            if len(title_parts) >= 2 and any(ch.isdigit() for ch in title_parts[1]):
+                return "-".join(part for part in title_parts[1:] if part)
+        # Scattered-site homes use the street address itself as the permanent
+        # physical identity, the same model as the registered Rently lane.
+        if title and re.search(
+            r"^\s*\d+[A-Za-z0-9-]*\s+.*\b(?:avenue|ave|boulevard|blvd|court|ct|"
+            r"drive|dr|highway|hwy|lane|ln|parkway|pkwy|place|pl|road|rd|"
+            r"street|st|terrace|ter|trail|trl|way)\.?\s*$",
+            title,
+            re.IGNORECASE,
+        ):
+            return title
+
+        description_node = anchor.select_one(".featured-listing__description")
+        description = (
+            description_node.get_text(" ", strip=True)
+            if description_node is not None
+            else ""
+        )
+        # Live Le Mirage evidence (2026-08-02) uses two explicit forms:
+        # ``Apartment #5102`` and a description beginning ``#2205 -``.
+        # The leading/label gates prevent rent, address and prose numbers from
+        # becoming identities. Keep the token short and require a digit.
+        patterns = (
+            re.compile(
+                r"\b(?:apartment|apt|unit)\s*#\s*([A-Z0-9][A-Z0-9-]{0,15})\b",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"^\s*#\s*([A-Z0-9][A-Z0-9-]{0,15})(?=\s*(?:[-–—,:]|$))",
+                re.IGNORECASE,
+            ),
+        )
+        for pattern in patterns:
+            match = pattern.search(description)
+            if match is not None and any(ch.isdigit() for ch in match.group(1)):
+                return match.group(1)
+        return ""
+
+    units: list[dict[str, Any]] = []
+    seen_listing_ids: set[str] = set()
+    for anchor in soup.select("a.featured-listing[href]"):
+        href = str(anchor.get("href") or "").strip()
+        if not href:
+            continue
+        try:
+            detail_url = urljoin(source_url, href)
+            parsed_detail = urlparse(detail_url)
+            detail_host = (parsed_detail.hostname or "").lower().rstrip(".")
+        except (TypeError, ValueError):
+            continue
+        if detail_host != source_host:
+            continue
+        path_match = _MANAGEBUILDING_LISTING_PATH_RE.fullmatch(
+            parsed_detail.path or ""
+        )
+        if path_match is None:
+            continue
+        listing_id = path_match.group("listing_id")
+        if listing_id in seen_listing_ids:
+            continue
+        if whitelist and listing_id not in whitelist:
+            continue
+        if scoped and _location_parts(str(anchor.get("data-location") or "")) != target_location:
+            continue
+
+        raw_bedrooms = str(anchor.get("data-bedrooms") or "").strip()
+        raw_bathrooms = str(anchor.get("data-bathrooms") or "").strip()
+        raw_rent = str(anchor.get("data-rent") or "").strip()
+        raw_sqft = str(anchor.get("data-square-feet") or "").strip()
+        if not all((raw_bedrooms, raw_bathrooms, raw_rent, raw_sqft)):
+            continue
+
+        bedrooms = _parse_int_token(raw_bedrooms)
+        bathrooms = _parse_int_token(raw_bathrooms)
+        sqft = _parse_int_token(raw_sqft)
+        rent_low, rent_high = _parse_rent_token(raw_rent)
+        if (
+            bedrooms == ""
+            or bathrooms == ""
+            or sqft == ""
+            or rent_low is None
+            or rent_high is None
+        ):
+            continue
+        try:
+            sqft_value = int(float(sqft))
+        except (TypeError, ValueError):
+            continue
+        if not 150 <= sqft_value <= 10_000:
+            continue
+
+        availability_date = ""
+        try:
+            availability_date = extract_available_date_from_card(str(anchor)) or ""
+        except Exception:
+            availability_date = ""
+
+        physical_unit_number = _scoped_unit_number(anchor) if scoped else ""
+        units.append(
+            {
+                "floor_plan_name": "",
+                "bed_label": "Studio" if bedrooms == "0" else f"{bedrooms}BR",
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "sqft": str(sqft_value),
+                "unit_number": physical_unit_number,
+                "floor": "",
+                "building": "",
+                "rent_range": (
+                    f"${rent_low:,} - ${rent_high:,}"
+                    if rent_low != rent_high
+                    else f"${rent_low:,}"
+                ),
+                "market_rent_low": rent_low,
+                "market_rent_high": rent_high,
+                "deposit": "",
+                "concession": "",
+                "availability_status": "AVAILABLE",
+                "available_units": "",
+                "availability_date": availability_date,
+                "lease_term": "",
+                "move_in_date": "",
+                "source_ids": {"managebuilding_listing_id": listing_id},
+                "source_api_url": detail_url,
+                "_source_url": source_url,
+                "source_response_sha256": response_sha256(html),
+                "source_response_url": sanitise_source_url(source_url),
+                "source_record_locator": f"featured-listing:{listing_id}",
+                "identity_quality": (
+                    "provider_explicit_physical_unit"
+                    if physical_unit_number
+                    else "volatile_listing_only"
+                ),
+                "source": "html_managebuilding_index",
+                "extraction_tier": "TIER_1_DOM_MANAGEBUILDING",
+            }
+        )
+        seen_listing_ids.add(listing_id)
+
+    return units
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Phase 6.3 (2026-05-21) — data-* attribute cards
 # ─────────────────────────────────────────────────────────────────────────────
 #
@@ -2537,7 +2838,7 @@ _UNIT_NUM_STOPWORDS: frozenset[str] = frozenset({
     "today", "view", "more", "see", "from", "starting", "rent", "lease",
     "bed", "bath", "beds", "baths", "bedroom", "bathroom", "sqft", "studio",
     "available", "homes", "home", "house", "loft", "lofts",
-    "this", "that", "your", "our", "is", "are",
+    "this", "that", "your", "our", "is", "are", "it",
 })
 
 
@@ -2954,6 +3255,23 @@ def _extract_rentcafe_option_row(
     ≥2 structural signals it requires. The plan-level beds/baths/plan_name
     come from `page_ctx`; per-unit fields come from specific child selectors.
     """
+    # ProspectPortal/RentCafe tables render their column headings as the same
+    # component with an added ``title`` class.  Letting that node reach the
+    # unit-number regex turns the mobile label ``Sq.ft.`` into a physical
+    # apartment (PID 23372 emitted it beside two genuine units).  The native
+    # Entrata option-row parser already applies this exact structural guard;
+    # generic DOM fallback must agree.
+    try:
+        node_classes = {
+            str(value).strip().casefold()
+            for value in (node.get("class") or [])
+            if str(value).strip()
+        }
+    except Exception:
+        node_classes = set()
+    if "title" in node_classes:
+        return None
+
     try:
         text = node.get_text(" ", strip=True)
     except Exception:

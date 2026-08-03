@@ -1,0 +1,604 @@
+{
+  "e2e_candidates": [
+    {
+      "adapter_e2e": {
+        "adapter_units": 6,
+        "error": "",
+        "passed": true,
+        "plans": 3,
+        "strict_native_positive_rent_rows": 3,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE_APPLICANT",
+        "winning_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "property_address_match": true,
+      "property_id": 29566,
+      "property_identity_match": true,
+      "property_name": "Heatherwood I",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 0,
+      "sample_native_unit_ids": [
+        "1101E",
+        "1013J",
+        "1007K"
+      ],
+      "source_support": "current_direct_exact_bound_applicant",
+      "source_urls": [
+        "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "09/02/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161013",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1101E"
+        },
+        {
+          "availability_date": "09/02/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161087",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1013J"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161054",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1007K"
+        }
+      ],
+      "units": 3,
+      "website": "https://heatherwoodfl.com/"
+    },
+    {
+      "adapter_e2e": {
+        "adapter_units": 6,
+        "error": "",
+        "passed": true,
+        "plans": 0,
+        "strict_native_positive_rent_rows": 6,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "winning_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 6,
+      "native_positive_rent_rows": 6,
+      "property_address_match": true,
+      "property_id": 277913,
+      "property_identity_match": true,
+      "property_name": "Redwood Perrysburg Oregon Road",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 0,
+      "sample_native_unit_ids": [
+        "D30",
+        "G69",
+        "H88",
+        "E48",
+        "H87"
+      ],
+      "source_support": "current_direct_exact_securecafe",
+      "source_urls": [
+        "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Fernwood",
+          "market_rent_high": 2267,
+          "market_rent_low": 1880,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165581"
+          },
+          "sqft": "1123",
+          "unit_number": "D30"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Fernwood",
+          "market_rent_high": 2250,
+          "market_rent_low": 1824,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165581"
+          },
+          "sqft": "1123",
+          "unit_number": "G69"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2367,
+          "market_rent_low": 1983,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "H88"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2319,
+          "market_rent_low": 1908,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "E48"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2394,
+          "market_rent_low": 1983,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "H87"
+        }
+      ],
+      "units": 6,
+      "website": "https://www.byredwood.com/apartments/oh/perrysburg/redwood-perrysburg-oregon-road/index.aspx"
+    },
+    {
+      "adapter_e2e": {
+        "adapter_units": 21,
+        "error": "",
+        "passed": true,
+        "plans": 0,
+        "strict_native_positive_rent_rows": 21,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "winning_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 21,
+      "native_positive_rent_rows": 21,
+      "property_address_match": true,
+      "property_id": 220907,
+      "property_identity_match": true,
+      "property_name": "Reserve At Bradbury Place",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 21,
+      "sample_native_unit_ids": [
+        "554B7",
+        "554C2",
+        "524A2",
+        "552C2",
+        "522C5"
+      ],
+      "source_support": "hb_discovered_exact_published_securecafe_then_direct_data_fetch",
+      "source_urls": [
+        "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "554B7"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "554C2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "524A2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "3",
+          "floor_plan_name": "Dover - Screen Patio",
+          "market_rent_high": 1675,
+          "market_rent_low": 1675,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1249",
+          "unit_number": "552C2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "Havencrest - Sunroom",
+          "market_rent_high": 1400,
+          "market_rent_low": 1400,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "811",
+          "unit_number": "522C5"
+        }
+      ],
+      "units": 21,
+      "website": "https://www.keystonemanagement.com/apartments/nc/reserve-at-bradbury-place"
+    }
+  ],
+  "net_new_ids": [
+    "29566",
+    "220907",
+    "277913"
+  ],
+  "overlap_ids": [],
+  "provenance": {
+    "applicant_source_sha256": "be38c32f716950ca6fde97e058d6e010ed2688c7e6ff824c47e4d6c82f4d3981",
+    "candidate_head": "1fa661575e2e06859dc77865a4541f9768e6787f",
+    "candidate_repo": "/Users/ankur/PropAi-main/.claude/worktrees/wf_94b9d351-073-7",
+    "network_policy": {
+      "canary": false,
+      "direct_first": true,
+      "hyperbrowser": {
+        "solveCaptchas": false,
+        "summary": "/Users/ankur/PropAi-codex-availability-date/investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_summary.json",
+        "targets": 3,
+        "useStealth": false
+      },
+      "llm_enabled": false,
+      "probe_proxies": {},
+      "probe_unlocker": false
+    }
+  },
+  "recoveries": [
+    {
+      "adapter_e2e": {
+        "adapter_units": 6,
+        "error": "",
+        "passed": true,
+        "plans": 3,
+        "strict_native_positive_rent_rows": 3,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE_APPLICANT",
+        "winning_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "property_address_match": true,
+      "property_id": 29566,
+      "property_identity_match": true,
+      "property_name": "Heatherwood I",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 0,
+      "sample_native_unit_ids": [
+        "1101E",
+        "1013J",
+        "1007K"
+      ],
+      "source_support": "current_direct_exact_bound_applicant",
+      "source_urls": [
+        "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "09/02/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161013",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1101E"
+        },
+        {
+          "availability_date": "09/02/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161087",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1013J"
+        },
+        {
+          "availability_date": "09/01/2026",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "One Bedroom",
+          "market_rent_high": 1175,
+          "market_rent_low": 1175,
+          "source_api_url": "https://heatherwoodfl.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1723103&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "property_name": "Heatherwood Apartments",
+            "securecafe_apartment_id": "38161054",
+            "securecafe_floorplan_id": "5188822"
+          },
+          "sqft": "576",
+          "unit_number": "1007K"
+        }
+      ],
+      "units": 3,
+      "website": "https://heatherwoodfl.com/"
+    },
+    {
+      "adapter_e2e": {
+        "adapter_units": 6,
+        "error": "",
+        "passed": true,
+        "plans": 0,
+        "strict_native_positive_rent_rows": 6,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "winning_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 6,
+      "native_positive_rent_rows": 6,
+      "property_address_match": true,
+      "property_id": 277913,
+      "property_identity_match": true,
+      "property_name": "Redwood Perrysburg Oregon Road",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 0,
+      "sample_native_unit_ids": [
+        "D30",
+        "G69",
+        "H88",
+        "E48",
+        "H87"
+      ],
+      "source_support": "current_direct_exact_securecafe",
+      "source_urls": [
+        "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Fernwood",
+          "market_rent_high": 2267,
+          "market_rent_low": 1880,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165581"
+          },
+          "sqft": "1123",
+          "unit_number": "D30"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Fernwood",
+          "market_rent_high": 2250,
+          "market_rent_low": 1824,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165581"
+          },
+          "sqft": "1123",
+          "unit_number": "G69"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2367,
+          "market_rent_low": 1983,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "H88"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2319,
+          "market_rent_low": 1908,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "E48"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Hazelwood",
+          "market_rent_high": 2394,
+          "market_rent_low": 1983,
+          "source_api_url": "https://byredwood.securecafe.com/onlineleasing/redwood-perrysburg-oregon-road/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3165582"
+          },
+          "sqft": "1200",
+          "unit_number": "H87"
+        }
+      ],
+      "units": 6,
+      "website": "https://www.byredwood.com/apartments/oh/perrysburg/redwood-perrysburg-oregon-road/index.aspx"
+    },
+    {
+      "adapter_e2e": {
+        "adapter_units": 21,
+        "error": "",
+        "passed": true,
+        "plans": 0,
+        "strict_native_positive_rent_rows": 21,
+        "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+        "winning_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx"
+      },
+      "contamination_verdict": "pass_exact_property_single_winning_source_no_sibling_rows",
+      "local_validation": "current_candidate_full_rentcafe_adapter_e2e_direct_only",
+      "native_identity_rows": 21,
+      "native_positive_rent_rows": 21,
+      "property_address_match": true,
+      "property_id": 220907,
+      "property_identity_match": true,
+      "property_name": "Reserve At Bradbury Place",
+      "property_name_match": true,
+      "rp_oracle_native_unit_rows": 21,
+      "sample_native_unit_ids": [
+        "554B7",
+        "554C2",
+        "524A2",
+        "552C2",
+        "522C5"
+      ],
+      "source_support": "hb_discovered_exact_published_securecafe_then_direct_data_fetch",
+      "source_urls": [
+        "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx"
+      ],
+      "strict_pass": true,
+      "unit_samples": [
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "554B7"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "554C2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "Biltmore",
+          "market_rent_high": 1525,
+          "market_rent_low": 1525,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1053",
+          "unit_number": "524A2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "2.0",
+          "bedrooms": "3",
+          "floor_plan_name": "Dover - Screen Patio",
+          "market_rent_high": 1675,
+          "market_rent_low": 1675,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "1249",
+          "unit_number": "552C2"
+        },
+        {
+          "availability_date": "",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "Havencrest - Sunroom",
+          "market_rent_high": 1400,
+          "market_rent_low": 1400,
+          "source_api_url": "https://reserve-at-bradbury-place-0-rentcafewebsite.securecafe.com/onlineleasing/reserve-at-bradbury-place-0/availableunits.aspx",
+          "source_ids": {},
+          "sqft": "811",
+          "unit_number": "522C5"
+        }
+      ],
+      "units": 21,
+      "website": "https://www.keystonemanagement.com/apartments/nc/reserve-at-bradbury-place"
+    }
+  ]
+}

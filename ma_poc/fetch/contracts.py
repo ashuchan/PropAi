@@ -96,6 +96,12 @@ class FetchResult:
     # only (cf_clearance is IP+UA bound); empty when render didn't solve a
     # challenge. Default empty so all pre-(b) callers stay valid.
     clearance_cookies: dict[str, str] = field(default_factory=dict)
+    # Content-addressed primary-body diagnostic. The path is relative to
+    # ``DATA_DIR``; SHA-256 verifies the decompressed response bytes. Empty on
+    # failures/HEAD and on callers that do not enable local raw persistence.
+    response_sha256: str | None = None
+    raw_html_archive_path: str | None = None
+    raw_html_archive_sha256: str | None = None
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""
@@ -125,4 +131,7 @@ class FetchResult:
             "last_modified": self.last_modified,
             "error_signature": self.error_signature,
             "proxy_used": self.proxy_used,
+            "response_sha256": self.response_sha256,
+            "raw_html_archive_path": self.raw_html_archive_path,
+            "raw_html_archive_sha256": self.raw_html_archive_sha256,
         }

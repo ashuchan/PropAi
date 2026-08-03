@@ -1,0 +1,839 @@
+{
+  "batch_label": "onesite8-property-boundary-revalidate",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      4554,
+      12398,
+      15358,
+      18736,
+      251974,
+      253646,
+      270367,
+      284199
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 9,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "4589771"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "8104531.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "4589771"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 9,
+        "rows_with_native_identity_and_positive_rent": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=24a6f47b-e6bf-474f-863e-0a8615dbc259"
+        ],
+        "website_host": "www.parkatcanyonridge.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "aade76502b6a",
+            "unit_number": "182"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1523,
+            "market_rent_low": 1523
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=24a6f47b-e6bf-474f-863e-0a8615dbc259",
+          "source_ids": {},
+          "source_portal_url": "https://8104531.onlineleasing.realpage.com/",
+          "source_property_id": "4589771",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1B",
+          "identity": {
+            "floor_plan_id": "773f8a0aaa45",
+            "unit_number": "139"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2010,
+            "market_rent_low": 1865
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4589771/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=24a6f47b-e6bf-474f-863e-0a8615dbc259",
+          "source_ids": {},
+          "source_portal_url": "https://8104531.onlineleasing.realpage.com/",
+          "source_property_id": "4589771",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 4554,
+      "property_identity_match": true,
+      "property_name": "Park at Canyon Ridge",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A1B",
+        "B2"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 9,
+      "website": "https://www.parkatcanyonridge.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 3,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "5451885"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "9174995.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "5451885"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 3,
+        "rows_with_native_identity_and_positive_rent": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=1609891a-ab19-41e5-9d0e-4a38f822dfa9"
+        ],
+        "website_host": "www.courtneyparkapthomes.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Keystone with Sunroom",
+          "identity": {
+            "floor_plan_id": "27973dde81cc",
+            "unit_number": "119"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1973,
+            "market_rent_low": 1973
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=1609891a-ab19-41e5-9d0e-4a38f822dfa9",
+          "source_ids": {},
+          "source_portal_url": "https://9174995.onlineleasing.realpage.com/",
+          "source_property_id": "5451885",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Breckenridge",
+          "identity": {
+            "floor_plan_id": "0f7137524102",
+            "unit_number": "212"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2336,
+            "market_rent_low": 2336
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5451885/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=1609891a-ab19-41e5-9d0e-4a38f822dfa9",
+          "source_ids": {},
+          "source_portal_url": "https://9174995.onlineleasing.realpage.com/",
+          "source_property_id": "5451885",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 4,
+      "property_id": 12398,
+      "property_identity_match": true,
+      "property_name": "Courtney Park",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Aspen",
+        "Breckenridge",
+        "Breckenridge with Sunroom",
+        "Keystone",
+        "Keystone with Sunroom",
+        "Telluride",
+        "Telluride with Sunroom"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "https://www.courtneyparkapthomes.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 3,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "1003757"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "marketing_page_site_id"
+        ],
+        "onesite_published_id_proof": true,
+        "onesite_published_portal_proof": false,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "1003757"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 3,
+        "rows_with_native_identity_and_positive_rent": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=862808c2-dcb3-4a9e-9378-e5cbb4103b82"
+        ],
+        "website_host": "www.mountainviewapartmenthomes.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan A",
+          "identity": {
+            "floor_plan_id": "33e06e12ba6f",
+            "unit_number": "9"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1975,
+            "market_rent_low": 1975
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=862808c2-dcb3-4a9e-9378-e5cbb4103b82",
+          "source_ids": {},
+          "source_portal_url": "",
+          "source_property_id": "1003757",
+          "source_property_name": "",
+          "source_property_provenance": "marketing_page_site_id",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan A",
+          "identity": {
+            "floor_plan_id": "33e06e12ba6f",
+            "unit_number": "138"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1975,
+            "market_rent_low": 1975
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/1003757/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=862808c2-dcb3-4a9e-9378-e5cbb4103b82",
+          "source_ids": {},
+          "source_portal_url": "",
+          "source_property_id": "1003757",
+          "source_property_name": "",
+          "source_property_provenance": "marketing_page_site_id",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 1,
+      "property_id": 15358,
+      "property_identity_match": true,
+      "property_name": "Mountain View",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Plan A",
+        "Plan B",
+        "Plan C"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "http://www.mountainviewapartmenthomes.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 14,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "4898130"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "marketing_page_site_id"
+        ],
+        "onesite_published_id_proof": true,
+        "onesite_published_portal_proof": false,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "4898130"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 14,
+        "rows_with_native_identity_and_positive_rent": 14,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=7cafaab4-effe-460a-b9bb-b6c2b9e20341"
+        ],
+        "website_host": ""
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Aspen",
+          "identity": {
+            "floor_plan_id": "3db3d2b9a148",
+            "unit_number": "2"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1901,
+            "market_rent_low": 971
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=7cafaab4-effe-460a-b9bb-b6c2b9e20341",
+          "source_ids": {},
+          "source_portal_url": "",
+          "source_property_id": "4898130",
+          "source_property_name": "",
+          "source_property_provenance": "marketing_page_site_id",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Aspen",
+          "identity": {
+            "floor_plan_id": "3db3d2b9a148",
+            "unit_number": "42"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1901,
+            "market_rent_low": 971
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4898130/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=7cafaab4-effe-460a-b9bb-b6c2b9e20341",
+          "source_ids": {},
+          "source_portal_url": "",
+          "source_property_id": "4898130",
+          "source_property_name": "",
+          "source_property_provenance": "marketing_page_site_id",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 2,
+      "property_id": 18736,
+      "property_identity_match": true,
+      "property_name": "Central Park",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Ashford",
+        "Aspen",
+        "Lennox",
+        "Lexington",
+        "Madison",
+        "Monroe"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 14,
+      "website": "www.centralparkmontgomery.com"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 11,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "4792503"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "8701112.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "4792503"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 11,
+        "rows_with_native_identity_and_positive_rent": 11,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=28f8081e-6f89-40ca-82eb-dac15bc2029a"
+        ],
+        "website_host": "www.domainatfoundersparc.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "fa12269bccc8",
+            "unit_number": "18"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1935,
+            "market_rent_low": 1520
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=28f8081e-6f89-40ca-82eb-dac15bc2029a",
+          "source_ids": {},
+          "source_portal_url": "https://8701112.onlineleasing.realpage.com/",
+          "source_property_id": "4792503",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "fa12269bccc8",
+            "unit_number": "65"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1935,
+            "market_rent_low": 1520
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4792503/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=28f8081e-6f89-40ca-82eb-dac15bc2029a",
+          "source_ids": {},
+          "source_portal_url": "https://8701112.onlineleasing.realpage.com/",
+          "source_property_id": "4792503",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 7,
+      "property_id": 251974,
+      "property_identity_match": true,
+      "property_name": "Domain at Founders Parc",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 11,
+      "website": "https://www.domainatfoundersparc.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 9,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "4892255"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "8778161.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "4892255"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 9,
+        "rows_with_native_identity_and_positive_rent": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=a185c5be-1486-4f75-b788-04497559855b"
+        ],
+        "website_host": "www.alapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Little Talbot",
+          "identity": {
+            "floor_plan_id": "feb9242d8407",
+            "unit_number": "246"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1550,
+            "market_rent_low": 1265
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=a185c5be-1486-4f75-b788-04497559855b",
+          "source_ids": {},
+          "source_portal_url": "https://8778161.onlineleasing.realpage.com/",
+          "source_property_id": "4892255",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Little Talbot",
+          "identity": {
+            "floor_plan_id": "feb9242d8407",
+            "unit_number": "255"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1550,
+            "market_rent_low": 1265
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4892255/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=a185c5be-1486-4f75-b788-04497559855b",
+          "source_ids": {},
+          "source_portal_url": "https://8778161.onlineleasing.realpage.com/",
+          "source_property_id": "4892255",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 3,
+      "property_id": 253646,
+      "property_identity_match": true,
+      "property_name": "Tapestry Westland Village",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Amelia",
+        "Ana Maria",
+        "Anastasia",
+        "Caladesi",
+        "Captivia",
+        "Little Talbot",
+        "Marco",
+        "Sanibel"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 9,
+      "website": "https://www.alapts.com/apartments/fl/jacksonville/tapestry-westland-village/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 3,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "5100087"
+        ],
+        "onesite_marketing_property_match": false,
+        "onesite_portal_hosts": [
+          "8967358.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": false,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "5100087"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 3,
+        "rows_with_native_identity_and_positive_rent": 3,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e379340e-fc45-46e6-914a-bc7a4a736fb3"
+        ],
+        "website_host": "blvd45apts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Sunset",
+          "identity": {
+            "floor_plan_id": "163c67ca9794",
+            "unit_number": "117"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2825,
+            "market_rent_low": 2825
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e379340e-fc45-46e6-914a-bc7a4a736fb3",
+          "source_ids": {},
+          "source_portal_url": "https://8967358.onlineleasing.realpage.com/",
+          "source_property_id": "5100087",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Sunset",
+          "identity": {
+            "floor_plan_id": "163c67ca9794",
+            "unit_number": "124"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2825,
+            "market_rent_low": 2825
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5100087/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=e379340e-fc45-46e6-914a-bc7a4a736fb3",
+          "source_ids": {},
+          "source_portal_url": "https://8967358.onlineleasing.realpage.com/",
+          "source_property_id": "5100087",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 6,
+      "property_id": 270367,
+      "property_identity_match": false,
+      "property_name": "Boulevard 45",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Broadway",
+        "Hollywood",
+        "Independence",
+        "Las Vegas",
+        "Santa Monica",
+        "Sunset",
+        "Wilshire"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 3,
+      "website": "https://blvd45apts.com/"
+    },
+    {
+      "adapter": "onesite",
+      "batch_label": "onesite8-property-boundary-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "exact_street_matches": [],
+        "onesite_api_ids": [
+          "4047044"
+        ],
+        "onesite_marketing_property_match": true,
+        "onesite_portal_hosts": [
+          "4414667.onlineleasing.realpage.com"
+        ],
+        "onesite_property_match": true,
+        "onesite_provenance": [
+          "published_portal_shell"
+        ],
+        "onesite_published_id_proof": false,
+        "onesite_published_portal_proof": true,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "4047044"
+        ],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "leasing.realpage.com"
+        ],
+        "source_urls": [
+          "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4047044/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=5db5f32e-9543-4592-829e-27eb5cb76a35"
+        ],
+        "website_host": "www.501brady.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "2C",
+          "identity": {
+            "floor_plan_id": "5efbf6509c54",
+            "unit_number": "26"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1670,
+            "market_rent_low": 1645
+          },
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/4047044/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=5db5f32e-9543-4592-829e-27eb5cb76a35",
+          "source_ids": {},
+          "source_portal_url": "https://4414667.onlineleasing.realpage.com/",
+          "source_property_id": "4047044",
+          "source_property_name": "",
+          "source_property_provenance": "published_portal_shell",
+          "unit_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 7,
+      "property_id": 284199,
+      "property_identity_match": true,
+      "property_name": "501 Brady",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1A",
+        "1B",
+        "1C",
+        "1D",
+        "2A",
+        "2B",
+        "2C",
+        "Studio"
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 1,
+      "website": "https://www.501brady.com/"
+    }
+  ]
+}

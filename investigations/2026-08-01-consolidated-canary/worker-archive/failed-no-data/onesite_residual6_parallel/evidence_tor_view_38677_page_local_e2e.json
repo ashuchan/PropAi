@@ -1,0 +1,197 @@
+{
+  "assertions": {
+    "all_tor_rows_exact_first_party_provenance": true,
+    "all_tor_rows_native_unique_positive": true,
+    "exact_three_live_configured_boundary_members": true,
+    "focused_tests_pass": true,
+    "no_paid_or_unlocker_calls": true,
+    "nonteam_boundary_members_never_use_new_tier": true,
+    "pid38677_full_scrape_jugnu_strict_success": true,
+    "team_shape_activates_only_for_tor_view": true,
+    "unit_street_plan_fields_never_conflated": true
+  },
+  "focused_test_run": {
+    "returncode": 0,
+    "stderr": "",
+    "stdout": ".....................................................                    [100%]\n53 passed in 0.22s"
+  },
+  "generated_at_utc": "2026-08-01T16:29:38.907244+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_calls": {
+      "14295": 0,
+      "291774": 0,
+      "38677": 0
+    },
+    "ledger_or_builder_modified": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker_calls": 0
+  },
+  "inputs": {
+    "failed344": "/private/tmp/propai-fnd-vBkmT9/failed344.json",
+    "failed344_sha256": "992b55ec4ca4605296f4996c46bf15a39ce3543b3fb54e1c1383e7f3a1f8137c",
+    "source": "ma_poc/pms/adapters/_static_team_unit_roster.py",
+    "source_sha256": "55066f8469ce769e0415b491743a210923e2f5d0ce29757d20f9036f13d0a914",
+    "test": "ma_poc/tests/pms/adapters/test_static_team_unit_roster.py",
+    "test_sha256": "5ff5918d48c8aa5a6f1bfa2c707b396c8ecf1fd0d53e56b4073acddf3dae057d"
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "configured_fetch": {
+        "body_bytes": 101741,
+        "body_sha256": "9ce013acdf9591be2c3b1c4d15a7ebd93fa699e534a9b1cd3700aa006b24dd39",
+        "final_url": "https://www.torviewvillageapts.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "www.torviewvillageapts.com",
+      "detected_pms": "generic_plan_text",
+      "elapsed_ms": 658,
+      "errors": [
+        "generic_plan_text: exact static team roster recovered 5 physical unit row(s)"
+      ],
+      "fallback_chain": [
+        "onesite",
+        "retry:generic_plan_text"
+      ],
+      "plan_summaries": 0,
+      "property_id": 38677,
+      "property_name": "Tor View Village",
+      "samples": [
+        {
+          "bedrooms": "1",
+          "floor_plan_name": "A Style",
+          "market_rent_low": 2625,
+          "source_api_url": "https://www.torviewvillageapts.com/",
+          "source_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-private-entrance-extra/7943277756.html",
+          "source_native_unit_id": "21I",
+          "source_property_provenance": "exact_configured_property_team_card_roster",
+          "source_street_label": "Hasbrouck Drive",
+          "source_unit_address_label": "21I Hasbrouck Drive",
+          "sqft": "840",
+          "unit_number": "21I"
+        },
+        {
+          "bedrooms": "2",
+          "floor_plan_name": "M Style",
+          "market_rent_low": 2930,
+          "source_api_url": "https://www.torviewvillageapts.com/",
+          "source_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-beautifully-renovated/7941626054.html",
+          "source_native_unit_id": "11B",
+          "source_property_provenance": "exact_configured_property_team_card_roster",
+          "source_street_label": "Hasbrouck Drive",
+          "source_unit_address_label": "11B Hasbrouck Drive",
+          "sqft": "955",
+          "unit_number": "11B"
+        },
+        {
+          "bedrooms": "2",
+          "floor_plan_name": "M Style",
+          "market_rent_low": 3030,
+          "source_api_url": "https://www.torviewvillageapts.com/",
+          "source_listing_url": "https://www.craigslist.org/view/d/garnerville-stunning-newly-renovated/rdsG57ET94bCeR7cvBycN2",
+          "source_native_unit_id": "20C",
+          "source_property_provenance": "exact_configured_property_team_card_roster",
+          "source_street_label": "Kensington Circle",
+          "source_unit_address_label": "20C Kensington Circle",
+          "sqft": "955",
+          "unit_number": "20C"
+        },
+        {
+          "bedrooms": "2",
+          "floor_plan_name": "E Style",
+          "market_rent_low": 2875,
+          "source_api_url": "https://www.torviewvillageapts.com/",
+          "source_listing_url": "https://hudsonvalley.craigslist.org/apa/d/garnerville-updated-large-bedroom/7941607121.html",
+          "source_native_unit_id": "18B",
+          "source_property_provenance": "exact_configured_property_team_card_roster",
+          "source_street_label": "Kensington Circle",
+          "source_unit_address_label": "18B Kensington Circle",
+          "sqft": "1080",
+          "unit_number": "18B"
+        },
+        {
+          "bedrooms": "2",
+          "floor_plan_name": "C Style",
+          "market_rent_low": 2895,
+          "source_api_url": "https://www.torviewvillageapts.com/",
+          "source_listing_url": "https://www.craigslist.org/view/d/garnerville-coxy-bedroom-balcony/cKsR2Dc1S2BRpyVM8mdAmx",
+          "source_native_unit_id": "3A",
+          "source_property_provenance": "exact_configured_property_team_card_roster",
+          "source_street_label": "Kensington Circle",
+          "source_unit_address_label": "3A Kensington Circle",
+          "sqft": "774",
+          "unit_number": "3A"
+        }
+      ],
+      "strict_native_positive_rent_rows": 5,
+      "team_roster_shape": true,
+      "tier": "TIER_1_DOM_STATIC_TEAM_UNIT_ROSTER",
+      "units": 5
+    },
+    {
+      "adapter": "onesite",
+      "configured_fetch": {
+        "body_bytes": 141249,
+        "body_sha256": "f60ad023eb00edfa1d72a371dc5e5c52c971af0ca8c32e3ff952c38811af2a9a",
+        "final_url": "https://www.myboulderapartment.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "www.myboulderapartment.com",
+      "detected_pms": "onesite",
+      "elapsed_ms": 2862,
+      "errors": [
+        "No RealPage/OneSite floorplan data found in captured API responses"
+      ],
+      "fallback_chain": [
+        "onesite",
+        "retry:generic_plan_text",
+        "generic"
+      ],
+      "plan_summaries": 0,
+      "property_id": 14295,
+      "property_name": "Timber Ridge Apartment Homes",
+      "samples": [],
+      "strict_native_positive_rent_rows": 0,
+      "team_roster_shape": false,
+      "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+      "units": 0
+    },
+    {
+      "adapter": "onesite",
+      "configured_fetch": {
+        "body_bytes": 162265,
+        "body_sha256": "d79e17aeca7ef1af72e19e6e5ea64c83b73e6e8aa855568a10dccd842893620d",
+        "final_url": "https://www.123taylor.com/gallatin-village",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "https://www.123taylor.com/gallatin-village",
+      "detected_pms": "onesite",
+      "elapsed_ms": 20960,
+      "errors": [
+        "No RealPage/OneSite floorplan data found in captured API responses"
+      ],
+      "fallback_chain": [
+        "onesite",
+        "retry:squarespace_nopms",
+        "generic"
+      ],
+      "plan_summaries": 0,
+      "property_id": 291774,
+      "property_name": "Gallatin Village",
+      "samples": [],
+      "strict_native_positive_rent_rows": 0,
+      "team_roster_shape": false,
+      "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+      "units": 0
+    }
+  ],
+  "run_type": "three live configured boundaries + full scrape_jugnu; direct-only; LLM off; no canary",
+  "self_verified": true
+}

@@ -117,6 +117,7 @@ def assess_publish_ceiling(
     html_signals: dict[str, Any] | None,
     tier_trace: list[dict[str, Any]] | None,
     page_html: str | None,
+    verified_plan_only_surface: bool = False,
 ) -> PublishCeilingResult:
     """Grade whether a zero-unit result is a genuine publish-ceiling.
 
@@ -128,6 +129,9 @@ def assess_publish_ceiling(
         tier_trace: list of ``{tier_key, outcome, reason}`` — the
             extract.tier_attempted events for this property.
         page_html: the fetched HTML (for marker / embed / unit-vocab checks).
+        verified_plan_only_surface: True only when a bounded adapter proved it
+            parsed the complete public plan-only surface represented by
+            ``plan_summaries``.
 
     Returns:
         PublishCeilingResult with a grade, confidence, reason and an
@@ -146,6 +150,7 @@ def assess_publish_ceiling(
         "rent_signal_count": rent_signals,
         "spa_confidence": spa_conf,
         "tiers_ran_and_empty": _tiers_ran_and_empty(tier_trace),
+        "verified_plan_only_surface": bool(verified_plan_only_surface),
     }
 
     # If units WERE extracted this is not a ceiling question at all.
@@ -153,6 +158,23 @@ def assess_publish_ceiling(
         return PublishCeilingResult(
             PublishCeiling.UNCERTAIN, 0.0,
             "units present — not a publish-ceiling case", ev
+        )
+
+    # A bounded adapter may opt in only after proving that it parsed the entire
+    # public source and that the source is plan-only.  Rent tokens on that exact
+    # surface describe the emitted plans, not missed apartments.  Unit-bearing
+    # embeds/vocabulary still veto the proof; the unverified Madrid guard below
+    # remains unchanged for every ordinary plan collection.
+    embed = _has_any(html, _UNIT_BEARING_EMBEDS)
+    vocab = _has_any(html, _UNIT_VOCAB_TOKENS)
+    if verified_plan_only_surface and plan_summaries and not embed and not vocab:
+        ev["guard"] = "verified_complete_plan_surface"
+        return PublishCeilingResult(
+            PublishCeiling.CONFIRMED_PLAN_ONLY,
+            0.95,
+            f"{len(plan_summaries)} plan rows from a verified complete plan-only "
+            "surface; rent tokens are explained by those plans",
+            ev,
         )
 
     # ── GUARD 1 (the madrid guard): rent tokens present but 0 units. ────────
@@ -170,7 +192,6 @@ def assess_publish_ceiling(
     # ── GUARD 2: a unit-bearing embed (SightMap/Engrain/ysi) is present. ────
     # Units exist behind the widget; a lazy-loaded embed that yielded nothing
     # is a render/probe miss, not proof of no data.
-    embed = _has_any(html, _UNIT_BEARING_EMBEDS)
     if embed:
         ev["unit_bearing_embed"] = embed
         return PublishCeilingResult(
@@ -181,7 +202,6 @@ def assess_publish_ceiling(
         )
 
     # ── GUARD 3: unit-vocab tokens in the DOM with 0 extracted units. ───────
-    vocab = _has_any(html, _UNIT_VOCAB_TOKENS)
     if vocab:
         ev["unit_vocab_token"] = vocab
         return PublishCeilingResult(

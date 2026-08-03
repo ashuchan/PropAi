@@ -1,0 +1,263 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_exact_published_detail",
+    "capture_timestamp_utc": "2026-08-01T13:07:24.985056+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      35192
+    ],
+    "native_positive_rent_rows": 4,
+    "captcha_solving": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 35192,
+      "property_name": "Enclave on Golden Triangle",
+      "website": "http://www.enclaveongoldentriangle.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 4,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_published_same_property_floorplan_native_ids_positive_rents",
+      "identity_evidence": {
+        "canonical_name": "Enclave on Golden Triangle",
+        "canonical_address": "5001 Golden Triangle Boulevard",
+        "current_page_name_match": true,
+        "current_page_street_number_zip_match": true,
+        "configured_domain_redirects_to_exact_same_property": true,
+        "current_detail_link_published_by_exact_property_page": true,
+        "rows_with_native_identity": 4,
+        "rows_with_native_identity_and_positive_rent": 4,
+        "source_urls": [
+          "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "2910"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1337,
+            "market_rent_high": 1805
+          },
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+        },
+        {
+          "identity": {
+            "unit_number": "2912"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1282,
+            "market_rent_high": 1731
+          },
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+        },
+        {
+          "identity": {
+            "unit_number": "2811"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1282,
+            "market_rent_high": 1731
+          },
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+        },
+        {
+          "identity": {
+            "unit_number": "1611"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1282,
+            "market_rent_high": 1731
+          },
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "The Mediterranean",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "689",
+          "unit_number": "2910",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,337 - $1,805",
+          "market_rent_low": 1337,
+          "market_rent_high": 1805,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4329387",
+            "entrata_fpid": "776778"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "The Mediterranean",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "689",
+          "unit_number": "2912",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,282 - $1,731",
+          "market_rent_low": 1282,
+          "market_rent_high": 1731,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4329378",
+            "entrata_fpid": "776778"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "The Mediterranean",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "689",
+          "unit_number": "2811",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,282 - $1,731",
+          "market_rent_low": 1282,
+          "market_rent_high": 1731,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-03",
+          "available_date": "2026-08-03",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4329383",
+            "entrata_fpid": "776778"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "The Mediterranean",
+          "bed_label": "1 Bedroom",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "689",
+          "unit_number": "1611",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,282 - $1,731",
+          "market_rent_low": 1282,
+          "market_rent_high": 1731,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-12",
+          "available_date": "2026-08-12",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+          "source_ids": {
+            "entrata_uid": "4329283",
+            "entrata_fpid": "776778"
+          },
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:05:41.429767+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_deep_inspect_35192_mediterranean_current.json",
+        "capture_artifact_sha256": "ce293d4e6cae27534facafcd95e04550cf1e5ef76579d9931468256a6a14aa7d",
+        "html_sha256": "e4fb4c44625fe16a54c6edabc01549ec5a5899ab354cce886095778c0b97180c",
+        "title": "The Mediterranean: 1 Bed 1 Bath in Fort Worth | 689 sq ft",
+        "final_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/",
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": true,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      },
+      "published_route_provenance": {
+        "parent_capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_deep_inspect_35192_current.json",
+        "parent_capture_sha256": "95c0978e04d34c33e69252b6829311d9fec12b4185996b1631884fbd4f5b5646",
+        "parent_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-baltic-776780-1/",
+        "published_detail_url": "https://www.enclaveongoldentriangle.com/floorplans/fort-worth-TX/enclave-on-golden-triangle/the-mediterranean-776778-1/"
+      }
+    }
+  ]
+}

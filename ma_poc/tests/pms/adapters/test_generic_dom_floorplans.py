@@ -8,9 +8,13 @@ chars, ≥2 admitted cards total, sqft-or-rent required.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from ma_poc.pms.adapters._generic_dom_floorplans import (
+    _recover_generic_floorplans_static,
+    _scan_static_html_for_cards,
     parse_generic_floorplan_cards,
     recover_generic_floorplans,
 )
@@ -89,6 +93,50 @@ def test_parse_filters_below_money_threshold() -> None:
     assert len(units) == 1
     assert units[0]["market_rent_low"] is None
     assert units[0]["sqft"] == "700"
+
+
+def test_parse_skips_labeled_deposit_and_uses_later_asking_rent() -> None:
+    """Riverbank's current card labels both amounts; FROM is the rent."""
+    cards = [
+        {
+            "name": "Plan1",
+            "text": (
+                "Plan1 1 Bed 1 Bath 702 sq ft "
+                "DEPOSIT: $1,000 FROM: $1,420"
+            ),
+            "klass": "fp-card",
+        },
+        {
+            "name": "Plan2",
+            "text": (
+                "Plan2 2 Bed 1 Bath 871 sq ft "
+                "$1,000 Deposit Starting at $1,625"
+            ),
+            "klass": "fp-card",
+        },
+    ]
+
+    units = parse_generic_floorplan_cards(cards, "u")
+
+    assert [unit["market_rent_low"] for unit in units] == [1420, 1625]
+    assert [unit["market_rent_high"] for unit in units] == [1420, 1625]
+
+
+def test_parse_never_uses_deposit_only_amount_as_rent() -> None:
+    """Ellis Midtown's visible $200 Deposit may not populate rent."""
+    cards = [
+        {
+            "name": "Studio A",
+            "text": "Studio A Studio 1 Bath 607 sq ft $200 Deposit",
+            "klass": "fp-card",
+        }
+    ]
+
+    units = parse_generic_floorplan_cards(cards, "u")
+
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] is None
+    assert units[0]["market_rent_high"] is None
 
 
 def test_parse_waitlist_status() -> None:
@@ -253,13 +301,6 @@ async def test_recover_accepts_brand_cms_winning_path() -> None:
 # scan worked but canary never got DOM tooling.
 # ─────────────────────────────────────────────────────────────────────
 
-from unittest.mock import MagicMock, patch
-from ma_poc.pms.adapters._generic_dom_floorplans import (
-    _recover_generic_floorplans_static,
-    _scan_static_html_for_cards,
-)
-
-
 def _ctx_with_body(body: str, final_url: str = "https://example.com/"):
     import dataclasses
     @dataclasses.dataclass
@@ -277,9 +318,9 @@ def _ctx_with_body(body: str, final_url: str = "https://example.com/"):
 def test_static_scanner_finds_repeated_plan_cards() -> None:
     """Three div.fp-card siblings with bd/ba/sqft/rent → 3 cards."""
     html = """<html><body>
-        <div class="fp-card"><h3>The Birch</h3><p>1 Bed 1 Bath 850 sqft \,179</p></div>
-        <div class="fp-card"><h3>Schooner Cove</h3><p>2 Bed 1 Bath 950 sqft \,746</p></div>
-        <div class="fp-card"><h3>Studio Loft</h3><p>Studio 1 Bath 500 sqft \</p></div>
+        <div class="fp-card"><h3>The Birch</h3><p>1 Bed 1 Bath 850 sqft $1,179</p></div>
+        <div class="fp-card"><h3>Schooner Cove</h3><p>2 Bed 1 Bath 950 sqft $1,746</p></div>
+        <div class="fp-card"><h3>Studio Loft</h3><p>Studio 1 Bath 500 sqft $895</p></div>
     </body></html>"""
     cards = _scan_static_html_for_cards(html)
     assert len(cards) == 3
@@ -392,9 +433,11 @@ async def test_static_recover_probes_subpaths_when_homepage_empty() -> None:
     def fake_probe(url, **kw):
         r = MagicMock()
         if url.endswith("/floor-plans") or url.endswith("/floorplans"):
-            r.status_code = 200; r.text = fp_html
+            r.status_code = 200
+            r.text = fp_html
         else:
-            r.status_code = 404; r.text = ""
+            r.status_code = 404
+            r.text = ""
         return r
 
     ctx = _ctx_with_body(homepage)
@@ -408,7 +451,9 @@ async def test_static_recover_probes_subpaths_when_homepage_empty() -> None:
 async def test_static_recover_returns_empty_when_no_subpath_yields_cards() -> None:
     homepage = "<html><body>nothing</body></html>"
     def fake_probe(url, **kw):
-        r = MagicMock(); r.status_code = 404; r.text = ""
+        r = MagicMock()
+        r.status_code = 404
+        r.text = ""
         return r
     ctx = _ctx_with_body(homepage)
     with patch("ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe):
@@ -635,6 +680,26 @@ def test_scope_link_naming_this_property_survives() -> None:
     )
 
 
+def test_scope_generic_property_url_has_no_sibling_identity_signal() -> None:
+    assert (
+        classify_href_scope(
+            "https://example.com/contact-us",
+            "/communities/some-property",
+        )
+        == "NEUTRAL"
+    )
+
+
+def test_three_character_property_slug_is_recognised() -> None:
+    assert (
+        classify_href_scope(
+            "https://example.com/ivy/",
+            "/properties/ivy/floorplans/a1",
+        )
+        == "NEUTRAL"
+    )
+
+
 # ── query-string-identified properties ───────────────────────────────
 # pmsi.biz / rookwoodproperties.com / apartmentsniagara.com identify the
 # property purely by query param, so path comparison alone cannot help.
@@ -675,10 +740,12 @@ def test_cards_without_anchors_are_never_rejected() -> None:
     assert len(kept) == len(_GOOD_CARDS)
 
 
-def test_scope_guard_rejects_set_when_fewer_than_two_survive() -> None:
-    """Re-applies the module's ≥2-admitted-cards invariant after filtering.
-    One surviving card is the property's own 'starting at' summary row
-    inside a sibling directory — plan-level noise, not a plan grid."""
+def test_scope_guard_keeps_single_positively_in_scope_survivor() -> None:
+    """A same-property anchor is stronger than the raw ≥2-card heuristic.
+
+    The two sibling recommendation cards are removed while the one card that
+    explicitly links back to the configured property remains attributable.
+    """
     cards = [
         {"name": "Riverwalk on the Falls", "text": "Riverwalk 1 Bed 1 Bath 800 sq ft $1,200",
          "hrefs": [_RIVERWALK]},
@@ -687,7 +754,7 @@ def test_scope_guard_rejects_set_when_fewer_than_two_survive() -> None:
         {"name": "The Orchard", "text": "The Orchard 1 Bed 1 Bath 900 sq ft $1,300",
          "hrefs": ["/apartments/wi/waukesha/the-orchard"]},
     ]
-    assert filter_cards_by_scope(cards, _RIVERWALK, _WIMMER_DIRECTORY) == []
+    assert filter_cards_by_scope(cards, _RIVERWALK, _WIMMER_DIRECTORY) == cards[:1]
 
 
 def test_scope_guard_keeps_majority_when_minority_off_scope() -> None:

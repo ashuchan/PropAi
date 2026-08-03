@@ -1,0 +1,102 @@
+property_id,property_name,website,source_adapter_0731,current_detected_adapter,rp_oracle_native_unit_rows,rp_oracle_distinct_floorplans,prior_disposition
+594,Harbinwood,www.harbinwoodbyelon.com,rentcafe,rentcafe,4,4,securecafe_exact_base_direct_blocked_or_pending_hb
+1617,,https://www.crossingatriverlake.com,,unknown,6,3,residual_unconverted
+2198,Lincoln Green,www.lincolngreenapartments.com,rentmanager,rentmanager,7,7,strict99_false_positive_reintroduced
+3788,,http://www.citadelvillageco.com/,,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+4124,,https://tramor.com/property/tramor-cannon-place/,,unknown,3,3,strict99_false_positive_reintroduced
+5782,Springfield,https://www.springfieldrenton.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+8740,,https://livebh.com/apartments/parc-plaza-apartments/,,sightmap,19,5,residual_unconverted
+8789,,https://livebh.com/apartments/flintridge-apartment-homes/?utm_source=vanity&utm_medium=redirect&utm_campaign=flintridge-apartment-homes&original_referrer=flintridgeapartments.com,,funnel,5,5,residual_unconverted
+9128,Kingswood,https://www.kingswoodenton.com/,resman,resman,2,2,strict99_false_positive_reintroduced
+14295,Timber Ridge Apartment Homes,www.myboulderapartment.com,onesite,onesite,8,8,strict99_false_positive_reintroduced
+16509,,http://brooklawngardensapts.com/property/brooklawn/,,unknown,0,0,residual_unconverted
+17186,The Park at Tivoli,https://www.theparkattivoli.com/,rentcafe,rentcafe,0,0,residual_unconverted
+17674,Hollywood Terrace,http://hpgmanagement.com/property/6550yucca/,rentcafe,rentcafe,4,4,residual_unconverted
+20262,Kings Mill,https://www.pedcorliving.com/apartments/kings-mill-apartment-homes,generic,generic_plan_text,3,3,strict99_false_positive_reintroduced
+22382,4418 Spruce Street,https://www.livecampusapts.com/property/4418-spruce-street/?search-parameters=1&start_date=0&end_date=9999999999&price_min=0&price_max=10000,entrata,entrata,0,0,residual_unconverted
+22962,Fox Lane,https://princetonmanagement.com/communities/fox-lane-apartments/,generic,unknown,3,3,residual_unconverted
+22986,Tuscany Hills,http://www.tuscanyhillsapartments.com/,entrata,entrata,18,8,hyperbrowser_exact_entrata_anchor_pending_native_unit_drill
+23494,Indian Village,https://indianvillageapt.wixsite.com/home/apartments,wix_nopms,wix_nopms,2,2,direct_or_archived_lane_exhausted_no_strict_win
+24337,Colonial House,https://residential.eprodesse.com/colonial-house-apartments/index.aspx,rentcafe,rentcafe,0,0,residual_unconverted
+24982,Fisher Building,https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940,generic,unknown,6,4,residual_unconverted
+25443,Lee Square,http://www.leesquareapartments.com/,appfolio,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+25489,Cortland North Dallas,https://cortland.com/apartments/cortland-north-dallas/,entrata,cortland,0,0,residual_unconverted
+27080,Easton North,http://www.oxfordrealtygroup.com/properties/new-jersey/easton-north/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+29970,Delane Glen,https://www.lernerapartments.com/Delane-Glen-Apartments,generic,generic_plan_text,3,3,direct_or_archived_lane_exhausted_no_strict_win
+32097,Clemmons Trace Village,http://www.clemmonstracevillage.com/,resman,resman,0,0,residual_unconverted
+32134,Crowders View Townhomes,https://crowdersviewtownhomes.com/,rentmanager,rentmanager,3,3,strict99_false_positive_reintroduced
+32978,Camden Vineyards,https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards,camden,unknown,0,0,residual_unconverted
+33993,City Club Apartments MDA,https://www.cityclubapartments.com/,generic,unknown,0,0,residual_unconverted
+34708,Camden Main & Jamboree,https://www.camdenliving.com/apartments/irvine-ca/camden-main-and-jamboree,camden,unknown,0,0,residual_unconverted
+35347,717 Olympic,https://www.717olympic.com/,generic_plan_text,generic_plan_text,0,0,direct_or_archived_lane_exhausted_no_strict_win
+36782,Harbor Station Townhomes,https://www.harborstationtownhomes.com/,rentmanager,rentmanager,2,2,direct_or_archived_lane_exhausted_no_strict_win
+38984,Lakeview Arms,http://www.lakeviewapartmentsms.com/,rentmanager,rentmanager,4,3,direct_or_archived_lane_exhausted_no_strict_win
+39198,Vista De Palmas Apartments,http://www.vistadepalmasapartments.com/,generic,unknown,7,4,residual_unconverted
+39710,Ashton Judiciary Square,http://www.ashtonjs.com/,rentcafe,rentcafe,5,3,residual_unconverted
+40733,Country Club,https://www.smdproperty.com/resident-properties/country-club-apartments/,generic,unknown,6,6,residual_unconverted
+42085,Revive Apartments,https://www.reviveapartments.com/,entrata,entrata,30,6,residual_unconverted
+44955,,https://www.kjaxproperty.com/fulton-woods,,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+45755,The Landings,https://www.pedcorliving.com/apartments/the-landings,generic,generic_plan_text,2,2,strict99_false_positive_reintroduced
+46036,Serengeti Springs,http://www.serengetisprings.com,entrata,entrata,13,7,hyperbrowser_exact_entrata_anchor_pending_native_unit_drill
+46179,,https://www.hayloftapartmenthomes.com/east-hampton-estates,,wix_nopms,6,5,direct_or_archived_lane_exhausted_no_strict_win
+47182,,https://livebh.com/apartments/the-crossings-at-bramblewood/?utm_source=realpage&utm_medium=referral&utm_campaign=cta,,funnel,0,0,residual_unconverted
+47444,Iroquois Green,https://www.sunresidential.com/iroquois-green-apartments0/default,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+47845,Casa De Caro,https://www.equilibriumprops.com/casa-de-caro-apartments,appfolio,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+47909,Westerville Park Apartment Homes,https://www.capcityapartments.com/westerville-park,wix_floor_plans,wix_nopms,3,3,direct_or_archived_lane_exhausted_no_strict_win
+48946,,https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb,,knock,0,0,residual_unconverted
+49921,Legacy At Abbington Place,https://www.pedcorliving.com/apartments/legacy-at-abbington-place,generic,generic_plan_text,4,3,strict99_false_positive_reintroduced
+50114,Woodgrove Point,https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+52182,Woodside Village Apartments,http://www.woodsideapartments.net,generic_plan_text,generic_plan_text,3,3,direct_or_archived_lane_exhausted_no_strict_win
+52541,,https://princetonmanagement.com/communities/woodbridge-manor-apartments/,,unknown,7,7,residual_unconverted
+52854,Parkside,https://parksideaptsliving.com/,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+53567,Trafalgar Square Apartments,https://princetonmanagement.com/communities/trafalgar-square-apartments/,generic,unknown,3,3,residual_unconverted
+53932,Misty Hollow,http://www.landmarkrealty.org/misty-hollow/,generic,unknown,3,2,residual_unconverted
+56567,Park Forest Apartments,https://www.apartmentsstatecollege.com/park-forest-apartments,appfolio,appfolio,2,2,direct_or_archived_lane_exhausted_no_strict_win
+56903,The Landmark,https://www.fxmessina.com/the-landmark?rq=The%20Landmark,squarespace_nopms,squarespace_nopms,5,5,residual_unconverted
+58390,,https://live30lancaster.com/,,rentcafe,14,7,residual_unconverted
+58546,Lake Park Estates,https://wright-weber.com/property/LakePark,rentcafe,rentcafe,1,1,residual_unconverted
+61459,,http://www.thiestalle.com/properties/oakstreet-st-cloud.html,,knock,0,0,residual_unconverted
+67154,Southern Pine Apartments,www.southernpineapts.com,onesite,onesite,0,0,residual_unconverted
+67598,,http://www.loftsatlittlecreek.com/,,rentvision,0,0,strict99_false_positive_reintroduced
+68497,Maya,http://www.liveatmaya.com/,knock,knock,0,0,residual_unconverted
+68956,266 Lofts,https://www.266lofts.com/,g5,g5,0,0,residual_unconverted
+69282,Vista Del Plaza,http://www.vistadelplaza.com/,appfolio,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+69558,Spring Hill Apartments,https://www.goldberg-realty.com/spring-hill-apartments/default.aspx?_yTrackUser=NjYxMjI5OTY5IzE0NTQ0NTc5MTc=-lDwvxVr1Jx8=&_yTrackVisit=MTQ4NjYyNzQ2OCM2NDQ2Nzc2ODg%3d-W7HwJRKaxxE%3d&_yTrackReqDT=05551420201206,rentcafe,rentcafe,1,1,securecafe_exact_base_direct_blocked_or_pending_hb
+69912,Creekwood,http://www.creekwoodapartmenthomes.com/,entrata,entrata,0,0,hyperbrowser_exact_entrata_anchor_pending_native_unit_drill
+71345,Westgate Village Townhouses,https://www.westgate-village-townhouses.com/,wix_nopms,wix_nopms,1,1,direct_or_archived_lane_exhausted_no_strict_win
+72631,Linden Lane,http://www.lindenlaneapartmenthomes.com/,generic_plan_text,generic_plan_text,3,3,direct_or_archived_lane_exhausted_no_strict_win
+72732,,http://www.centralmngt.com/Search?Community=15,,unknown,2,2,residual_unconverted
+72743,,https://brandywinecommunities.com/properties/della-plaza/,,rentcafe,0,0,residual_unconverted
+74519,The Jamestown,https://www.thejamestownapartments.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+76138,Covey Chase,https://morrowapartments.net/wdk-listing/covey-chase-apartments/,generic_plan_text,generic_plan_text,3,3,direct_or_archived_lane_exhausted_no_strict_win
+118965,16 Bennett,https://www.16bennett.com,wix_nopms,wix_nopms,4,4,direct_or_archived_lane_exhausted_no_strict_win
+218378,The Terraces Apartments,http://www.equityapartments.com/california/san-francisco-bay-apartments/lower-nob-hill/the-terraces-apartments.aspx,equity,equity,0,0,residual_unconverted
+218786,,https://www.landcoapartments.com/coopers-landing-apartments/,,rentcafe,44,44,strict99_false_positive_reintroduced
+223248,Royal Oaks,http://www.metroplexapts.com,rentcafe,rentcafe,0,0,residual_unconverted
+223864,Kendall Square,http://www.stewartlangleyproperties.com/kendall-square/,rentmanager,rentmanager,2,2,direct_or_archived_lane_exhausted_no_strict_win
+224888,,http://www.coveatoverlakeapts.com/,,knock,3,3,strict99_false_positive_reintroduced
+225886,Casa Baywood,https://www.casabaywoodapts.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+226383,The Colony Apartments,http://availability.sparkleam.com/properties/?rmwebsvc_command=PropertyDetail&rmwebsvc_id=4&rmwebsvc_template=Properties,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+231543,Autumn Hills,https://bestrentnj.com/Communities/Autumn-Hills/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+232583,Custer Crossing Apartments,https://princetonmanagement.com/communities/custer-crossing-apartments/,generic,unknown,4,4,residual_unconverted
+234945,IMT Belasera at Superior,https://www.imtresidential.com/imtbelaseraatsuperior/,sightmap,sightmap,0,0,residual_unconverted
+235473,,http://www.rooftop252.com/,,unknown,6,4,residual_unconverted
+237787,,http://heritagepropertyrentals.com/heritage-amity-commons-overview/,,appfolio,2,2,strict99_false_positive_reintroduced
+241145,,https://www.midtownwestdetroit.com/single-family,,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+241538,Block 88,http://www.block88apts.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+244756,Town Commons,https://harvest-properties.com/project/town-commons-apartments/,rentcafe,rentcafe,6,6,residual_unconverted
+245993,Alberta Square,https://www.glendalecommunities.com/property/alberta-square/,rentmanager,rentmanager,1,1,direct_or_archived_lane_exhausted_no_strict_win
+246351,Chatsworth Village Townhomes,https://www.glendalecommunities.com/property/chatsworth-townhouses/,rentmanager,rentmanager,2,2,direct_or_archived_lane_exhausted_no_strict_win
+246468,Colonial Manor,https://www.rentwatertown.com/colonial-manor,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+251514,LC SoBro I,https://lifestylecommunities.com/community/lc-sobro,entrata,appfolio,28,13,direct_or_archived_lane_exhausted_no_strict_win
+254122,,https://www.pedcorliving.com/apartments/avril-cambridge-village,,generic_plan_text,5,3,strict99_false_positive_reintroduced
+260761,Westridge Lofts,http://www.westridgelofts.com/,appfolio,appfolio,0,0,direct_or_archived_lane_exhausted_no_strict_win
+263732,Hoyt Tower,https://www.hoyttowernewark.com/,wix_nopms,wix_nopms,2,2,direct_or_archived_lane_exhausted_no_strict_win
+266766,101 Oxford,https://www.101oxford.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+272772,Hawkeye Village,http://hawkeyevillageapartments.com/,generic,unknown,5,5,residual_unconverted
+282696,Allen Ranch Estates,https://www.ishranchestates.com/allen-ranch,wix_nopms,wix_nopms,1,1,direct_or_archived_lane_exhausted_no_strict_win
+289338,201 Walnut,https://www.201walnut.com/,rentcafe,rentcafe,0,0,securecafe_exact_base_direct_blocked_or_pending_hb
+291774,Gallatin Village,https://www.123taylor.com/gallatin-village,onesite,onesite,5,5,strict99_false_positive_reintroduced
+294493,Ashland,https://krcapartments.com/property-detail/?propid=587&propname=Ashland%20Apartments,rentmanager,rentmanager,0,0,direct_or_archived_lane_exhausted_no_strict_win
+295643,Walnut River Residences,https://walnutriverresidences.com/,generic_plan_text,generic_plan_text,3,3,direct_or_archived_lane_exhausted_no_strict_win
+299847,Mirabella,https://www.mirabellamcallen.com/,generic,generic_plan_text,5,5,direct_or_archived_lane_exhausted_no_strict_win

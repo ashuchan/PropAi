@@ -1,0 +1,31 @@
+{
+  "build": {
+    "cloud_build_id": "db939adf-3853-454b-b9ee-c26093f9224a",
+    "commit": "ff7b377",
+    "image_digest": "sha256:5618d786557195575ffe436791a7262f585de2763b6a0419523963036f4e648a",
+    "image_uri": "us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:5618d786557195575ffe436791a7262f585de2763b6a0419523963036f4e648a"
+  },
+  "execution": {
+    "job": "jugnu-strat1000-ff7b377",
+    "execution": "jugnu-strat1000-ff7b377-gxtvm",
+    "project": "jugnu-494013",
+    "region": "us-central1",
+    "task_count": 100,
+    "parallelism": 50,
+    "llm_enabled": false,
+    "fetch_backend": "hyperbrowser",
+    "run_output": "gs://jugnu-canary/runs/2026-08-02-strat1000-ff7b377/"
+  },
+  "input": {
+    "property_count": 1000,
+    "properties_csv": "gs://jugnu-canary/property-list/stratified1000-ff7b377.csv",
+    "properties_csv_generation": "1785712853457869",
+    "sample_ledger_sha256": "0a51ad268034ed333e67bbcc7b51855c16c66a448091c71ea6bef2c6c936909d"
+  },
+  "warm_profiles": {
+    "destination": "gs://jugnu-canary/profiles/strat1000-ff7b377/",
+    "identity_vetted_profiles_copied": 462,
+    "source": "gs://jugnu-canary/profiles/strict-v2-fa1afb7/",
+    "shared_store_mutated": false
+  }
+}

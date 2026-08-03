@@ -1,0 +1,86 @@
+{
+  "run_date": "2026-08-01-plan60-full549-v2",
+  "generated_at": "2026-08-01T06:27:45.938117+00:00",
+  "totals": {
+    "properties": 6,
+    "succeeded": 5,
+    "failed": 1,
+    "carry_forward": 0,
+    "operator_transparency": 0,
+    "success_rate_pct": 83.33
+  },
+  "operator_transparency_detail": {
+    "count": 0,
+    "phrase_histogram": {},
+    "properties": []
+  },
+  "tier_distribution": {
+    "TIER_1_DOM_RENTCAFE_AVAILABLEUNITS_ROSTER_HYPERBROWSER": 1,
+    "TIER_3_PLAN_TEXT": 1,
+    "TIER_1_API_REALPAGE_ONLINELEASING_GETUNITS": 1,
+    "TIER_1_JSONLD_UDR": 1,
+    "TIER_1_API_RENTCAFE_NO_RESPONSE": 1
+  },
+  "verdict_distribution": {
+    "SUCCESS": 3,
+    "SUCCESS_PLAN_LEVEL": 2,
+    "FAILED_UNREACHABLE": 1
+  },
+  "field_fill_rates": {
+    "unit_id": 100.0,
+    "beds": 100.0,
+    "baths": 93.2,
+    "area": 100.0,
+    "rent_low": 100.0,
+    "available_date": 100.0,
+    "availability_status": 100.0,
+    "floor_plan_name": 100.0,
+    "floor": 9.1,
+    "building": 93.2,
+    "concession_text": 90.9,
+    "source_ids": 93.2
+  },
+  "data_quality": {
+    "total_units": 44,
+    "by_tier_family": {
+      "JSONLD": 37,
+      "API": 4,
+      "DOM": 3
+    },
+    "real_id_units": 44,
+    "synthetic_id_units": 0,
+    "plan_level_units": 0
+  },
+  "pre_extraction_terminations": {
+    "fetch_other": 6
+  },
+  "fetch_bot_blocked": {
+    "count": 1,
+    "property_ids": [
+      "4785"
+    ]
+  },
+  "fetch_captcha_detected": {
+    "count": 1,
+    "property_ids": [
+      "4785"
+    ]
+  },
+  "non_extracted_fields": [
+    "lease_term",
+    "move_in_date",
+    "pmc",
+    "website_design",
+    "phone",
+    "email_address",
+    "concessions"
+  ],
+  "cost": {},
+  "slo_violations": [
+    {
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.8333
+    }
+  ]
+}

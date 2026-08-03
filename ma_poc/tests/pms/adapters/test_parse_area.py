@@ -395,6 +395,25 @@ def test_rentcafe_option_row_keeps_the_labelled_unit_area() -> None:
     assert by_unit == {"2205": "682", "1104": "725"}
 
 
+def test_generic_option_row_skips_the_title_component() -> None:
+    """A mobile column label is not an apartment number (PID 23372)."""
+    html = _RENTCAFE_ROW_HTML.replace(
+        "<html><body>",
+        """<html><body>
+<div class="option-row title">
+  <div class="detail first">Unit</div>
+  <div class="detail">Rent</div>
+  <div class="detail">Sq.ft.</div>
+  <div class="detail">Available</div>
+</div>""",
+    )
+
+    units, mode = extract_units_from_dom(html, "https://x.test/")
+
+    assert mode == "default"
+    assert {u["unit_number"] for u in units} == {"2205", "1104"}
+
+
 def test_rentcafe_option_row_area_survives_an_amenity_word_in_the_name() -> None:
     """Literal listing-row text from the run; guard-on loses the 952."""
     html = (

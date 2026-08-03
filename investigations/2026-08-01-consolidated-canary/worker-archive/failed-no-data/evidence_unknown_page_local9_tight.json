@@ -1,0 +1,420 @@
+{
+  "batch_label": "unknown-page-local9-tight",
+  "filters": {
+    "evidence_lane": "page_local_archived_replay",
+    "ledger_level": "unknown",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTMANAGER: no ua.rentmanager.com Search_Result and no iLoveLeasing table",
+        "page-local static recovery: generic_plan_text admitted 6 row(s)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": ""
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 6,
+      "property_id": 2198,
+      "property_identity_match": false,
+      "property_name": "Lincoln Green",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK",
+      "units": 0,
+      "website": "www.lincolngreenapartments.com"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RESMAN: no Availability portal URL discoverable",
+        "page-local static recovery: generic_plan_text admitted 2 row(s)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.kingswoodenton.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 2,
+      "property_id": 9128,
+      "property_identity_match": false,
+      "property_name": "Kingswood",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK",
+      "units": 0,
+      "website": "https://www.kingswoodenton.com/"
+    },
+    {
+      "adapter": "rentcafe_layout_tab",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 15,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 15,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.tudorplaceapts.com"
+        ],
+        "source_urls": [
+          "https://www.tudorplaceapts.com/availableunits"
+        ],
+        "website_host": "www.tudorplaceapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Two bedrooms",
+          "identity": {
+            "floor_plan_id": "0572fe07199d",
+            "unit_number": "6009_09"
+          },
+          "source_api_url": "https://www.tudorplaceapts.com/availableunits",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Two bedrooms",
+          "identity": {
+            "floor_plan_id": "0572fe07199d",
+            "unit_number": "847_07"
+          },
+          "source_api_url": "https://www.tudorplaceapts.com/availableunits",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 27125,
+      "property_identity_match": true,
+      "property_name": "Tudor Place",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Two bedrooms"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_LT",
+      "units": 15,
+      "website": "https://www.tudorplaceapts.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.countryvillageapthomes.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 14,
+      "property_id": 27349,
+      "property_identity_match": false,
+      "property_name": "Country Village of Sherman",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath",
+        "3 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://www.countryvillageapthomes.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTMANAGER: no units parsed from Search_Result",
+        "page-local static recovery: generic_plan_text admitted 3 row(s)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "crowdersviewtownhomes.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 3,
+      "property_id": 32134,
+      "property_identity_match": false,
+      "property_name": "Crowders View Townhomes",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "3 Bedroom / 1 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK",
+      "units": 0,
+      "website": "https://crowdersviewtownhomes.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTMANAGER: no units parsed from Search_Result",
+        "page-local static recovery: generic_plan_text admitted 6 row(s)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.parknorthsiderva.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 6,
+      "property_id": 38378,
+      "property_identity_match": false,
+      "property_name": "Park Northside",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "3 Bedroom / 1.5 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK",
+      "units": 0,
+      "website": "https://www.parknorthsiderva.com/"
+    },
+    {
+      "adapter": "rentcafe_layout_tab",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 30,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 30,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.fountainparksouth.com"
+        ],
+        "source_urls": [
+          "https://www.fountainparksouth.com/availableunits"
+        ],
+        "website_host": "www.fountainparksouth.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bed | 1 Bath",
+          "identity": {
+            "floor_plan_id": "2c1188eb4bef",
+            "unit_number": "02C-112"
+          },
+          "source_api_url": "https://www.fountainparksouth.com/availableunits",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bed | 1 Bath",
+          "identity": {
+            "floor_plan_id": "2c1188eb4bef",
+            "unit_number": "21B-307"
+          },
+          "source_api_url": "https://www.fountainparksouth.com/availableunits",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 74384,
+      "property_identity_match": true,
+      "property_name": "Fountain Park South",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bed | 1 Bath",
+        "2 Bed | 1 Bath",
+        "2 Bed | 1.5 Bath",
+        "Studio | 1 Bath"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_LT",
+      "units": 30,
+      "website": "https://www.fountainparksouth.com/"
+    },
+    {
+      "adapter": "rentcafe_layout_tab",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.aviareedycreek.com"
+        ],
+        "source_urls": [
+          "https://www.aviareedycreek.com/availableunits"
+        ],
+        "website_host": "www.aviareedycreek.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bed x 1 Bath A",
+          "identity": {
+            "floor_plan_id": "900d44a6d7af",
+            "unit_number": "G111"
+          },
+          "source_api_url": "https://www.aviareedycreek.com/availableunits",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 Bed x 1 Bath A",
+          "identity": {
+            "floor_plan_id": "900d44a6d7af",
+            "unit_number": "G112"
+          },
+          "source_api_url": "https://www.aviareedycreek.com/availableunits",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 262717,
+      "property_identity_match": true,
+      "property_name": "AVIA Apartments at Reedy Creek",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 Bed x 1 Bath A"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_LT",
+      "units": 5,
+      "website": "https://www.aviareedycreek.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-page-local9-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "rentcafe_lt: no drill anchors in listing (code-only)",
+        "page-local static recovery: generic_plan_text admitted 1 row(s)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.hickorygrovega.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 1,
+      "property_id": 263127,
+      "property_identity_match": false,
+      "property_name": "Hickory Grove",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "2 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT_EMPTY_FALLBACK",
+      "units": 0,
+      "website": "https://www.hickorygrovega.com/"
+    }
+  ]
+}

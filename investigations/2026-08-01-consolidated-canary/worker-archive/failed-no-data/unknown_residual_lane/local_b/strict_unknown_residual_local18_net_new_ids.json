@@ -1,0 +1,83 @@
+{
+  "ledger_rows": 183,
+  "ledger_sha256": "fdf82e2b4db693da776944ac58927e071559a726522a353cd94f207efd7cfd60",
+  "net_new_count": 1,
+  "net_new_ids": [
+    "19245"
+  ],
+  "rows": [
+    {
+      "artifact": "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/local_b/evidence_19245_tenzen_current_strict.json",
+      "contamination_verdict": "exact_property_page_to_single_knock_property_id",
+      "current_full_scraper_e2e": {
+        "adapter": "knock",
+        "emitted_units": 2,
+        "errors": [],
+        "rows": [
+          {
+            "availability_date": "2026-08-21",
+            "floor_plan_name": "2X1",
+            "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+            "rent": 2650.0,
+            "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+            "source_ids": {
+              "knock_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502"
+            },
+            "source_property_id": "2022654",
+            "unit_id": "knock_unit_id-ddd80a1f-7cea-4920-862a-fe90cef79502",
+            "unit_number": "104"
+          },
+          {
+            "availability_date": "2026-09-08",
+            "floor_plan_name": "1X1",
+            "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+            "rent": 2050.0,
+            "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+            "source_ids": {
+              "knock_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d"
+            },
+            "source_property_id": "2022654",
+            "unit_id": "knock_unit_id-b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+            "unit_number": "504"
+          }
+        ],
+        "strict_native_positive_rent_rows": 2,
+        "tier": "TIER_1_KNOCK_API",
+        "winning_url": "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5"
+      },
+      "native_identity_rows": 2,
+      "native_positive_rent_rows": 2,
+      "native_rows": [
+        {
+          "available_on": "2026-08-21",
+          "floor_plan_name": "2X1",
+          "native_unit_id": "ddd80a1f-7cea-4920-862a-fe90cef79502",
+          "property_id": "2022654",
+          "rent": 2650.0,
+          "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "unit_number": "104"
+        },
+        {
+          "available_on": "2026-09-08",
+          "floor_plan_name": "1X1",
+          "native_unit_id": "b348c00f-6c3f-4a4c-bf04-bf10f8c5634d",
+          "property_id": "2022654",
+          "rent": 2050.0,
+          "source_url": "https://doorway-api.knockrentals.com/v1/property/2022654/units",
+          "unit_number": "504"
+        }
+      ],
+      "net_new_vs_current_ledger": true,
+      "property_id": "19245",
+      "property_identity_match": true,
+      "property_name": "Tenzen",
+      "source_urls": [
+        "https://tenzenapartments.com/",
+        "https://doorway-api.knockrentals.com/v1/property/community/5d11eef5c367a4b5",
+        "https://doorway-api.knockrentals.com/v1/property/2022654/units"
+      ],
+      "strict_qualifies": true,
+      "website": "http://www.tenzenapartments.com/"
+    }
+  ]
+}

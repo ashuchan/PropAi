@@ -106,8 +106,14 @@ from ma_poc.pms.adapters._parsing import (
     format_rent_range,
     make_unit_dict,
     money_to_int,
+    parse_published_area_pair,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.source_provenance import (
+    build_unit_source_provenance,
+    response_sha256,
+    sanitise_source_url,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -244,6 +250,9 @@ async () => {
         special: aTitle.special,
         // Floor-plan starting price often lives in a "from $X" element.
         startingPrice: T(b.querySelector('.floorplan-num, .floorplan-rent')),
+        // Sandpiper-style cards publish plan area here. It may be a scalar
+        // ("930 sq.ft.") or an honest family range ("1122 - 1197 sq.ft.").
+        areaText: T(b.querySelector('.floorplan-sqft')),
         units: Array.from(b.querySelectorAll('.floorplan-unit-single')).map((u) => ({
           unitNumber: (T(u).match(/UNIT\s*[#:]?\s*([A-Z0-9\-]+)/i) || [])[1] || '',
           dataWhen: A(u, 'data-when'),
@@ -663,7 +672,7 @@ def _parse_avail_text(text: str) -> str:
 
 def parse_marketapts_template_a(
     plans: list[dict[str, object]], url: str
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Emit unit-level rows from Template A ``.floorplan-block`` cards.
 
     One row per ``.floorplan-unit-single`` inside each plan card. Plan
@@ -673,7 +682,7 @@ def parse_marketapts_template_a(
     its own price (``data-price``), and availability date (``data-when``,
     which is ISO and authoritative).
     """
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
     for plan in plans:
         if not isinstance(plan, dict):
             continue
@@ -687,7 +696,32 @@ def parse_marketapts_template_a(
             plan_beds: int | None = int(plan_beds_str) if plan_beds_str else None
         except (TypeError, ValueError):
             plan_beds = None
-        plan_sqft = ""
+        area_text = str(plan.get("areaText") or "").strip()
+        area_low, area_high = parse_published_area_pair(area_text)
+        plan_sqft = (
+            str(area_low)
+            if area_low is not None and area_high is not None and area_low == area_high
+            else ""
+        )
+        area_fields: dict[str, Any] = {}
+        if area_low is not None and area_high is not None:
+            area_fields = {
+                "area_low": area_low,
+                "area_high": area_high,
+                "area_range": (
+                    str(area_low)
+                    if area_low == area_high
+                    else f"{area_low}-{area_high}"
+                ),
+                "area_range_raw": area_text,
+                "area_provenance": (
+                    "published_plan_exact"
+                    if area_low == area_high
+                    else "published_plan_range_no_midpoint"
+                ),
+                "area_source_url": url,
+                "source_record_locator": f"marketapts_template_a_plan:{plan_name}",
+            }
         # Plan-level "FROM $X" — useful only as a fallback if a unit row
         # somehow lacks data-price.
         sp_text = str(plan.get("startingPrice") or "")
@@ -698,24 +732,25 @@ def parse_marketapts_template_a(
         if not isinstance(units, list) or not units:
             # Plan-level fallback when no unit roster present.
             if plan_name or plan_floor_price is not None:
-                out.append(
-                    make_unit_dict(
-                        floor_plan_name=plan_name,
-                        bed_label=bed_label_from(plan_beds, plan_name),
-                        bedrooms=str(plan_beds) if plan_beds is not None else "",
-                        bathrooms=plan_baths_str,
-                        sqft=plan_sqft,
-                        unit_number="",
-                        rent_low=plan_floor_price,
-                        rent_high=plan_floor_price,
-                        rent_range=format_rent_range(plan_floor_price, plan_floor_price),
-                        availability_status="AVAILABLE",
-                        source_api_url=url,
-                        extraction_tier="TIER_1_DOM_MARKETAPTS",
-                        concession_text=conc_text,
-                        concession_source=conc_src,
-                    )
+                row = make_unit_dict(
+                    floor_plan_name=plan_name,
+                    bed_label=bed_label_from(plan_beds, plan_name),
+                    bedrooms=str(plan_beds) if plan_beds is not None else "",
+                    bathrooms=plan_baths_str,
+                    sqft=plan_sqft,
+                    unit_number="",
+                    rent_low=plan_floor_price,
+                    rent_high=plan_floor_price,
+                    rent_range=format_rent_range(plan_floor_price, plan_floor_price),
+                    availability_status="AVAILABLE",
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_MARKETAPTS",
+                    floor_plan_name_provenance="marketapts.plan.name",
+                    concession_text=conc_text,
+                    concession_source=conc_src,
                 )
+                row.update(area_fields)
+                out.append(row)
             continue
 
         for u in units:
@@ -746,25 +781,26 @@ def parse_marketapts_template_a(
                 u_beds: int | None = int(u_beds_str) if u_beds_str else plan_beds
             except (TypeError, ValueError):
                 u_beds = plan_beds
-            out.append(
-                make_unit_dict(
-                    floor_plan_name=plan_name,
-                    bed_label=bed_label_from(u_beds, plan_name),
-                    bedrooms=str(u_beds) if u_beds is not None else "",
-                    bathrooms=u_baths_str,
-                    sqft=plan_sqft,
-                    unit_number=unit_no,
-                    rent_low=rent,
-                    rent_high=rent,
-                    availability_status="AVAILABLE",
-                    available_units="1",
-                    availability_date=avail_date,
-                    source_api_url=url,
-                    extraction_tier="TIER_1_DOM_MARKETAPTS",
-                    concession_text=conc_text,
-                    concession_source=conc_src,
-                )
+            row = make_unit_dict(
+                floor_plan_name=plan_name,
+                bed_label=bed_label_from(u_beds, plan_name),
+                bedrooms=str(u_beds) if u_beds is not None else "",
+                bathrooms=u_baths_str,
+                sqft=plan_sqft,
+                unit_number=unit_no,
+                rent_low=rent,
+                rent_high=rent,
+                availability_status="AVAILABLE",
+                available_units="1",
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_MARKETAPTS",
+                floor_plan_name_provenance="marketapts.plan.name",
+                concession_text=conc_text,
+                concession_source=conc_src,
             )
+            row.update(area_fields)
+            out.append(row)
     return out
 
 
@@ -1477,6 +1513,7 @@ def marketapts_static_payload(
                     "startingPrice": _ma_txt(
                         b.select_one(".floorplan-num, .floorplan-rent")
                     ),
+                    "areaText": _ma_txt(b.select_one(".floorplan-sqft")),
                     "units": [
                         _ma_template_a_unit(u)
                         for u in b.select(".floorplan-unit-single")
@@ -1646,7 +1683,7 @@ def _ma_payload_has_data(payload: Any) -> bool:
     )
 
 
-def marketapts_payload_to_units(payload: dict[str, Any], url: str) -> list[dict[str, str]]:
+def marketapts_payload_to_units(payload: dict[str, Any], url: str) -> list[dict[str, Any]]:
     """Dispatch a ``{template, plans, rows}`` payload to the matching
     ``parse_marketapts_template_*`` transform. Shared by the live-page and
     the fetch-only paths so both produce identical rows."""
@@ -1806,6 +1843,56 @@ class MarketAptsAdapter:
             suffix = "_UNIT_LEVEL" if has_unit_level else ""
             result.tier_used = f"TIER_1_DOM_MARKETAPTS_{template}{suffix}"
             result.confidence = min(0.92, 0.65 + 0.04 * pp.n_admitted)
+            area_rows = [row for row in result.units if row.get("area_low") is not None]
+            if area_rows:
+                raw_html = _ma_ctx_body(ctx)
+                source_body: Any = (
+                    raw_html
+                    if raw_html and "floorplan-sqft" in raw_html.casefold()
+                    else payload
+                )
+                source_kind = (
+                    "marketapts_template_a_html"
+                    if isinstance(source_body, str)
+                    else "marketapts_dom_extraction_payload"
+                )
+                source_hash = response_sha256(source_body)
+                safe_winning = sanitise_source_url(winning)
+                for row in area_rows:
+                    row["source_response_sha256"] = source_hash
+                    row["source_response_url"] = safe_winning
+                result.html_responses.append(
+                    {
+                        "url": winning,
+                        "status": 200,
+                        "body": source_body,
+                        "content_type": (
+                            "text/html"
+                            if isinstance(source_body, str)
+                            else "application/json"
+                        ),
+                        "response_kind": source_kind,
+                        "via": "marketapts_template_a",
+                        "identity": {
+                            "status": "CONFIGURED_PROPERTY_ROUTE",
+                            "configured_property_id": str(ctx.property_id or ""),
+                            "admitted_field_count": len(area_rows),
+                        },
+                    }
+                )
+                result.unit_source_provenance.append(
+                    build_unit_source_provenance(
+                        provider="marketapts",
+                        source_url=winning,
+                        body=source_body,
+                        unit_count=len(area_rows),
+                        identity={
+                            "status": "CONFIGURED_PROPERTY_ROUTE",
+                            "configured_property_id": str(ctx.property_id or ""),
+                        },
+                        response_kind=source_kind,
+                    )
+                )
             return result
 
         result.errors.append(

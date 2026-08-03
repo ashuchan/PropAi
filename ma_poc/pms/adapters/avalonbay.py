@@ -33,6 +33,7 @@ from ma_poc.pms.adapters._parsing import (
     money_to_int,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.source_provenance import build_unit_source_provenance
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -42,7 +43,7 @@ def parse_avalonbay_units(
     items: list[dict[str, Any]],
     url: str,
     summary: dict[str, Any] | None = None,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Parse AvalonBay unit objects into standard unit dicts.
 
     AvalonBay's community-units API returns units with bedroomNumber, bathroomNumber,
@@ -60,12 +61,13 @@ def parse_avalonbay_units(
                 if isinstance(rent_val, (int, float)):
                     starting_rents[int(bed_key)] = int(rent_val)
 
-    units: list[dict[str, str]] = []
+    units: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
         # AvalonBay-specific fields
-        unit_name = get_field(item, "unitName", "unitNumber", "unit_number", "unitId", "id", "label")
+        public_unit_name = get_field(item, "unitName", "unitNumber", "unit_number", "label")
+        native_unit_id = get_field(item, "unitId", "id")
         beds_str = get_field(item, "bedroomNumber", "bedrooms", "beds", "bedRooms", "bedroom_count")
         baths_str = get_field(item, "bathroomNumber", "bathrooms", "baths", "bathRooms", "bathroom_count")
         beds = int(float(beds_str)) if beds_str else None
@@ -93,9 +95,7 @@ def parse_avalonbay_units(
         rent_lo = money_to_int(get_field(item, "minRent", "rent_min", "price", "askingRent"))
         rent_hi = money_to_int(get_field(item, "maxRent", "rent_max", "maxAskingRent"))
         if rent_lo is None:
-            nested_prices = (
-                (item.get("startingAtPricesUnfurnished") or {}).get("prices") or {}
-            )
+            nested_prices = (item.get("startingAtPricesUnfurnished") or {}).get("prices") or {}
             if isinstance(nested_prices, dict):
                 # Prefer the published "price" (asking rent before concessions);
                 # fall back to netEffective which is identical when no promo,
@@ -111,9 +111,8 @@ def parse_avalonbay_units(
                         return n if n > 0 else None
                     return money_to_int(str(v))
 
-                rent_lo = (
-                    _coerce_rent(nested_prices.get("price"))
-                    or _coerce_rent(nested_prices.get("netEffectivePrice"))
+                rent_lo = _coerce_rent(nested_prices.get("price")) or _coerce_rent(
+                    nested_prices.get("netEffectivePrice")
                 )
         # Bedroom-summary fallback only when per-unit and nested both empty.
         if rent_lo is None and beds is not None and beds in starting_rents:
@@ -130,23 +129,29 @@ def parse_avalonbay_units(
         if isinstance(promos, list) and promos:
             concession = promos[0].get("promotionTitle", "")
 
-        units.append(
-            make_unit_dict(
-                floor_plan_name=fp_name,
-                bed_label=bed_label_from(beds, fp_name),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
-                sqft=sqft,
-                unit_number=unit_name,
-                floor=floor,
-                rent_range=format_rent_range(rent_lo, rent_hi),
-                concession=concession,
-                availability_status="AVAILABLE",
-                availability_date=avail_date,
-                source_api_url=url,
-                extraction_tier="TIER_1_API_AVALONBAY",
-            )
+        unit = make_unit_dict(
+            floor_plan_name=fp_name,
+            bed_label=bed_label_from(beds, fp_name),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(baths) if baths is not None else "",
+            sqft=sqft,
+            unit_number=public_unit_name or native_unit_id,
+            unit_name=public_unit_name,
+            floor=floor,
+            rent_range=format_rent_range(rent_lo, rent_hi),
+            concession=concession,
+            availability_status="AVAILABLE",
+            availability_date=avail_date,
+            source_api_url=url,
+            extraction_tier="TIER_1_API_AVALONBAY",
+            source_ids=({"avalonbay_unit_id": native_unit_id} if native_unit_id else None),
         )
+        if native_unit_id:
+            # ``unitName`` is intentionally a short public label and repeats
+            # across Arlington Square buildings. The Fusion-native unitId is
+            # the physical property-scoped apartment anchor.
+            unit["unit_id"] = native_unit_id
+        units.append(unit)
     return units
 
 
@@ -167,9 +172,7 @@ def parse_avalonbay_units(
 # meydenbauer, union, frisco, alderwood): all use the same Fusion shape
 # with 28-82 ``startingAtPricesUnfurnished`` blocks per page and unit_id
 # prefix ``AVB-``.
-_FUSION_UNITS_ARRAY_RE = re.compile(
-    r'"units"\s*:\s*\[\s*(?=\{[^}]*"unitId"\s*:\s*"AVB-)', re.DOTALL
-)
+_FUSION_UNITS_ARRAY_RE = re.compile(r'"units"\s*:\s*\[\s*(?=\{[^}]*"unitId"\s*:\s*"AVB-)', re.DOTALL)
 # Gate: whitespace-tolerant. Live Fusion ships compact JSON, but the
 # tests construct synthetic blobs via json.dumps (default separators
 # include spaces). Either form must clear the gate.
@@ -248,14 +251,13 @@ def parse_avalonbay_html(html: str, url: str) -> list[dict[str, Any]]:
         return []
     try:
         import json
+
         items = json.loads(arr_str)
     except (ValueError, TypeError):
         return []
     if not isinstance(items, list):
         return []
-    return parse_avalonbay_units(
-        [it for it in items if isinstance(it, dict)], url
-    )
+    return parse_avalonbay_units([it for it in items if isinstance(it, dict)], url)
 
 
 class AvalonBayAdapter:
@@ -292,6 +294,18 @@ class AvalonBayAdapter:
                     if units:
                         all_units.extend(units)
                         result.api_responses.append(resp)
+                        result.unit_source_provenance.append(
+                            build_unit_source_provenance(
+                                provider="avalonbay",
+                                source_url=str(url),
+                                body=body,
+                                unit_count=len(units),
+                                identity={
+                                    "property_id": str(getattr(ctx, "property_id", "") or ""),
+                                    "base_url": str(getattr(ctx, "base_url", "") or ""),
+                                },
+                            )
+                        )
                     continue
 
             # Fallback: generic envelope search for non-AvalonBay responses
@@ -319,6 +333,18 @@ class AvalonBayAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+                    result.unit_source_provenance.append(
+                        build_unit_source_provenance(
+                            provider="avalonbay",
+                            source_url=str(url),
+                            body=body,
+                            unit_count=len(units),
+                            identity={
+                                "property_id": str(getattr(ctx, "property_id", "") or ""),
+                                "base_url": str(getattr(ctx, "base_url", "") or ""),
+                            },
+                        )
+                    )
 
         # 2026-05-23: when no API-response path produced units, parse
         # the rendered HTML's Fusion embedded JSON. Avalon is SSR — the
@@ -355,6 +381,19 @@ class AvalonBayAdapter:
                             "via": "html_embedded_fusion",
                         }
                     )
+                    result.unit_source_provenance.append(
+                        build_unit_source_provenance(
+                            provider="avalonbay",
+                            source_url=base_url,
+                            body=html,
+                            unit_count=len(html_units),
+                            identity={
+                                "property_id": str(getattr(ctx, "property_id", "") or ""),
+                                "base_url": base_url,
+                            },
+                            response_kind="embedded_unit_roster",
+                        )
+                    )
 
         if all_units:
             from ma_poc.extraction.post_process import post_process
@@ -364,9 +403,7 @@ class AvalonBayAdapter:
             if _pp.n_admitted > 0:
                 result.units = _pp.admitted
                 result.plan_summaries = _pp.plan_summaries
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else None
-                )
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
                 result.confidence = min(0.90, 0.7 + 0.05 * _pp.n_admitted)
             else:
                 result.confidence = 0.0

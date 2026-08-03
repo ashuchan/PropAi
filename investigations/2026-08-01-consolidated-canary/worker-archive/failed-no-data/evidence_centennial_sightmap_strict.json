@@ -1,0 +1,111 @@
+{
+  "batch_label": "centennial-sightmap-strict",
+  "recoveries": [
+    {
+      "native_identity_rows": 6,
+      "native_positive_rent_rows": 6,
+      "property_boundary_evidence": {
+        "canonical_address": "506 W Centennial Blvd",
+        "canonical_city": "Springfield",
+        "canonical_zip": "97477",
+        "embed_code": "r5v5rdgrpny",
+        "proofs": {
+          "api_http_200": true,
+          "asset_name_matches_canonical": true,
+          "canonical_address_city_zip_on_subpage": true,
+          "embed_http_200": true,
+          "embed_publishes_api_url": true,
+          "native_positive_rent_rows": 6,
+          "same_origin_property_subpage": true,
+          "single_exact_embed": true,
+          "subpage_http_200": true,
+          "zero_parser_join_drops": true
+        },
+        "sightmap_asset_name": "Centennial"
+      },
+      "property_id": 238508,
+      "property_name": "Centennial",
+      "source_urls": [
+        "https://www.liveatcentennialapartments.com/apartments/",
+        "https://sightmap.com/embed/r5v5rdgrpny",
+        "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921"
+      ],
+      "strict_verdict": "pass_exact_same_origin_sightmap_chain",
+      "units": [
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bed One Bath A",
+          "market_rent_high": 1675,
+          "rent": 1675,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385187",
+            "sightmap_unit_id": "7752853"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "003"
+        },
+        {
+          "availability_date": "2026-10-14",
+          "floor_plan_name": "Two Bed One Bath A",
+          "market_rent_high": 1675,
+          "rent": 1675,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385187",
+            "sightmap_unit_id": "7752861"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "B011"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bed One Bath B",
+          "market_rent_high": 1825,
+          "rent": 1825,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385190",
+            "sightmap_unit_id": "7752885"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "E035"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bed One Bath C",
+          "market_rent_high": 1699,
+          "rent": 1699,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385192",
+            "sightmap_unit_id": "7752893"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "F043"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bed One Bath C",
+          "market_rent_high": 1699,
+          "rent": 1699,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385192",
+            "sightmap_unit_id": "7752915"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "J071"
+        },
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Two Bed One Bath B",
+          "market_rent_high": 1699,
+          "rent": 1699,
+          "source_ids": {
+            "sightmap_floor_plan_id": "385190",
+            "sightmap_unit_id": "11983515"
+          },
+          "source_url": "https://sightmap.com/app/api/v1/9zw44ye0w87/sightmaps/44921",
+          "unit_number": "I067"
+        }
+      ],
+      "website": "https://www.liveatcentennialapartments.com/"
+    }
+  ]
+}

@@ -1,0 +1,551 @@
+{
+  "canonical_identity": {
+    "address": "1515 Park Pl",
+    "apartmentid": "261580",
+    "city": "Brooklyn",
+    "name": "1515 Park Place",
+    "state": "NY",
+    "website": "https://www.1515parkplace.com/",
+    "zip": "11213"
+  },
+  "cohort": {
+    "boundary": "exact_2026-07-31_FAILED_NO_DATA_344",
+    "ledger_rows_before": 233,
+    "ledger_sha256_before": "b6aa15cb6f0621371720bd4259583940e0b4c8a62393f6a4f732a6c8fcaeedd2",
+    "property_in_ledger_before": false,
+    "property_in_remaining_before": true,
+    "remaining_rows_before": 111,
+    "remaining_sha256_before": "276cbd2379db9243b7445cf9cabb72227a5d271b535fcc786b7ae074607b3b6f"
+  },
+  "configured_pipeline_repeats": [
+    {
+      "adapter": "generic_plan_text",
+      "assertions": {
+        "adapter_exact": true,
+        "availability_provenance_preserved": true,
+        "configured_fetch_200": true,
+        "configured_final_url_exact": true,
+        "detector_exact": true,
+        "exact_three_native_positive_rows": true,
+        "link_hop_exact": true,
+        "llm_not_used": true,
+        "property_identity_exact": true,
+        "provider_floorplan_name_not_invented": true,
+        "source_url_exact": true,
+        "tier_exact": true,
+        "unit_dimensions_and_rents_exact": true,
+        "unit_numbers_exact": true
+      },
+      "configured_fetch": {
+        "body_bytes": 22366,
+        "final_url": "https://www.1515parkplace.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "detected_pms": "generic_plan_text",
+      "fallback_chain": [
+        "generic_plan_text"
+      ],
+      "link_hop_from": "https://www.1515parkplace.com/",
+      "link_hop_success": true,
+      "plan_rows": 0,
+      "repeat": 1,
+      "tier": "TIER_1_DOM_STATIC_RESIDENCE_TABLE",
+      "unit_rows": 3,
+      "units": [
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 3000,
+          "market_rent_low": 3000,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "102",
+          "unit_number": "102"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4500,
+          "market_rent_low": 4500,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "101",
+          "unit_number": "101"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4300,
+          "market_rent_low": 4300,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "103",
+          "unit_number": "103"
+        }
+      ],
+      "winning_page_url": "https://www.1515parkplace.com/availability.html"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "assertions": {
+        "adapter_exact": true,
+        "availability_provenance_preserved": true,
+        "configured_fetch_200": true,
+        "configured_final_url_exact": true,
+        "detector_exact": true,
+        "exact_three_native_positive_rows": true,
+        "link_hop_exact": true,
+        "llm_not_used": true,
+        "property_identity_exact": true,
+        "provider_floorplan_name_not_invented": true,
+        "source_url_exact": true,
+        "tier_exact": true,
+        "unit_dimensions_and_rents_exact": true,
+        "unit_numbers_exact": true
+      },
+      "configured_fetch": {
+        "body_bytes": 22366,
+        "final_url": "https://www.1515parkplace.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "detected_pms": "generic_plan_text",
+      "fallback_chain": [
+        "generic_plan_text"
+      ],
+      "link_hop_from": "https://www.1515parkplace.com/",
+      "link_hop_success": true,
+      "plan_rows": 0,
+      "repeat": 2,
+      "tier": "TIER_1_DOM_STATIC_RESIDENCE_TABLE",
+      "unit_rows": 3,
+      "units": [
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 3000,
+          "market_rent_low": 3000,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "102",
+          "unit_number": "102"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4500,
+          "market_rent_low": 4500,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "101",
+          "unit_number": "101"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4300,
+          "market_rent_low": 4300,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "103",
+          "unit_number": "103"
+        }
+      ],
+      "winning_page_url": "https://www.1515parkplace.com/availability.html"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "assertions": {
+        "adapter_exact": true,
+        "availability_provenance_preserved": true,
+        "configured_fetch_200": true,
+        "configured_final_url_exact": true,
+        "detector_exact": true,
+        "exact_three_native_positive_rows": true,
+        "link_hop_exact": true,
+        "llm_not_used": true,
+        "property_identity_exact": true,
+        "provider_floorplan_name_not_invented": true,
+        "source_url_exact": true,
+        "tier_exact": true,
+        "unit_dimensions_and_rents_exact": true,
+        "unit_numbers_exact": true
+      },
+      "configured_fetch": {
+        "body_bytes": 22366,
+        "final_url": "https://www.1515parkplace.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "detected_pms": "generic_plan_text",
+      "fallback_chain": [
+        "generic_plan_text"
+      ],
+      "link_hop_from": "https://www.1515parkplace.com/",
+      "link_hop_success": true,
+      "plan_rows": 0,
+      "repeat": 3,
+      "tier": "TIER_1_DOM_STATIC_RESIDENCE_TABLE",
+      "unit_rows": 3,
+      "units": [
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "2",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 3000,
+          "market_rent_low": 3000,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "102",
+          "unit_number": "102"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4500,
+          "market_rent_low": 4500,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "101",
+          "unit_number": "101"
+        },
+        {
+          "availability_date": "",
+          "availability_date_provenance": "current_availability_roster_no_explicit_date",
+          "availability_status": "AVAILABLE",
+          "available_date": "",
+          "bathrooms": "2",
+          "bedrooms": "4",
+          "data_gaps": [
+            "floor_plan_name",
+            "sqft",
+            "availability_date"
+          ],
+          "data_quality_flag": "STATIC_RESIDENCE_TABLE_PLAN_NAME_SQFT_DATE_NOT_PUBLISHED|UNIT_LEVEL_PARTIAL_MISSING_SQFT",
+          "floor_plan_name": "",
+          "floor_plan_name_catalog": "",
+          "floor_plan_name_provenance": "provider_table_does_not_publish_floor_plan_name",
+          "market_rent_high": 4300,
+          "market_rent_low": 4300,
+          "positive_rent": true,
+          "real_native_anchor": true,
+          "source_api_url": "https://www.1515parkplace.com/availability.html",
+          "source_property_address": "1515 Park Pl, Brooklyn, NY, 11213",
+          "source_property_name": "1515 Park Place",
+          "source_property_provenance": "exact_property_identity_server_rendered_availability_table",
+          "sqft": "",
+          "unit_name": "103",
+          "unit_number": "103"
+        }
+      ],
+      "winning_page_url": "https://www.1515parkplace.com/availability.html"
+    }
+  ],
+  "four_member_exr_boundary": [
+    {
+      "body_bytes": 21443,
+      "body_sha256": "b765a263203018dfcf7f53d3f587205d50267698c4252229b0c5e98fc7792321",
+      "emitted_units": 3,
+      "expected_units": 3,
+      "final_url": "https://www.1515parkplace.com/availability.html",
+      "name": "1515 Park Place",
+      "pass": true,
+      "status": 200,
+      "telemetry": {
+        "accepted_physical_residences": 3,
+        "raw_rows": 8,
+        "skipped_numeric_stack_ranges": [
+          "205-805",
+          "206-806",
+          "303-803",
+          "307-807",
+          "201-801"
+        ],
+        "source_url": "https://www.1515parkplace.com/availability.html"
+      },
+      "unit_numbers": [
+        "102",
+        "101",
+        "103"
+      ],
+      "url": "https://www.1515parkplace.com/availability.html"
+    },
+    {
+      "body_bytes": 28064,
+      "body_sha256": "a0395865cb2e123a8e96dfb9597bce6fc14bd8d5f601934778fa91f05aac8e1b",
+      "emitted_units": 0,
+      "expected_units": 0,
+      "final_url": "https://200montaguebk.com/availability",
+      "name": "200 Montague",
+      "pass": true,
+      "status": 200,
+      "telemetry": {},
+      "unit_numbers": [],
+      "url": "https://200montaguebk.com/availability"
+    },
+    {
+      "body_bytes": 160797,
+      "body_sha256": "2401b58e40d5abdfe47b8ac9620dbf86e1cd4348bace7bf4d0275033c1931138",
+      "emitted_units": 0,
+      "expected_units": 0,
+      "final_url": "https://prosperbrooklyn.com/availability",
+      "name": "Prosper Prospect Heights",
+      "pass": true,
+      "status": 200,
+      "telemetry": {},
+      "unit_numbers": [],
+      "url": "https://prosperbrooklyn.com/availability"
+    },
+    {
+      "body_bytes": 37642,
+      "body_sha256": "b40799d299100add3c72419fe304281c8815d55e72b477474faf0dd17373a969",
+      "emitted_units": 0,
+      "expected_units": 0,
+      "final_url": "https://franklincrt.com/availabilities",
+      "name": "Franklin Court",
+      "pass": true,
+      "status": 200,
+      "telemetry": {},
+      "unit_numbers": [],
+      "url": "https://franklincrt.com/availabilities"
+    }
+  ],
+  "generated_at_utc": "2026-08-01T16:09:44.925206+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_ENTRATA_PLAN_RENDER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_PLAN_UNIT_RENDER": "false",
+      "ENABLE_RENDER_ON_EMPTY": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "brightdata",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": "",
+      "RENDER_BACKEND": "local"
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser": false,
+    "hyperbrowser_call_count": 0,
+    "llm": false,
+    "ordinary_direct_get_only": true,
+    "paid_canary": false,
+    "proxy": false,
+    "web_unlocker": false,
+    "web_unlocker_call_count": 0
+  },
+  "lane": "static_residence_1515_park_place_current_configured_e2e",
+  "property_id": 261580,
+  "rp_2026_07_31_reconciliation": {
+    "accepted_physical_residences": [
+      "101",
+      "102",
+      "103"
+    ],
+    "excluded_numeric_stack_ranges": [
+      "201-801",
+      "205-805",
+      "206-806",
+      "303-803",
+      "307-807"
+    ],
+    "interpretation": "numeric-to-numeric labels are multi-floor stack/plan ranges; only single physical residence codes enter the unit ledger",
+    "rows": 8,
+    "source": "/Users/ankur/Downloads/rp_unit_detail_0731.csv",
+    "source_sha256": "c9fe58ec076a6ce8a37081ec174ab77fb52653cce374b1bea67160a1534e1c57",
+    "unit_ids": [
+      "101",
+      "102",
+      "103",
+      "201-801",
+      "205-805",
+      "206-806",
+      "303-803",
+      "307-807"
+    ]
+  },
+  "source_snapshot_after": {
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "sha256": {
+      "ma_poc/pms/adapters/_static_residence_table.py": "f835dcc10a984306c6d30eb93e30382566c31a3d3b5d67d491f466b2fed7a20b",
+      "ma_poc/pms/adapters/generic_plan_text.py": "dbd86f1dc66c97139cd01ad6c92e70f9330fb255ff23dbab0b0a6c011ebe973b",
+      "ma_poc/pms/scraper.py": "b720c624851b6bcdc0783a4769bd50fbe88bb40de1a273f55a8edb93cae88f3f",
+      "ma_poc/services/floorplan_snap.py": "e41fc435b25d431ff8db2e044690fcda39fa45bae977c813d2da53aa1b990f06",
+      "ma_poc/tests/pms/adapters/test_static_residence_table.py": "eb7d8ac733a8151e187f6c430bc4ed91512e481ed4b54aea7fd587090063c2fc",
+      "ma_poc/tests/pms/test_page_local_static_recovery.py": "48b22e00b8e346e4984078ccf6606a0f4135d8f79c9de4d9606f34d1a5b13f6f"
+    }
+  },
+  "source_snapshot_before": {
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "sha256": {
+      "ma_poc/pms/adapters/_static_residence_table.py": "f835dcc10a984306c6d30eb93e30382566c31a3d3b5d67d491f466b2fed7a20b",
+      "ma_poc/pms/adapters/generic_plan_text.py": "dbd86f1dc66c97139cd01ad6c92e70f9330fb255ff23dbab0b0a6c011ebe973b",
+      "ma_poc/pms/scraper.py": "b720c624851b6bcdc0783a4769bd50fbe88bb40de1a273f55a8edb93cae88f3f",
+      "ma_poc/services/floorplan_snap.py": "e41fc435b25d431ff8db2e044690fcda39fa45bae977c813d2da53aa1b990f06",
+      "ma_poc/tests/pms/adapters/test_static_residence_table.py": "eb7d8ac733a8151e187f6c430bc4ed91512e481ed4b54aea7fd587090063c2fc",
+      "ma_poc/tests/pms/test_page_local_static_recovery.py": "48b22e00b8e346e4984078ccf6606a0f4135d8f79c9de4d9606f34d1a5b13f6f"
+    }
+  },
+  "strict_assertions": {
+    "all_four_boundary_members_pass": true,
+    "critical_source_stable_during_replay": true,
+    "hyperbrowser_calls_zero": true,
+    "no_paid_or_prohibited_mechanism": true,
+    "three_configured_pipeline_repeats_pass": true,
+    "web_unlocker_calls_zero": true
+  },
+  "verdict": "pass_exact_identity_static_residence_table_three_native_units"
+}

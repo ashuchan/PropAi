@@ -1,0 +1,148 @@
+{
+  "result_type": "local_current_live_audit_not_canary",
+  "labels": {
+    "historical_oracle": "RealPage dates captured July 31, 2026",
+    "source_evidence": "current-live public marketing and SecureCafe pages",
+    "execution": "local investigation; not GCP; not canary; no CAPTCHA solving"
+  },
+  "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+  "capture_date_utc": "2026-08-01",
+  "scope": {
+    "filter": {
+      "extraction_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "comparison": "rp_future_to_capture_date"
+    },
+    "target_units": 567,
+    "target_properties": 65,
+    "expected_target_units": 567,
+    "expected_target_properties": 65
+  },
+  "discovery_and_selection": {
+    "marketing_http_200_properties": 65,
+    "properties_with_candidate_base": 64,
+    "distinct_candidate_bases": 77,
+    "candidate_portal_http_status_counts": {
+      "200": 77
+    },
+    "properties_with_selected_unit_matched_portal": 64,
+    "selection_reason_counts": {
+      "no_candidate_portal": 1,
+      "target_overlap_tie_identical_inventory_first_published": 3,
+      "unique_max_target_unit_overlap": 61
+    }
+  },
+  "current_live_results": {
+    "target_units_present_in_current_inventory": 549,
+    "target_properties_with_any_current_unit": 64,
+    "target_units_with_raw_source_date": 494,
+    "target_properties_with_any_raw_source_date": 57,
+    "explicit_future_recovered_units": 483,
+    "explicit_future_recovered_properties": 53,
+    "apply_move_in_fallback_recovered_units": 483,
+    "apply_move_in_fallback_recovered_properties": 53,
+    "within_one_day_of_july31_rp_units": 425,
+    "within_one_day_of_july31_rp_properties": 48,
+    "comparison_counts": {
+      "current_exact": 4,
+      "current_minus_one_day": 1,
+      "current_nonfuture": 63,
+      "current_other_future": 61,
+      "current_plus_one_day": 420,
+      "current_unit_not_in_selected_inventory": 18
+    },
+    "provenance_counts": {
+      "": 18,
+      "available_now": 1,
+      "capture_date_default": 55,
+      "explicit_future": 483,
+      "sentinel_clamped": 10
+    },
+    "raw_source_origin_counts": {
+      "apply_move_in_fallback": 483,
+      "source_date_blank": 73,
+      "visible_concrete_date": 10,
+      "visible_relative_availability": 1
+    },
+    "failure_counts": {
+      "current_date_not_explicit_future:available_now": 1,
+      "current_date_not_explicit_future:sentinel_clamped": 10,
+      "current_source_date_blank": 55,
+      "no_candidate_portal": 2,
+      "recovered": 483,
+      "target_unit_not_in_current_inventory": 16
+    }
+  },
+  "manual_three_property_validation": [
+    {
+      "result_type": "local_current_live_audit_not_canary",
+      "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+      "property_id": "265098",
+      "property_name": "Smith & Rio",
+      "portal_url": "https://smithandrio.securecafe.com/onlineleasing/smith-rio/availableunits.aspx",
+      "target_unit_id": "1002",
+      "independent_row_unit": "1002",
+      "independent_visible_date": "",
+      "independent_apply_move_in_date": "8/28/2026",
+      "patched_parser_raw_date": "8/28/2026",
+      "canonical_date": "2026-08-28",
+      "canonical_provenance": "explicit_future",
+      "independent_action_matches_parser": "true"
+    },
+    {
+      "result_type": "local_current_live_audit_not_canary",
+      "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+      "property_id": "268338",
+      "property_name": "Solace at Cimarron Hills",
+      "portal_url": "https://livesolacecimarron.securecafe.com/onlineleasing/solace-at-cimarron-hills-apartments/availableunits.aspx",
+      "target_unit_id": "A108",
+      "independent_row_unit": "A108",
+      "independent_visible_date": "",
+      "independent_apply_move_in_date": "9/16/2026",
+      "patched_parser_raw_date": "9/16/2026",
+      "canonical_date": "2026-09-16",
+      "canonical_provenance": "explicit_future",
+      "independent_action_matches_parser": "true"
+    },
+    {
+      "result_type": "local_current_live_audit_not_canary",
+      "capture_time_utc": "2026-08-01T08:33:17.555214+00:00",
+      "property_id": "296175",
+      "property_name": "Compass Meridian",
+      "portal_url": "https://sheaapartments.securecafe.com/onlineleasing/compass-meridian/availableunits.aspx",
+      "target_unit_id": "0535-102",
+      "independent_row_unit": "0535-102",
+      "independent_visible_date": "",
+      "independent_apply_move_in_date": "9/26/2026",
+      "patched_parser_raw_date": "9/26/2026",
+      "canonical_date": "2026-09-26",
+      "canonical_provenance": "explicit_future",
+      "independent_action_matches_parser": "true"
+    }
+  ],
+  "reproducibility": {
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c",
+    "git_branch": "codex/availability-date-preservation",
+    "ledger_path": "/private/tmp/propai-availability-fix-projection-0731/projection_unit_ledger.csv",
+    "ledger_sha256": "2307b4f2fa79dff3eca567d4d49d658bf399e673e76a7cdbbc5721ab61f72e9c",
+    "properties_path": "/Users/ankur/PropAi-codex-availability-date/properties.csv",
+    "properties_sha256": "086d922b6b41ac5c6b881b3509486feb1846b61812c14e89a3fcf794b4465628",
+    "script_path": "/Users/ankur/PropAi-codex-availability-date/investigations/2026-08-01-availability-date/securecafe_live_audit/run_securecafe_live_audit.py",
+    "script_sha256": "e81b092188f476d98e0881c6f9701ec63acc5ab604ea864d4706a3d3b90f0d68",
+    "parser_path": "/Users/ankur/PropAi-codex-availability-date/ma_poc/pms/adapters/rentcafe.py",
+    "parser_sha256": "a9a5b03e49ac265f3d008559a8beb10b9c6c85b0bef5fda250e6034ca3619dca",
+    "formatter_path": "/Users/ankur/PropAi-codex-availability-date/ma_poc/core/schema_v2.py",
+    "formatter_sha256": "6544ce4d81172d304e87fa3fd407fd767ad9c7caf705187e11e9064b72d09f04",
+    "curl_impersonation_attempts": [
+      "chrome120",
+      "chrome124"
+    ],
+    "workers": 12,
+    "timeout_seconds": 30.0
+  },
+  "limitations": [
+    "Current-live inventory is compared with a July-31 RealPage oracle; units can legitimately lease, appear, or change dates between captures.",
+    "A one-day difference is reported as agreement for this audit because the two systems were captured on different days.",
+    "Properties whose public legacy portal is gone, blocked, empty, or no longer lists a July-31 target unit are reported as failures rather than inferred recoveries.",
+    "This is local evidence from direct public fetches, not a paid GCP canary or production run."
+  ]
+}

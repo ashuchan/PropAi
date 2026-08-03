@@ -184,6 +184,56 @@ def _plan_name_key(raw: Any) -> str:
     return " ".join(name.split()).casefold()
 
 
+def _is_degenerate_internal_floor_plan(fp: dict[str, Any]) -> bool:
+    """Return True only for a provable SightMap internal placeholder.
+
+    Current first-party evidence is provider record 442397 at 250 High:
+    ``name=TEMP``, zero beds, zero baths, no joined apartment, and no area,
+    price or availability payload.  ``TEMP`` alone is not enough to reject a
+    row; every semantic absence must agree so a legitimately operator-named
+    plan cannot be lost.
+    """
+    if _plan_name_key(fp.get("name") or "") != "temp":
+        return False
+
+    def _is_explicit_zero(value: Any) -> bool:
+        if value in (None, "") or isinstance(value, bool):
+            return False
+        try:
+            return float(str(value).replace(",", "").strip()) == 0
+        except (TypeError, ValueError):
+            return False
+
+    if not (
+        _is_explicit_zero(fp.get("bedroom_count"))
+        and _is_explicit_zero(fp.get("bathroom_count"))
+    ):
+        return False
+
+    semantic_fields = (
+        "area",
+        "sqft",
+        "square_feet",
+        "min_area",
+        "max_area",
+        "min_square_feet",
+        "max_square_feet",
+        "price",
+        "rent",
+        "min_rent",
+        "max_rent",
+        "available_on",
+        "available_date",
+        "availability_date",
+    )
+    for key in semantic_fields:
+        value = fp.get(key)
+        if value in (None, "", 0, 0.0, "0", "0.0"):
+            continue
+        return False
+    return True
+
+
 def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
@@ -330,6 +380,11 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
     for fp_id, fp in fp_by_id.items():
         if fp_id in seen_fp_ids:
             continue
+        # A unitless provider record named TEMP with explicit 0/0 dimensions
+        # and no area/rent/date is an internal staging artifact, not a
+        # client-facing plan.  The helper deliberately rejects nothing else.
+        if _is_degenerate_internal_floor_plan(fp):
+            continue
         plan_key = _plan_name_key(fp.get("name") or fp.get("filter_label") or "")
         # Contradiction guard: this plan already shipped a real, priced,
         # AVAILABLE unit under a different floor_plan id. Claiming it is
@@ -401,6 +456,63 @@ def _is_sightmap_response(body: Any) -> bool:
     if "units" in data and "floor_plans" in data:
         return True
     return False
+
+
+def _sightmap_identity_gate(
+    ctx: AdapterContext,
+    body: Any,
+    url: str,
+    result: AdapterResult,
+    *,
+    require_positive: bool = False,
+) -> Any | None:
+    """Validate SightMap ``data.asset`` before accepting its roster.
+
+    Captured in-page responses may predate the vendor's asset metadata, so
+    they reject explicit mismatches but retain an observable ``UNKNOWN``.
+    Detached warm replays use ``require_positive=True`` in
+    :mod:`ma_poc.pms.sightmap_direct`.
+    """
+
+    from ma_poc.pms.property_identity import (
+        MATCH,
+        MISMATCH,
+        evaluate_observed_from_context,
+        sightmap_observed_identity,
+    )
+
+    identity = evaluate_observed_from_context(ctx, sightmap_observed_identity(body))
+    configured = bool(getattr(ctx, "property_name", "") or getattr(ctx, "address", ""))
+    if identity.status == MISMATCH or (require_positive and configured and identity.status != MATCH):
+        result.errors.append(
+            "SIGHTMAP_PROPERTY_IDENTITY_REJECTED: "
+            f"url={url[:160]} status={identity.status} "
+            f"evidence={','.join(identity.evidence)} "
+            f"observed={identity.observed_name or identity.observed_address!r}"
+        )
+        return None
+    return identity
+
+
+def _record_sightmap_unit_source(
+    result: AdapterResult,
+    *,
+    url: str,
+    body: Any,
+    unit_count: int,
+    identity: Any,
+) -> None:
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    result.unit_source_provenance.append(
+        build_unit_source_provenance(
+            provider="sightmap",
+            source_url=url,
+            body=body,
+            unit_count=unit_count,
+            identity=identity,
+        )
+    )
 
 
 def _try_subpage_sightmap_with_prices(
@@ -483,6 +595,9 @@ def _try_subpage_sightmap_with_prices(
                     f"{type(exc).__name__}: {str(exc)[:80]}"
                 )
                 continue
+            identity = _sightmap_identity_gate(ctx, body, api_url, result)
+            if identity is None:
+                continue
             sub_units, _ = parse_sightmap_payload(body, api_url)
             # Only accept this subpage embed if it actually has rent —
             # else we'd just be swapping one no-rent embed for another.
@@ -507,6 +622,14 @@ def _try_subpage_sightmap_with_prices(
                     }
                 )
                 result.winning_url = api_url
+                result.unit_source_provenance.clear()
+                _record_sightmap_unit_source(
+                    result,
+                    url=api_url,
+                    body=body,
+                    unit_count=len(sub_units),
+                    identity=identity,
+                )
                 return sub_units
     return []
 
@@ -553,6 +676,23 @@ def _try_avalon_override_for_sightmap(
             f"{type(exc).__name__}: {str(exc)[:100]}"
         )
         return []
+    if avalon_units:
+        from ma_poc.pms.property_identity import evaluate_from_context
+        from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+        # This override replaces the SightMap roster completely, so replace
+        # (rather than append to) provenance with the marketing HTML that
+        # actually produced the admitted Avalon units.
+        result.unit_source_provenance = [
+            build_unit_source_provenance(
+                provider="avalonbay",
+                source_url=base_url,
+                body=html,
+                unit_count=len(avalon_units),
+                identity=evaluate_from_context(ctx),
+                response_kind="marketing_html_unit_roster",
+            )
+        ]
     return avalon_units
 
 
@@ -768,11 +908,21 @@ class SightMapAdapter:
             raw_units_list = data.get("units") if isinstance(data, dict) else None
             if isinstance(raw_units_list, list):
                 total_raw_units += len(raw_units_list)
+            identity = _sightmap_identity_gate(ctx, body, url, result)
+            if identity is None:
+                continue
             units, dropped = parse_sightmap_payload(body, url)
             total_dropped += dropped
             if units:
                 all_units.extend(units)
                 result.api_responses.append(resp)
+                _record_sightmap_unit_source(
+                    result,
+                    url=url,
+                    body=body,
+                    unit_count=len(units),
+                    identity=identity,
+                )
 
         if all_units:
             # Stage 1 validity gate — drops dim-less rows before they leak
@@ -1018,7 +1168,7 @@ class SightMapAdapter:
             )
             try:
                 direct_units = (
-                    await _try_direct_sightmap_api_probe(ctx)
+                    await _try_direct_sightmap_api_probe(ctx, result)
                     if not _disabled
                     else []
                 )
@@ -1196,7 +1346,12 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
             _key_ctx = html[max(0, start - 60):start].lower()
             if not any(
                 k in _key_ctx
-                for k in ("sightmap_embed_url", "sightmap_link", "engrainedurl")
+                for k in (
+                    "sightmap_embed_url",
+                    "sightmap_url",
+                    "sightmap_link",
+                    "engrainedurl",
+                )
             ):
                 continue
 
@@ -1249,6 +1404,11 @@ def _extract_sightmap_embed_codes(body: str) -> list[str]:
     """
     if not body:
         return []
+    # Entrata/Spaces config blobs can JSON-escape every slash in the exact
+    # published ``sightmap_url`` value (``https:\/\/sightmap.com\/embed\/
+    # {code}``).  The iframe fallback already normalizes this shape before
+    # applying its embed regex; keep the direct-probe discovery path aligned.
+    body = _normalize_sightmap_slashes(body)
     out: list[str] = []
     for m in _SM_EMBED_RE.finditer(body):
         code = m.group(1)
@@ -1265,6 +1425,7 @@ def _extract_sightmap_embed_codes(body: str) -> list[str]:
 
 async def _try_direct_sightmap_api_probe(
     ctx: AdapterContext,
+    result: AdapterResult | None = None,
 ) -> list[dict[str, str]]:
     """Discover sightmap embed codes from the captured page body, hit
     the embed-redirect endpoint to learn the {TOKEN}/{ID} pairing,
@@ -1509,12 +1670,25 @@ async def _try_direct_sightmap_api_probe(
             continue
         if not _is_sightmap_response(body):
             continue
+        identity = None
+        if result is not None:
+            identity = _sightmap_identity_gate(ctx, body, api_url, result)
+            if identity is None:
+                continue
         # Reuse the existing join parser
         units, _dropped = parse_sightmap_payload(body, api_url)
         if units:
             # Set the new tier label
             for u in units:
                 u["extraction_tier"] = "TIER_1_API_SIGHTMAP_DIRECT"
+            if result is not None:
+                _record_sightmap_unit_source(
+                    result,
+                    url=api_url,
+                    body=body,
+                    unit_count=len(units),
+                    identity=identity,
+                )
             return units
 
     return []
@@ -1629,6 +1803,9 @@ async def _try_sightmap_iframe_fallback(
                     continue
                 if not isinstance(body, dict) or not _is_sightmap_response(body):
                     continue
+                identity = _sightmap_identity_gate(ctx, body, api_url, result)
+                if identity is None:
+                    continue
                 units, _dropped = parse_sightmap_payload(body, api_url)
                 if units:
                     result.api_responses.append(
@@ -1636,6 +1813,13 @@ async def _try_sightmap_iframe_fallback(
                          "via": "direct_api_fallback"}
                     )
                     result.winning_url = api_url
+                    _record_sightmap_unit_source(
+                        result,
+                        url=api_url,
+                        body=body,
+                        unit_count=len(units),
+                        identity=identity,
+                    )
                     return units
         except Exception as exc:
             result.errors.append(
@@ -1680,12 +1864,22 @@ async def _try_sightmap_iframe_fallback(
             return []
         if not isinstance(body, dict) or not _is_sightmap_response(body):
             return []
+        identity = _sightmap_identity_gate(ctx, body, api_url, result)
+        if identity is None:
+            return []
         units, _dropped = parse_sightmap_payload(body, api_url)
         if units:
             result.api_responses.append(
                 {"url": api_url, "status": 200, "body": body, "via": "iframe_fallback"}
             )
             result.winning_url = api_url
+            _record_sightmap_unit_source(
+                result,
+                url=api_url,
+                body=body,
+                unit_count=len(units),
+                identity=identity,
+            )
         return units
     except Exception as exc:
         result.errors.append(

@@ -1,0 +1,324 @@
+{
+  "batch_label": "appfolio4-strict-address-revalidate",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      15693,
+      23572,
+      32716,
+      46576
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "appfolio",
+      "batch_label": "appfolio4-strict-address-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=299 ctx_addr='18700 Yorba Linda Blvd' ctx_zip='92886'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": true,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "exact_street_matches": [
+          "18700 Yorba Linda Boulevard #61, Yorba Linda, CA 92886"
+        ],
+        "property_name_consistent": false,
+        "row_addresses": [
+          "18700 Yorba Linda Boulevard #61, Yorba Linda, CA 92886"
+        ],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "livehappy.appfolio.com"
+        ],
+        "source_urls": [
+          "https://livehappy.appfolio.com/listings"
+        ],
+        "website_host": "www.yorbalindapines.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "8/28/26",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "cba1e9abb88a",
+            "unit_id": "18700-yorba-linda-boulevard-61-yorba-linda-ca-92886",
+            "unit_number": "61"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3895,
+            "market_rent_low": 3895
+          },
+          "source_api_url": "https://livehappy.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "7331"
+          },
+          "source_property_id": "",
+          "source_property_name": "",
+          "unit_name": "18700 Yorba Linda Boulevard #61, Yorba Linda, CA 92886"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 15693,
+      "property_identity_match": true,
+      "property_name": "Yorba Linda Pines",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "http://www.yorbalindapines.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "appfolio4-strict-address-revalidate",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=12 ctx_addr='2939 Unicornio St' ctx_zip='92009'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": true,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "exact_street_matches": [
+          "2939 Unicornio Street, Carlsbad, CA 92009"
+        ],
+        "property_name_consistent": false,
+        "row_addresses": [
+          "2939 Unicornio Street, Carlsbad, CA 92009"
+        ],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "riveroaksmgmt.appfolio.com"
+        ],
+        "source_urls": [
+          "https://riveroaksmgmt.appfolio.com/listings"
+        ],
+        "website_host": "www.riveroaksmgmt.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "d7663bd215ca",
+            "unit_id": "2939-unicornio-street-carlsbad-ca-92009",
+            "unit_number": "709"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3295,
+            "market_rent_low": 3295
+          },
+          "source_api_url": "https://riveroaksmgmt.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "709"
+          },
+          "source_property_id": "",
+          "source_property_name": "",
+          "unit_name": "2939 Unicornio Street, Carlsbad, CA 92009"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 23572,
+      "property_identity_match": true,
+      "property_name": "Somerset La Costa",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "https://www.riveroaksmgmt.com/vacancies-sommerset-la-costa"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "appfolio4-strict-address-revalidate",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=1 dropped=299 ctx_addr='10853 Firestone Blvd' ctx_zip='90650'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": true,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 1,
+        "exact_street_matches": [
+          "10853 Firestone Boulevard #40B, Norwalk, CA 90650"
+        ],
+        "property_name_consistent": false,
+        "row_addresses": [
+          "10853 Firestone Boulevard #40B, Norwalk, CA 90650"
+        ],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "livehappy.appfolio.com"
+        ],
+        "source_urls": [
+          "https://livehappy.appfolio.com/listings"
+        ],
+        "website_host": "portobellaapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "a7c3fc984ae4",
+            "unit_id": "10853-firestone-boulevard-40b-norwalk-ca-90650",
+            "unit_number": "40B"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2080,
+            "market_rent_low": 2080
+          },
+          "source_api_url": "https://livehappy.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "3487"
+          },
+          "source_property_id": "",
+          "source_property_name": "",
+          "unit_name": "10853 Firestone Boulevard #40B, Norwalk, CA 90650"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 32716,
+      "property_identity_match": true,
+      "property_name": "Porto Bella",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 1,
+      "website": "https://portobellaapts.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "appfolio4-strict-address-revalidate",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "contaminated_address_conflict",
+      "errors": [
+        "appfolio-vanity-address-filter: reason=address_filter_applied kept=7 dropped=293 ctx_addr='1601 NW 30th St' ctx_zip='73118'"
+      ],
+      "identity_evidence": {
+        "address_conflict": true,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "applicant_tenant_link_harvested": false,
+        "distinct_unit_numbers": 7,
+        "exact_street_matches": [],
+        "property_name_consistent": false,
+        "row_addresses": [
+          "1600 NW 31st St., 156, Oklahoma City, OK 73118",
+          "1600 NW 31st St., 157, Oklahoma City, OK 73118",
+          "1602 NW 31st St., 265, Oklahoma City, OK 73118",
+          "1604 NW 31th St., 233, Oklahoma City, OK 73118",
+          "1605 NW 30th St., 127, Oklahoma City, OK 73118",
+          "1605 NW 30th St., 128, Oklahoma City, OK 73118",
+          "1608 NW 31st St., 240, Oklahoma City, OK 73118"
+        ],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "proresidential.appfolio.com"
+        ],
+        "source_urls": [
+          "https://proresidential.appfolio.com/listings"
+        ],
+        "website_host": "www.proresidential.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "0edc18384ea3",
+            "unit_id": "1604-nw-31th-st-233-oklahoma-city-ok-73118",
+            "unit_number": "233"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 849,
+            "market_rent_low": 849
+          },
+          "source_api_url": "https://proresidential.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "318"
+          },
+          "source_property_id": "",
+          "source_property_name": "",
+          "unit_name": "1604 NW 31th St., 233, Oklahoma City, OK 73118"
+        },
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "0edc18384ea3",
+            "unit_id": "1600-nw-31st-st-157-oklahoma-city-ok-73118",
+            "unit_number": "157"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 899,
+            "market_rent_low": 899
+          },
+          "source_api_url": "https://proresidential.appfolio.com/listings",
+          "source_ids": {
+            "appfolio_listing_id": "967"
+          },
+          "source_property_id": "",
+          "source_property_name": "",
+          "unit_name": "1600 NW 31st St., 157, Oklahoma City, OK 73118"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 46576,
+      "property_identity_match": false,
+      "property_name": "Campus Pointe",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_VANITY",
+      "units": 7,
+      "website": "https://www.proresidential.com/oklahoma-properties/campus-pointe-"
+    }
+  ]
+}

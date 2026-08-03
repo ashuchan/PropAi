@@ -331,7 +331,14 @@ async def test_portal_hint_survives_full_scrape_chain(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
+@pytest.mark.parametrize(
+    "plan_summaries",
+    ([], [{"floor_plan_name": "A1", "unit_number": ""}]),
+    ids=("empty-subpage", "plan-only-subpage"),
+)
+async def test_try_link_hop_queues_portal_hint_from_sub_fetch(
+    plan_summaries: list[dict[str, str]],
+) -> None:
     """End-to-end of the dynamic-discovery path: when a sub-fetch's scrape
     result carries ``_embedded_portal_hints``, ``_try_link_hop`` must
     append that URL onto the queue and fetch it in the same hop pass.
@@ -367,6 +374,7 @@ async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
     scrape_results: dict[str, dict] = {
         floorplans_url: {
             "units": [],
+            "plan_summaries": plan_summaries,
             "_embedded_portal_hints": [(sightmap_url, "sightmap")],
         },
         sightmap_url: {

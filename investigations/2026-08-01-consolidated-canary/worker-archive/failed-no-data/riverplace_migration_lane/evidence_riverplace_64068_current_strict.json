@@ -1,0 +1,1130 @@
+{
+  "summary": {
+    "result_type": "riverplace_dead_domain_to_current_official_rentcafe_strict",
+    "capture_timestamp_utc": "2026-08-01T14:37:31.498669+00:00",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      64068
+    ],
+    "native_positive_rent_rows": 14,
+    "plan_direct_probes": 5,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "unlocker": false,
+    "proxies": {},
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 64068,
+      "property_name": "Riverplace",
+      "website": "http://www.riverplacecr.com/",
+      "current_official_url": "https://www.riverplace.us/",
+      "outcome": "UNIT_QUALIFIED",
+      "adapter": "rentcafe",
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 14,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_official_riverplace_us_property_1908594_five_same_origin_plan_pages_full_pipeline_native_unique_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "Riverplace",
+        "published_name": "Riverplace Apartment Homes",
+        "published_address": "201 DeAnn Drive",
+        "city_state_zip": "Independence, OR 97351",
+        "rentcafe_property_id": "1908594",
+        "current_root_name_address_zip_match": true,
+        "all_five_plan_pages_name_address_zip_match": true,
+        "rows_with_native_identity": 14,
+        "rows_with_native_identity_and_positive_rent": 14,
+        "distinct_unit_numbers": 14,
+        "distinct_rentcafe_unit_ids": 14,
+        "source_urls": [
+          "https://www.riverplace.us/floorplans/brook",
+          "https://www.riverplace.us/floorplans/creek",
+          "https://www.riverplace.us/floorplans/delta",
+          "https://www.riverplace.us/floorplans/falls",
+          "https://www.riverplace.us/floorplans/river"
+        ]
+      },
+      "strict_gates": {
+        "exact_current_property_identity": true,
+        "exact_rentcafe_property_id_1908594": true,
+        "five_plan_pages_discovered_from_current_root": true,
+        "five_plan_pages_directly_probed": true,
+        "all_rows_native_unit_number": true,
+        "all_rows_unique_rentcafe_unit_id": true,
+        "all_rows_exact_numeric_rentcafe_floorplan_id": true,
+        "all_rows_positive_row_level_rent": true,
+        "full_pipeline_current_root_14_native_positive_rent_rows": true,
+        "full_pipeline_and_direct_probe_unit_rent_plan_match": true,
+        "no_llm": true,
+        "no_unlocker": true,
+        "no_captcha_solver": true,
+        "no_fingerprint_rotation": true
+      },
+      "configured_source_validation": {
+        "configured_dead_domain_fetch": {
+          "requested_url": "http://www.riverplacecr.com/",
+          "status": 200,
+          "final_url": "http://www.riverplacecr.com/",
+          "body_bytes": 114,
+          "body_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          }
+        },
+        "configured_dead_domain_full_pipeline": {
+          "adapter": "generic",
+          "detected_pms": {
+            "pms": "unknown",
+            "confidence": 0.0,
+            "evidence": [
+              "no URL/HTML/mgmt signal"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "cascade"
+          },
+          "tier": "TIER_1_API",
+          "errors": [
+            "Generic parser found no units in captured API responses"
+          ],
+          "strict_native_positive_rent_rows": 0,
+          "distinct_native_unit_numbers": 0,
+          "source_urls": [],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "configured_domain_limitation": "HTTP 200 blank 114-byte shell with no Riverplace identity",
+        "current_official_root_fetch": {
+          "requested_url": "https://www.riverplace.us/",
+          "status": 200,
+          "final_url": "https://www.riverplace.us/",
+          "body_bytes": 171547,
+          "body_sha256": "6b76c0ba05363f16d6e7eff924f29b537df6990681ff97cd9c34282cdf668cbc",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          }
+        },
+        "current_floorplans_index_fetch": {
+          "requested_url": "https://www.riverplace.us/floorplans",
+          "status": 200,
+          "final_url": "https://www.riverplace.us/floorplans",
+          "body_bytes": 240006,
+          "body_sha256": "af26227c9df416d150a675da4365d7d79c10a5182419ebd64d59524598d49f36",
+          "challenge_detected": false,
+          "transport": {
+            "backend": "direct_curl_cffi_probe_get",
+            "unlocker": false,
+            "proxies": {},
+            "captcha_solving": false,
+            "fingerprint_rotation": false
+          }
+        },
+        "current_official_root_full_pipeline": {
+          "adapter": "rentcafe",
+          "detected_pms": {
+            "pms": "rentcafe",
+            "confidence": 0.8,
+            "evidence": [
+              "RentCafe/Yardi marker in HTML"
+            ],
+            "pms_client_account_id": null,
+            "recommended_strategy": "jsonld_first"
+          },
+          "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "errors": [],
+          "strict_native_positive_rent_rows": 14,
+          "distinct_native_unit_numbers": 14,
+          "source_urls": [
+            "https://www.riverplace.us/floorplans/brook",
+            "https://www.riverplace.us/floorplans/creek",
+            "https://www.riverplace.us/floorplans/delta",
+            "https://www.riverplace.us/floorplans/falls",
+            "https://www.riverplace.us/floorplans/river"
+          ],
+          "validation_budget": {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 0,
+            "llm_monolithic": 0,
+            "link_hop": 0,
+            "_cost_cap_usd": 0
+          }
+        },
+        "minimal_production_lever": "update canonical URL from riverplacecr.com to current official riverplace.us"
+      },
+      "five_plan_direct_probes": [
+        {
+          "plan_slug": "brook",
+          "plan_name": "Brook",
+          "url": "https://www.riverplace.us/floorplans/brook",
+          "status": 200,
+          "rentcafe_property_id": "1908594",
+          "rentcafe_floorplan_id": "5577550",
+          "native_positive_rent_rows": 4,
+          "unit_numbers": [
+            "218-11",
+            "249-07",
+            "249-12",
+            "249-11"
+          ],
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_slug": "creek",
+          "plan_name": "Creek",
+          "url": "https://www.riverplace.us/floorplans/creek",
+          "status": 200,
+          "rentcafe_property_id": "1908594",
+          "rentcafe_floorplan_id": "5577547",
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "213-06",
+            "213-05"
+          ],
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_slug": "delta",
+          "plan_name": "Delta",
+          "url": "https://www.riverplace.us/floorplans/delta",
+          "status": 200,
+          "rentcafe_property_id": "1908594",
+          "rentcafe_floorplan_id": "5577549",
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "237-05",
+            "237-09"
+          ],
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_slug": "falls",
+          "plan_name": "Falls",
+          "url": "https://www.riverplace.us/floorplans/falls",
+          "status": 200,
+          "rentcafe_property_id": "1908594",
+          "rentcafe_floorplan_id": "5577551",
+          "native_positive_rent_rows": 2,
+          "unit_numbers": [
+            "241-09",
+            "221-03"
+          ],
+          "exact_property_identity_on_page": true
+        },
+        {
+          "plan_slug": "river",
+          "plan_name": "River",
+          "url": "https://www.riverplace.us/floorplans/river",
+          "status": 200,
+          "rentcafe_property_id": "1908594",
+          "rentcafe_floorplan_id": "5577552",
+          "native_positive_rent_rows": 4,
+          "unit_numbers": [
+            "209-06",
+            "206-11",
+            "245-09",
+            "209-03"
+          ],
+          "exact_property_identity_on_page": true
+        }
+      ],
+      "floorplan_name_and_date_semantics": {
+        "exact_published_floorplan_names": [
+          "Brook",
+          "Creek",
+          "Delta",
+          "Falls",
+          "River"
+        ],
+        "exact_numeric_floorplan_ids": [
+          "5577547",
+          "5577549",
+          "5577550",
+          "5577551",
+          "5577552"
+        ],
+        "available_now_rows": 8,
+        "explicit_future_date_rows": 6,
+        "all_cards_publish_availability_status_or_date": true,
+        "all_applicant_links_publish_move_in_date": true,
+        "move_in_dates": [
+          "10/10/2026",
+          "8/1/2026",
+          "8/10/2026",
+          "9/10/2026"
+        ],
+        "explicit_future_availability_dates_materialized": true,
+        "available_now_rows_leave_date_blank": true,
+        "reason": "explicit Date Available values are preserved; Available Now remains a status without inventing a calendar date from the applicant selection MoveInDate"
+      },
+      "contamination_negative_checks": {
+        "all_page_property_ids": [
+          "1908594"
+        ],
+        "all_source_hosts": [
+          "www.riverplace.us"
+        ],
+        "all_applicant_hosts": [
+          "riverplace.rentcafe.com"
+        ],
+        "all_applicant_slugs": [
+          "riverplace-apartment-homes"
+        ],
+        "sibling_rows_admitted": 0,
+        "direct_vs_full_pipeline_unit_set_difference": []
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "218-11",
+            "rentcafe_unit_id": "43724158",
+            "rentcafe_floorplan_id": "5577550",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Brook",
+          "positive_rent_evidence": {
+            "market_rent_low": 1980,
+            "market_rent_high": 1980
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/brook"
+        },
+        {
+          "identity": {
+            "unit_number": "249-07",
+            "rentcafe_unit_id": "43724250",
+            "rentcafe_floorplan_id": "5577550",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Brook",
+          "positive_rent_evidence": {
+            "market_rent_low": 1955,
+            "market_rent_high": 1955
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/brook"
+        },
+        {
+          "identity": {
+            "unit_number": "249-12",
+            "rentcafe_unit_id": "43724255",
+            "rentcafe_floorplan_id": "5577550",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Brook",
+          "positive_rent_evidence": {
+            "market_rent_low": 1970,
+            "market_rent_high": 1970
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/brook"
+        },
+        {
+          "identity": {
+            "unit_number": "249-11",
+            "rentcafe_unit_id": "43724254",
+            "rentcafe_floorplan_id": "5577550",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Brook",
+          "positive_rent_evidence": {
+            "market_rent_low": 1980,
+            "market_rent_high": 1980
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/brook"
+        },
+        {
+          "identity": {
+            "unit_number": "213-06",
+            "rentcafe_unit_id": "43724129",
+            "rentcafe_floorplan_id": "5577547",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Creek",
+          "positive_rent_evidence": {
+            "market_rent_low": 1575,
+            "market_rent_high": 1575
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/creek"
+        },
+        {
+          "identity": {
+            "unit_number": "213-05",
+            "rentcafe_unit_id": "43724128",
+            "rentcafe_floorplan_id": "5577547",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Creek",
+          "positive_rent_evidence": {
+            "market_rent_low": 1660,
+            "market_rent_high": 1660
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/creek"
+        },
+        {
+          "identity": {
+            "unit_number": "237-05",
+            "rentcafe_unit_id": "43724212",
+            "rentcafe_floorplan_id": "5577549",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Delta",
+          "positive_rent_evidence": {
+            "market_rent_low": 1924,
+            "market_rent_high": 1924
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/delta"
+        },
+        {
+          "identity": {
+            "unit_number": "237-09",
+            "rentcafe_unit_id": "43724216",
+            "rentcafe_floorplan_id": "5577549",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Delta",
+          "positive_rent_evidence": {
+            "market_rent_low": 1939,
+            "market_rent_high": 1939
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/delta"
+        },
+        {
+          "identity": {
+            "unit_number": "241-09",
+            "rentcafe_unit_id": "43724228",
+            "rentcafe_floorplan_id": "5577551",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Falls",
+          "positive_rent_evidence": {
+            "market_rent_low": 2037,
+            "market_rent_high": 2037
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/falls"
+        },
+        {
+          "identity": {
+            "unit_number": "221-03",
+            "rentcafe_unit_id": "43724162",
+            "rentcafe_floorplan_id": "5577551",
+            "rentcafe_property_id": "1908594"
+          },
+          "floor_plan_name": "Falls",
+          "positive_rent_evidence": {
+            "market_rent_low": 2022,
+            "market_rent_high": 2022
+          },
+          "source_api_url": "https://www.riverplace.us/floorplans/falls"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Brook",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1114",
+          "unit_number": "218-11",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,980",
+          "market_rent_low": 1980,
+          "market_rent_high": 1980,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/brook",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724158",
+            "rentcafe_floorplan_id": "5577550"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724158/5577550?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Brook",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1114",
+          "unit_number": "249-07",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,955",
+          "market_rent_low": 1955,
+          "market_rent_high": 1955,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/brook",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724250",
+            "rentcafe_floorplan_id": "5577550"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724250/5577550?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Brook",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1114",
+          "unit_number": "249-12",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,970",
+          "market_rent_low": 1970,
+          "market_rent_high": 1970,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/brook",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724255",
+            "rentcafe_floorplan_id": "5577550"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724255/5577550?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Brook",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1114",
+          "unit_number": "249-11",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,980",
+          "market_rent_low": 1980,
+          "market_rent_high": 1980,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/brook",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724254",
+            "rentcafe_floorplan_id": "5577550"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724254/5577550?MoveInDate=8/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 8/10/2026"
+        },
+        {
+          "floor_plan_name": "Creek",
+          "bed_label": "1 Bed(s)",
+          "bedrooms": "1",
+          "bathrooms": "",
+          "sqft": "728",
+          "unit_number": "213-06",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,575",
+          "market_rent_low": 1575,
+          "market_rent_high": 1575,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/creek",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724129",
+            "rentcafe_floorplan_id": "5577547"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724129/5577547?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Creek",
+          "bed_label": "1 Bed(s)",
+          "bedrooms": "1",
+          "bathrooms": "",
+          "sqft": "728",
+          "unit_number": "213-05",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,660",
+          "market_rent_low": 1660,
+          "market_rent_high": 1660,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-10",
+          "available_date": "2026-09-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/creek",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724128",
+            "rentcafe_floorplan_id": "5577547"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "9/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724128/5577547?MoveInDate=9/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 9/10/2026"
+        },
+        {
+          "floor_plan_name": "Delta",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1029",
+          "unit_number": "237-05",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,924",
+          "market_rent_low": 1924,
+          "market_rent_high": 1924,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/delta",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724212",
+            "rentcafe_floorplan_id": "5577549"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724212/5577549?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Delta",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1029",
+          "unit_number": "237-09",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,939",
+          "market_rent_low": 1939,
+          "market_rent_high": 1939,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/delta",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724216",
+            "rentcafe_floorplan_id": "5577549"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724216/5577549?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Falls",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1125",
+          "unit_number": "241-09",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,037",
+          "market_rent_low": 2037,
+          "market_rent_high": 2037,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/falls",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724228",
+            "rentcafe_floorplan_id": "5577551"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724228/5577551?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "Falls",
+          "bed_label": "2 Bed(s)",
+          "bedrooms": "2",
+          "bathrooms": "",
+          "sqft": "1125",
+          "unit_number": "221-03",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,022",
+          "market_rent_low": 2022,
+          "market_rent_high": 2022,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/falls",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724162",
+            "rentcafe_floorplan_id": "5577551"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724162/5577551?MoveInDate=8/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 8/10/2026"
+        },
+        {
+          "floor_plan_name": "River",
+          "bed_label": "3 Bed(s)",
+          "bedrooms": "3",
+          "bathrooms": "",
+          "sqft": "1204",
+          "unit_number": "209-06",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,196",
+          "market_rent_low": 2196,
+          "market_rent_high": 2196,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "",
+          "available_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/river",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724105",
+            "rentcafe_floorplan_id": "5577552"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/1/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724105/5577552?MoveInDate=8/1/2026&dropdownlangid=999",
+          "published_availability_text": "Available Now"
+        },
+        {
+          "floor_plan_name": "River",
+          "bed_label": "3 Bed(s)",
+          "bedrooms": "3",
+          "bathrooms": "",
+          "sqft": "1204",
+          "unit_number": "206-11",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,261",
+          "market_rent_low": 2261,
+          "market_rent_high": 2261,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/river",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724098",
+            "rentcafe_floorplan_id": "5577552"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724098/5577552?MoveInDate=8/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 8/10/2026"
+        },
+        {
+          "floor_plan_name": "River",
+          "bed_label": "3 Bed(s)",
+          "bedrooms": "3",
+          "bathrooms": "",
+          "sqft": "1204",
+          "unit_number": "245-09",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,261",
+          "market_rent_low": 2261,
+          "market_rent_high": 2261,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-10",
+          "available_date": "2026-08-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/river",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724240",
+            "rentcafe_floorplan_id": "5577552"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "8/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724240/5577552?MoveInDate=8/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 8/10/2026"
+        },
+        {
+          "floor_plan_name": "River",
+          "bed_label": "3 Bed(s)",
+          "bedrooms": "3",
+          "bathrooms": "",
+          "sqft": "1204",
+          "unit_number": "209-03",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$2,136",
+          "market_rent_low": 2136,
+          "market_rent_high": 2136,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-10-10",
+          "available_date": "2026-10-10",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.riverplace.us/floorplans/river",
+          "extraction_tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+          "source_ids": {
+            "rentcafe_property_id": "1908594",
+            "rentcafe_unit_id": "43724102",
+            "rentcafe_floorplan_id": "5577552"
+          },
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "rentcafe_selection_move_in_date": "10/10/2026",
+          "applicant_url": "https://riverplace.rentcafe.com/applicant/riverplace-apartment-homes/rentaloptions/43724102/5577552?MoveInDate=10/10/2026&dropdownlangid=999",
+          "published_availability_text": "Date Available: 10/10/2026"
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T14:37:31.498655+00:00",
+        "captures": {
+          "configured_dead_domain": {
+            "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_configured_dead_domain.html.gz",
+            "compressed_sha256": "eec55e2c4e7a49d4e83f9f81d8dff3f314528a3ceae2131fe5ceef5b865fbbca",
+            "raw_sha256": "6dc9c7fc93bb488bb0520a6c780a8d3c0fb5486a4711aca49b4c53fac7393023",
+            "raw_bytes": 114
+          },
+          "current_official_root": {
+            "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_current_official_root.html.gz",
+            "compressed_sha256": "b57d36d187f96b2aaecd6c5ef233a1bdf2363ad6d9f0f53266d7feef88fa96af",
+            "raw_sha256": "6b76c0ba05363f16d6e7eff924f29b537df6990681ff97cd9c34282cdf668cbc",
+            "raw_bytes": 171547
+          },
+          "current_floorplans_index": {
+            "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_current_floorplans_index.html.gz",
+            "compressed_sha256": "0c147d56ce200c68c64ee8d145b59db1fc164db9f62d518e4f7e334e376e521f",
+            "raw_sha256": "af26227c9df416d150a675da4365d7d79c10a5182419ebd64d59524598d49f36",
+            "raw_bytes": 240006
+          },
+          "current_plan_pages": [
+            {
+              "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_brook_current.html.gz",
+              "compressed_sha256": "cf11aa255bb8b92dd8bf596dbb3e8455087267b6ec0da95d45d2864182c80945",
+              "raw_sha256": "513f3dd3bea0cb14f7a059c23eab40ee3c87eb04395f0fdea6abf55c5374e058",
+              "raw_bytes": 208999
+            },
+            {
+              "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_creek_current.html.gz",
+              "compressed_sha256": "63cb32ce277a3599989837643494edc70357cf95729171fe2b376b148a0ab41c",
+              "raw_sha256": "0fc19db282b0579bac6d36230558d3eaac3d7fded96163c581407621129966b4",
+              "raw_bytes": 205557
+            },
+            {
+              "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_delta_current.html.gz",
+              "compressed_sha256": "321e08200e468014dd356882bd7093c73bbdcc357cf838648ab53b120c3dd411",
+              "raw_sha256": "67842bb3dae617ab7217911ac73e31c2e2197d7369ce9494cad0db6147ff0bfd",
+              "raw_bytes": 205494
+            },
+            {
+              "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_falls_current.html.gz",
+              "compressed_sha256": "2d2dc9406bf0117d1fd384c954ff0748376e4d5c592d27ea75be65173b72c7cf",
+              "raw_sha256": "7bcc9da193b6a8b17afc62888855f3886a4a307396784beff9cff65424dfa20b",
+              "raw_bytes": 205613
+            },
+            {
+              "path": "/private/tmp/propai-fnd-vBkmT9/riverplace_migration_lane/direct_river_current.html.gz",
+              "compressed_sha256": "f440bd9f93a9b30ac3bf4813276db555aef6474c2625846fb8d9e4d312b7c2fa",
+              "raw_sha256": "ad8a377ead3eb91ffc6fed2ac41b4e34313ba249d61dd268d18178cdf9feb045",
+              "raw_bytes": 209033
+            }
+          ]
+        },
+        "transport_policy": {
+          "compliance_mode": true,
+          "llm_calls": 0,
+          "web_unlocker_calls": 0,
+          "captcha_interactions": 0,
+          "fingerprint_rotation": false,
+          "paid_canary_run": false
+        }
+      },
+      "ledger_snapshot": {
+        "before": {
+          "ledger": "aa5759e60412781fe9040159c8093f97be57f077ba09f10c1817c9167d1d5df5",
+          "summary": "d6c901e9ca9e280b2c232850963f1abf82b10ca6b9a816f27a74e604ca557233",
+          "remaining": "52c06963995b3347c5aa3bd7ccc1b03931c4d6748e0d73198076bc20d47bf226"
+        },
+        "after": {
+          "ledger": "aa5759e60412781fe9040159c8093f97be57f077ba09f10c1817c9167d1d5df5",
+          "summary": "d6c901e9ca9e280b2c232850963f1abf82b10ca6b9a816f27a74e604ca557233",
+          "remaining": "52c06963995b3347c5aa3bd7ccc1b03931c4d6748e0d73198076bc20d47bf226"
+        },
+        "unchanged_during_materialization": true
+      }
+    }
+  ]
+}

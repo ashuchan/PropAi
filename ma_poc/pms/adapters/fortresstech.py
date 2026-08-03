@@ -47,6 +47,7 @@ import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -122,6 +123,41 @@ _FT_ORG_PROP_RE = re.compile(
     r"fortresstech\.io/([0-9a-f]{8}-[0-9a-f-]{20,})/([0-9a-f]{8}-[0-9a-f-]{20,})",
     re.IGNORECASE,
 )
+
+_FT_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_FT_AVAILABILITY_PATH_RE = re.compile(
+    rf"^/unit-availability/(?P<org>{_FT_UUID})/(?P<property>{_FT_UUID})/?$",
+    re.IGNORECASE,
+)
+_FT_AVAILABILITY_HOSTS = frozenset(
+    {
+        "availability.fortresstech.io",
+        "www.availability.fortresstech.io",
+        "embed.fortresstech.io",
+        "www.embed.fortresstech.io",
+    }
+)
+
+
+def fortresstech_scope_ids(url: str) -> tuple[str, str] | None:
+    """Return the exact org/property UUID pair bound by an availability URL.
+
+    The path and host are both validated.  A UUID-like pair from a portal,
+    sibling route, query string, or unrelated domain is not unit-roster
+    provenance and therefore cannot enable the trusted typed-area contract.
+    """
+    if not url:
+        return None
+    try:
+        parsed = urlsplit(url)
+    except (TypeError, ValueError):
+        return None
+    if (parsed.hostname or "").casefold() not in _FT_AVAILABILITY_HOSTS:
+        return None
+    match = _FT_AVAILABILITY_PATH_RE.fullmatch(parsed.path or "")
+    if not match:
+        return None
+    return match.group("org").lower(), match.group("property").lower()
 
 
 def fortresstech_availability_url(html: str) -> str | None:
@@ -220,9 +256,10 @@ def _extract_units_from_ssr_chunk(chunk: str) -> list[dict[str, Any]] | None:
     return None
 
 
-def _items_to_units(items: list[dict[str, Any]], source_url: str) -> list[dict[str, str]]:
+def _items_to_units(items: list[dict[str, Any]], source_url: str) -> list[dict[str, Any]]:
     """Map FortressTech unit dicts to the standard unit dict shape."""
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
+    scope_ids = fortresstech_scope_ids(source_url)
     for it in items:
         if not isinstance(it, dict):
             continue
@@ -261,9 +298,11 @@ def _items_to_units(items: list[dict[str, Any]], source_url: str) -> list[dict[s
         source_ids: dict[str, Any] = {}
         if isinstance(unit_id_raw, str) and unit_id_raw:
             source_ids["fortresstech_unit_id"] = unit_id_raw
+        if scope_ids:
+            source_ids["fortresstech_org_id"] = scope_ids[0]
+            source_ids["fortresstech_property_id"] = scope_ids[1]
 
-        out.append(
-            make_unit_dict(
+        row = make_unit_dict(
                 floor_plan_name=plan_name,
                 bed_label=bed_label_from(beds, plan_name),
                 bedrooms=str(beds) if beds is not None else "",
@@ -279,7 +318,23 @@ def _items_to_units(items: list[dict[str, Any]], source_url: str) -> list[dict[s
                 extraction_tier=_TIER,
                 source_ids=source_ids,
             )
-        )
+        # Narrow trust marker consumed by extraction.sanity.  It records the
+        # typed field and exact property-scoped first-party roster that supplied
+        # the value; sanity independently validates every component before it
+        # may bypass only the bedroom-relative heuristic.  Absolute bounds are
+        # never bypassed.  Rows lacking a native UUID deliberately get no
+        # marker, even if they came from an otherwise-valid widget.
+        if sqft and scope_ids and isinstance(unit_id_raw, str) and unit_id_raw:
+            row["_trusted_typed_area"] = {
+                "provider": "fortresstech",
+                "field": "floorPlanSquareFeet",
+                "value": sqft,
+                "source_url": source_url,
+                "org_id": scope_ids[0],
+                "property_id": scope_ids[1],
+                "unit_id": unit_id_raw,
+            }
+        out.append(row)
     return out
 
 
@@ -317,7 +372,9 @@ async def _fetch(url: str) -> tuple[int, str]:
     """
     from ma_poc.pms.adapters._probe import probe_get
 
-    r = probe_get(url, timeout=25)
+    # Production path: paid/bypass fetch modes remain disabled.  The exact
+    # public first-party widget is sufficient for the audited cohort.
+    r = probe_get(url, timeout=25, unlocker=False)
     return int(getattr(r, "status_code", 0) or 0), (r.text or "")
 
 
@@ -430,12 +487,37 @@ class FortressTechAdapter:
         result.winning_url = iframe_url
         result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
         result.tier_used = _TIER
+        from ma_poc.pms.source_provenance import (
+            build_unit_source_provenance,
+            response_sha256,
+        )
+
+        scope_ids = fortresstech_scope_ids(iframe_url)
+        identity = {
+            "org_id": scope_ids[0] if scope_ids else None,
+            "property_id": scope_ids[1] if scope_ids else None,
+            "configured_property_id": str(getattr(ctx, "property_id", "") or ""),
+            "configured_property_name": str(getattr(ctx, "property_name", "") or ""),
+            "marketing_url": str(getattr(ctx, "base_url", "") or ""),
+        }
         result.api_responses.append(
             {
                 "url": iframe_url,
-                "status": 200,
+                "status": _status,
                 "body": "<fortresstech-iframe-ssr>",
+                "response_sha256": response_sha256(iframe_html),
+                "identity": identity,
                 "via": "fortresstech_probe",
             }
+        )
+        result.unit_source_provenance.append(
+            build_unit_source_provenance(
+                provider="fortresstech",
+                source_url=iframe_url,
+                body=iframe_html,
+                unit_count=pp.n_admitted,
+                identity=identity,
+                status=_status,
+            )
         )
         return result

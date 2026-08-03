@@ -30,6 +30,7 @@ from ma_poc.pms.adapters._rentcafe_nestin import (
     _money_to_int,
     _normalize_unit_number,
     is_nestin_template,
+    is_rentcafe_applicant_shell,
     parse_nestin_detail_page,
     recover_rentcafe_nestin_per_plan,
 )
@@ -245,6 +246,20 @@ def test_is_nestin_template_handles_empty_html() -> None:
     assert not is_nestin_template(None)  # type: ignore[arg-type]
 
 
+def test_is_rentcafe_applicant_shell_requires_exact_title_and_bundle() -> None:
+    shell = """
+    <html><head><title>Applicant Portal | RentCafe</title></head>
+    <body><script src="/applicant/js/app.abc123.js"></script></body></html>
+    """
+    assert is_rentcafe_applicant_shell(shell)
+    assert not is_rentcafe_applicant_shell(
+        '<title>Applicant Portal | RentCafe</title><script src="/assets/app.js"></script>'
+    )
+    assert not is_rentcafe_applicant_shell(
+        '<title>Resident Portal | RentCafe</title><script src="/applicant/js/app.js"></script>'
+    )
+
+
 # ── Detail-URL discovery ────────────────────────────────────────────────────
 
 
@@ -356,6 +371,131 @@ async def test_recover_no_nestin_signal_short_circuits() -> None:
     assert units == []
     assert source == ""
     assert calls == []  # never invoked
+
+
+@pytest.mark.asyncio
+async def test_applicant_shell_uses_one_hb_session_for_index_and_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A vanity Applicant shell may recover one native RentCafe detail page.
+
+    The exact detail URL must be selected from a same-origin Nestin index and
+    both requests must stay inside the one bounded Hyperbrowser session.
+    """
+    landing = """
+    <html><head><title>Applicant Portal | RentCafe</title></head>
+    <body><script src="/applicant/js/app.abc123.js"></script></body></html>
+    """
+    index_html = """
+    <html><body>
+      <img src="https://resource.rentcafe.com/logo.png">
+      <a href="/floorplans/th-b-end">TH-B END</a>
+    </body></html>
+    """
+    monkeypatch.setenv("FETCH_BACKEND", "hyperbrowser")
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda _url, **_kwargs: _FakeResp(403, ""),
+    )
+    hb_calls: list[tuple[str, str, str]] = []
+
+    async def fake_hb_raw_get_then(
+        url: str,
+        property_id: str,
+        selector: object,
+    ) -> tuple[tuple[int, str], tuple[str, int, str]]:
+        selected = selector(index_html)  # type: ignore[operator]
+        hb_calls.append((url, property_id, selected))
+        return (200, index_html), (selected, 200, _TABLE_LAYOUT_HTML)
+
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.hb_raw_get_then",
+        fake_hb_raw_get_then,
+    )
+
+    units, source = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://www.liveenclavecrystallake.com/",
+        property_id="295542",
+    )
+
+    assert {row["unit_number"] for row in units} == {"4112-3", "1120"}
+    assert source == "https://www.liveenclavecrystallake.com/floorplans"
+    assert hb_calls == [
+        (
+            "https://www.liveenclavecrystallake.com/floorplans",
+            "295542",
+            "https://www.liveenclavecrystallake.com/floorplans/th-b-end",
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_known_nestin_detail_403_uses_one_hb_raw_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    landing = """
+    <html><body>
+      <img src="https://resource.rentcafe.com/logo.png">
+      <a href="/floorplans/a1">A1</a>
+    </body></html>
+    """
+    monkeypatch.setenv("FETCH_BACKEND", "hyperbrowser")
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda _url, **_kwargs: _FakeResp(403, ""),
+    )
+    hb_calls: list[tuple[str, str]] = []
+
+    async def fake_hb_raw_get(url: str, property_id: str) -> tuple[int, str]:
+        hb_calls.append((url, property_id))
+        return 200, _TABLE_LAYOUT_HTML
+
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.hb_raw_get",
+        fake_hb_raw_get,
+    )
+
+    units, _source = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://example.test/",
+        property_id="rentcafe-403",
+    )
+
+    assert len(units) == 2
+    assert hb_calls == [("https://example.test/floorplans/a1", "rentcafe-403")]
+
+
+@pytest.mark.asyncio
+async def test_injected_fetcher_never_escalates_to_hyperbrowser(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    landing = """
+    <img src="https://resource.rentcafe.com/logo.png">
+    <a href="/floorplans/a1">A1</a>
+    """
+    monkeypatch.setenv("FETCH_BACKEND", "hyperbrowser")
+    hb_called = False
+
+    async def fake_hb_raw_get(_url: str, _property_id: str) -> tuple[int, str]:
+        nonlocal hb_called
+        hb_called = True
+        return 200, _TABLE_LAYOUT_HTML
+
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.hb_raw_get",
+        fake_hb_raw_get,
+    )
+
+    units, _source = await recover_rentcafe_nestin_per_plan(
+        landing,
+        "https://example.test/",
+        fetcher=lambda _url: _FakeResp(403, ""),
+        property_id="injected-fetcher",
+    )
+
+    assert units == []
+    assert not hb_called
 
 
 @pytest.mark.asyncio
@@ -512,6 +652,73 @@ def test_applyga_button_layout_extracts_units() -> None:
     # beds-label parsed to numeric
     assert all(u["bedrooms"] == "1" for u in units)
     assert all(u["sqft"] == "900" for u in units)
+
+
+def test_applyga_button_layout_preserves_card_date() -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import _parse_applyga_button_layout
+
+    html = """
+    <div class="card-body text-center">
+      <h3>Apartment: # 4741-109</h3>
+      <p class="card-subtitle">Date Available: 9/5/2026</p>
+      <a id="4741-109" href="/apply?MoveInDate=9/20/2026"
+        onclick="applyGAClick('A1A','1 Bed(s)','638','1535','1711','4741-109')">
+        Apply Now</a>
+    </div>
+    """
+    units = _parse_applyga_button_layout(html, "u", "A1A")
+    assert len(units) == 1
+    assert units[0]["availability_date"] == "9/5/2026"
+
+
+def test_applyga_button_layout_falls_back_to_action_move_in_date() -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import _parse_applyga_button_layout
+
+    html = """
+    <div class="card-body text-center">
+      <p class="card-subtitle">Date Available: Available</p>
+      <a id="3131" href="/apply?UnitID=1&amp;MoveInDate=8%2F16%2F2026"
+        onclick="applyGAClick('S1','Studio','546','1775','2499','3131')">
+        Apply Now</a>
+    </div>
+    """
+    units = _parse_applyga_button_layout(html, "u", "S1")
+    assert units[0]["availability_date"] == "8/16/2026"
+
+
+def test_applyga_button_layout_preserves_visible_available_now() -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import _parse_applyga_button_layout
+
+    html = """
+    <div class="card-body text-center">
+      <p class="card-subtitle">Available Now</p>
+      <a id="100" href="/apply?MoveInDate=8/15/2026"
+        onclick="applyGAClick('S1','Studio','500','1200','1200','100')">
+        Apply Now</a>
+    </div>
+    """
+    units = _parse_applyga_button_layout(html, "u", "S1")
+    assert units[0]["availability_date"] == "Available Now"
+
+
+def test_applyga_button_date_does_not_bleed_between_cards() -> None:
+    from ma_poc.pms.adapters._rentcafe_nestin import _parse_applyga_button_layout
+
+    html = """
+    <div class="row">
+      <div class="card"><div class="card-body">
+        <p>Date Available: 9/5/2026</p>
+        <a id="101" onclick="applyGAClick('A1','1 Bed(s)','700','1400','1400','101')">Apply</a>
+      </div></div>
+      <div class="card"><div class="card-body">
+        <p>Date Available: Available</p>
+        <a id="102" onclick="applyGAClick('A1','1 Bed(s)','700','1400','1400','102')">Apply</a>
+      </div></div>
+    </div>
+    """
+    units = _parse_applyga_button_layout(html, "u", "A1")
+    dates = {unit["unit_number"]: unit["availability_date"] for unit in units}
+    assert dates == {"101": "9/5/2026", "102": ""}
 
 
 def test_applyga_button_handles_studio_beds_label() -> None:

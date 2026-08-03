@@ -1,0 +1,33 @@
+{
+  "evidence_source_counts": {
+    "api_sample": 8,
+    "live_fetch_failed": 362,
+    "live_route_metadata": 1340,
+    "live_winner_route": 1750,
+    "no_positive_identity": 3698
+  },
+  "generated_at": "2026-08-02T00:45:32.460758+00:00",
+  "materializer_version": "strict-warm-profile-candidate-v2",
+  "output": {
+    "ledger": "strict-profile-ledger.jsonl",
+    "profiles": 2566,
+    "retained_routes": 3025
+  },
+  "profile_status_counts": {
+    "ADMIT": 2566,
+    "QUARANTINE": 51,
+    "REVIEW": 832
+  },
+  "route_status_counts": {
+    "MATCH": 3025,
+    "MISMATCH": 73,
+    "UNRESOLVED": 4060
+  },
+  "sanitization": {
+    "admitted_profiles_with_mismatch_routes_removed": 14,
+    "admitted_profiles_with_unresolved_routes_removed": 1988
+  },
+  "scope": {
+    "source_profiles": 3449
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "authoritative_ledger_snapshot_properties": 170,
+  "authoritative_overlap_count": 0,
+  "authoritative_overlap_ids": [],
+  "cohort_current_adapter": "rentcafe",
+  "cohort_file": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+  "cohort_properties": 29,
+  "paid_canary_run": false,
+  "production_code_mutated": false,
+  "projected_failed344_recovery_percent_if_accepted": 50.2907,
+  "projected_ledger_properties_if_accepted": 173,
+  "projected_remaining_to_60_percent_gate": 34,
+  "projected_remaining_to_75_percent_target": 85,
+  "provenance": {
+    "applicant_source_sha256": "be38c32f716950ca6fde97e058d6e010ed2688c7e6ff824c47e4d6c82f4d3981",
+    "candidate_head": "1fa661575e2e06859dc77865a4541f9768e6787f",
+    "candidate_repo": "/Users/ankur/PropAi-main/.claude/worktrees/wf_94b9d351-073-7",
+    "network_policy": {
+      "canary": false,
+      "direct_first": true,
+      "hyperbrowser": {
+        "solveCaptchas": false,
+        "summary": "/Users/ankur/PropAi-codex-availability-date/investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_summary.json",
+        "targets": 3,
+        "useStealth": false
+      },
+      "llm_enabled": false,
+      "probe_proxies": {},
+      "probe_unlocker": false
+    }
+  },
+  "root_direct_status_counts": {
+    "200": 24,
+    "202": 3,
+    "404": 2
+  },
+  "route_audit_rows": 96,
+  "rp_native_overlap_ids": [
+    "220907"
+  ],
+  "rp_native_overlap_properties": 1,
+  "shared_ledger_mutated": false,
+  "strict_candidate_ids": [
+    "29566",
+    "220907",
+    "277913"
+  ],
+  "strict_candidate_properties": 3,
+  "strict_net_new_ids": [
+    "29566",
+    "220907",
+    "277913"
+  ],
+  "strict_net_new_properties": 3
+}

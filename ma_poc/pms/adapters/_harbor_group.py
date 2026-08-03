@@ -46,9 +46,8 @@ The adapter is wired into ``generic.py`` sub-tier detection for the
 from __future__ import annotations
 
 import re
-from datetime import date
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -280,7 +279,10 @@ def parse_harbor_units_page(
             "market_rent_high": rent,
             "availability_status": avail_status,
             "available_date_raw": avail_text,
-            "available_date_post_fix": avail_date,
+            # Canonical formatter input.  Keep the untouched visible label in
+            # ``available_date_raw`` for provenance, but do not invent a
+            # private alias that the production formatter cannot read.
+            "available_date": avail_date,
             "source": "harbor_group_units_page",
             "source_api_url": base_url,
             # Internal: let orchestrator store the Findigs/MRI unit ID

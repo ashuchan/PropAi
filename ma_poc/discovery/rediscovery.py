@@ -354,6 +354,53 @@ def base_property_url(url: str) -> str:
     return f"{p.scheme}://{p.netloc}{new_path}"
 
 
+def _property_scope_key(url: str) -> tuple[str, str]:
+    """Canonical host/path key used only for redirect tie validation."""
+    try:
+        parsed = urlparse(base_property_url(url))
+    except Exception:
+        return "", ""
+    host = _registrable((parsed.hostname or "").lower())
+    path = re.sub(r"/+", "/", parsed.path or "/").rstrip("/") or "/"
+    return host, path.lower()
+
+
+def _page_matches_entry_location(
+    page: FetchedPage, candidate_url: str, entry: RediscoveryEntry
+) -> bool:
+    """Whether a substantive tied property page explicitly matches city/state."""
+    if not page.ok or len(page.body) < 2_048 or not entry.city:
+        return False
+    try:
+        raw = page.body.decode("utf-8", "replace")
+    except Exception:
+        return False
+    city = normalize_name(entry.city)
+    haystack = f" {normalize_name(candidate_url + ' ' + raw)} "
+    if not city or f" {city} " not in haystack:
+        return False
+    state = str(entry.state or "").strip().upper()
+    if not state:
+        return True
+    if not re.fullmatch(r"[A-Z]{2}", state):
+        return False
+    # Prefer explicit structured-address syntax, with a postal-address text
+    # fallback. A bare two-letter substring would be far too noisy ("IN",
+    # "OR", etc. are ordinary English words).
+    return bool(
+        re.search(
+            rf"addressRegion[\"'\s:=]+[\"']?{re.escape(state)}\b",
+            raw,
+            re.IGNORECASE,
+        )
+        or re.search(
+            rf"\b{re.escape(state)}\s+\d{{5}}(?:-\d{{4}})?\b",
+            raw,
+            re.IGNORECASE,
+        )
+    )
+
+
 def is_nonproperty_path(url: str) -> bool:
     """True if *url*'s path contains a news/blog/nav segment (not a property page)."""
     try:
@@ -573,7 +620,7 @@ class RediscoveryEngine:
 
         # Path 1 — name-match against the landing host (sitemap + homepage anchors).
         candidates = await self._collect_candidates(entry, crawl_host, page)
-        resolved = self._resolve_from_candidates(entry, candidates, crawl_host)
+        resolved = await self._resolve_from_candidates(entry, candidates, crawl_host)
         if resolved is not None:
             return resolved
 
@@ -588,7 +635,7 @@ class RediscoveryEngine:
         secondary = _external_portfolio_host(page, {orig_host, crawl_host})
         if secondary is not None:
             sec_candidates = await self._collect_candidates(entry, secondary, page)
-            resolved = self._resolve_from_candidates(entry, sec_candidates, secondary)
+            resolved = await self._resolve_from_candidates(entry, sec_candidates, secondary)
             if resolved is not None:
                 return resolved
 
@@ -597,7 +644,7 @@ class RediscoveryEngine:
             entry, "NO_HOST_MATCH", f"{crawl_host} best={best_score:.0f}"
         )
 
-    def _resolve_from_candidates(
+    async def _resolve_from_candidates(
         self,
         entry: RediscoveryEntry,
         candidates: list[_Candidate],
@@ -612,6 +659,17 @@ class RediscoveryEngine:
             return None
         # Two near-tied high scorers => withhold rather than guess (precision).
         if runner_up >= self._threshold and (best.score - runner_up) < self._margin:
+            redirect_winner = await self._redirect_disambiguate(entry, candidates)
+            if redirect_winner is not None:
+                return self._resolved(
+                    entry,
+                    redirect_winner.url,
+                    redirect_winner.source,
+                    redirect_winner.score / 100.0,
+                    redirect_winner.slug_text,
+                    runner_up,
+                    host,
+                )
             return RediscoveryResult(
                 property_id=entry.property_id,
                 original_url=entry.original_url,
@@ -622,6 +680,64 @@ class RediscoveryEngine:
             )
         return self._resolved(entry, best.url, best.source, best.score / 100.0,
                               best.slug_text, runner_up, host)
+
+    async def _redirect_disambiguate(
+        self, entry: RediscoveryEntry, candidates: list[_Candidate]
+    ) -> _Candidate | None:
+        """Resolve a lexical tie only when redirects disprove every rival.
+
+        Portfolio sitemaps sometimes retain both a stale short slug and its
+        current canonical slug.  Name matching correctly ties them (for
+        example ``harbour-pointe`` and ``harbour-pointe-apartment-homes``),
+        while a live GET proves the stale URL redirects to a generic state
+        index and the canonical URL remains property-scoped.
+
+        This stays precision-first: transport errors/non-2xx responses are
+        UNKNOWN, not negative evidence.  A winner is returned only when one
+        candidate successfully remains in its own property scope and every
+        other near-tied candidate successfully redirects out of scope.
+        """
+        if len(candidates) < 2:
+            return None
+        best_score = candidates[0].score
+        tied = [
+            candidate
+            for candidate in candidates
+            if candidate.score >= self._threshold
+            and (best_score - candidate.score) < self._margin
+        ][:4]
+        if len(tied) < 2:
+            return None
+
+        valid: list[tuple[_Candidate, FetchedPage]] = []
+        invalid = 0
+        unknown = 0
+        for candidate in tied:
+            page = await self._fetcher(candidate.url)
+            if not page.ok or not page.final_url:
+                unknown += 1
+                continue
+            if _property_scope_key(candidate.url) == _property_scope_key(page.final_url):
+                valid.append((candidate, page))
+            else:
+                invalid += 1
+        if len(valid) == 1 and invalid == len(tied) - 1 and unknown == 0:
+            return valid[0][0]
+
+        # A genuine same-name portfolio tie can survive redirect validation
+        # (Harbour Pointe in Bradenton, FL vs Harbor Pointe in Moultrie, GA).
+        # The input already carries city/state. Accept one candidate only when
+        # its substantive property page explicitly carries BOTH location
+        # signals and every tied fetch completed, otherwise keep withholding.
+        if len(valid) > 1 and unknown == 0 and entry.city:
+            location_matches = [
+                candidate
+                for candidate, page in valid
+                if _page_matches_entry_location(page, candidate.url, entry)
+            ]
+            if len(location_matches) == 1:
+                return location_matches[0]
+        return None
 
     # ── candidate collection ──────────────────────────────────────────────────
     async def _collect_candidates(

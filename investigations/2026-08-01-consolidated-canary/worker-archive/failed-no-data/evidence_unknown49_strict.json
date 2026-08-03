@@ -1,0 +1,3088 @@
+{
+  "audit": "FAILED_NO_DATA residual current-detected-adapter=unknown strict native-unit recovery",
+  "capture_date": "2026-08-01",
+  "scope": {
+    "input": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_remaining_current.csv",
+    "input_rows": 49,
+    "filter": "current_detected_adapter == unknown",
+    "rp_oracle_is_prioritization_only": true
+  },
+  "strict_gate": [
+    "exact property identity",
+    "native unit identity",
+    "positive base rent",
+    "current publicly visible source data",
+    "no sibling/portfolio contamination",
+    "no plan-only conversion",
+    "no CAPTCHA-derived data"
+  ],
+  "summary": {
+    "audited_properties": 49,
+    "strict_recovered_properties": 10,
+    "strict_recovered_native_positive_rent_units": 203,
+    "strict_excluded_properties": 39,
+    "property_recovery_rate": 0.204082,
+    "paid_canary": false
+  },
+  "provider_clusters": {
+    "MRI ProspectConnect (TGM)": {
+      "properties": 4,
+      "units": 147
+    },
+    "RealPage Online Leasing": {
+      "properties": 1,
+      "units": 23
+    },
+    "Spherexx": {
+      "properties": 1,
+      "units": 10
+    },
+    "RentCafe": {
+      "properties": 1,
+      "units": 3
+    },
+    "Prometheus custom React": {
+      "properties": 1,
+      "units": 14
+    },
+    "RentManager": {
+      "properties": 1,
+      "units": 3
+    },
+    "RentPro RPA5": {
+      "properties": 1,
+      "units": 3
+    }
+  },
+  "recoveries": [
+    {
+      "property_id": "2239",
+      "property_name": "TGM Autumn Woods",
+      "provider": "MRI ProspectConnect",
+      "provider_property_id": "288034",
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+      ],
+      "capture_method": "live exact-property provider HTML",
+      "raw_artifacts": [
+        "/private/tmp/propai-fnd-vBkmT9/unknown49_current/2239_mri.html"
+      ],
+      "property_identity_evidence": {
+        "provider_h1": "TGM Autumn Woods Apartments",
+        "provider_title": "Search - TGM Autumn Woods Apartments",
+        "root_data_propertyid": "288034"
+      },
+      "contamination_evidence": "Single exact-property portal; no portfolio/sibling roster in the extracted unit region.",
+      "units": [
+        {
+          "unit": "WM1A",
+          "provider_unit_id": "946:WM1A",
+          "building_id": "946",
+          "unit_address": "8946 WOODMOSS LANE #1A",
+          "available_date": "2026-09-24",
+          "available_end_date": "2026-10-14",
+          "lease_term_months": "12",
+          "rent": 1745.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM1A",
+          "provider_unit_id": "028:WM1A",
+          "building_id": "028",
+          "unit_address": "9028 WOODMOSS LANE #1A",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1885.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM1A",
+          "provider_unit_id": "052:WM1A",
+          "building_id": "052",
+          "unit_address": "9052 WOODMOSS LANE #1A",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1885.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM3B",
+          "provider_unit_id": "028:WM3B",
+          "building_id": "028",
+          "unit_address": "9028 WOODMOSS LANE #3B",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1785.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WW3A",
+          "provider_unit_id": "408:WW3A",
+          "building_id": "408",
+          "unit_address": "5408 WEST WIND LANE #3A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1599.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM2A",
+          "provider_unit_id": "040:WM2A",
+          "building_id": "040",
+          "unit_address": "9040 WOODMOSS LANE #2A",
+          "available_date": "2026-08-03",
+          "available_end_date": "2026-08-23",
+          "lease_term_months": "12",
+          "rent": 1599.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM3A",
+          "provider_unit_id": "058:WM3A",
+          "building_id": "058",
+          "unit_address": "9058 WOODMOSS LANE #3A",
+          "available_date": "2026-08-03",
+          "available_end_date": "2026-08-23",
+          "lease_term_months": "12",
+          "rent": 1599.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD2B",
+          "provider_unit_id": "925:AD2B",
+          "building_id": "925",
+          "unit_address": "8925 AUTUMN WOODS DRIVE #2B",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1470.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3B",
+          "provider_unit_id": "135:BL3B",
+          "building_id": "135",
+          "unit_address": "9135 BRYANT LANE #3B",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1460.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL1A",
+          "provider_unit_id": "936:BL1A",
+          "building_id": "936",
+          "unit_address": "8936 BRYANT LANE #1A",
+          "available_date": "2026-08-11",
+          "available_end_date": "2026-08-31",
+          "lease_term_months": "12",
+          "rent": 1575.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BC1B",
+          "provider_unit_id": "108:BC1B",
+          "building_id": "108",
+          "unit_address": "9108 BRYANT COURT #1B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1590.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BC2B",
+          "provider_unit_id": "114:BC2B",
+          "building_id": "114",
+          "unit_address": "9114 BRYANT COURT #2B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD3A",
+          "provider_unit_id": "925:AD3A",
+          "building_id": "925",
+          "unit_address": "8925 AUTUMN WOODS DRIVE #3A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BC1A",
+          "provider_unit_id": "108:BC1A",
+          "building_id": "108",
+          "unit_address": "9108 BRYANT COURT #1A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1590.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "HO1B",
+          "provider_unit_id": "475:HO1B",
+          "building_id": "475",
+          "unit_address": "5475 HOLLOW OAK COURT #1B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1550.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR1B",
+          "provider_unit_id": "007:SR1B",
+          "building_id": "007",
+          "unit_address": "9007 SUNNY RIDGE DRIVE #1B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WW1B",
+          "provider_unit_id": "431:WW1B",
+          "building_id": "431",
+          "unit_address": "5431 WEST WIND LANE #1B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1575.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD1A",
+          "provider_unit_id": "035:AD1A",
+          "building_id": "035",
+          "unit_address": "9035 AUTUMN WOODS DRIVE #1A",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1565.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD1C",
+          "provider_unit_id": "035:AD1C",
+          "building_id": "035",
+          "unit_address": "9035 AUTUMN WOODS DRIVE #1C",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1565.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR1B",
+          "provider_unit_id": "012:SR1B",
+          "building_id": "012",
+          "unit_address": "9012 SUNNY RIDGE DRIVE #1B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1199.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR1B",
+          "provider_unit_id": "030:SR1B",
+          "building_id": "030",
+          "unit_address": "9030 SUNNY RIDGE DRIVE #1B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1525.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD1D",
+          "provider_unit_id": "955:AD1D",
+          "building_id": "955",
+          "unit_address": "8955 AUTUMN WOODS DRIVE #1D",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1550.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD2A",
+          "provider_unit_id": "955:AD2A",
+          "building_id": "955",
+          "unit_address": "8955 AUTUMN WOODS DRIVE #2A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1575.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD2C",
+          "provider_unit_id": "035:AD2C",
+          "building_id": "035",
+          "unit_address": "9035 AUTUMN WOODS DRIVE #2C",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1150.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR2B",
+          "provider_unit_id": "030:SR2B",
+          "building_id": "030",
+          "unit_address": "9030 SUNNY RIDGE DRIVE #2B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1150.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR2D",
+          "provider_unit_id": "030:SR2D",
+          "building_id": "030",
+          "unit_address": "9030 SUNNY RIDGE DRIVE #2D",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1575.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM1B",
+          "provider_unit_id": "064:WM1B",
+          "building_id": "064",
+          "unit_address": "9064 WOODMOSS LANE #1B",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 1635.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3A",
+          "provider_unit_id": "102:BL3A",
+          "building_id": "102",
+          "unit_address": "9102 BRYANT LANE #3A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM2A",
+          "provider_unit_id": "010:WM2A",
+          "building_id": "010",
+          "unit_address": "9010 WOODMOSS LANE #2A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM3A",
+          "provider_unit_id": "940:WM3A",
+          "building_id": "940",
+          "unit_address": "8940 WOODMOSS LANE #3A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WW3B",
+          "provider_unit_id": "402:WW3B",
+          "building_id": "402",
+          "unit_address": "5402 WEST WIND LANE #3B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL1A",
+          "provider_unit_id": "114:BL1A",
+          "building_id": "114",
+          "unit_address": "9114 BRYANT LANE #1A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1620.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL1B",
+          "provider_unit_id": "144:BL1B",
+          "building_id": "144",
+          "unit_address": "9144 BRYANT LANE #1B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1279.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3B",
+          "provider_unit_id": "102:BL3B",
+          "building_id": "102",
+          "unit_address": "9102 BRYANT LANE #3B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1520.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WM3A",
+          "provider_unit_id": "016:WM3A",
+          "building_id": "016",
+          "unit_address": "9016 WOODMOSS LANE #3A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1505.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "WW3B",
+          "provider_unit_id": "438:WW3B",
+          "building_id": "438",
+          "unit_address": "5438 WEST WIND LANE #3B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1505.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR1A",
+          "provider_unit_id": "018:SR1A",
+          "building_id": "018",
+          "unit_address": "9018 SUNNY RIDGE DRIVE #1A",
+          "available_date": "2026-08-25",
+          "available_end_date": "2026-09-14",
+          "lease_term_months": "12",
+          "rent": 1380.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AD1A",
+          "provider_unit_id": "049:AD1A",
+          "building_id": "049",
+          "unit_address": "9049 AUTUMN WOODS DRIVE #1A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1340.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR1B",
+          "provider_unit_id": "018:SR1B",
+          "building_id": "018",
+          "unit_address": "9018 SUNNY RIDGE DRIVE #1B",
+          "available_date": "2026-08-05",
+          "available_end_date": "2026-08-25",
+          "lease_term_months": "12",
+          "rent": 1380.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BC3A",
+          "provider_unit_id": "120:BC3A",
+          "building_id": "120",
+          "unit_address": "9120 BRYANT COURT #3A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1049.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BC3B",
+          "provider_unit_id": "120:BC3B",
+          "building_id": "120",
+          "unit_address": "9120 BRYANT COURT #3B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1049.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL2A",
+          "provider_unit_id": "141:BL2A",
+          "building_id": "141",
+          "unit_address": "9141 BRYANT LANE #2A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1049.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3A",
+          "provider_unit_id": "107:BL3A",
+          "building_id": "107",
+          "unit_address": "9107 BRYANT LANE #3A",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1049.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR2B",
+          "provider_unit_id": "001:SR2B",
+          "building_id": "001",
+          "unit_address": "9001 SUNNY RIDGE DRIVE #2B",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1049.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AL3B",
+          "provider_unit_id": "477:AL3B",
+          "building_id": "477",
+          "unit_address": "5477 AUTUMN WOODS LANE #3B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1300.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "AL3B",
+          "provider_unit_id": "517:AL3B",
+          "building_id": "517",
+          "unit_address": "5517 AUTUMN WOODS LANE #3B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 999.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3A",
+          "provider_unit_id": "930:BL3A",
+          "building_id": "930",
+          "unit_address": "8930 BRYANT LANE #3A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1285.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "BL3B",
+          "provider_unit_id": "141:BL3B",
+          "building_id": "141",
+          "unit_address": "9141 BRYANT LANE #3B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 999.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "HO2B",
+          "provider_unit_id": "457:HO2B",
+          "building_id": "457",
+          "unit_address": "5457 HOLLOW OAK COURT #2B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1295.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "SR2B",
+          "provider_unit_id": "024:SR2B",
+          "building_id": "024",
+          "unit_address": "9024 SUNNY RIDGE DRIVE #2B",
+          "available_date": "2026-08-04",
+          "available_end_date": "2026-08-24",
+          "lease_term_months": "12",
+          "rent": 1480.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+        }
+      ],
+      "website": "http://www.tgmautumnwoods.com",
+      "rp_oracle_native_unit_rows": 47,
+      "rp_oracle_distinct_floorplans": 6,
+      "native_identity_rows": 50,
+      "native_positive_rent_rows": 50,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "2844",
+      "property_name": "TGM Danada",
+      "provider": "MRI ProspectConnect",
+      "provider_property_id": "360002",
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+      ],
+      "capture_method": "live exact-property provider HTML",
+      "raw_artifacts": [
+        "/private/tmp/propai-fnd-vBkmT9/unknown49_current/2844_mri.html"
+      ],
+      "property_identity_evidence": {
+        "provider_h1": "TGM Danada",
+        "provider_title": "Search - TGM Danada",
+        "root_data_propertyid": "360002"
+      },
+      "contamination_evidence": "Single exact-property portal; no portfolio/sibling roster in the extracted unit region.",
+      "units": [
+        {
+          "unit": "208",
+          "provider_unit_id": "095:208",
+          "building_id": "095",
+          "unit_address": "95 Kensington Circle #095-208",
+          "available_date": "2026-09-13",
+          "available_end_date": "2026-10-03",
+          "lease_term_months": "12",
+          "rent": 3068.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "066:201",
+          "building_id": "066",
+          "unit_address": "66 Sterling Circle #066-201",
+          "available_date": "2026-09-12",
+          "available_end_date": "2026-10-02",
+          "lease_term_months": "12",
+          "rent": 3098.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "107",
+          "provider_unit_id": "007:107",
+          "building_id": "007",
+          "unit_address": "7 Kensington Circle #007-107",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 3098.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "012:201",
+          "building_id": "012",
+          "unit_address": "12 Sterling Circle #012-201",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 2973.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "102",
+          "provider_unit_id": "015:102",
+          "building_id": "015",
+          "unit_address": "15 Kensington Circle #015-102",
+          "available_date": "2026-08-16",
+          "available_end_date": "2026-09-05",
+          "lease_term_months": "12",
+          "rent": 2799.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "207",
+          "provider_unit_id": "048:207",
+          "building_id": "048",
+          "unit_address": "48 Sterling Circle #048-207",
+          "available_date": "2026-08-14",
+          "available_end_date": "2026-09-03",
+          "lease_term_months": "12",
+          "rent": 2799.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "202",
+          "provider_unit_id": "066:202",
+          "building_id": "066",
+          "unit_address": "66 Sterling Circle #066-202",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 2799.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "056:201",
+          "building_id": "056",
+          "unit_address": "56 Sterling Circle #056-201",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2799.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "203",
+          "provider_unit_id": "093:203",
+          "building_id": "093",
+          "unit_address": "93 Kensington Circle #093-203",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 2275.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "206",
+          "provider_unit_id": "071:206",
+          "building_id": "071",
+          "unit_address": "71 Kensington Circle #071-206",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2370.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "206",
+          "provider_unit_id": "008:206",
+          "building_id": "008",
+          "unit_address": "8 Sterling Circle #008-206",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "103",
+          "provider_unit_id": "008:103",
+          "building_id": "008",
+          "unit_address": "8 Sterling Circle #008-103",
+          "available_date": "2026-08-04",
+          "available_end_date": "2026-08-24",
+          "lease_term_months": "12",
+          "rent": 1749.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "103",
+          "provider_unit_id": "078:103",
+          "building_id": "078",
+          "unit_address": "78 Sterling Circle #078-103",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1749.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "105",
+          "provider_unit_id": "008:105",
+          "building_id": "008",
+          "unit_address": "8 Sterling Circle #008-105",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "107",
+          "provider_unit_id": "076:107",
+          "building_id": "076",
+          "unit_address": "76 Sterling Circle #076-107",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "207",
+          "provider_unit_id": "023:207",
+          "building_id": "023",
+          "unit_address": "23 Kensington Circle #023-207",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1749.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "208",
+          "provider_unit_id": "063:208",
+          "building_id": "063",
+          "unit_address": "63 Kensington Circle #063-208",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "210",
+          "provider_unit_id": "023:210",
+          "building_id": "023",
+          "unit_address": "23 Kensington Circle #023-210",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "303",
+          "provider_unit_id": "061:303",
+          "building_id": "061",
+          "unit_address": "61 Kensington Circle #061-303",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "303",
+          "provider_unit_id": "078:303",
+          "building_id": "078",
+          "unit_address": "78 Sterling Circle #078-303",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1699.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "107",
+          "provider_unit_id": "105:107",
+          "building_id": "105",
+          "unit_address": "105 Kensington Circle #105-107",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 2546.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "070:204",
+          "building_id": "070",
+          "unit_address": "70 Sterling Circle #070-204",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2399.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "101",
+          "provider_unit_id": "036:101",
+          "building_id": "036",
+          "unit_address": "36 Sterling Circle #036-101",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "107",
+          "provider_unit_id": "045:107",
+          "building_id": "045",
+          "unit_address": "45 Kensington Circle #045-107",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "084:201",
+          "building_id": "084",
+          "unit_address": "84 Sterling Circle #084-201",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2349.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "206",
+          "provider_unit_id": "052:206",
+          "building_id": "052",
+          "unit_address": "52 Sterling Circle #052-206",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "308",
+          "provider_unit_id": "027:308",
+          "building_id": "027",
+          "unit_address": "27 Kensington Circle #027-308",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "308",
+          "provider_unit_id": "082:308",
+          "building_id": "082",
+          "unit_address": "82 Sterling Circle #082-308",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "308",
+          "provider_unit_id": "085:308",
+          "building_id": "085",
+          "unit_address": "85 Kensington Circle #085-308",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2349.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "308",
+          "provider_unit_id": "105:308",
+          "building_id": "105",
+          "unit_address": "105 Kensington Circle #105-308",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2349.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "102",
+          "provider_unit_id": "018:102",
+          "building_id": "018",
+          "unit_address": "18 Sterling Circle #018-102",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1899.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "105",
+          "provider_unit_id": "082:105",
+          "building_id": "082",
+          "unit_address": "82 Sterling Circle #082-105",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1849.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "099:204",
+          "building_id": "099",
+          "unit_address": "99 Kensington Circle #099-204",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1849.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "206",
+          "provider_unit_id": "082:206",
+          "building_id": "082",
+          "unit_address": "82 Sterling Circle #082-206",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1899.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "206",
+          "provider_unit_id": "105:206",
+          "building_id": "105",
+          "unit_address": "105 Kensington Circle #105-206",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1899.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "212",
+          "provider_unit_id": "024:212",
+          "building_id": "024",
+          "unit_address": "24 Sterling Circle #024-212",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1899.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "303",
+          "provider_unit_id": "084:303",
+          "building_id": "084",
+          "unit_address": "84 Sterling Circle #084-303",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1949.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "304",
+          "provider_unit_id": "089:304",
+          "building_id": "089",
+          "unit_address": "89 Kensington Circle #089-304",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1849.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "305",
+          "provider_unit_id": "082:305",
+          "building_id": "082",
+          "unit_address": "82 Sterling Circle #082-305",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1849.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "305",
+          "provider_unit_id": "085:305",
+          "building_id": "085",
+          "unit_address": "85 Kensington Circle #085-305",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1849.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+        }
+      ],
+      "website": "www.tgmdanada.com",
+      "rp_oracle_native_unit_rows": 40,
+      "rp_oracle_distinct_floorplans": 5,
+      "native_identity_rows": 40,
+      "native_positive_rent_rows": 40,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "4330",
+      "property_name": "Invitational Apartments",
+      "provider": "Spherexx property availability",
+      "source_urls": [
+        "https://www.invitationalapartments.com/floorplans/1-bedroom/coral/",
+        "https://www.invitationalapartments.com/floorplans/2-bedroom/pearl/"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Invitational property footer/address and property-scoped Spherexx PID 1457.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "001-0212",
+          "plan": "Coral",
+          "rent": "$1,200.00",
+          "available": "Available Now",
+          "provider_unit_id": "001-0212"
+        },
+        {
+          "unit": "001-2221",
+          "plan": "Coral",
+          "rent": "$1,200.00",
+          "available": "Available 8/5",
+          "provider_unit_id": "001-2221"
+        },
+        {
+          "unit": "001-1124",
+          "plan": "Coral",
+          "rent": "$1,200.00",
+          "available": "Available 8/20",
+          "provider_unit_id": "001-1124"
+        },
+        {
+          "unit": "001-1614",
+          "plan": "Coral",
+          "rent": "$1,200.00",
+          "available": "Available 8/31",
+          "provider_unit_id": "001-1614"
+        },
+        {
+          "unit": "001-0222",
+          "plan": "Coral",
+          "rent": "$1,238.00",
+          "available": "Available Now",
+          "provider_unit_id": "001-0222"
+        },
+        {
+          "unit": "001-0722",
+          "plan": "Pearl",
+          "rent": "$1,470.00",
+          "available": "Available Now",
+          "provider_unit_id": "001-0722"
+        },
+        {
+          "unit": "001-0724",
+          "plan": "Pearl",
+          "rent": "$1,470.00",
+          "available": "Available 8/15",
+          "provider_unit_id": "001-0724"
+        },
+        {
+          "unit": "001-1011",
+          "plan": "Pearl",
+          "rent": "$1,470.00",
+          "available": "Available 8/20",
+          "provider_unit_id": "001-1011"
+        },
+        {
+          "unit": "001-1421",
+          "plan": "Pearl",
+          "rent": "$1,470.00",
+          "available": "Available 8/22",
+          "provider_unit_id": "001-1421"
+        },
+        {
+          "unit": "001-2124",
+          "plan": "Pearl",
+          "rent": "$1,470.00",
+          "available": "Available 9/18",
+          "provider_unit_id": "001-2124"
+        }
+      ],
+      "website": "https://www.invitationalapartments.com/",
+      "rp_oracle_native_unit_rows": 11,
+      "rp_oracle_distinct_floorplans": 2,
+      "native_identity_rows": 10,
+      "native_positive_rent_rows": 10,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "24139",
+      "property_name": "Boardwalk",
+      "provider": "Prometheus custom React availability",
+      "source_urls": [
+        "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Boardwalk exact property route; every extracted native ID links back to /boardwalk/unit-<id>.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "0409",
+          "plan": "Studio A",
+          "rent": "$2,970/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0409",
+          "provider_unit_id": "0409"
+        },
+        {
+          "unit": "1109",
+          "plan": "Studio A",
+          "rent": "$2,970/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-1109",
+          "provider_unit_id": "1109"
+        },
+        {
+          "unit": "0407",
+          "plan": "Plan 1CR",
+          "rent": "$3,731/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0407",
+          "provider_unit_id": "0407"
+        },
+        {
+          "unit": "0705W",
+          "plan": "Plan 1CR",
+          "rent": "$3,736/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0705W",
+          "provider_unit_id": "0705W"
+        },
+        {
+          "unit": "0405",
+          "plan": "Plan 1CR",
+          "rent": "$3,742/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0405",
+          "provider_unit_id": "0405"
+        },
+        {
+          "unit": "0211W",
+          "plan": "Plan 1CR",
+          "rent": "$3,791/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0211W",
+          "provider_unit_id": "0211W"
+        },
+        {
+          "unit": "0203W",
+          "plan": "Plan 1CR",
+          "rent": "$3,802/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0203W",
+          "provider_unit_id": "0203W"
+        },
+        {
+          "unit": "1405",
+          "plan": "Plan 1CR",
+          "rent": "$3,802/12mo",
+          "available": "Available Now",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-1405",
+          "provider_unit_id": "1405"
+        },
+        {
+          "unit": "1102",
+          "plan": "Plan 1CR",
+          "rent": "$3,901/12mo",
+          "available": "Available Now",
+          "floor": "2",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-1102",
+          "provider_unit_id": "1102"
+        },
+        {
+          "unit": "0702",
+          "plan": "Plan 1CR",
+          "rent": "$3,928/12mo",
+          "available": "Available Now",
+          "floor": "2",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0702",
+          "provider_unit_id": "0702"
+        },
+        {
+          "unit": "0408",
+          "plan": "Plan 1CR",
+          "rent": "$3,891/12mo",
+          "available": "Available Aug 9",
+          "floor": "2",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0408",
+          "provider_unit_id": "0408"
+        },
+        {
+          "unit": "0307W",
+          "plan": "Plan 2AR",
+          "rent": "$4,788/12mo",
+          "available": "Available Aug 14",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0307W",
+          "provider_unit_id": "0307W"
+        },
+        {
+          "unit": "0603",
+          "plan": "Plan 2AR",
+          "rent": "$4,823/12mo",
+          "available": "Available Aug 29",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0603",
+          "provider_unit_id": "0603"
+        },
+        {
+          "unit": "0801",
+          "plan": "Plan 2AR",
+          "rent": "$4,788/12mo",
+          "available": "Available Sep 5",
+          "floor": "1",
+          "source_url": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/unit-0801",
+          "provider_unit_id": "0801"
+        }
+      ],
+      "website": "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/",
+      "rp_oracle_native_unit_rows": 14,
+      "rp_oracle_distinct_floorplans": 3,
+      "native_identity_rows": 14,
+      "native_positive_rent_rows": 14,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "32996",
+      "property_name": "TGM Ridge",
+      "provider": "MRI ProspectConnect",
+      "provider_property_id": "241007",
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+      ],
+      "capture_method": "live exact-property provider HTML",
+      "raw_artifacts": [
+        "/private/tmp/propai-fnd-vBkmT9/unknown49_current/32996_mri.html"
+      ],
+      "property_identity_evidence": {
+        "provider_h1": "TGM Ridge",
+        "provider_title": "Search - TGM Ridge",
+        "root_data_propertyid": "241007"
+      },
+      "contamination_evidence": "Single exact-property portal; no portfolio/sibling roster in the extracted unit region.",
+      "units": [
+        {
+          "unit": "101",
+          "provider_unit_id": "41Y:101",
+          "building_id": "41Y",
+          "unit_address": "7641 Yellow Lily Dr #41Y-101",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 2555.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "20M:201",
+          "building_id": "20M",
+          "unit_address": "10920 Morning Glory Ct#20M-201",
+          "available_date": "2026-08-15",
+          "available_end_date": "2026-09-04",
+          "lease_term_months": "12",
+          "rent": 2440.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "301",
+          "provider_unit_id": "41Y:301",
+          "building_id": "41Y",
+          "unit_address": "7641 Yellow Lily Dr #41Y-301",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 2410.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "102",
+          "provider_unit_id": "21Y:102",
+          "building_id": "21Y",
+          "unit_address": "7621 Yellow Lily Dr #21Y-102",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2555.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "41Y:201",
+          "building_id": "41Y",
+          "unit_address": "7641 Yellow Lily Dr #41Y-201",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2420.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "202",
+          "provider_unit_id": "21Y:202",
+          "building_id": "21Y",
+          "unit_address": "7621 Yellow Lily Dr #21Y-202",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2390.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "403",
+          "provider_unit_id": "50B:403",
+          "building_id": "50B",
+          "unit_address": "10850 Buttercup Place #50B-403",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 1999.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "103",
+          "provider_unit_id": "60B:103",
+          "building_id": "60B",
+          "unit_address": "10860 Buttercup Place #60B-103",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 2855.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "303",
+          "provider_unit_id": "81W:303",
+          "building_id": "81W",
+          "unit_address": "10981 Wild Ginger Cir #81W-303",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 2960.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "203",
+          "provider_unit_id": "01Y:203",
+          "building_id": "01Y",
+          "unit_address": "7601 Yellow Lily Dr #01Y-203",
+          "available_date": "2026-08-17",
+          "available_end_date": "2026-09-06",
+          "lease_term_months": "12",
+          "rent": 2865.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "401",
+          "provider_unit_id": "51W:401",
+          "building_id": "51W",
+          "unit_address": "10951 Wild Ginger Cir #51W-401",
+          "available_date": "2026-08-14",
+          "available_end_date": "2026-09-03",
+          "lease_term_months": "12",
+          "rent": 2925.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "102",
+          "provider_unit_id": "50B:102",
+          "building_id": "50B",
+          "unit_address": "10850 Buttercup Place #50B-102",
+          "available_date": "2026-08-13",
+          "available_end_date": "2026-09-02",
+          "lease_term_months": "12",
+          "rent": 2855.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "20M:204",
+          "building_id": "20M",
+          "unit_address": "10920 Morning Glory Ct#20M-204",
+          "available_date": "2026-08-13",
+          "available_end_date": "2026-09-02",
+          "lease_term_months": "12",
+          "rent": 2865.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "104",
+          "provider_unit_id": "31B:104",
+          "building_id": "31B",
+          "unit_address": "10831 Buttercup Place #31B-104",
+          "available_date": "2026-08-08",
+          "available_end_date": "2026-08-28",
+          "lease_term_months": "12",
+          "rent": 2875.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "104",
+          "provider_unit_id": "81W:104",
+          "building_id": "81W",
+          "unit_address": "10981 Wild Ginger Cir #81W-104",
+          "available_date": "2026-08-06",
+          "available_end_date": "2026-08-26",
+          "lease_term_months": "12",
+          "rent": 2855.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "101",
+          "provider_unit_id": "61W:101",
+          "building_id": "61W",
+          "unit_address": "10961 Wild Ginger Cir #61W-101",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2855.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "40B:204",
+          "building_id": "40B",
+          "unit_address": "10840 Buttercup Place #40B-204",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2299.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "403",
+          "provider_unit_id": "90M:403",
+          "building_id": "90M",
+          "unit_address": "10890 Morning Glory Ct#90M-403",
+          "available_date": "2026-09-08",
+          "available_end_date": "2026-09-28",
+          "lease_term_months": "12",
+          "rent": 3230.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "11W:204",
+          "building_id": "11W",
+          "unit_address": "10911 Wild Ginger Cir #11W-204",
+          "available_date": "2026-08-29",
+          "available_end_date": "2026-09-18",
+          "lease_term_months": "12",
+          "rent": 3220.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "302",
+          "provider_unit_id": "21W:302",
+          "building_id": "21W",
+          "unit_address": "10921 Wild Ginger Cir #21W-302",
+          "available_date": "2026-08-17",
+          "available_end_date": "2026-09-06",
+          "lease_term_months": "12",
+          "rent": 3190.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "301",
+          "provider_unit_id": "01Y:301",
+          "building_id": "01Y",
+          "unit_address": "7601 Yellow Lily Dr #01Y-301",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 3285.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "102",
+          "provider_unit_id": "41W:102",
+          "building_id": "41W",
+          "unit_address": "10941 Wild Ginger Cir #41W-102",
+          "available_date": "2026-08-12",
+          "available_end_date": "2026-09-01",
+          "lease_term_months": "12",
+          "rent": 2805.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "10Y:204",
+          "building_id": "10Y",
+          "unit_address": "7610 Yellow Lily Dr #10Y-204",
+          "available_date": "2026-08-11",
+          "available_end_date": "2026-08-31",
+          "lease_term_months": "12",
+          "rent": 2660.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "202",
+          "provider_unit_id": "10Y:202",
+          "building_id": "10Y",
+          "unit_address": "7610 Yellow Lily Dr #10Y-202",
+          "available_date": "2026-08-10",
+          "available_end_date": "2026-08-30",
+          "lease_term_months": "12",
+          "rent": 2835.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "201",
+          "provider_unit_id": "31B:201",
+          "building_id": "31B",
+          "unit_address": "10831 Buttercup Place #31B-201",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2660.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "203",
+          "provider_unit_id": "71W:203",
+          "building_id": "71W",
+          "unit_address": "10971 Wild Ginger Cir #71W-203",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2835.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "403",
+          "provider_unit_id": "31W:403",
+          "building_id": "31W",
+          "unit_address": "10931 Wild Ginger Cir #31W-403",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2725.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "302",
+          "provider_unit_id": "30C:302",
+          "building_id": "30C",
+          "unit_address": "7630 Cupids Dart Ct #30C-302",
+          "available_date": "2026-08-10",
+          "available_end_date": "2026-08-30",
+          "lease_term_months": "12",
+          "rent": 2529.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "202",
+          "provider_unit_id": "30C:202",
+          "building_id": "30C",
+          "unit_address": "7630 Cupids Dart Ct #30C-202",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2539.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "101",
+          "provider_unit_id": "30C:101",
+          "building_id": "30C",
+          "unit_address": "7630 Cupids Dart Ct #30C-101",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2684.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "101",
+          "provider_unit_id": "10C:101",
+          "building_id": "10C",
+          "unit_address": "7610 Cupids Dart Ct #10C-101",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2525.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "203",
+          "provider_unit_id": "10C:203",
+          "building_id": "10C",
+          "unit_address": "7610 Cupids Dart Ct #10C-203",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2505.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "204",
+          "provider_unit_id": "30M:204",
+          "building_id": "30M",
+          "unit_address": "10930 Morning Glory Ct#30M-204",
+          "available_date": "2026-08-07",
+          "available_end_date": "2026-08-27",
+          "lease_term_months": "12",
+          "rent": 2624.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        },
+        {
+          "unit": "202",
+          "provider_unit_id": "40B:202",
+          "building_id": "40B",
+          "unit_address": "10840 Buttercup Place #40B-202",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2624.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+        }
+      ],
+      "website": "https://tgmridge.com/",
+      "rp_oracle_native_unit_rows": 34,
+      "rp_oracle_distinct_floorplans": 7,
+      "native_identity_rows": 34,
+      "native_positive_rent_rows": 34,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "51143",
+      "property_name": "Lauderdale Hollows",
+      "provider": "RentManager WordPress availability plugin",
+      "source_urls": [
+        "https://mgmmgmt.net/property-details/?pid=136",
+        "https://mgmmgmt.net/unit-details/?uid=7792",
+        "https://mgmmgmt.net/unit-details/?uid=7828",
+        "https://mgmmgmt.net/unit-details/?uid=7874"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Exact property page pid=136 links each detail; every detail heading is Lauderdale Hollows / Unit: <id>.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "1618-09",
+          "provider_unit_id": "7792",
+          "rent": "$1270",
+          "source_url": "https://mgmmgmt.net/unit-details/?uid=7792"
+        },
+        {
+          "unit": "1630-03",
+          "provider_unit_id": "7828",
+          "rent": "$1085",
+          "source_url": "https://mgmmgmt.net/unit-details/?uid=7828"
+        },
+        {
+          "unit": "1622-203",
+          "provider_unit_id": "7874",
+          "rent": "$1095",
+          "source_url": "https://mgmmgmt.net/unit-details/?uid=7874"
+        }
+      ],
+      "website": "https://mgmmgmt.net/property-details/?pid=136",
+      "rp_oracle_native_unit_rows": 4,
+      "rp_oracle_distinct_floorplans": 2,
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "61285",
+      "property_name": "Allez Apartments",
+      "provider": "RentCafe",
+      "source_urls": [
+        "https://www.allezliving.com/floorplans/a-1",
+        "https://www.allezliving.com/floorplans/a-7",
+        "https://www.allezliving.com/floorplans/s-1"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Allez exact site plus consistent RentCafe myOlePropertyId 626768 on all three unit links.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "0321",
+          "provider_unit_id": "10904407",
+          "plan": "A-1",
+          "rent": "$2,496.00 to -$2,765.00",
+          "available": "8/1/2026",
+          "rentcafe_property_id": "626768"
+        },
+        {
+          "unit": "0110",
+          "provider_unit_id": "10904350",
+          "plan": "A-7",
+          "rent": "$2,581.00 to -$2,859.00",
+          "available": "8/1/2026",
+          "rentcafe_property_id": "626768"
+        },
+        {
+          "unit": "0314",
+          "provider_unit_id": "10904400",
+          "plan": "S-1",
+          "rent": "$2,474.00 to -$2,677.00",
+          "available": "8/7/2026",
+          "rentcafe_property_id": "626768"
+        }
+      ],
+      "website": "http://www.allezliving.com/",
+      "rp_oracle_native_unit_rows": 4,
+      "rp_oracle_distinct_floorplans": 4,
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "75912",
+      "property_name": "TGM Creekside Village",
+      "provider": "MRI ProspectConnect",
+      "provider_property_id": "294005",
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+      ],
+      "capture_method": "live exact-property provider HTML",
+      "raw_artifacts": [
+        "/private/tmp/propai-fnd-vBkmT9/unknown49_current/75912_mri.html"
+      ],
+      "property_identity_evidence": {
+        "provider_h1": "TGM Creekside Village",
+        "provider_title": "Search - TGM Creekside Village",
+        "root_data_propertyid": "294005"
+      },
+      "contamination_evidence": "Single exact-property portal; no portfolio/sibling roster in the extracted unit region.",
+      "units": [
+        {
+          "unit": "2I",
+          "provider_unit_id": "309:2I",
+          "building_id": "309",
+          "unit_address": "309 Maple Tree Drive, Bldg F",
+          "available_date": "2026-09-25",
+          "available_end_date": "2026-10-15",
+          "lease_term_months": "12",
+          "rent": 2845.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3D",
+          "provider_unit_id": "309:3D",
+          "building_id": "309",
+          "unit_address": "309 Maple Tree Drive, Bldg F",
+          "available_date": "2026-09-05",
+          "available_end_date": "2026-09-25",
+          "lease_term_months": "12",
+          "rent": 2610.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "4H",
+          "provider_unit_id": "305:4H",
+          "building_id": "305",
+          "unit_address": "305 Maple Tree Drive, Bldg D",
+          "available_date": "2026-09-02",
+          "available_end_date": "2026-09-22",
+          "lease_term_months": "12",
+          "rent": 2730.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "1J",
+          "provider_unit_id": "307:1J",
+          "building_id": "307",
+          "unit_address": "307 Maple Tree Drive, Bldg E",
+          "available_date": "2026-09-01",
+          "available_end_date": "2026-09-21",
+          "lease_term_months": "12",
+          "rent": 2735.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2H",
+          "provider_unit_id": "309:2H",
+          "building_id": "309",
+          "unit_address": "309 Maple Tree Drive, Bldg F",
+          "available_date": "2026-09-01",
+          "available_end_date": "2026-09-21",
+          "lease_term_months": "12",
+          "rent": 2695.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "4D",
+          "provider_unit_id": "309:4D",
+          "building_id": "309",
+          "unit_address": "309 Maple Tree Drive, Bldg F",
+          "available_date": "2026-09-01",
+          "available_end_date": "2026-09-21",
+          "lease_term_months": "12",
+          "rent": 2645.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2B",
+          "provider_unit_id": "307:2B",
+          "building_id": "307",
+          "unit_address": "307 Maple Tree Drive, Bldg E",
+          "available_date": "2026-08-02",
+          "available_end_date": "2026-08-22",
+          "lease_term_months": "12",
+          "rent": 2415.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2A",
+          "provider_unit_id": "305:2A",
+          "building_id": "305",
+          "unit_address": "305 Maple Tree Drive, Bldg D",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2250.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3I",
+          "provider_unit_id": "307:3I",
+          "building_id": "307",
+          "unit_address": "307 Maple Tree Drive, Bldg E",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2415.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "4J",
+          "provider_unit_id": "305:4J",
+          "building_id": "305",
+          "unit_address": "305 Maple Tree Drive, Bldg D",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2360.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3B",
+          "provider_unit_id": "308:3B",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-09-25",
+          "available_end_date": "2026-10-15",
+          "lease_term_months": "12",
+          "rent": 3295.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2L",
+          "provider_unit_id": "308:2L",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-08-25",
+          "available_end_date": "2026-09-14",
+          "lease_term_months": "12",
+          "rent": 2765.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "1L",
+          "provider_unit_id": "302:1L",
+          "building_id": "302",
+          "unit_address": "302 Maple Tree Drive, Bldg B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 3175.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "1L",
+          "provider_unit_id": "308:1L",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 3045.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2A",
+          "provider_unit_id": "302:2A",
+          "building_id": "302",
+          "unit_address": "302 Maple Tree Drive, Bldg B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2599.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3K",
+          "provider_unit_id": "302:3K",
+          "building_id": "302",
+          "unit_address": "302 Maple Tree Drive, Bldg B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2780.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3F",
+          "provider_unit_id": "309:3F",
+          "building_id": "309",
+          "unit_address": "309 Maple Tree Drive, Bldg F",
+          "available_date": "2026-09-01",
+          "available_end_date": "2026-09-21",
+          "lease_term_months": "12",
+          "rent": 2375.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2J",
+          "provider_unit_id": "308:2J",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-09-01",
+          "available_end_date": "2026-09-21",
+          "lease_term_months": "12",
+          "rent": 2430.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "2A",
+          "provider_unit_id": "304:2A",
+          "building_id": "304",
+          "unit_address": "304 Maple Tree Drive, Bldg A",
+          "available_date": "2026-08-11",
+          "available_end_date": "2026-08-31",
+          "lease_term_months": "12",
+          "rent": 2330.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "1D",
+          "provider_unit_id": "304:1D",
+          "building_id": "304",
+          "unit_address": "304 Maple Tree Drive, Bldg A",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2250.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "1I",
+          "provider_unit_id": "302:1I",
+          "building_id": "302",
+          "unit_address": "302 Maple Tree Drive, Bldg B",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2300.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3E",
+          "provider_unit_id": "308:3E",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2070.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        },
+        {
+          "unit": "3H",
+          "provider_unit_id": "308:3H",
+          "building_id": "308",
+          "unit_address": "308 Maple Tree Drive, Bldg C",
+          "available_date": "2026-08-01",
+          "available_end_date": "2026-08-21",
+          "lease_term_months": "12",
+          "rent": 2370.0,
+          "source_url": "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+        }
+      ],
+      "website": "www.tgmcreeksidevillage.com",
+      "rp_oracle_native_unit_rows": 24,
+      "rp_oracle_distinct_floorplans": 6,
+      "native_identity_rows": 23,
+      "native_positive_rent_rows": 23,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "251597",
+      "property_name": "Wyndham Ridge",
+      "provider": "RealPage Online Leasing embedded availability",
+      "source_urls": [
+        "https://www.wyndhamridgecolumbus.com/floorplans/meadow/",
+        "https://www.wyndhamridgecolumbus.com/floorplans/orchard/"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Wyndham Ridge name/address on exact site; only its Meadow and Orchard plan flows were opened.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "5400",
+          "plan": "Meadow",
+          "rent": "Starting at $989",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5400"
+        },
+        {
+          "unit": "5467",
+          "plan": "Meadow",
+          "rent": "Starting at $974",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5467"
+        },
+        {
+          "unit": "5551",
+          "plan": "Meadow",
+          "rent": "Starting at $999",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5551"
+        },
+        {
+          "unit": "5555",
+          "plan": "Meadow",
+          "rent": "Starting at $974",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5555"
+        },
+        {
+          "unit": "5556",
+          "plan": "Meadow",
+          "rent": "Starting at $974",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5556"
+        },
+        {
+          "unit": "5443",
+          "plan": "Meadow",
+          "rent": "Starting at $999",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5443"
+        },
+        {
+          "unit": "5508",
+          "plan": "Meadow",
+          "rent": "Starting at $974",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5508"
+        },
+        {
+          "unit": "5325",
+          "plan": "Meadow",
+          "rent": "Starting at $989",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5325"
+        },
+        {
+          "unit": "5424",
+          "plan": "Meadow",
+          "rent": "Starting at $974",
+          "available": "Available Now",
+          "sqft": "850",
+          "provider_unit_id": "5424"
+        },
+        {
+          "unit": "5421",
+          "plan": "Meadow",
+          "rent": "Starting at $979",
+          "available": "Available Aug 05",
+          "sqft": "850",
+          "provider_unit_id": "5421"
+        },
+        {
+          "unit": "5465",
+          "plan": "Meadow",
+          "rent": "Starting at $987",
+          "available": "Available Sep 12",
+          "sqft": "850",
+          "provider_unit_id": "5465"
+        },
+        {
+          "unit": "5434",
+          "plan": "Meadow",
+          "rent": "Starting at $972",
+          "available": "Available Sep 24",
+          "sqft": "850",
+          "provider_unit_id": "5434"
+        },
+        {
+          "unit": "1114",
+          "plan": "Meadow",
+          "rent": "Starting at $981",
+          "available": "Available Nov 04",
+          "sqft": "850",
+          "provider_unit_id": "1114"
+        },
+        {
+          "unit": "5564",
+          "plan": "Orchard",
+          "rent": "Starting at $954",
+          "available": "Available Aug 05",
+          "sqft": "850",
+          "provider_unit_id": "5564"
+        },
+        {
+          "unit": "5456",
+          "plan": "Orchard",
+          "rent": "Starting at $952",
+          "available": "Available Aug 11",
+          "sqft": "850",
+          "provider_unit_id": "5456"
+        },
+        {
+          "unit": "5562",
+          "plan": "Orchard",
+          "rent": "Starting at $962",
+          "available": "Available Aug 14",
+          "sqft": "850",
+          "provider_unit_id": "5562"
+        },
+        {
+          "unit": "5547",
+          "plan": "Orchard",
+          "rent": "Starting at $937",
+          "available": "Available Aug 20",
+          "sqft": "850",
+          "provider_unit_id": "5547"
+        },
+        {
+          "unit": "5497",
+          "plan": "Orchard",
+          "rent": "Starting at $937",
+          "available": "Available Aug 22",
+          "sqft": "850",
+          "provider_unit_id": "5497"
+        },
+        {
+          "unit": "5455",
+          "plan": "Orchard",
+          "rent": "Starting at $952",
+          "available": "Available Aug 26",
+          "sqft": "850",
+          "provider_unit_id": "5455"
+        },
+        {
+          "unit": "5483",
+          "plan": "Orchard",
+          "rent": "Starting at $932",
+          "available": "Available Sep 02",
+          "sqft": "850",
+          "provider_unit_id": "5483"
+        },
+        {
+          "unit": "5565",
+          "plan": "Orchard",
+          "rent": "Starting at $932",
+          "available": "Available Sep 22",
+          "sqft": "850",
+          "provider_unit_id": "5565"
+        },
+        {
+          "unit": "5527",
+          "plan": "Orchard",
+          "rent": "Starting at $936",
+          "available": "Available Oct 07",
+          "sqft": "850",
+          "provider_unit_id": "5527"
+        },
+        {
+          "unit": "5409",
+          "plan": "Orchard",
+          "rent": "Starting at $939",
+          "available": "Available Oct 28",
+          "sqft": "850",
+          "provider_unit_id": "5409"
+        }
+      ],
+      "website": "https://www.wyndhamridgecolumbus.com/",
+      "rp_oracle_native_unit_rows": 6,
+      "rp_oracle_distinct_floorplans": 2,
+      "native_identity_rows": 23,
+      "native_positive_rent_rows": 23,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    },
+    {
+      "property_id": "269346",
+      "property_name": "Ashford Apartment Homes",
+      "provider": "RentPro RPA5 availability",
+      "source_urls": [
+        "https://rentpro.rpa5.com/availibility/avapage.a5w?cd=AB"
+      ],
+      "capture_method": "Chrome DOM snapshot of live exact-property page/provider flow",
+      "property_identity_evidence": "Ashford Brook exact site links cd=AB directly; the provider page applies only to ashfordbrook and exposes no sibling roster.",
+      "contamination_evidence": "Exact property page/provider boundary; no sibling or portfolio rows in the extracted unit region.",
+      "units": [
+        {
+          "unit": "0307",
+          "available": "08/06/2026",
+          "rent": "$1,249",
+          "beds": "2.00",
+          "type": "2X1L",
+          "min_credit": "600",
+          "provider_unit_id": "0307"
+        },
+        {
+          "unit": "0707",
+          "available": "Immediately",
+          "rent": "$1,249",
+          "beds": "2.00",
+          "type": "2X1S",
+          "min_credit": "600",
+          "provider_unit_id": "0707"
+        },
+        {
+          "unit": "0801",
+          "available": "Immediately",
+          "rent": "$1,249",
+          "beds": "2.00",
+          "type": "2X1S",
+          "min_credit": "600",
+          "provider_unit_id": "0801"
+        }
+      ],
+      "website": "https://rjamesproperties.com/ashford-brook/",
+      "rp_oracle_native_unit_rows": 4,
+      "rp_oracle_distinct_floorplans": 2,
+      "native_identity_rows": 3,
+      "native_positive_rent_rows": 3,
+      "strict_verdict": "pass_exact_property_native_identity_positive_rent_no_contamination"
+    }
+  ],
+  "audited_properties": [
+    {
+      "property_id": "1617",
+      "property_name": "",
+      "website": "https://www.crossingatriverlake.com",
+      "strict_qualifies": false,
+      "disposition": "fetch_and_browser_timeout",
+      "reason": "Exact property site timed out in both direct and Chrome probes; no source unit evidence.",
+      "rp_oracle_native_unit_rows": 6,
+      "current_fetch": {
+        "bytes": 0,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 35002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "1765",
+      "property_name": "Annaberg",
+      "website": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+      "strict_qualifies": false,
+      "disposition": "native_listing_explicitly_not_available",
+      "reason": "Exact unit D3 and $950 rent are visible, but the page twice states This Property Is Not Available; not current inventory.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+        "title": "2905 Arrowhead Drive - D3 Augusta, GA 30909 | Augusta Rental Homes",
+        "bytes": 46522,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "2239",
+      "property_name": "TGM Autumn Woods",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "MRI ProspectConnect",
+      "native_positive_rent_rows": 50,
+      "rp_oracle_native_unit_rows": 47,
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/288034?minbeds=1&maxbeds=2"
+      ]
+    },
+    {
+      "property_id": "2844",
+      "property_name": "TGM Danada",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "MRI ProspectConnect",
+      "native_positive_rent_rows": 40,
+      "rp_oracle_native_unit_rows": 40,
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/360002?minbeds=1&maxbeds=3"
+      ]
+    },
+    {
+      "property_id": "4124",
+      "property_name": "",
+      "website": "https://tramor.com/property/tramor-cannon-place/",
+      "strict_qualifies": false,
+      "disposition": "plan_only_contact_for_availability",
+      "reason": "Exact page says contact the community for current availability and exposes floor-plan rents only.",
+      "rp_oracle_native_unit_rows": 3,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://tramor.com/property/tramor-cannon-place/",
+        "title": "Tramor at Cannon Place &#8211; Tramor",
+        "bytes": 66583,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "4330",
+      "property_name": "Invitational Apartments",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "Spherexx property availability",
+      "native_positive_rent_rows": 10,
+      "rp_oracle_native_unit_rows": 11,
+      "source_urls": [
+        "https://www.invitationalapartments.com/floorplans/1-bedroom/coral/",
+        "https://www.invitationalapartments.com/floorplans/2-bedroom/pearl/"
+      ]
+    },
+    {
+      "property_id": "4756",
+      "property_name": "Clear Run",
+      "website": "https://www.clearrunaptswilmington.com/",
+      "strict_qualifies": false,
+      "disposition": "redirected_corporate_homepage_sibling_contamination",
+      "reason": "Requested Clear Run currently serves the Gables corporate homepage with many sibling communities.",
+      "rp_oracle_native_unit_rows": 44,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.clearrunaptswilmington.com/",
+        "title": "Gables",
+        "bytes": 564094,
+        "redetected_pms": "knock"
+      }
+    },
+    {
+      "property_id": "16509",
+      "property_name": "",
+      "website": "http://brooklawngardensapts.com/property/brooklawn/",
+      "strict_qualifies": false,
+      "disposition": "fetch_timeout",
+      "reason": "Current exact property page timed out; no live native-unit evidence.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "bytes": 0,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 35002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "19245",
+      "property_name": "Tenzen",
+      "website": "http://www.tenzenapartments.com/",
+      "strict_qualifies": false,
+      "disposition": "plan_only_and_blank_onesite",
+      "reason": "Exact site publishes plan-level availability only; linked OneSite root identifies Tenzen but exposes no native rows.",
+      "rp_oracle_native_unit_rows": 2,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://tenzenapartments.com/",
+        "title": "Tenzen Apartments Bellevue Washington &#8211; Tenzen Apartments Bellevue Washington",
+        "bytes": 1475786,
+        "redetected_pms": "knock"
+      }
+    },
+    {
+      "property_id": "22962",
+      "property_name": "Fox Lane",
+      "website": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+      "strict_qualifies": false,
+      "disposition": "exact_mri_plan_only_no_native_rows",
+      "reason": "Fox Lane MRI portal shows three plan cards, zero data-unitid rows, and no positive rents.",
+      "rp_oracle_native_unit_rows": 3,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://princetonmanagement.com/communities/fox-lane-apartments/",
+        "title": "Fox Lane Apartments - Princeton Management",
+        "bytes": 123357,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "22964",
+      "property_name": "Tropicana Village Apartments",
+      "website": "https://www.tropicanavillageapartments.com/",
+      "strict_qualifies": false,
+      "disposition": "exact_site_no_published_availability",
+      "reason": "Exact Tropicana site exposes apply/contact navigation but no native availability.",
+      "rp_oracle_native_unit_rows": 17,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.tropicanavillageapartments.com/",
+        "title": "Tropicana Village",
+        "bytes": 121735,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "24139",
+      "property_name": "Boardwalk",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "Prometheus custom React availability",
+      "native_positive_rent_rows": 14,
+      "rp_oracle_native_unit_rows": 14,
+      "source_urls": [
+        "https://prometheusapartments.com/ca/santa-clara-apartments/boardwalk/"
+      ]
+    },
+    {
+      "property_id": "24982",
+      "property_name": "Fisher Building",
+      "website": "https://www.cityclubapartments.com/usa/chicago-il/downtown/fisher-building-city-club/?lvcode=890940",
+      "strict_qualifies": false,
+      "disposition": "provider_hosting_suspended",
+      "reason": "Current URL redirects to Spherexx Site Taken Down (Non-Payment).",
+      "rp_oracle_native_unit_rows": 6,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://nonpayment.spherexx.com/",
+        "title": "Site Taken Down (Non-Payment) - Web hosting provided by Spherexx.com",
+        "bytes": 962,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "27349",
+      "property_name": "",
+      "website": "https://www.countryvillageapthomes.com/",
+      "strict_qualifies": false,
+      "disposition": "plan_only_no_native_identity",
+      "reason": "Eleven floor-plan rows are visible, but no native unit identity is published.",
+      "rp_oracle_native_unit_rows": 11,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.countryvillageapthomes.com/",
+        "title": "Country Village Apartments in Sherman, TX (Official Site)",
+        "bytes": 194982,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "32978",
+      "property_name": "Camden Vineyards",
+      "website": "https://www.camdenliving.com/apartments/murrieta-ca/camden-vineyards",
+      "strict_qualifies": false,
+      "disposition": "redirected_corporate_homepage",
+      "reason": "Retired Camden property route redirects to the Camden corporate homepage; no exact property inventory.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.camdenliving.com/",
+        "title": "Luxury Apartments for Rent <!-- --> - camdenliving.com",
+        "bytes": 86356,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "32996",
+      "property_name": "TGM Ridge",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "MRI ProspectConnect",
+      "native_positive_rent_rows": 34,
+      "rp_oracle_native_unit_rows": 34,
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/241007?minbeds=1&maxbeds=2"
+      ]
+    },
+    {
+      "property_id": "33993",
+      "property_name": "City Club Apartments MDA",
+      "website": "https://www.cityclubapartments.com/",
+      "strict_qualifies": false,
+      "disposition": "provider_hosting_suspended",
+      "reason": "Current URL redirects to Spherexx Site Taken Down (Non-Payment).",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://nonpayment.spherexx.com/",
+        "title": "Site Taken Down (Non-Payment) - Web hosting provided by Spherexx.com",
+        "bytes": 962,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "34362",
+      "property_name": "Tamarron",
+      "website": "www.thetamarronapts.com",
+      "strict_qualifies": false,
+      "disposition": "tls_certificate_invalid",
+      "reason": "Both direct and Chrome exact-domain probes fail ERR_CERT_COMMON_NAME_INVALID.",
+      "rp_oracle_native_unit_rows": 25,
+      "current_fetch": {
+        "bytes": 0,
+        "error": "CertificateVerifyError: Failed to perform, curl: (60) SSL: no alternative certificate subject name matches target hostname 'www.thetamarronapts.com'. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "34708",
+      "property_name": "Camden Main & Jamboree",
+      "website": "https://www.camdenliving.com/apartments/irvine-ca/camden-main-and-jamboree",
+      "strict_qualifies": false,
+      "disposition": "redirected_corporate_homepage",
+      "reason": "Retired Camden property route redirects to the Camden corporate homepage; no exact property inventory.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.camdenliving.com/",
+        "title": "Luxury Apartments for Rent <!-- --> - camdenliving.com",
+        "bytes": 86356,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "34785",
+      "property_name": "",
+      "website": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+      "strict_qualifies": false,
+      "disposition": "provider_403_or_blank_root",
+      "reason": "Direct Yotta URL is 403; Chrome redirects to a blank provider root with no unit evidence.",
+      "rp_oracle_native_unit_rows": 15,
+      "current_fetch": {
+        "status": 403,
+        "final_url": "http://adaraportal.yottareal.com/pages/HomePage.aspx?Id=55",
+        "title": "403 Forbidden",
+        "bytes": 581,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "37071",
+      "property_name": "Summerwood on Towne Line",
+      "website": "www.summerwoodindy.com",
+      "strict_qualifies": false,
+      "disposition": "domain_hijacked",
+      "reason": "The current domain serves an unrelated Chinese gambling page, not Summerwood.",
+      "rp_oracle_native_unit_rows": 15,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.summerwoodindy.com/",
+        "title": "\u4e5d\u6e38\u5b98\u65b9\u7aef\u7f51\u7ad9\u5728\u7ebf\u767b\u5165-\u4e5d\u6e38(\u4e2d\u56fd)",
+        "bytes": 150828,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "39198",
+      "property_name": "Vista De Palmas Apartments",
+      "website": "http://www.vistadepalmasapartments.com/",
+      "strict_qualifies": false,
+      "disposition": "network_security_interstitial",
+      "reason": "Current route resolves to a Spectrum/CUJO security warning, not exact property data.",
+      "rp_oracle_native_unit_rows": 7,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://block.charter-prod.hosted.cujo.io/warn.html?url=http://www.vistadepalmasapartments.com/&token=16a827b5",
+        "bytes": 1621,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "40733",
+      "property_name": "Country Club",
+      "website": "https://www.smdproperty.com/resident-properties/country-club-apartments/",
+      "strict_qualifies": false,
+      "disposition": "plan_only_no_native_identity",
+      "reason": "Units & Prices expands six style/plan rows only; no native unit IDs.",
+      "rp_oracle_native_unit_rows": 6,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.smdproperty.com/resident-properties/country-club-apartments/",
+        "title": "Country Club Apartments",
+        "bytes": 53909,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "42554",
+      "property_name": "",
+      "website": "http://summerwindaptsfl.com/",
+      "strict_qualifies": false,
+      "disposition": "fetch_timeout",
+      "reason": "Current exact property page timed out; no live native-unit evidence.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "bytes": 0,
+        "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 35002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "42977",
+      "property_name": "Elms at Stoney Run",
+      "website": "https://stoneyrunelmsliving.com/home#",
+      "strict_qualifies": false,
+      "disposition": "provider_call_support_page",
+      "reason": "Current RealPage route is a call-support/dead-property page with no inventory.",
+      "rp_oracle_native_unit_rows": 22,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://stoneyrunelmsliving.com/call-support.html",
+        "title": "Property Management Software &amp; Services | RealPage",
+        "bytes": 10176,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "48075",
+      "property_name": "",
+      "website": "https://www.edgefieldaptsva.com/",
+      "strict_qualifies": false,
+      "disposition": "security_interstitial_no_source_data",
+      "reason": "Direct is 403 and Chrome shows only a connection-security interstitial; no challenge interaction or derived rows.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 403,
+        "final_url": "https://www.edgefieldaptsva.com/",
+        "bytes": 167,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "48389",
+      "property_name": "Village Gate Apartments",
+      "website": "http://www.villagegatenc.com/",
+      "strict_qualifies": false,
+      "disposition": "captcha_blocked_no_interaction",
+      "reason": "Village Gate redirected to /sgcaptcha/; no CAPTCHA interaction and no CAPTCHA-derived data.",
+      "rp_oracle_native_unit_rows": 18,
+      "current_fetch": {
+        "status": 403,
+        "final_url": "http://www.villagegatenc.com/",
+        "bytes": 167,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "51143",
+      "property_name": "Lauderdale Hollows",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "RentManager WordPress availability plugin",
+      "native_positive_rent_rows": 3,
+      "rp_oracle_native_unit_rows": 4,
+      "source_urls": [
+        "https://mgmmgmt.net/property-details/?pid=136",
+        "https://mgmmgmt.net/unit-details/?uid=7792",
+        "https://mgmmgmt.net/unit-details/?uid=7828",
+        "https://mgmmgmt.net/unit-details/?uid=7874"
+      ]
+    },
+    {
+      "property_id": "52541",
+      "property_name": "",
+      "website": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+      "strict_qualifies": false,
+      "disposition": "exact_mri_plan_only_no_native_rows",
+      "reason": "Woodbridge Manor MRI portal has exact identity but zero native rows and zero prices.",
+      "rp_oracle_native_unit_rows": 7,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://princetonmanagement.com/communities/woodbridge-manor-apartments/",
+        "title": "Woodbridge Manor Apartments - Princeton Management",
+        "bytes": 132581,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "53567",
+      "property_name": "Trafalgar Square Apartments",
+      "website": "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+      "strict_qualifies": false,
+      "disposition": "exact_mri_plan_only_no_native_rows",
+      "reason": "Trafalgar Square MRI portal has exact identity but zero native rows and zero prices.",
+      "rp_oracle_native_unit_rows": 3,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://princetonmanagement.com/communities/trafalgar-square-apartments/",
+        "title": "Trafalgar Square Apartments - Princeton Management",
+        "bytes": 121537,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "53932",
+      "property_name": "Misty Hollow",
+      "website": "http://www.landmarkrealty.org/misty-hollow/",
+      "strict_qualifies": false,
+      "disposition": "static_plan_pricing_no_native_availability",
+      "reason": "Exact Misty Hollow page publishes amenity/plan pricing only; no native availability identity.",
+      "rp_oracle_native_unit_rows": 3,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "http://www.landmarkrealty.org/misty-hollow/",
+        "title": "Misty Hollow Apartments, LLC - Landmark Realty, LLCLandmark Realty, LLC | Apartments in Bossier City, LA",
+        "bytes": 42615,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "61285",
+      "property_name": "Allez Apartments",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "RentCafe",
+      "native_positive_rent_rows": 3,
+      "rp_oracle_native_unit_rows": 4,
+      "source_urls": [
+        "https://www.allezliving.com/floorplans/a-1",
+        "https://www.allezliving.com/floorplans/a-7",
+        "https://www.allezliving.com/floorplans/s-1"
+      ]
+    },
+    {
+      "property_id": "64068",
+      "property_name": "Riverplace",
+      "website": "www.riverplacecr.com",
+      "strict_qualifies": false,
+      "disposition": "parked_or_placeholder_domain",
+      "reason": "Current exact domain returns a 114-byte placeholder/parked response.",
+      "rp_oracle_native_unit_rows": 15,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.riverplacecr.com/",
+        "bytes": 114,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "71962",
+      "property_name": "Towne House",
+      "website": "https://www.townehousequincy.com/",
+      "strict_qualifies": false,
+      "disposition": "exact_onesite_blank_no_published_availability",
+      "reason": "Towne House OneSite root confirms exact property/address but publishes no unit rows.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.townehousequincy.com/",
+        "title": "Towne House Quincy Apartments - Towne House Quincy Living",
+        "bytes": 126950,
+        "redetected_pms": "knock"
+      }
+    },
+    {
+      "property_id": "72732",
+      "property_name": "",
+      "website": "http://www.centralmngt.com/Search?Community=15",
+      "strict_qualifies": false,
+      "disposition": "exact_plan_table_no_native_identity",
+      "reason": "Willows exact page has two bedroom-type rent ranges, not native units.",
+      "rp_oracle_native_unit_rows": 2,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://www.centralmngt.com/Search?Community=15",
+        "title": "Central Management",
+        "bytes": 77571,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "74523",
+      "property_name": "Charter Club",
+      "website": "http://www.charterclubapts.com/",
+      "strict_qualifies": false,
+      "disposition": "static_plan_only_no_native_availability",
+      "reason": "Charter Club rental information contains no native current inventory.",
+      "rp_oracle_native_unit_rows": 0,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://charterclubapts.com/",
+        "title": "Home - Charter Club Apartments",
+        "bytes": 131731,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "75314",
+      "property_name": "Village Park at Paladin",
+      "website": "https://pettinaro.com/village-park-paladin/",
+      "strict_qualifies": false,
+      "disposition": "security_interstitial_no_source_data",
+      "reason": "Direct returns 202/190 bytes and Chrome shows only a connection-security interstitial.",
+      "rp_oracle_native_unit_rows": 6,
+      "current_fetch": {
+        "status": 202,
+        "final_url": "https://pettinaro.com/village-park-paladin/",
+        "bytes": 190,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "75912",
+      "property_name": "TGM Creekside Village",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "MRI ProspectConnect",
+      "native_positive_rent_rows": 23,
+      "rp_oracle_native_unit_rows": 24,
+      "source_urls": [
+        "https://tgm.mriprospectconnect.com/Search/Index/294005?minbeds=1&maxbeds=3"
+      ]
+    },
+    {
+      "property_id": "78597",
+      "property_name": "Sentral Union Station",
+      "website": "https://www.sentral.com/denver/union-station",
+      "strict_qualifies": false,
+      "disposition": "exact_floorplan_api_no_native_units",
+      "reason": "Sentral exposes floorplans, but its authenticated production floorplan normalizer returns an empty units array.",
+      "rp_oracle_native_unit_rows": 51,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://sentral.com/denver/union-station",
+        "bytes": 34257,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "232583",
+      "property_name": "Custer Crossing Apartments",
+      "website": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+      "strict_qualifies": false,
+      "disposition": "exact_mri_plan_only_no_native_rows",
+      "reason": "Custer Crossing MRI property 404 shows four plan cards but no native unit rows or prices.",
+      "rp_oracle_native_unit_rows": 4,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+        "title": "Custer Crossing Apartments - Princeton Management",
+        "bytes": 125535,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "235473",
+      "property_name": "",
+      "website": "http://www.rooftop252.com/",
+      "strict_qualifies": false,
+      "disposition": "static_floorplans_no_native_availability",
+      "reason": "Rooftop252 exact floorplan page publishes plan links/amenities only; no rents or native units.",
+      "rp_oracle_native_unit_rows": 6,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://rooftop252.com/",
+        "title": "Rooftop252 |",
+        "bytes": 170884,
+        "redetected_pms": "generic_plan_text"
+      }
+    },
+    {
+      "property_id": "246962",
+      "property_name": "Portola Bridge Creek",
+      "website": "http://www.bridgecreekapthomes.com/",
+      "strict_qualifies": false,
+      "disposition": "parked_or_placeholder_domain",
+      "reason": "Current exact domain returns a 114-byte placeholder/parked response.",
+      "rp_oracle_native_unit_rows": 13,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "http://www.bridgecreekapthomes.com/",
+        "bytes": 114,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "251597",
+      "property_name": "Wyndham Ridge",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "RealPage Online Leasing embedded availability",
+      "native_positive_rent_rows": 23,
+      "rp_oracle_native_unit_rows": 6,
+      "source_urls": [
+        "https://www.wyndhamridgecolumbus.com/floorplans/meadow/",
+        "https://www.wyndhamridgecolumbus.com/floorplans/orchard/"
+      ]
+    },
+    {
+      "property_id": "260505",
+      "property_name": "Onyx Uptown PHX",
+      "website": "https://broadstoneuptownphx.com/",
+      "strict_qualifies": false,
+      "disposition": "expired_parked_domain",
+      "reason": "Current Broadstone Uptown PHX domain is a GoDaddy parked/expired page.",
+      "rp_oracle_native_unit_rows": 274,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://broadstoneuptownphx.com/",
+        "bytes": 114,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "263498",
+      "property_name": "The Julington",
+      "website": "https://risejulington.com/",
+      "strict_qualifies": false,
+      "disposition": "expired_parked_domain",
+      "reason": "Current Rise Julington domain is a GoDaddy parked/expired page.",
+      "rp_oracle_native_unit_rows": 27,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://risejulington.com/",
+        "bytes": 114,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "268888",
+      "property_name": "Artthaus Jack London",
+      "website": "https://arthaus.mov/building-community.php?slug=arthaus-jack-london",
+      "strict_qualifies": false,
+      "disposition": "tls_protocol_error",
+      "reason": "Direct and Chrome probes fail TLS/SSL protocol negotiation; no source unit evidence.",
+      "rp_oracle_native_unit_rows": 1,
+      "current_fetch": {
+        "bytes": 0,
+        "error": "SSLError: Failed to perform, curl: (35) TLS connect error: error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "269346",
+      "property_name": "Ashford Apartment Homes",
+      "strict_qualifies": true,
+      "disposition": "strict_recovered",
+      "provider": "RentPro RPA5 availability",
+      "native_positive_rent_rows": 3,
+      "rp_oracle_native_unit_rows": 4,
+      "source_urls": [
+        "https://rentpro.rpa5.com/availibility/avapage.a5w?cd=AB"
+      ]
+    },
+    {
+      "property_id": "272772",
+      "property_name": "Hawkeye Village",
+      "website": "http://hawkeyevillageapartments.com/",
+      "strict_qualifies": false,
+      "disposition": "exact_site_no_published_availability",
+      "reason": "Hawkeye Village exact site publishes leasing/application content but no current unit/rent rows.",
+      "rp_oracle_native_unit_rows": 5,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "http://hawkeyevillageapartments.com/",
+        "title": "Welcome to Hawkeye Village",
+        "bytes": 13607,
+        "redetected_pms": "unknown"
+      }
+    },
+    {
+      "property_id": "274886",
+      "property_name": "",
+      "website": "https://parkplace380.com/listings/aster-village-two/",
+      "strict_qualifies": false,
+      "disposition": "plan_only_no_native_identity",
+      "reason": "Aster Village Two publishes eleven floor-plan styles; no native unit identity is exposed.",
+      "rp_oracle_native_unit_rows": 11,
+      "current_fetch": {
+        "status": 200,
+        "final_url": "https://parkplace380.com/listings/aster-village-two/",
+        "title": "Aster Village Two - Park Place 380",
+        "bytes": 446492,
+        "redetected_pms": "generic_plan_text"
+      }
+    }
+  ]
+}

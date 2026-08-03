@@ -1,0 +1,586 @@
+{
+  "cohort": "exact_2026-07-31_FAILED_NO_DATA_344",
+  "commit": "none",
+  "configured_identity": {
+    "address": "5262 Timuquana Rd",
+    "apartmentid": "42554",
+    "city": "Jacksonville",
+    "name": "Vintage Grove Apartments",
+    "state": "FL",
+    "website": "http://summerwindaptsfl.com/",
+    "zip": "32210"
+  },
+  "configured_route_probe": {
+    "body_bytes": 0,
+    "error": "Timeout: Failed to perform, curl: (28) Connection timed out after 20001 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+    "final_url": "http://summerwindaptsfl.com/",
+    "requested_url": "http://summerwindaptsfl.com/",
+    "status": 0
+  },
+  "current_identity": {
+    "address": "5262 Timuquana Rd",
+    "city": "Jacksonville",
+    "name": "Vintage Grove Apartments",
+    "state": "FL",
+    "website": "https://vintagegroveapts.com/",
+    "zip": "32210"
+  },
+  "current_root": {
+    "body_bytes": 402853,
+    "body_sha256": "d4fb583f656e335347adfcc8558d65bde7f0a0ab90b6490abb884a1c8f96f012",
+    "final_url": "https://vintagegroveapts.com/",
+    "gzip_artifact": "/private/tmp/propai-fnd-vBkmT9/vintage_grove_migration_lane/42554_vintage_grove_current_root.html.gz",
+    "gzip_sha256": "597e701b2e5ed6a6038950119fac6c75150e4f8174d1ac60dd3bcc6837a60d92",
+    "published_securecafe_floorplan_routes": [
+      "https://vintagegroveapts.securecafe.com/onlineleasing/summerwind-apartments0/floorplans.aspx"
+    ],
+    "published_securecafe_links": [
+      "https://vintagegroveapts.securecafe.com/onlineleasing/summerwind-apartments0/floorplans.aspx",
+      "https://vintagegroveapts.securecafe.com/onlineleasing/summerwind-apartments0/guestlogin.aspx",
+      "https://vintagegroveapts.securecafenet.com/residentservices/summerwind-apartments0/userlogin"
+    ],
+    "requested_url": "https://vintagegroveapts.com/",
+    "status": 200
+  },
+  "full_pipeline_repeats": [
+    {
+      "adapter": "rentcafe",
+      "emitted_rows": 7,
+      "errors": [],
+      "fallback_chain": [
+        "rentcafe"
+      ],
+      "plan_summaries": 1,
+      "repeat": 1,
+      "strict_native_positive_rent_rows": 7,
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": [
+        {
+          "availability_date": "08/17/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133284",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "307"
+        },
+        {
+          "availability_date": "08/19/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133274",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "08/20/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133235",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "501"
+        },
+        {
+          "availability_date": "08/26/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133283",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133246",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "701"
+        },
+        {
+          "availability_date": "08/21/2026",
+          "floor_plan_name": "2 Bedroom - 2 Bathroom",
+          "market_rent_high": 1205,
+          "market_rent_low": 1205,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133240",
+            "securecafe_floorplan_id": "5186224"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "601"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 945,
+          "market_rent_low": 945,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133268",
+            "securecafe_floorplan_id": "5186227"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "107"
+        }
+      ]
+    },
+    {
+      "adapter": "rentcafe",
+      "emitted_rows": 7,
+      "errors": [],
+      "fallback_chain": [
+        "rentcafe"
+      ],
+      "plan_summaries": 1,
+      "repeat": 2,
+      "strict_native_positive_rent_rows": 7,
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": [
+        {
+          "availability_date": "08/17/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133284",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "307"
+        },
+        {
+          "availability_date": "08/19/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133274",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "08/20/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133235",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "501"
+        },
+        {
+          "availability_date": "08/26/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133283",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133246",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "701"
+        },
+        {
+          "availability_date": "08/21/2026",
+          "floor_plan_name": "2 Bedroom - 2 Bathroom",
+          "market_rent_high": 1205,
+          "market_rent_low": 1205,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133240",
+            "securecafe_floorplan_id": "5186224"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "601"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 945,
+          "market_rent_low": 945,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133268",
+            "securecafe_floorplan_id": "5186227"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "107"
+        }
+      ]
+    },
+    {
+      "adapter": "rentcafe",
+      "emitted_rows": 7,
+      "errors": [],
+      "fallback_chain": [
+        "rentcafe"
+      ],
+      "plan_summaries": 1,
+      "repeat": 3,
+      "strict_native_positive_rent_rows": 7,
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": [
+        {
+          "availability_date": "08/17/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133284",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "307"
+        },
+        {
+          "availability_date": "08/19/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133274",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "201"
+        },
+        {
+          "availability_date": "08/20/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133235",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "501"
+        },
+        {
+          "availability_date": "08/26/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133283",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "305"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "1 Bedroom",
+          "market_rent_high": 1084,
+          "market_rent_low": 1084,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133246",
+            "securecafe_floorplan_id": "5186221"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "701"
+        },
+        {
+          "availability_date": "08/21/2026",
+          "floor_plan_name": "2 Bedroom - 2 Bathroom",
+          "market_rent_high": 1205,
+          "market_rent_low": 1205,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133240",
+            "securecafe_floorplan_id": "5186224"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "601"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "floor_plan_name": "Studio",
+          "market_rent_high": 945,
+          "market_rent_low": 945,
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "38133268",
+            "securecafe_floorplan_id": "5186227"
+          },
+          "source_property_address": "5262 Timaquana Rd, Jacksonville, FL, 32210",
+          "source_property_id": "1722315",
+          "source_property_name": "Vintage Grove Apartments",
+          "unit_number": "107"
+        }
+      ]
+    }
+  ],
+  "generated_at_utc": "2026-08-01T20:12:09.573153+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "direct_public_http_only": true,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_HYPERBROWSER": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER5_VISION": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "requests"
+    },
+    "fingerprint_rotation": false,
+    "flaresolverr_calls": 0,
+    "hyperbrowser_calls": 0,
+    "llm_calls": 0,
+    "proxy_calls": 0,
+    "web_unlocker_calls": 0
+  },
+  "lane": "vintage_grove_stale_summerwind_current_official_rentcafe_e2e",
+  "ledger_mutation": "none",
+  "materializer": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/vintage_grove_migration_lane/materialize_vintage_grove_42554_current_strict.py",
+    "sha256": "1ff67485c4052a527de86e2e574bad0a62d08763f127b9113d729650b8c03a2e"
+  },
+  "paid_canary": false,
+  "provider_identity_checks": {
+    "all_source_addresses_exact_property": true,
+    "all_source_property_ids_exact": true,
+    "all_source_property_names_exact": true,
+    "all_source_urls_exact": true
+  },
+  "push": "none",
+  "repeat_checks": {
+    "all_applicant_direct_tier": true,
+    "all_availability_dates": true,
+    "all_floorplan_names": true,
+    "all_no_errors": true,
+    "all_rentcafe_adapter": true,
+    "all_rows_strict_native_positive_rent": true,
+    "native_ids_unique": true,
+    "same_native_id_set": true,
+    "same_unit_set": true,
+    "three_full_pipeline_repeats": true
+  },
+  "results": [
+    {
+      "adapter": "rentcafe",
+      "contamination_verdict": "pass_exact_same_address_current_official_vintage_grove_published_securecafe_property_native_units_three_repeats",
+      "current_official_url": "https://vintagegroveapts.com/",
+      "identity_evidence": {
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "source_property_ids": [
+          "1722315"
+        ],
+        "source_urls": [
+          "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "08/17/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133284",
+            "unit_number": "307"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1084,
+            "market_rent_low": 1084
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/19/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133274",
+            "unit_number": "201"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1084,
+            "market_rent_low": 1084
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/20/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133235",
+            "unit_number": "501"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1084,
+            "market_rent_low": 1084
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/26/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133283",
+            "unit_number": "305"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1084,
+            "market_rent_low": 1084
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133246",
+            "unit_number": "701"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1084,
+            "market_rent_low": 1084
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/21/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133240",
+            "unit_number": "601"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1205,
+            "market_rent_low": 1205
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        },
+        {
+          "availability_date": "08/31/2026",
+          "identity": {
+            "securecafe_apartment_id": "38133268",
+            "unit_number": "107"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 945,
+            "market_rent_low": 945
+          },
+          "source_api_url": "https://vintagegroveapts.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1722315&RequestBeforeLogin=true&isPropertyList=false"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 42554,
+      "property_identity_match": true,
+      "property_name": "Vintage Grove Apartments",
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 7,
+      "website": "http://summerwindaptsfl.com/"
+    }
+  ],
+  "root_identity_checks": {
+    "all_securecafe_links_same_property_slug": true,
+    "city_visible": true,
+    "property_name_visible": true,
+    "sole_published_securecafe_floorplan_route": true,
+    "state_visible": true,
+    "street_visible": true,
+    "zip_visible": true
+  },
+  "source_snapshot_after": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/rentcafe.py": "78527dd59228dbf978c29674ac34cc9c77ce9844a13425a2defddf36af4cf13a",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  },
+  "source_snapshot_before": {
+    "ma_poc/core/identity.py": "7215ed6a3b74ad5c4741d32a20142dee64e43faee79740660f31ddf7f1487167",
+    "ma_poc/pms/adapters/rentcafe.py": "78527dd59228dbf978c29674ac34cc9c77ce9844a13425a2defddf36af4cf13a",
+    "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f"
+  }
+}

@@ -10,6 +10,7 @@ injected exactly like the residential_render tests do.
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 
@@ -20,6 +21,10 @@ from ma_poc.fetch import hyperbrowser_backend as hb
 from ma_poc.fetch.contracts import FetchOutcome
 from ma_poc.fetch.hyperbrowser_backend import (
     HyperbrowserProvider,
+    _hb_try_reserve_property,
+    _published_rentmanager_inventory_url,
+    hb_raw_get,
+    hyperbrowser_property_call_count,
     reset_hyperbrowser_property_counts,
 )
 from ma_poc.fetch.tier_escalator import _make_provider
@@ -28,8 +33,12 @@ from ma_poc.models.fetch_tier import FetchTier
 
 def _task(url: str = "https://walled.example/", pid: str = "p-1") -> CrawlTask:
     return CrawlTask(
-        url=url, property_id=pid, priority=0,
-        reason=TaskReason.SCHEDULED, render_mode=RenderMode.RENDER, budget_ms=180_000,
+        url=url,
+        property_id=pid,
+        priority=0,
+        reason=TaskReason.SCHEDULED,
+        render_mode=RenderMode.RENDER,
+        budget_ms=180_000,
     )
 
 
@@ -48,7 +57,9 @@ class _FakeResp:
 
 
 class _FakePage:
-    def __init__(self, html: str, responses: list[_FakeResp], title: str = "", url: str | None = None) -> None:
+    def __init__(
+        self, html: str, responses: list[_FakeResp], title: str = "", url: str | None = None
+    ) -> None:
         self._html = html
         self._responses = responses
         self._title = title
@@ -94,7 +105,6 @@ class _FakeSession:
             raise self._raise
         assert self._page is not None
         return self._page
-
 
     async def close(self) -> None:
         self.closed = True
@@ -144,8 +154,11 @@ async def test_ok_result_is_drop_in(monkeypatch: pytest.MonkeyPatch) -> None:
     reset_hyperbrowser_property_counts()
     page = _FakePage(
         html="<html><body>$1,499 1 bed</body></html>",
-        responses=[_FakeResp("https://x/api/v1/units", 200, "application/json", b'{"units":[{"rent":1499}]}')],
-        title="Real Property", url="https://walled.example/final",
+        responses=[
+            _FakeResp("https://x/api/v1/units", 200, "application/json", b'{"units":[{"rent":1499}]}')
+        ],
+        title="Real Property",
+        url="https://walled.example/final",
     )
     sess = _FakeSession(page)
     prov = HyperbrowserProvider(mode="unlock", session_factory=lambda: sess)
@@ -163,6 +176,79 @@ async def test_ok_result_is_drop_in(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(entry["body"], str) and json.loads(entry["body"])  # json.loads-able (scraper.py:1070)
     assert entry["captcha_detected"] is False
     assert sess.closed, "session must be stopped"
+
+
+def test_rentmanager_inventory_hop_requires_exact_same_origin_publication() -> None:
+    root = """
+    <a href="https://gmc.twa.rentmanager.com/">Resident Portal</a>
+    <a href="/unit-availability/">View Live Apartment Availability</a>
+    """
+    assert (
+        _published_rentmanager_inventory_url(
+            root,
+            "https://legacy.example/",
+        )
+        == "https://legacy.example/unit-availability/"
+    )
+    assert (
+        _published_rentmanager_inventory_url(
+            root.replace("/unit-availability/", "https://sibling.example/unit-availability/"),
+            "https://legacy.example/",
+        )
+        == ""
+    )
+    assert (
+        _published_rentmanager_inventory_url(
+            '<a href="/unit-availability/">Availability</a>',
+            "https://legacy.example/",
+        )
+        == ""
+    )
+
+
+@pytest.mark.asyncio
+async def test_provider_reuses_session_for_published_rentmanager_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hb, "_SETTLE_MS", 5)
+    monkeypatch.setenv("HYPERBROWSER_MAX_CALLS_PER_PROPERTY", "1")
+    reset_hyperbrowser_property_counts()
+    root = """
+    <html><body>
+      <a href="https://gmc.twa.rentmanager.com/">Resident Portal</a>
+      <a href="/unit-availability/">View Live Apartment Availability</a>
+    </body></html>
+    """
+    roster = """
+    <div class="rmwb_listing-wrapper">
+      <a href="details/?uid=928">Details</a>
+      <span class="rmwb_info-title">Rent</span>
+    </div>
+    """
+    requested: list[str] = []
+
+    class _InventoryPage(_FakePage):
+        async def evaluate(self, _js: str, relative: str) -> dict[str, object]:
+            requested.append(relative)
+            return {"status": 200, "body": roster}
+
+    page = _InventoryPage(
+        html=root,
+        responses=[],
+        title="Legacy Apartments",
+        url="https://legacy.example/",
+    )
+    session = _FakeSession(page)
+    result = await HyperbrowserProvider(session_factory=lambda: session).fetch(
+        _task(url="https://legacy.example/", pid="legacy-rm"), None
+    )
+
+    assert result.outcome == FetchOutcome.OK
+    assert result.final_url == "https://legacy.example/unit-availability/"
+    assert result.body == roster.encode()
+    assert requested == ["/unit-availability/"]
+    assert hyperbrowser_property_call_count("legacy-rm") == 1
+    assert session.closed
 
 
 @pytest.mark.asyncio
@@ -198,6 +284,35 @@ async def test_timeout_is_transient() -> None:
     assert res.outcome == FetchOutcome.TRANSIENT
 
 
+@pytest.mark.asyncio
+async def test_local_close_hangs_are_bounded_before_remote_stop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A wedged CDP close must not delay the paid-session stop indefinitely."""
+    monkeypatch.setattr(hb, "_LOCAL_CLOSE_TIMEOUT_SECONDS", 0.01)
+    calls: list[str] = []
+
+    class _HungBrowser:
+        async def close(self) -> None:
+            calls.append("browser")
+            await asyncio.Event().wait()
+
+    class _HungPlaywright:
+        async def stop(self) -> None:
+            calls.append("playwright")
+            await asyncio.Event().wait()
+
+    session = hb._HbSession(mode="render")
+    session._browser = _HungBrowser()
+    session._pw = _HungPlaywright()
+    # No remote id is needed here: reaching the end of close() after both
+    # hung local resources proves neither can obstruct the following stop
+    # section. The production path enters that section whenever id is set.
+    await asyncio.wait_for(session.close(), timeout=0.2)
+
+    assert calls == ["browser", "playwright"]
+
+
 # ── per-property cost cap ────────────────────────────────────────────────────
 
 
@@ -222,6 +337,137 @@ async def test_per_property_cost_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r3.outcome == FetchOutcome.BOT_BLOCKED
     assert r3.block_signature == "hb_property_cap"
     assert r3.attempts == 0
+
+
+def test_priority_slot_is_reserved_without_increasing_total_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HYPERBROWSER_MAX_CALLS_PER_PROPERTY", "3")
+    monkeypatch.setenv("HYPERBROWSER_RESERVED_PRIORITY_CALLS", "1")
+    reset_hyperbrowser_property_counts()
+
+    assert _hb_try_reserve_property("priority-cap", reason="discovery-1")
+    assert _hb_try_reserve_property("priority-cap", reason="discovery-2")
+    assert not _hb_try_reserve_property("priority-cap", reason="discovery-3")
+    assert _hb_try_reserve_property(
+        "priority-cap",
+        priority=True,
+        reason="exact-profile-route",
+    )
+    assert not _hb_try_reserve_property(
+        "priority-cap",
+        priority=True,
+        reason="over-total-cap",
+    )
+    assert hyperbrowser_property_call_count("priority-cap") == 3
+
+
+@pytest.mark.asyncio
+async def test_raw_get_shares_per_property_cost_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct raw shortcuts must not bypass the paid-session cap."""
+    monkeypatch.setenv("HYPERBROWSER_MAX_CALLS_PER_PROPERTY", "1")
+    reset_hyperbrowser_property_counts()
+    opens = {"n": 0}
+
+    class _RawPage:
+        async def goto(self, url: str, **kw) -> None:
+            return None
+
+        async def evaluate(self, js: str, rel: str) -> dict[str, object]:
+            return {"status": 200, "body": "raw-ok"}
+
+    def _factory() -> _FakeSession:
+        opens["n"] += 1
+        return _FakeSession(_RawPage())  # type: ignore[arg-type]
+
+    first = await hb_raw_get("https://example.test/units", "raw-cap-x", session_factory=_factory)
+    second = await hb_raw_get("https://example.test/units", "raw-cap-x", session_factory=_factory)
+
+    assert first == (200, "raw-ok")
+    assert second == (0, "")
+    assert opens["n"] == 1, "capped raw GET must not open a paid session"
+    assert hyperbrowser_property_call_count("raw-cap-x") == 1
+
+
+@pytest.mark.asyncio
+async def test_raw_get_then_reuses_one_session_for_same_origin_followup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HYPERBROWSER_MAX_CALLS_PER_PROPERTY", "1")
+    reset_hyperbrowser_property_counts()
+    opens = {"n": 0}
+    requested_paths: list[str] = []
+
+    class _RawChainPage:
+        async def goto(self, url: str, **kw) -> None:
+            return None
+
+        async def evaluate(self, js: str, rel: str) -> dict[str, object]:
+            requested_paths.append(rel)
+            bodies = {
+                "/floorplans": '<a href="/floorplans/a1">A1</a>',
+                "/floorplans/a1": "native-unit-roster",
+            }
+            return {"status": 200, "body": bodies.get(rel, "")}
+
+    def _factory() -> _FakeSession:
+        opens["n"] += 1
+        return _FakeSession(_RawChainPage())  # type: ignore[arg-type]
+
+    first, followup = await hb.hb_raw_get_then(
+        "https://example.test/floorplans",
+        "raw-chain-x",
+        lambda _body: "/floorplans/a1",
+        session_factory=_factory,
+    )
+
+    assert first == (200, '<a href="/floorplans/a1">A1</a>')
+    assert followup == (
+        "https://example.test/floorplans/a1",
+        200,
+        "native-unit-roster",
+    )
+    assert requested_paths == ["/floorplans", "/floorplans/a1"]
+    assert opens["n"] == 1
+    assert hyperbrowser_property_call_count("raw-chain-x") == 1
+
+    capped, capped_followup = await hb.hb_raw_get_then(
+        "https://example.test/floorplans",
+        "raw-chain-x",
+        lambda _body: "/floorplans/a1",
+        session_factory=_factory,
+    )
+    assert capped == (0, "") and capped_followup is None
+    assert opens["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_raw_get_then_rejects_cross_origin_followup() -> None:
+    reset_hyperbrowser_property_counts()
+    requested_paths: list[str] = []
+
+    class _RawChainPage:
+        async def goto(self, url: str, **kw) -> None:
+            return None
+
+        async def evaluate(self, js: str, rel: str) -> dict[str, object]:
+            requested_paths.append(rel)
+            return {"status": 200, "body": "index"}
+
+    session = _FakeSession(_RawChainPage())  # type: ignore[arg-type]
+    first, followup = await hb.hb_raw_get_then(
+        "https://example.test/floorplans",
+        "raw-chain-cross-origin",
+        lambda _body: "https://sibling.example/floorplans/a1",
+        session_factory=lambda: session,
+    )
+
+    assert first == (200, "index")
+    assert followup is None
+    assert requested_paths == ["/floorplans"]
+    assert session.closed
 
 
 # ── HB preferred over BrightData (Ankur: HB free, BrightData backup) ──────────

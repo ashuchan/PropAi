@@ -10,6 +10,7 @@ Fixtures are REAL ``available=true`` GetUnits bodies captured 2026-07-19:
 from __future__ import annotations
 
 import json
+import types
 from pathlib import Path
 
 import pytest
@@ -108,6 +109,45 @@ def test_parse_skips_units_without_number() -> None:
     rows = parse_realpage_cws_getunits(body, "u")
     assert len(rows) == 1
     assert rows[0]["unit_number"] == "12A"
+
+
+def test_parse_public_widget_response_envelope_keeps_repeated_unit_numbers() -> None:
+    body = {
+        "response": {
+            "units": [
+                {
+                    "id": 101,
+                    "unitNumber": "08",
+                    "buildingName": "A",
+                    "floorplanId": 11,
+                    "rent": 1200,
+                    "squareFeet": 700,
+                    "numberOfBeds": 1,
+                    "leaseStatus": "AVAILABLE_READY",
+                    "internalAvailableDate": "2026-08-15 00:00 -0500",
+                },
+                {
+                    "id": 102,
+                    "unitNumber": "08",
+                    "buildingName": "B",
+                    "floorplanId": 12,
+                    "rent": 1400,
+                    "squareFeet": 800,
+                    "numberOfBeds": 2,
+                    "leaseStatus": "AVAILABLE_READY",
+                    "internalAvailableDate": "2026-09-01 00:00 -0500",
+                },
+            ]
+        }
+    }
+    rows = parse_realpage_cws_getunits(body, "https://api.ws.realpage.com/units")
+    assert len(rows) == 2
+    assert [row["unit_number"] for row in rows] == ["08", "08"]
+    assert [row["building"] for row in rows] == ["A", "B"]
+    assert [row["availability_date"] for row in rows] == [
+        "2026-08-15",
+        "2026-09-01",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -220,3 +260,146 @@ async def test_adapter_skips_getunits_when_flag_off(monkeypatch: pytest.MonkeyPa
     )  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_DOM_REALPAGE_CWS"
     assert result.confidence == 0.0
+
+
+def _public_widget_body() -> dict[str, object]:
+    return {
+        "response": {
+            "units": [
+                {
+                    "id": 101,
+                    "unitNumber": "08",
+                    "buildingName": "A",
+                    "floorplanId": 11,
+                    "rent": 1200,
+                    "squareFeet": 700,
+                    "numberOfBeds": 1,
+                    "leaseStatus": "AVAILABLE_READY",
+                    "internalAvailableDate": "2026-08-15 00:00 -0500",
+                },
+                {
+                    "id": 102,
+                    "unitNumber": "11",
+                    "buildingName": "B",
+                    "floorplanId": 12,
+                    "rent": 1400,
+                    "squareFeet": 800,
+                    "numberOfBeds": 2,
+                    "leaseStatus": "AVAILABLE_READY",
+                    "internalAvailableDate": "2026-09-01 00:00 -0500",
+                },
+            ]
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_adapter_consumes_captured_public_units_before_generic_dedup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENABLE_CWS_GETUNITS", "false")
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise AssertionError("captured /units must not cause another request")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _boom)
+    ctx = _ctx("https://www.townesuniversity.com/")
+    ctx.fetch_result = types.SimpleNamespace(
+        body=b"<script>var propertyId = '8175735';</script>",
+        final_url="https://www.townesuniversity.com/",
+    )
+    ctx._api_responses = [  # type: ignore[attr-defined]
+        {
+            "url": (
+                "https://api.ws.realpage.com/v2/property/8175735/units"
+                "?available=true&honordisplayorder=true"
+            ),
+            "status": 200,
+            "body": _public_widget_body(),
+        }
+    ]
+    result = await RealPageCwsAdapter().extract(
+        _FakePage({"ok": False, "reason": "no cards"}), ctx
+    )  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_REALPAGE_CWS_UNITS"
+    assert len(result.units) == 2
+    assert [row["availability_date"] for row in result.units] == [
+        "2026-08-15",
+        "2026-09-01",
+    ]
+    assert result.api_responses[0]["via"] == "captured_realpage_public_units"
+
+
+@pytest.mark.asyncio
+async def test_floorplan_checkpoint_depth_probes_matching_public_units_direct_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENABLE_CWS_GETUNITS", "false")
+    seen: dict[str, object] = {}
+
+    def _probe(url: str, **kwargs: object) -> _Resp:
+        seen.update(url=url, **kwargs)
+        return _Resp(json.dumps(_public_widget_body()))
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _probe)
+    ctx = _ctx("https://www.townesuniversity.com/")
+    ctx.fetch_result = types.SimpleNamespace(
+        body=(
+            b"<script>var propertyId = '8175735'; "
+            b"var config = {apiKey: '11111111-2222-3333-4444-555555555555'};"
+            b"</script>"
+        ),
+        final_url="https://www.townesuniversity.com/",
+    )
+    ctx._api_responses = [  # type: ignore[attr-defined]
+        {
+            "url": "https://api.ws.realpage.com/v2/property/8175735/floorplans",
+            "status": 200,
+            "body": {"response": {"floorplans": [{"id": 11}]}},
+        }
+    ]
+    result = await RealPageCwsAdapter().extract(
+        _FakePage({"ok": False, "reason": "no cards"}), ctx
+    )  # type: ignore[arg-type]
+    assert len(result.units) == 2
+    assert seen["unlocker"] is False
+    assert seen["url"] == (
+        "https://api.ws.realpage.com/v2/property/8175735/units"
+        "?available=true&honordisplayorder=true"
+    )
+    headers = seen["headers"]
+    assert isinstance(headers, dict)
+    assert headers["Origin"] == "https://www.townesuniversity.com"
+    assert result.api_responses[0]["via"] == "realpage_public_widget_units"
+
+
+@pytest.mark.asyncio
+async def test_public_widget_identity_mismatch_does_not_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENABLE_CWS_GETUNITS", "false")
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise AssertionError("cross-property public probe must not run")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _boom)
+    ctx = _ctx("https://www.townesuniversity.com/")
+    ctx.fetch_result = types.SimpleNamespace(
+        body=(
+            b"<script>var propertyId = '8175735'; "
+            b"var config = {apiKey: '11111111-2222-3333-4444-555555555555'};"
+            b"</script>"
+        ),
+        final_url="https://www.townesuniversity.com/",
+    )
+    ctx._api_responses = [  # type: ignore[attr-defined]
+        {
+            "url": "https://api.ws.realpage.com/v2/property/9999999/floorplans",
+            "status": 200,
+            "body": {"response": {"floorplans": [{"id": 11}]}},
+        }
+    ]
+    result = await RealPageCwsAdapter().extract(
+        _FakePage({"ok": False, "reason": "no cards"}), ctx
+    )  # type: ignore[arg-type]
+    assert result.units == []

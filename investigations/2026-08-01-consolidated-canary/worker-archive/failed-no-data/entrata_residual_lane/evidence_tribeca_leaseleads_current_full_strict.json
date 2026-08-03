@@ -1,0 +1,512 @@
+{
+  "generated_at_utc": "2026-08-01T12:55:32.931048+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions": 0,
+    "llm_enabled": false,
+    "ordinary_direct_get_only": true,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "tribeca_leaseleads_current_full_configured_pipeline_strict",
+  "results": [
+    {
+      "adapter": "squarespace_nopms",
+      "configured_fetch": {
+        "attempts": 1,
+        "body_bytes": 395147,
+        "final_url": "https://www.tribecacolumbus.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "contamination_verdict": "pass_exact_published_leaseleads_uuid_domain_name_street_city_zip_native_unit_ids_full_configured_pipeline",
+      "fallback_chain": [
+        "squarespace_nopms",
+        "universal_recovery:leaseleads_embed"
+      ],
+      "identity_evidence": {
+        "distinct_native_ids": 21,
+        "distinct_unit_numbers": 21,
+        "rows_with_native_identity": 21,
+        "rows_with_native_identity_and_positive_rent": 21,
+        "source_property_ids": [
+          "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c"
+        ],
+        "source_urls": [
+          "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662197",
+            "unit_number": "414WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2573,
+            "market_rent_low": 1483
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662177",
+            "unit_number": "344WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2598,
+            "market_rent_low": 1512
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662176",
+            "unit_number": "343WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1940,
+            "market_rent_low": 1512
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662127",
+            "unit_number": "244WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1995,
+            "market_rent_low": 1507
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662135",
+            "unit_number": "302WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2607,
+            "market_rent_low": 1508
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662185",
+            "unit_number": "402WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1971,
+            "market_rent_low": 1528
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662050",
+            "unit_number": "100WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2748,
+            "market_rent_low": 1588
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        },
+        {
+          "identity": {
+            "leaseleads_unit_id": "4662110",
+            "unit_number": "227WT"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2075,
+            "market_rent_low": 1538
+          },
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 57195,
+      "property_identity_match": true,
+      "property_name": "Tribeca",
+      "rp_oracle_distinct_floorplans": 15,
+      "rp_oracle_native_unit_rows": 25,
+      "tier": "TIER_1_API_LEASELEADS",
+      "unit_rows": [
+        {
+          "address": "",
+          "floor_plan_name": "Albany 1",
+          "market_rent_high": 2573,
+          "market_rent_low": 1483,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662197"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "791",
+          "unit_id": "",
+          "unit_name": "414WT",
+          "unit_number": "414WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Barclay 1",
+          "market_rent_high": 2598,
+          "market_rent_low": 1512,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662177"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "656",
+          "unit_id": "",
+          "unit_name": "344WT",
+          "unit_number": "344WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Barclay 1",
+          "market_rent_high": 1940,
+          "market_rent_low": 1512,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662176"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "656",
+          "unit_id": "",
+          "unit_name": "343WT",
+          "unit_number": "343WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Barclay 1",
+          "market_rent_high": 1995,
+          "market_rent_low": 1507,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662127"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "656",
+          "unit_id": "",
+          "unit_name": "244WT",
+          "unit_number": "244WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Delancy 2",
+          "market_rent_high": 2607,
+          "market_rent_low": 1508,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662135"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "812",
+          "unit_id": "",
+          "unit_name": "302WT",
+          "unit_number": "302WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Delancy 2",
+          "market_rent_high": 1971,
+          "market_rent_low": 1528,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662185"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "812",
+          "unit_id": "",
+          "unit_name": "402WT",
+          "unit_number": "402WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Exchange",
+          "market_rent_high": 2748,
+          "market_rent_low": 1588,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662050"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "870",
+          "unit_id": "",
+          "unit_name": "100WT",
+          "unit_number": "100WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Greenwhich",
+          "market_rent_high": 2075,
+          "market_rent_low": 1538,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662110"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "820",
+          "unit_id": "",
+          "unit_name": "227WT",
+          "unit_number": "227WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Park Row 1",
+          "market_rent_high": 2670,
+          "market_rent_low": 1466,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662087"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "586",
+          "unit_id": "",
+          "unit_name": "204WT",
+          "unit_number": "204WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Park Row 1",
+          "market_rent_high": 1878,
+          "market_rent_low": 1462,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662096"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "586",
+          "unit_id": "",
+          "unit_name": "213WT",
+          "unit_number": "213WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Park Row 1",
+          "market_rent_high": 1884,
+          "market_rent_low": 1467,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662136"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "586",
+          "unit_id": "",
+          "unit_name": "303WT",
+          "unit_number": "303WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Baxter",
+          "market_rent_high": 2920,
+          "market_rent_low": 2027,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662178"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1200",
+          "unit_id": "",
+          "unit_name": "345WT",
+          "unit_number": "345WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Bridge",
+          "market_rent_high": 2634,
+          "market_rent_low": 1899,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662084"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1102",
+          "unit_id": "",
+          "unit_name": "201WT",
+          "unit_number": "201WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Bridge",
+          "market_rent_high": 2640,
+          "market_rent_low": 1904,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662134"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1102",
+          "unit_id": "",
+          "unit_name": "301WT",
+          "unit_number": "301WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Bridge",
+          "market_rent_high": 2724,
+          "market_rent_low": 1887,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662123"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1102",
+          "unit_id": "",
+          "unit_name": "240WT",
+          "unit_number": "240WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2556,
+          "market_rent_low": 1767,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662154"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "321WT",
+          "unit_number": "321WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2605,
+          "market_rent_low": 1827,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662056"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "106WT",
+          "unit_number": "106WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2617,
+          "market_rent_low": 1749,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662104"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "221WT",
+          "unit_number": "221WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2575,
+          "market_rent_low": 1774,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662092"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "209WT",
+          "unit_number": "209WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2432,
+          "market_rent_low": 1679,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662188"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "405WT",
+          "unit_number": "405WT"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "Trinity",
+          "market_rent_high": 2606,
+          "market_rent_low": 1799,
+          "native_unit_id": "",
+          "source_api_url": "https://api.leaseleads.co/api/v2/property/9e4f1b70-ec67-4725-81da-7dd6b6c04d8c/floor-plans",
+          "source_ids": {
+            "leaseleads_unit_id": "4662105"
+          },
+          "source_property_id": "9e4f1b70-ec67-4725-81da-7dd6b6c04d8c",
+          "source_property_name": "Tribeca",
+          "sqft": "1051",
+          "unit_id": "",
+          "unit_name": "222WT",
+          "unit_number": "222WT"
+        }
+      ],
+      "units": 21,
+      "website": "https://tribecacolumbus.com/"
+    }
+  ],
+  "source_snapshot": {
+    "critical_file_sha256": {
+      "ma_poc/core/source_ids.py": "7197a469176d51caa9cb1de22735e2a2474cb588d576d951a33092953ab7e5fa",
+      "ma_poc/pms/adapters/_leaseleads_embed.py": "76eeebaa1a6f525687d978d2a89ba043589d7a83e842cb458b2f1a6b2bdccce4",
+      "ma_poc/pms/adapters/_universal_recovery.py": "7dd37b334de9ca3e0f0332cf48947f9861608c833ac95c12031bd31b7e0f9515",
+      "ma_poc/pms/adapters/squarespace_nopms.py": "f6a5a1621549ebe8fc2789a6ed95326c7e31f3aae8d890b52731f6ebb97f70df",
+      "ma_poc/pms/detector.py": "159440739f264e69b4faccf2ba0b7cb1eab4e45193631ef25cb4ba6a48fe2812",
+      "ma_poc/pms/scraper.py": "2548c63156d664610771594680838fa435fced47f7320ac03c62deb7bef98c8e"
+    },
+    "git_head": "02369d2827dd6bfe49e7abb8d32e028742ef8d6c"
+  }
+}

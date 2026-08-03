@@ -80,6 +80,18 @@ def _walk(obj: Any, path: list[str]) -> Any:
     return cur
 
 
+def _trpc_queries(next_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return dehydrated tRPC queries from both observed Next.js roots."""
+    for path in (
+        ["props", "pageProps", "trpcState", "json", "queries"],
+        ["pageProps", "trpcState", "json", "queries"],
+    ):
+        queries = _walk(next_data, path)
+        if isinstance(queries, list):
+            return [query for query in queries if isinstance(query, dict)]
+    return []
+
+
 def _floorplan_arrays(next_data: dict[str, Any]) -> list[list[dict[str, Any]]]:
     """Find every queries[*].state.data array that looks like a floor-plan list.
 
@@ -88,11 +100,8 @@ def _floorplan_arrays(next_data: dict[str, Any]) -> list[list[dict[str, Any]]]:
     arrays whose first item has a ``floorplanName`` key — that's the load-bearing
     field across both submarket and property JSONs.
     """
-    queries = _walk(next_data, ["pageProps", "trpcState", "json", "queries"])
-    if not isinstance(queries, list):
-        return []
     out: list[list[dict[str, Any]]] = []
-    for q in queries:
+    for q in _trpc_queries(next_data):
         data = _walk(q, ["state", "data"])
         if not isinstance(data, list) or not data:
             continue
@@ -100,6 +109,129 @@ def _floorplan_arrays(next_data: dict[str, Any]) -> list[list[dict[str, Any]]]:
         if isinstance(first, dict) and "floorplanName" in first:
             out.append(data)
     return out
+
+
+def _identity_text(value: Any) -> str:
+    if isinstance(value, bool) or value in (None, ""):
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _amli_floorplan_query_records(next_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only exact ``["amli", "floorplans"]`` query records.
+
+    The current property and submarket pages also carry floor-plan-shaped
+    highlights and sibling arrays.  Query identity is the authoritative
+    boundary; a bare list shape is not.
+    """
+    records: list[dict[str, Any]] = []
+    for query in _trpc_queries(next_data):
+        query_key = query.get("queryKey")
+        if not isinstance(query_key, list) or not query_key:
+            continue
+        path = query_key[0]
+        if path != ["amli", "floorplans"] and path != ("amli", "floorplans"):
+            continue
+        options = query_key[1] if len(query_key) > 1 and isinstance(query_key[1], dict) else {}
+        query_input = options.get("input") if isinstance(options.get("input"), dict) else {}
+        data = _walk(query, ["state", "data"])
+        if not isinstance(data, list):
+            continue
+        records.append(
+            {
+                "floor_plans": data,
+                "amli_property_id": _identity_text(query_input.get("amliPropertyId")),
+                "prismic_property_id": _identity_text(
+                    query_input.get("propertyId")
+                    or query_input.get("propertyDocumentID")
+                    or query_input.get("prismicPropertyId")
+                ),
+                "query_key": query_key,
+            }
+        )
+    return records
+
+
+def _select_amli_floorplan_query(
+    next_data: dict[str, Any],
+    *,
+    property_slug: str | None,
+    expected_identity: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, str]:
+    """Select one property-bound floor-plan query or explain the miss."""
+    records = _amli_floorplan_query_records(next_data)
+    if not records:
+        return None, "missing_exact_query"
+
+    expected_amli = _identity_text((expected_identity or {}).get("amli_property_id"))
+    expected_prismic = _identity_text((expected_identity or {}).get("prismic_property_id"))
+    candidates: list[dict[str, Any]] = []
+    for record in records:
+        if expected_amli and record["amli_property_id"] != expected_amli:
+            continue
+        if expected_prismic and record["prismic_property_id"] != expected_prismic:
+            continue
+        if not expected_identity and property_slug:
+            observed_slugs = {
+                slug
+                for fp in record["floor_plans"]
+                if isinstance(fp, dict)
+                for slug in [_floorplan_property_uid(fp)]
+                if slug
+            }
+            if observed_slugs and observed_slugs != {property_slug}:
+                continue
+        if not record["amli_property_id"] or not record["prismic_property_id"]:
+            continue
+        candidates.append(record)
+
+    if not candidates:
+        return None, "no_property_bound_query"
+    identities = {
+        (record["amli_property_id"], record["prismic_property_id"])
+        for record in candidates
+    }
+    if len(identities) != 1:
+        return None, "contradictory_exact_queries"
+    # Duplicate dehydrated records with the same identity are harmless; use
+    # the most complete response rather than unioning repeated snapshots.
+    return max(candidates, key=lambda record: len(record["floor_plans"])), "matched"
+
+
+def _amli_query_identity(record: dict[str, Any]) -> dict[str, str]:
+    return {
+        "amli_property_id": _identity_text(record.get("amli_property_id")),
+        "prismic_property_id": _identity_text(record.get("prismic_property_id")),
+    }
+
+
+def _record_amli_unit_source(
+    result: AdapterResult,
+    *,
+    source_url: str,
+    record: dict[str, Any],
+    unit_count: int,
+    property_slug: str | None,
+) -> None:
+    from ma_poc.pms.source_provenance import build_unit_source_provenance
+
+    identity = _amli_query_identity(record)
+    result.unit_source_provenance.append(
+        build_unit_source_provenance(
+            provider="amli",
+            source_url=source_url,
+            body=record.get("floor_plans") or [],
+            unit_count=unit_count,
+            identity={
+                "status": "MATCH",
+                "evidence": ["exact_amli_floorplans_query", "query_property_ids"],
+                "configured_slug": property_slug or "",
+                **identity,
+            },
+        )
+    )
 
 
 def _bedrooms_int(v: Any) -> int | None:
@@ -136,14 +268,44 @@ def _floorplan_property_uid(fp: dict[str, Any]) -> str | None:
         v = fp.get(key)
         if isinstance(v, str) and v.strip():
             return v.strip()
+    cms = fp.get("cms")
+    cms_data = cms.get("data") if isinstance(cms, dict) else None
+    properties = cms_data.get("properties") if isinstance(cms_data, dict) else None
+    if isinstance(properties, list):
+        for wrapper in properties:
+            prop = wrapper.get("property") if isinstance(wrapper, dict) else None
+            if not isinstance(prop, dict):
+                continue
+            for key in ("uid", "slug"):
+                value = prop.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
     return None
+
+
+def _floorplan_prismic_property_ids(fp: dict[str, Any]) -> set[str]:
+    out: set[str] = set()
+    cms = fp.get("cms")
+    cms_data = cms.get("data") if isinstance(cms, dict) else None
+    properties = cms_data.get("properties") if isinstance(cms_data, dict) else None
+    if not isinstance(properties, list):
+        return out
+    for wrapper in properties:
+        prop = wrapper.get("property") if isinstance(wrapper, dict) else None
+        if isinstance(prop, dict):
+            value = _identity_text(prop.get("id"))
+            if value:
+                out.add(value)
+    return out
 
 
 def parse_amli_floor_plans(
     floor_plans: list[dict[str, Any]],
     property_slug: str | None,
     source_url: str,
-) -> list[dict[str, str]]:
+    *,
+    query_identity: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Convert AMLI floor-plan dicts into our standard unit dicts.
 
     Filters by ``property_slug`` when provided (submarket JSON contains plans
@@ -152,50 +314,72 @@ def parse_amli_floor_plans(
     Rows without a ``units[]`` array do not produce floor-plan-level fallback
     rows here — JSON-LD already covers that path elsewhere.
     """
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
 
-    # Filter: exact-match propertyUid wins; otherwise accept all (submarket
-    # JSONs that don't carry propertyUid would be unusable if we filtered
-    # too aggressively).
-    if property_slug:
+    # A current exact query is already property-bound.  Without one, require
+    # exact row/CMS slug evidence; never accept an unscoped submarket array.
+    if property_slug and not query_identity:
         matched = [fp for fp in floor_plans if _floorplan_property_uid(fp) == property_slug]
-        if not matched:
-            # Substring fallback handles slug renames (e.g. "amli-evanston" vs
-            # "evanston"). Better one false-positive than zero recovery.
-            matched = [
-                fp for fp in floor_plans
-                if property_slug in (_floorplan_property_uid(fp) or "")
-            ]
-        # If still nothing matched, AMLI may have served a single-property
-        # JSON where every entry implicitly belongs to this property. Fall
-        # through to all entries.
-        if not matched:
-            uids_seen = {_floorplan_property_uid(fp) for fp in floor_plans}
-            uids_seen.discard(None)
-            if not uids_seen:
-                matched = floor_plans
         floor_plans = matched
 
+    expected_amli_id = _identity_text((query_identity or {}).get("amli_property_id"))
+    expected_prismic_id = _identity_text((query_identity or {}).get("prismic_property_id"))
+
     for fp in floor_plans:
+        row_amli_id = _identity_text(fp.get("propertyId") or fp.get("amliPropertyId"))
+        if expected_amli_id and row_amli_id and row_amli_id != expected_amli_id:
+            continue
+        row_prismic_ids = _floorplan_prismic_property_ids(fp)
+        if expected_prismic_id and row_prismic_ids and expected_prismic_id not in row_prismic_ids:
+            continue
         fp_name = str(fp.get("floorplanName") or "")
-        beds = _bedrooms_int(fp.get("bedrooms"))
+        beds_value = fp.get("bedroomMax")
+        if beds_value in (None, ""):
+            beds_value = fp.get("bedroomMin")
+        if beds_value in (None, ""):
+            beds_value = fp.get("bedrooms")
+        beds = _bedrooms_int(beds_value)
         baths_raw = fp.get("bathroomMax") or fp.get("bathroomMin") or fp.get("bathrooms")
-        sqft_raw = fp.get("sqftMin") or fp.get("sqftMax") or fp.get("sqft")
         raw_units = fp.get("units")
         fp_units: list[Any] = raw_units if isinstance(raw_units, list) else []
         for u in fp_units:
             if not isinstance(u, dict):
                 continue
             rent = _rent_int(u.get("rent") or u.get("priceMin"))
-            out.append(
-                make_unit_dict(
+            unit_native_id = _identity_text(u.get("unitId"))
+            public_number = str(u.get("unitNumber") or u.get("unit_number") or "")
+            unit_sqft = u.get("squareFeet")
+            if unit_sqft in (None, ""):
+                unit_sqft = fp.get("sqftMin") or fp.get("sqftMax") or fp.get("sqft")
+            source_ids: dict[str, Any] = {}
+            if unit_native_id:
+                source_ids["amli_unit_id"] = unit_native_id
+            engrain_unit_id = _identity_text(u.get("engrainUnitId"))
+            if engrain_unit_id:
+                source_ids["amli_engrain_unit_id"] = engrain_unit_id
+            entrata_unit_id = _identity_text(u.get("entrataUnitId"))
+            if entrata_unit_id and entrata_unit_id != "0":
+                source_ids["amli_entrata_unit_id"] = entrata_unit_id
+            floor_plan_id = _identity_text(fp.get("floorplanId") or fp.get("id"))
+            if floor_plan_id and floor_plan_id != "0":
+                source_ids["amli_floor_plan_id"] = floor_plan_id
+            if expected_amli_id:
+                source_ids["amli_property_id"] = expected_amli_id
+            if expected_prismic_id:
+                source_ids["amli_prismic_property_id"] = expected_prismic_id
+            entrata_property_id = _identity_text(fp.get("entrataPropertyId"))
+            if entrata_property_id and entrata_property_id != "0":
+                source_ids["amli_entrata_property_id"] = entrata_property_id
+            row = make_unit_dict(
                     floor_plan_name=fp_name,
                     bed_label=bed_label_from(beds, fp_name),
                     bedrooms=str(beds) if beds is not None else "",
                     bathrooms=str(baths_raw) if baths_raw not in (None, "") else "",
-                    sqft=str(sqft_raw) if sqft_raw not in (None, "") else "",
-                    unit_number=str(u.get("unitNumber") or u.get("unit_number") or ""),
+                    sqft=str(unit_sqft) if unit_sqft not in (None, "") else "",
+                    unit_number=public_number,
+                    unit_name=public_number,
                     floor=str(u.get("floor") or ""),
+                    building=str(u.get("buildingNumber") or ""),
                     rent_range=format_rent_range(rent, rent),
                     rent_low=rent,
                     rent_high=rent,
@@ -203,8 +387,11 @@ def parse_amli_floor_plans(
                     availability_date=_avail_date(u.get("rpAvailableDate") or u.get("availableDate")),
                     source_api_url=source_url,
                     extraction_tier=_TIER_FETCHED,
+                    source_ids=source_ids,
                 )
-            )
+            if unit_native_id:
+                row["unit_id"] = unit_native_id
+            out.append(row)
     return out
 
 
@@ -255,11 +442,42 @@ class AmliAdapter:
         # populated floor-plan array inline (Prismic-only), so this usually
         # produces 0 units, but it's free when it works.
         if next_data:
-            inline_fps = _floorplan_arrays(next_data)
-            for fp_array in inline_fps:
-                inline_units = parse_amli_floor_plans(fp_array, property_slug, ctx.base_url)
-                if inline_units:
-                    result.units.extend(inline_units)
+            exact_record, exact_status = _select_amli_floorplan_query(
+                next_data,
+                property_slug=property_slug,
+            )
+            if exact_status == "contradictory_exact_queries":
+                result.errors.append("AMLI: contradictory property-bound floorplan queries")
+                return result
+            if exact_record is not None:
+                target_identity = _amli_query_identity(exact_record)
+                result.units = parse_amli_floor_plans(
+                    exact_record["floor_plans"],
+                    property_slug,
+                    ctx.base_url,
+                    query_identity=target_identity,
+                )
+                result.tier_used = _TIER_INLINE
+                result.winning_url = ctx.base_url
+                _record_amli_unit_source(
+                    result,
+                    source_url=ctx.base_url,
+                    record=exact_record,
+                    unit_count=len(result.units),
+                    property_slug=property_slug,
+                )
+                if not result.units:
+                    result.errors.append("AMLI: exact property query published no physical units")
+                    return result
+            else:
+                target_identity = None
+                # Backward-compatible old schema: only exact row/CMS slugs are
+                # admissible.  Unscoped arrays now produce zero rows.
+                for fp_array in _floorplan_arrays(next_data):
+                    result.units.extend(
+                        parse_amli_floor_plans(fp_array, property_slug, ctx.base_url)
+                    )
+                if result.units:
                     result.tier_used = _TIER_INLINE
                     result.winning_url = ctx.base_url
             if result.units:
@@ -282,6 +500,12 @@ class AmliAdapter:
                     f"AMLI_INLINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
+                # The exact property-bound response was present; do not replace
+                # a validity failure with a sibling-rich submarket response.
+                if exact_record is not None:
+                    return result
+        else:
+            target_identity = None
 
         # Step 2 — refetch the SUBMARKET _next/data JSON. This is the
         # authoritative source — it always has units when AMLI has them.
@@ -350,8 +574,36 @@ class AmliAdapter:
 
         result.api_responses.append({"url": submarket_url, "body": payload})
 
-        for fp_array in _floorplan_arrays(payload):
-            result.units.extend(parse_amli_floor_plans(fp_array, property_slug, submarket_url))
+        exact_record, exact_status = _select_amli_floorplan_query(
+            payload if isinstance(payload, dict) else {},
+            property_slug=property_slug,
+            expected_identity=target_identity,
+        )
+        if exact_status == "contradictory_exact_queries":
+            result.errors.append("AMLI: contradictory submarket floorplan queries")
+            return result
+        if exact_record is not None:
+            query_identity = _amli_query_identity(exact_record)
+            result.units = parse_amli_floor_plans(
+                exact_record["floor_plans"],
+                property_slug,
+                submarket_url,
+                query_identity=query_identity,
+            )
+            _record_amli_unit_source(
+                result,
+                source_url=submarket_url,
+                record=exact_record,
+                unit_count=len(result.units),
+                property_slug=property_slug,
+            )
+        else:
+            # Legacy submarket schema: exact row/CMS slug filtering is still
+            # permitted, but an identity-free array can no longer win.
+            for fp_array in _floorplan_arrays(payload if isinstance(payload, dict) else {}):
+                result.units.extend(
+                    parse_amli_floor_plans(fp_array, property_slug, submarket_url)
+                )
 
         if not result.units:
             result.errors.append(

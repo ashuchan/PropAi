@@ -1,0 +1,123 @@
+{
+  "generated_at_utc": "2026-08-01T12:30:35.005640+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_sessions_for_current_pipeline": 0,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "web_unlocker": false
+  },
+  "lane": "millennium_published_appfolio_current_strict",
+  "results": [
+    {
+      "adapter": "appfolio",
+      "contamination_verdict": "pass_published_appfolio_index_exact_address_zip_filter_native_priced_units",
+      "identity_evidence": {
+        "address_filter_errors": [
+          "appfolio-ssr-address-filter: evidence=published_index reason=address_filter_applied kept=4 dropped=7 ctx_addr='2002 N Monroe St' ctx_zip='99205'"
+        ],
+        "configured_address": "2002 N Monroe St",
+        "configured_zip": "99205",
+        "published_route_chain": [
+          "https://www.millenniumnw.com/properties-for-rent",
+          "https://www-millenniumnw-com.filesusr.com/html/790584_8774c5f3287cc8cbd5b49adeb9ba3765.html",
+          "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc"
+        ],
+        "rows_with_native_identity": 4,
+        "rows_with_native_identity_and_positive_rent": 4,
+        "source_urls": [
+          "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc"
+        ]
+      },
+      "native_samples": [
+        {
+          "availability_date": "NOW",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "identity": {
+            "appfolio_listing_id": "62",
+            "unit_number": "102"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1390,
+            "market_rent_low": 1390
+          },
+          "source_api_url": "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc",
+          "sqft": "690"
+        },
+        {
+          "availability_date": "NOW",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "identity": {
+            "appfolio_listing_id": "76",
+            "unit_number": "405"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1390,
+            "market_rent_low": 1390
+          },
+          "source_api_url": "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc",
+          "sqft": "703"
+        },
+        {
+          "availability_date": "NOW",
+          "bathrooms": "1.0",
+          "bedrooms": "1",
+          "floor_plan_name": "",
+          "identity": {
+            "appfolio_listing_id": "52",
+            "unit_number": "307"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1790,
+            "market_rent_low": 1790
+          },
+          "source_api_url": "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc",
+          "sqft": "882"
+        },
+        {
+          "availability_date": "8/9/26",
+          "bathrooms": "2.0",
+          "bedrooms": "2",
+          "floor_plan_name": "",
+          "identity": {
+            "appfolio_listing_id": "40",
+            "unit_number": "409"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 2190,
+            "market_rent_low": 2190
+          },
+          "source_api_url": "https://newmpm.appfolio.com/listings?theme_color=%23676767&filters%5Border_by%5D=rent_asc",
+          "sqft": "1045"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 271721,
+      "property_identity_match": true,
+      "property_name": "The Millennium on Monroe",
+      "strict_gates": {
+        "all_emitted_rows_native_positive_rent": true,
+        "all_rows_from_exact_appfolio_index": true,
+        "configured_property_metadata_exact": true,
+        "current_full_pipeline_selected_appfolio_ssr": true,
+        "exact_address_zip_filter_kept_4_dropped_7": true,
+        "exact_configured_inventory_page_capture_http_200": true,
+        "native_appfolio_listing_ids_present": true,
+        "placeholder_property_group_ignored": true,
+        "published_embed_binds_newmpm_appfolio": true,
+        "sole_published_filesusr_embed_route": true
+      },
+      "tier": "TIER_1_DOM_APPFOLIO_SSR",
+      "units": 4,
+      "website": "https://www.millenniumnw.com/"
+    }
+  ],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/millennium_appfolio_current_full_pipeline.json",
+  "source_artifact_sha256": "ee92a83e84a8ab1df634c16e4f8c33281599bb9bcd637ba2f0a7767cbe29ee68"
+}

@@ -1437,40 +1437,84 @@ class GenericPlanTextAdapter:
         result = AdapterResult(tier_used="TIER_1_DOM_GENERIC_PLAN_TEXT")
         body = ""
 
-        # 2026-06-27: Camden Living NEXT_DATA short-circuit.
-        # Camden's 165+ properties route here (no PMS fingerprint hits);
-        # inventory lives in __NEXT_DATA__.props.pageProps.suggestedFloorPlans
-        # rather than the visible DOM, so plan-text regex sees only the
-        # "Starting at $X" hero. Parse the blob directly.
+        # A few bespoke sites publish a mixed server-rendered table where
+        # physical residences and numeric plan/stack ranges share the same
+        # availability page. Preserve the stronger native identity before
+        # flattening the DOM into generic plan text. The helper is page-local,
+        # requires exact configured property identity and one precise labelled
+        # table shape, and fails closed on malformed or ambiguous rows.
         try:
-            from ma_poc.pms.adapters._camden import (
-                is_camden_host as _is_camden_host,
-                detect_camden_next_data as _detect_camden,
-                parse_camden_next_data as _parse_camden,
+            from ma_poc.pms.adapters._static_residence_table import (
+                recover_static_residence_table,
             )
-            _camden_url = str(getattr(ctx, "base_url", "") or "")
-            if _is_camden_host(_camden_url):
-                fr = getattr(ctx, "fetch_result", None)
-                raw = getattr(fr, "body", None) if fr is not None else None
-                if isinstance(raw, bytes):
-                    raw_html = raw.decode("utf-8", errors="replace")
-                elif isinstance(raw, str):
-                    raw_html = raw
-                else:
-                    raw_html = ""
-                if raw_html and _detect_camden(raw_html):
-                    try:
-                        camden_units = _parse_camden(raw_html, source_url=_camden_url)
-                    except Exception as _cx:
-                        result.errors.append(f"camden-parse-error: {_cx}")
-                        camden_units = []
-                    if camden_units:
-                        result.units = camden_units
-                        result.tier_used = "TIER_1_DOM_CAMDEN_NEXT_DATA"
-                        result.confidence = 0.9
-                        return result
-        except Exception as _cx_outer:
-            result.errors.append(f"camden-wiring-error: {_cx_outer}")
+
+            static_residences = recover_static_residence_table(ctx)
+            static_plans = list(
+                getattr(ctx, "_static_residence_table_plan_summaries", []) or []
+            )
+        except Exception as static_exc:
+            result.errors.append(
+                "generic_plan_text: static-residence wiring error: "
+                f"{type(static_exc).__name__}"
+            )
+            static_residences = []
+            static_plans = []
+        if static_residences:
+            result.units = static_residences
+            result.plan_summaries = static_plans
+            result.tier_used = "TIER_1_DOM_STATIC_RESIDENCE_TABLE"
+            result.winning_url = str(
+                static_residences[0].get("source_api_url") or ""
+            ) or None
+            result.confidence = 0.95
+            from ma_poc.pms.source_provenance import (
+                context_unit_source_provenance,
+            )
+
+            result.unit_source_provenance = context_unit_source_provenance(ctx)
+            result.errors.append(
+                "generic_plan_text: exact static residence table recovered "
+                f"{len(static_residences)} physical unit row(s) and "
+                f"{len(static_plans)} plan stack(s)"
+            )
+            return result
+
+        # WordPress team-card rosters keep the physical apartment code,
+        # street label, plan heading, and rent in separate card-local fields.
+        # Preserve that structure before flattening. If the distinctive shape
+        # is present but exact configured-property validation fails, stop
+        # empty: the legacy flat UNIT_STREET regex is intentionally not a
+        # fallback for an identity-ambiguous page.
+        try:
+            from ma_poc.pms.adapters._static_team_unit_roster import (
+                has_static_team_unit_roster_shape,
+                recover_static_team_unit_roster,
+            )
+
+            has_team_roster = has_static_team_unit_roster_shape(ctx)
+            team_units = recover_static_team_unit_roster(ctx) if has_team_roster else []
+        except Exception as team_exc:
+            result.errors.append(
+                "generic_plan_text: static-team-roster wiring error: "
+                f"{type(team_exc).__name__}"
+            )
+            has_team_roster = False
+            team_units = []
+        if team_units:
+            result.units = team_units
+            result.tier_used = "TIER_1_DOM_STATIC_TEAM_UNIT_ROSTER"
+            result.winning_url = str(team_units[0].get("source_api_url") or "") or None
+            result.confidence = 0.96
+            result.errors.append(
+                "generic_plan_text: exact static team roster recovered "
+                f"{len(team_units)} physical unit row(s)"
+            )
+            return result
+        if has_team_roster:
+            result.errors.append(
+                "generic_plan_text: static team roster failed exact identity/row validation"
+            )
+            return result
 
         # 2026-07-11 adapter audit: UDR short-circuit. UDR's ~16 portfolio
         # properties (udr.com) also route here (zero PMS fingerprints on
@@ -1480,43 +1524,44 @@ class GenericPlanTextAdapter:
         # Same pattern as the Camden short-circuit above.
         try:
             _udr_url = str(getattr(ctx, "base_url", "") or "")
-            if "udr.com" in _udr_url.lower():
-                from ma_poc.pms.adapters._udr import (
-                    parse_udr_jsonld as _sc_parse_udr,
-                )
+            fr = getattr(ctx, "fetch_result", None)
+            raw = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(raw, bytes):
+                _udr_html = raw.decode("utf-8", errors="replace")
+            elif isinstance(raw, str):
+                _udr_html = raw
+            else:
+                _udr_html = ""
+            from ma_poc.pms.adapters._udr import (
+                canonical_udr_url_from_html as _sc_canonical_udr_url,
+            )
+            from ma_poc.pms.adapters._udr import is_udr_url as _sc_is_udr_url
+            from ma_poc.pms.adapters._udr import (
+                parse_udr_jsonld as _sc_parse_udr,
+            )
+            from ma_poc.pms.adapters._udr import (
+                udr_pricing_urls as _sc_udr_pricing_urls,
+            )
 
-                fr = getattr(ctx, "fetch_result", None)
-                raw = getattr(fr, "body", None) if fr is not None else None
-                if isinstance(raw, bytes):
-                    _udr_html = raw.decode("utf-8", errors="replace")
-                elif isinstance(raw, str):
-                    _udr_html = raw
-                else:
-                    _udr_html = ""
+            _udr_base = (
+                _udr_url
+                if _sc_is_udr_url(_udr_url)
+                else _sc_canonical_udr_url(_udr_html)
+            )
+            if _udr_base:
                 udr_units = []
                 if _udr_html:
                     try:
-                        udr_units = _sc_parse_udr(_udr_html, source_url=_udr_url)
+                        udr_units = _sc_parse_udr(
+                            _udr_html, source_url=_udr_base
+                        )
                     except Exception as _ux:
                         result.errors.append(f"udr-parse-error: {_ux}")
-                if not udr_units and "/apartments-pricing" not in _udr_url:
+                if not udr_units:
                     # Hop to the pricing subpage: naive append first, then
                     # the 3-segment community root (catalog rows sometimes
                     # point at junk leaves like /contact-us/).
-                    from urllib.parse import urlparse as _udr_urlparse
-
-                    _cands = [_udr_url.rstrip("/") + "/apartments-pricing/"]
-                    try:
-                        _pu = _udr_urlparse(_udr_url)
-                        _segs = [s for s in _pu.path.split("/") if s]
-                        if len(_segs) > 3:
-                            _cands.append(
-                                f"{_pu.scheme}://{_pu.netloc}/"
-                                + "/".join(_segs[:3])
-                                + "/apartments-pricing/"
-                            )
-                    except Exception:
-                        pass
+                    _cands = _sc_udr_pricing_urls(_udr_base)
                     try:
                         from ma_poc.pms.adapters._probe import probe_get
 
@@ -1532,6 +1577,7 @@ class GenericPlanTextAdapter:
                                 continue
                             udr_units = _sc_parse_udr(_h, source_url=_cand)
                             if udr_units:
+                                result.winning_url = _cand
                                 result.errors.append(
                                     f"udr: recovered via pricing hop ({_cand})"
                                 )

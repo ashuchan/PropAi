@@ -1,0 +1,118 @@
+{
+  "canary": false,
+  "llm_enabled": false,
+  "results": [
+    {
+      "body_bytes": 178546,
+      "captcha_detected": false,
+      "error_signature": null,
+      "final_url": "https://lamphouseapts.com/",
+      "network_log_count": 2,
+      "network_urls": [
+        "https://api.myfiona.com/v1/tracking-numbers/swapTarget?websiteUrl=https%3A%2F%2Flamphouseapts.com%2F",
+        "https://www.google.com/pagead/attribution/wcm?cc=ZZ&dn=6088027889&cl=m9WCCKSVnZoBEOvVxOQC&dma=0"
+      ],
+      "outcome": "OK",
+      "parser_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "property_id": 219752,
+      "property_name": "Lamphouse",
+      "rp_oracle_native_unit_rows": 11,
+      "session_calls": 1,
+      "status": 200,
+      "strict_native_positive_rent_rows": 0,
+      "strict_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "strict_samples": [],
+      "strongest_parser": "securecafe_availableunits",
+      "url": "https://lamphouseapts.com/"
+    },
+    {
+      "body_bytes": 827187,
+      "captcha_detected": false,
+      "error_signature": null,
+      "final_url": "https://keystonemanagement.com/goldsboro-north-carolina-apartments/reserve-at-bradbury-place",
+      "network_log_count": 4,
+      "network_urls": [
+        "https://maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true",
+        "https://googleads.g.doubleclick.net/pagead/id?slf_rd=1",
+        "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT",
+        "https://www.youtube.com/youtubei/v1/log_event?alt=json"
+      ],
+      "outcome": "OK",
+      "parser_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "property_id": 220907,
+      "property_name": "Reserve At Bradbury Place",
+      "rp_oracle_native_unit_rows": 21,
+      "session_calls": 1,
+      "status": 200,
+      "strict_native_positive_rent_rows": 0,
+      "strict_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "strict_samples": [],
+      "strongest_parser": "securecafe_availableunits",
+      "url": "https://www.keystonemanagement.com/apartments/nc/reserve-at-bradbury-place"
+    },
+    {
+      "body_bytes": 118569,
+      "captcha_detected": false,
+      "error_signature": null,
+      "final_url": "https://wright-weber.com/property/lake-park-estates/",
+      "network_log_count": 0,
+      "network_urls": [],
+      "outcome": "OK",
+      "parser_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "property_id": 58546,
+      "property_name": "Lake Park Estates",
+      "rp_oracle_native_unit_rows": 1,
+      "session_calls": 1,
+      "status": 200,
+      "strict_native_positive_rent_rows": 0,
+      "strict_row_counts": {
+        "rentcafe_hosted_table": 0,
+        "rentcafe_layout_tab_applyga": 0,
+        "rentcafe_nestin_detail": 0,
+        "rentcafe_ysi_unitslist": 0,
+        "securecafe_availableunits": 0
+      },
+      "strict_samples": [],
+      "strongest_parser": "securecafe_availableunits",
+      "url": "https://wright-weber.com/property/LakePark"
+    }
+  ],
+  "run_kind": "bounded_hyperbrowser_exact_url_probe",
+  "session_options": {
+    "adblock": true,
+    "solveCaptchas": false,
+    "useProxy": true,
+    "useStealth": false
+  },
+  "targets": 3
+}

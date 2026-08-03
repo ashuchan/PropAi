@@ -1,0 +1,30 @@
+[
+  {
+    "body": "{}\n",
+    "captcha_detected": false,
+    "content_type": "application/json; charset=UTF-8",
+    "status": 200,
+    "url": "https://maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true"
+  },
+  {
+    "body": ")]}'\n\n{\"id\":\"ANyPxKqO0Acz0Zgh8lhwiPA_d5yWsGDE3-tciXeuYGuDM__CoZ4_mjsC1vl6rxUG99E3e3AG3LGL\",\"type\":4}",
+    "captcha_detected": false,
+    "content_type": "application/json; charset=UTF-8",
+    "status": 200,
+    "url": "https://googleads.g.doubleclick.net/pagead/id?slf_rd=1"
+  },
+  {
+    "body": "[\"j1QuTDJ0vJP/3+XlpmlZ7bckpP+MKu2MtKlWvoGLZRU43XIb/uUgCarzpcQuOsU5m2tm+6/UP9unpi08\",43200,100]",
+    "captcha_detected": false,
+    "content_type": "application/json+protobuf; charset=UTF-8",
+    "status": 200,
+    "url": "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT"
+  },
+  {
+    "body": "{\n  \"responseContext\": {}\n}\n",
+    "captcha_detected": false,
+    "content_type": "application/json; charset=UTF-8",
+    "status": 200,
+    "url": "https://www.youtube.com/youtubei/v1/log_event?alt=json"
+  }
+]

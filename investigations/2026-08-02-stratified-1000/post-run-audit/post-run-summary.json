@@ -1,0 +1,74 @@
+{
+  "coverage": {
+    "finding_runtime_status": {
+      "FAIL_OUTPUT_CONTRACT": 1,
+      "NOT_TARGET_ROUTE_EXERCISED": 9,
+      "PASS_RUNTIME_EXERCISED": 39
+    },
+    "findings": 49,
+    "focused_properties": 32,
+    "focused_properties_with_snapshot": 32,
+    "prior_adapter_strata": 48,
+    "prior_property_type_strata": 6,
+    "states": 50,
+    "target_adapter_routes": 64,
+    "target_adapter_routes_exercised": 43
+  },
+  "quality": {
+    "issue_code_counts": {
+      "AVAILABLE_NOW_PROVENANCE_LOST": 8,
+      "CANONICAL_UNIQUENESS_GATE_FAILED": 15,
+      "DUPLICATE_CANONICAL_UNIT_ID": 8,
+      "ENTRATA_PARALLEL_ROSTER_DUPLICATE": 103,
+      "FAILURE_VERDICT_WITH_UNITS": 6,
+      "FINAL_COUNT_MISMATCH": 7,
+      "NEGATIVE_STATUS_CAPTURE_DATE": 8,
+      "OFFLINE_ARCHIVE_INVALID": 7,
+      "PROVENANCE_FIELDS_MISSING": 7,
+      "SOURCE_HASH_NOT_ARCHIVED": 17,
+      "SYNTHETIC_OUTPUT_WITH_PREFORMAT_NATURAL_ID": 89
+    },
+    "properties_with_critical_or_high_issues": 25,
+    "severity_counts": {
+      "critical": 140,
+      "high": 135
+    }
+  },
+  "regression_test_skips": "test_g5.py has two explicitly skipped Apollo-cache fallback tests; the merged G5 adapter exits on NO_URN before that fallback",
+  "regression_tests": "984 passed, 2 skipped across 50 finding-mapped modules",
+  "results": {
+    "archived_source_responses": 1374,
+    "area_range_units": 12,
+    "avoidable_synthetic_id_units": 89,
+    "building_id_units": 7397,
+    "matched_prior_future_dates_checked": 3193,
+    "matched_prior_future_dates_preserved": 3193,
+    "properties_with_extraction_snapshot": 993,
+    "real_id_units": 21379,
+    "rent_range_units": 4386,
+    "synthetic_id_units": 89,
+    "unit_level_success_rate": 0.868,
+    "unit_or_plan_success_rate": 0.921,
+    "unit_rows": 21468,
+    "unresolved_area_units": 184,
+    "verdict_counts": {
+      "DEAD_URL": 9,
+      "FAILED_NO_DATA": 43,
+      "FAILED_UNREACHABLE": 23,
+      "SUCCESS": 868,
+      "SUCCESS_NO_DATA_PUBLISHED": 4,
+      "SUCCESS_PLAN_LEVEL": 53
+    }
+  },
+  "run": {
+    "capture_date": "2026-08-02",
+    "duplicate_properties": 0,
+    "expected_properties": 1000,
+    "missing_properties": 0,
+    "output_properties": 1000,
+    "prior_duplicate_properties": 0,
+    "run_dir": "/Users/ankur/PropAi-codex-recovery-replay/investigations/2026-08-02-stratified-1000/canary-output",
+    "selected_manifest_properties": 1000,
+    "unexpected_properties": 0
+  }
+}

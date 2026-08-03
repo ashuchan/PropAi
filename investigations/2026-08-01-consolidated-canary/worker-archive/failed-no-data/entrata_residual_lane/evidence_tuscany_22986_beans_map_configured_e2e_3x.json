@@ -1,0 +1,944 @@
+{
+  "schema_version": "tuscany_beans_map_configured_e2e_v1",
+  "generated_at": "2026-08-01T20:09:31.350115+00:00",
+  "property_id": 22986,
+  "configured_property": {
+    "apartmentid": "22986",
+    "name": "Tuscany Hills",
+    "address": "715 Ash Ln",
+    "city": "San Marcos",
+    "state": "CA",
+    "zip": "92069",
+    "website": "http://www.tuscanyhillsapartments.com/"
+  },
+  "expected_source": {
+    "map_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+    "entrata_property_id": "1182838",
+    "published_address": "715 Ash Lane, San Marcos, CA, , 92069, US"
+  },
+  "guardrails": {
+    "direct_only": true,
+    "hyperbrowser": false,
+    "web_unlocker": false,
+    "flaresolverr": false,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "llm": false,
+    "paid_canary": false,
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "FETCH_BACKEND": "requests",
+      "ENABLE_HYPERBROWSER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER5_VISION": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "PROBE_PROXY_URL": "",
+      "WEB_UNLOCKER_KEY": ""
+    }
+  },
+  "input_hashes": {
+    "ma_poc/config/properties.csv": "4f0a12e0e3fa04993e31fe277db052f7893307c87ed7d11cb1afbc6cd04675de",
+    "/private/tmp/propai-fnd-vBkmT9/failed344.csv": "f0f110b43fda0d269331afe683eaf76f57b0bf734af78500f2f84d25a9bb0b06"
+  },
+  "source_hashes": {
+    "ma_poc/pms/adapters/entrata.py": "80ab07d2b3b8fb8fba9a747687a970798b0ee57a321803981691feac1f4b2bb1",
+    "ma_poc/pms/scraper.py": "85a573f3fc0ea40b386a58d973441d4184d29cc81a4b0122d7088f4abe3c9f7f",
+    "ma_poc/tests/pms/adapters/test_entrata_beans_map.py": "5b13bab787c11f8d6b8405a3c166515948339210e150752b8b3d6d5262ec35f5",
+    "ma_poc/tests/pms/test_entrata_redirect_identity_guard.py": "472887245248889fb22c4b21dfe6bf40e521e83b6664ec18006d86118ae19c28"
+  },
+  "test_run": {
+    "command": [
+      "/opt/anaconda3/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "ma_poc/tests/pms/adapters/test_entrata.py",
+      "ma_poc/tests/pms/adapters/test_entrata_anchor_discovery.py",
+      "ma_poc/tests/pms/adapters/test_entrata_beans_map.py",
+      "ma_poc/tests/pms/adapters/test_entrata_conventional_index.py",
+      "ma_poc/tests/pms/adapters/test_entrata_conventional_landing_refetch.py",
+      "ma_poc/tests/pms/adapters/test_entrata_crossdomain_pp.py",
+      "ma_poc/tests/pms/adapters/test_entrata_data_attr_fallback.py",
+      "ma_poc/tests/pms/adapters/test_entrata_floorplan_html_jsonld.py",
+      "ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_fallback.py",
+      "ma_poc/tests/pms/adapters/test_entrata_hyperbrowser_recovery.py",
+      "ma_poc/tests/pms/adapters/test_entrata_leaseleads_fallback.py",
+      "ma_poc/tests/pms/adapters/test_entrata_modern_units_data.py",
+      "ma_poc/tests/pms/adapters/test_entrata_option_row_rent.py",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_fee_transparency_rent.py",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_jd_fp.py",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_option_rows.py",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_ssr.py",
+      "ma_poc/tests/pms/adapters/test_entrata_pp_unit_drill.py",
+      "ma_poc/tests/pms/adapters/test_entrata_property_snippet_hb.py",
+      "ma_poc/tests/pms/adapters/test_entrata_prospectportal.py",
+      "ma_poc/tests/pms/adapters/test_entrata_snippet_iframe.py",
+      "ma_poc/tests/pms/adapters/test_entrata_vus_harvest.py",
+      "ma_poc/tests/pms/test_entrata_redirect_identity_guard.py",
+      "ma_poc/tests/pms/test_livebh_portfolio_redirect_guard.py"
+    ],
+    "exit_code": 0,
+    "stdout": "..............s......................................................... [ 24%]\n........................................................................ [ 48%]\n........................................................................ [ 72%]\n........................................................................ [ 96%]\n...........                                                              [100%]\n298 passed, 1 skipped in 3.29s",
+    "stderr": "",
+    "elapsed_ms": 4481
+  },
+  "repeats": [
+    {
+      "repeat": 1,
+      "configured_fetch": {
+        "status": 200,
+        "final_url": "https://www.tuscanyhillsapartments.com/",
+        "body_bytes": 151074,
+        "body_sha256": "128dbc16bcae3188f46cfe8d0783b68eaabcfe1e7cc895aeeb8478e7030ae458"
+      },
+      "elapsed_ms": 3139,
+      "adapter": "entrata",
+      "tier": "TIER_1_DOM_ENTRATA_BEANS_MAP",
+      "emitted_rows": 13,
+      "strict_native_positive_rent_rows": 13,
+      "availability_date_present_rows": 8,
+      "checks": {
+        "configured_fetch_200": true,
+        "configured_final_host": true,
+        "configured_name_visible": true,
+        "adapter_entrata": true,
+        "beans_tier": true,
+        "thirteen_emitted": true,
+        "all_emitted_strict": true,
+        "distinct_native_unit_numbers": true,
+        "exact_published_map_source": true,
+        "configured_address_boundary": true,
+        "native_ids_complete": true,
+        "available_status": true,
+        "no_fatal_pipeline_errors": true,
+        "no_plan_fallback": true
+      },
+      "units": [
+        {
+          "unit_number": "M-715-243M",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3004,
+          "market_rent_high": 3754,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870030",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598003"
+          }
+        },
+        {
+          "unit_number": "O-736-110O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3135,
+          "market_rent_high": 3926,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870153",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598126"
+          }
+        },
+        {
+          "unit_number": "A-719-119A",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3121,
+          "market_rent_high": 3908,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-02",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869919",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597892"
+          }
+        },
+        {
+          "unit_number": "O-726-285O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3154,
+          "market_rent_high": 3950,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870116",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598089"
+          }
+        },
+        {
+          "unit_number": "R-323-227R",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3130,
+          "market_rent_high": 3920,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870190",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598163"
+          }
+        },
+        {
+          "unit_number": "H-738-162H",
+          "floor_plan_name": "2x2D",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "998",
+          "market_rent_low": 2735,
+          "market_rent_high": 3419,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869990",
+            "entrata_fpid": "1041354",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597963"
+          }
+        },
+        {
+          "unit_number": "O-736-109O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2371,
+          "market_rent_high": 2962,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870152",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598125"
+          }
+        },
+        {
+          "unit_number": "M-704-133M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2418,
+          "market_rent_high": 3026,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-01",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870013",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597986"
+          }
+        },
+        {
+          "unit_number": "O-736-212O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2483,
+          "market_rent_high": 3110,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870159",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598132"
+          }
+        },
+        {
+          "unit_number": "M-735-256M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2389,
+          "market_rent_high": 2991,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-30",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870055",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598028"
+          }
+        },
+        {
+          "unit_number": "O-725-177O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2514,
+          "market_rent_high": 3143,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870096",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598069"
+          }
+        },
+        {
+          "unit_number": "O-725-277O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2605,
+          "market_rent_high": 3256,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-05",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870104",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598077"
+          }
+        },
+        {
+          "unit_number": "O-739-213O",
+          "floor_plan_name": "2x2B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "888",
+          "market_rent_low": 2494,
+          "market_rent_high": 3118,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870164",
+            "entrata_fpid": "1041348",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598137"
+          }
+        }
+      ],
+      "errors": [],
+      "fatal_errors": []
+    },
+    {
+      "repeat": 2,
+      "configured_fetch": {
+        "status": 200,
+        "final_url": "https://www.tuscanyhillsapartments.com/",
+        "body_bytes": 151074,
+        "body_sha256": "d5febebe083eded65cede02db88eb58b7b1daa81022fb7f3c1936bd1de18fe01"
+      },
+      "elapsed_ms": 2822,
+      "adapter": "entrata",
+      "tier": "TIER_1_DOM_ENTRATA_BEANS_MAP",
+      "emitted_rows": 13,
+      "strict_native_positive_rent_rows": 13,
+      "availability_date_present_rows": 8,
+      "checks": {
+        "configured_fetch_200": true,
+        "configured_final_host": true,
+        "configured_name_visible": true,
+        "adapter_entrata": true,
+        "beans_tier": true,
+        "thirteen_emitted": true,
+        "all_emitted_strict": true,
+        "distinct_native_unit_numbers": true,
+        "exact_published_map_source": true,
+        "configured_address_boundary": true,
+        "native_ids_complete": true,
+        "available_status": true,
+        "no_fatal_pipeline_errors": true,
+        "no_plan_fallback": true
+      },
+      "units": [
+        {
+          "unit_number": "M-715-243M",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3004,
+          "market_rent_high": 3754,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870030",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598003"
+          }
+        },
+        {
+          "unit_number": "O-736-110O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3135,
+          "market_rent_high": 3926,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870153",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598126"
+          }
+        },
+        {
+          "unit_number": "A-719-119A",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3121,
+          "market_rent_high": 3908,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-02",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869919",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597892"
+          }
+        },
+        {
+          "unit_number": "O-726-285O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3154,
+          "market_rent_high": 3950,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870116",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598089"
+          }
+        },
+        {
+          "unit_number": "R-323-227R",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3130,
+          "market_rent_high": 3920,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870190",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598163"
+          }
+        },
+        {
+          "unit_number": "H-738-162H",
+          "floor_plan_name": "2x2D",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "998",
+          "market_rent_low": 2735,
+          "market_rent_high": 3419,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869990",
+            "entrata_fpid": "1041354",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597963"
+          }
+        },
+        {
+          "unit_number": "O-736-109O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2371,
+          "market_rent_high": 2962,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870152",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598125"
+          }
+        },
+        {
+          "unit_number": "M-704-133M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2418,
+          "market_rent_high": 3026,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-01",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870013",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597986"
+          }
+        },
+        {
+          "unit_number": "O-736-212O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2483,
+          "market_rent_high": 3110,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870159",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598132"
+          }
+        },
+        {
+          "unit_number": "M-735-256M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2389,
+          "market_rent_high": 2991,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-30",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870055",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598028"
+          }
+        },
+        {
+          "unit_number": "O-725-177O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2514,
+          "market_rent_high": 3143,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870096",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598069"
+          }
+        },
+        {
+          "unit_number": "O-725-277O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2605,
+          "market_rent_high": 3256,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-05",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870104",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598077"
+          }
+        },
+        {
+          "unit_number": "O-739-213O",
+          "floor_plan_name": "2x2B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "888",
+          "market_rent_low": 2494,
+          "market_rent_high": 3118,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870164",
+            "entrata_fpid": "1041348",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598137"
+          }
+        }
+      ],
+      "errors": [],
+      "fatal_errors": []
+    },
+    {
+      "repeat": 3,
+      "configured_fetch": {
+        "status": 200,
+        "final_url": "https://www.tuscanyhillsapartments.com/",
+        "body_bytes": 151074,
+        "body_sha256": "a1bc74421ccae446cdbe861d10f4a263da83266c84cb512f6599292d5baeda37"
+      },
+      "elapsed_ms": 2752,
+      "adapter": "entrata",
+      "tier": "TIER_1_DOM_ENTRATA_BEANS_MAP",
+      "emitted_rows": 13,
+      "strict_native_positive_rent_rows": 13,
+      "availability_date_present_rows": 8,
+      "checks": {
+        "configured_fetch_200": true,
+        "configured_final_host": true,
+        "configured_name_visible": true,
+        "adapter_entrata": true,
+        "beans_tier": true,
+        "thirteen_emitted": true,
+        "all_emitted_strict": true,
+        "distinct_native_unit_numbers": true,
+        "exact_published_map_source": true,
+        "configured_address_boundary": true,
+        "native_ids_complete": true,
+        "available_status": true,
+        "no_fatal_pipeline_errors": true,
+        "no_plan_fallback": true
+      },
+      "units": [
+        {
+          "unit_number": "M-715-243M",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3004,
+          "market_rent_high": 3754,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870030",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598003"
+          }
+        },
+        {
+          "unit_number": "O-736-110O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3135,
+          "market_rent_high": 3926,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870153",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598126"
+          }
+        },
+        {
+          "unit_number": "A-719-119A",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3121,
+          "market_rent_high": 3908,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-02",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869919",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597892"
+          }
+        },
+        {
+          "unit_number": "O-726-285O",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3154,
+          "market_rent_high": 3950,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870116",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598089"
+          }
+        },
+        {
+          "unit_number": "R-323-227R",
+          "floor_plan_name": "3x2A",
+          "bedrooms": "3",
+          "bathrooms": "2",
+          "sqft": "992",
+          "market_rent_low": 3130,
+          "market_rent_high": 3920,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870190",
+            "entrata_fpid": "1041356",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598163"
+          }
+        },
+        {
+          "unit_number": "H-738-162H",
+          "floor_plan_name": "2x2D",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "998",
+          "market_rent_low": 2735,
+          "market_rent_high": 3419,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4869990",
+            "entrata_fpid": "1041354",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597963"
+          }
+        },
+        {
+          "unit_number": "O-736-109O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2371,
+          "market_rent_high": 2962,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870152",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598125"
+          }
+        },
+        {
+          "unit_number": "M-704-133M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2418,
+          "market_rent_high": 3026,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-01",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870013",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4597986"
+          }
+        },
+        {
+          "unit_number": "O-736-212O",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2483,
+          "market_rent_high": 3110,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-13",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870159",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598132"
+          }
+        },
+        {
+          "unit_number": "M-735-256M",
+          "floor_plan_name": "1x1A",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "614",
+          "market_rent_low": 2389,
+          "market_rent_high": 2991,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-08-30",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870055",
+            "entrata_fpid": "1041338",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598028"
+          }
+        },
+        {
+          "unit_number": "O-725-177O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2514,
+          "market_rent_high": 3143,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870096",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598069"
+          }
+        },
+        {
+          "unit_number": "O-725-277O",
+          "floor_plan_name": "2x2B",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "815",
+          "market_rent_low": 2605,
+          "market_rent_high": 3256,
+          "availability_status": "AVAILABLE",
+          "availability_date": "2026-09-05",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870104",
+            "entrata_fpid": "1041346",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598077"
+          }
+        },
+        {
+          "unit_number": "O-739-213O",
+          "floor_plan_name": "2x2B2",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "888",
+          "market_rent_low": 2494,
+          "market_rent_high": 3118,
+          "availability_status": "AVAILABLE",
+          "availability_date": "",
+          "source_api_url": "https://www.tuscanyhillsapartments.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1182838/?occupancy_type=conventional&analytics=1",
+          "source_property_address": "715 Ash Lane, San Marcos, CA, , 92069, US",
+          "source_ids": {
+            "entrata_uid": "4870164",
+            "entrata_fpid": "1041348",
+            "entrata_property_id": "1182838",
+            "entrata_beans_listing_id": "4598137"
+          }
+        }
+      ],
+      "errors": [],
+      "fatal_errors": []
+    }
+  ],
+  "verification": {
+    "repeat_count": 3,
+    "all_repeats_strict": true,
+    "stable_unit_number_set": true,
+    "source_stable": true,
+    "strict_admission_ready": true
+  }
+}

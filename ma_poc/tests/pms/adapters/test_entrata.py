@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -86,23 +87,269 @@ def _stub_probe_seam(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_entrata_extract_happy_path() -> None:
-    """Real Entrata payload (257356) produces units with rent and floor plan name."""
+async def test_entrata_floorplan_fixture_is_preserved_as_plan_catalogue() -> None:
+    """Real 257356 payload is one row per floor plan, not per apartment."""
     responses = _load_fixture("257356.json")
     adapter = EntrataAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
-    assert len(result.units) >= 10
-    first = result.units[0]
+    assert result.units == []
+    assert len(result.plan_summaries) >= 10
+    first = result.plan_summaries[0]
     assert first["floor_plan_name"]
     assert first["rent_range"]
     assert "ENTRATA" in first["extraction_tier"]
+    assert first["unit_number"] == ""
+    assert first["source_ids"].get("entrata_fpid")
+    assert "PLAN_LEVEL" in result.tier_used
+
+
+@pytest.mark.asyncio
+async def test_widget_checkpoint_follows_direct_conventional_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Date-less widget plans are a checkpoint when SSR publishes a date."""
+    responses = [
+        {
+            "url": "https://www.nordenrange.com/Apartments/module/widgets/",
+            "body": [
+                {
+                    "id": 99,
+                    "floorplan-name": "Widget A1",
+                    "no_of_bedroom": 1,
+                    "no_of_bathroom": 1,
+                    "square_footage": 700,
+                    "min_rent": "$1,800",
+                    "max_rent": "$1,800",
+                }
+            ],
+        }
+    ]
+    ctx = _make_ctx(responses)
+    conventional = (
+        "https://www.nordenrange.com/oconomowoc/"
+        "norden-range-apartments/conventional/"
+    )
+    ctx.fetch_result = SimpleNamespace(
+        body=(
+            f'<html><a href="{conventional}">Floor plans</a></html>'
+        ).encode(),
+        final_url="https://www.nordenrange.com/",
+    )
+    route_html = """
+    <div class="fp-card">
+      <div class="fp-title">Operator A1</div>
+      <div class="dynamic-text-before">1 Bed / 1 Bath</div>
+      <div class="dynamic-text-after">700 sq. ft</div>
+      <div class="fee-transparency-text">From $1,800 per month</div>
+      <div class="availability">Available September 22, 2026</div>
+    </div>
+    """
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class _Response:
+        status_code = 200
+        text = route_html
+
+    def _probe(url: str, **kwargs: object) -> _Response:
+        calls.append((url, kwargs))
+        return _Response()
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _probe)
+
+    result = await EntrataAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert len(result.units) == 1
+    assert result.units[0]["floor_plan_name"] == "Operator A1"
+    assert result.units[0]["availability_date"] == "September 22, 2026"
+    assert result.tier_used == "TIER_1_DOM_ENTRATA_PP_SSR"
+    assert result.winning_url == conventional
+    assert calls == [(conventional, {"timeout": 20, "unlocker": False, "retries": 2})]
+
+
+@pytest.mark.asyncio
+async def test_widget_checkpoint_is_preserved_when_direct_route_misses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HYPERBROWSER_API_KEY", raising=False)
+    responses = [
+        {
+            "url": "https://www.nordenrange.com/Apartments/module/widgets/",
+            "body": [
+                {
+                    "id": 99,
+                    "floorplan-name": "Widget A1",
+                    "no_of_bedroom": 1,
+                    "no_of_bathroom": 1,
+                    "square_footage": 700,
+                    "min_rent": "$1,800",
+                    "max_rent": "$1,800",
+                }
+            ],
+        }
+    ]
+    ctx = _make_ctx(responses)
+    ctx.fetch_result = SimpleNamespace(
+        body=(
+            b'<a href="/oconomowoc/norden-range-apartments/conventional/">'
+            b"Floor plans</a>"
+        ),
+        final_url="https://www.nordenrange.com/",
+    )
+
+    class _Miss:
+        status_code = 403
+        text = ""
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda *_args, **_kwargs: _Miss(),
+    )
+
+    result = await EntrataAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert len(result.units) == 1
+    assert result.units[0]["floor_plan_name"] == "Widget A1"
+    assert result.tier_used == "TIER_1_API_ENTRATA"
+
+
+@pytest.mark.asyncio
+async def test_widget_checkpoint_uses_one_configured_hyperbrowser_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        {
+            "url": "https://www.nordenrange.com/Apartments/module/widgets/",
+            "body": {
+                "widget_name": "floor_plans",
+                "widget_data": {
+                    "header": {
+                        "header_title": {
+                            "url": (
+                                "https://www.nordenrange.com/oconomowoc/"
+                                "norden-range-apartments/conventional/"
+                            )
+                        }
+                    },
+                    "content": {
+                        "floor_plans": {
+                            "floor_plans": [
+                                {
+                                    "id": 99,
+                                    "floorplan-name": "Widget A1",
+                                    "no_of_bedroom": 1,
+                                    "no_of_bathroom": 1,
+                                    "square_footage": 700,
+                                    "min_rent": "$1,800",
+                                }
+                            ]
+                        }
+                    },
+                },
+            },
+        }
+    ]
+    ctx = _make_ctx(responses)
+    conventional = (
+        "https://www.nordenrange.com/oconomowoc/"
+        "norden-range-apartments/conventional/"
+    )
+    ctx.fetch_result = SimpleNamespace(
+        body=b"<html><title>Forbidden</title></html>",
+        final_url="https://www.nordenrange.com/",
+    )
+    monkeypatch.setenv("HYPERBROWSER_API_KEY", "configured-test-key")
+
+    class _DirectMiss:
+        status_code = 403
+        text = ""
+
+    monkeypatch.setattr(
+        "ma_poc.pms.adapters._probe.probe_get",
+        lambda *_args, **_kwargs: _DirectMiss(),
+    )
+    hb_calls: list[tuple[str, str]] = []
+    rendered_html = """
+    <div class="fp-card">
+      <div class="fp-title">Rendered A1</div>
+      <div class="dynamic-text-before">1 Bed / 1 Bath</div>
+      <div class="dynamic-text-after">700 sq. ft</div>
+      <div class="fee-transparency-text">From $1,800 per month</div>
+      <div class="availability">Available September 22, 2026</div>
+    </div>
+    """
+
+    class _Rendered:
+        body = rendered_html.encode()
+        final_url = conventional
+
+        @staticmethod
+        def ok() -> bool:
+            return True
+
+    class _FakeProvider:
+        def __init__(self, *, mode: str) -> None:
+            self.mode = mode
+
+        async def fetch(self, task: object, _profile: object) -> _Rendered:
+            hb_calls.append((self.mode, str(getattr(task, "url", ""))))
+            return _Rendered()
+
+    monkeypatch.setattr(
+        "ma_poc.fetch.hyperbrowser_backend.HyperbrowserProvider",
+        _FakeProvider,
+    )
+
+    result = await EntrataAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert hb_calls == [("render", conventional)]
+    assert result.units[0]["floor_plan_name"] == "Rendered A1"
+    assert result.units[0]["availability_date"] == "September 22, 2026"
+    assert result.api_responses[-1]["via"] == (
+        "entrata_widget_checkpoint_hyperbrowser"
+    )
+
+
+@pytest.mark.asyncio
+async def test_dated_widget_does_not_issue_depth_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        {
+            "url": "https://example.com/Apartments/module/widgets/",
+            "body": [
+                {
+                    "id": 99,
+                    "floorplan-name": "Widget A1",
+                    "no_of_bedroom": 1,
+                    "no_of_bathroom": 1,
+                    "square_footage": 700,
+                    "min_rent": "$1,800",
+                    "available_date": "2026-09-22",
+                }
+            ],
+        }
+    ]
+    ctx = _make_ctx(responses)
+    ctx.fetch_result = SimpleNamespace(
+        body=b'<a href="/city/property/conventional/">Floor plans</a>',
+        final_url="https://example.com/",
+    )
+
+    def _must_not_probe(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("a dated widget row should remain terminal")
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _must_not_probe)
+
+    result = await EntrataAdapter().extract(None, ctx)  # type: ignore[arg-type]
+
+    assert result.units[0]["availability_date"] == "2026-09-22"
 
 
 @pytest.mark.asyncio
 async def test_entrata_extract_from_stored_fixture() -> None:
-    """All stored fixtures load and produce units."""
+    """All stored fixtures load; the floorplan fixture remains plan-level."""
     for fixture_path in FIXTURES.glob("*.json"):
         responses = json.loads(fixture_path.read_text(encoding="utf-8"))
         adapter = EntrataAdapter()
@@ -111,7 +358,8 @@ async def test_entrata_extract_from_stored_fixture() -> None:
         assert isinstance(result, AdapterResult)
         # 252511 has no floorplan data (only availability widget + ppConfig)
         if "257356" in fixture_path.name:
-            assert len(result.units) > 0
+            assert result.units == []
+            assert result.plan_summaries
 
 
 @pytest.mark.asyncio
@@ -145,6 +393,29 @@ def test_parse_entrata_floorplans_basic() -> None:
     assert units[0]["floor_plan_name"] == "A1"
     assert units[0]["bedrooms"] == "1"
     assert "$1,500" in units[0]["rent_range"]
+    assert units[0]["unit_number"] == ""
+    assert units[0]["source_ids"] == {"entrata_fpid": "100"}
+    assert units[0]["extraction_tier"].endswith("_PLAN_LEVEL")
+    assert units[0]["availability_status"] == ""
+    assert units[0]["available_units"] == ""
+
+
+def test_parse_entrata_floorplans_preserves_published_availability_count() -> None:
+    items = [
+        {
+            "id": 101,
+            "floorplan-name": "A2",
+            "no_of_bedroom": 1,
+            "no_of_bathroom": 1,
+            "square_footage": 780,
+            "available_units": 2,
+        }
+    ]
+
+    plans = parse_entrata_floorplans(items, "https://test.com/widgets/")
+
+    assert plans[0]["availability_status"] == "AVAILABLE"
+    assert plans[0]["available_units"] == "2"
 
 
 def test_parse_entrata_widget_envelope() -> None:
@@ -238,9 +509,8 @@ class _ProbingPage:
 
 
 @pytest.mark.asyncio
-async def test_bug9_probe_returns_units_when_floorplans_endpoint_responds() -> None:
-    """Bug 9: direct probe of /Apartments/module/floor_plans/ wins when the
-    captured-API path returned nothing."""
+async def test_bug9_probe_retains_catalogue_when_floorplans_endpoint_responds() -> None:
+    """A direct floorplans probe supplies plan context, not apartment ids."""
     page = _ProbingPage(
         url="https://www.livethearch.com/",
         payload_by_path={
@@ -275,9 +545,10 @@ async def test_bug9_probe_returns_units_when_floorplans_endpoint_responds() -> N
     )
     ctx._api_responses = []  # type: ignore[attr-defined]
     result = await EntrataAdapter().extract(page, ctx)  # type: ignore[arg-type]
-    assert len(result.units) == 2
-    assert result.tier_used == "TIER_1_API_ENTRATA_PROBE"
-    assert result.confidence > 0.7
+    assert result.units == []
+    assert len(result.plan_summaries) == 2
+    assert result.tier_used == "TIER_1_API_ENTRATA_PROBE_PLAN_LEVEL"
+    assert result.confidence > 0.6
 
 
 @pytest.mark.asyncio
@@ -310,7 +581,9 @@ async def test_bug9_probe_skips_paths_until_data_returned() -> None:
     )
     ctx._api_responses = []  # type: ignore[attr-defined]
     result = await EntrataAdapter().extract(page, ctx)  # type: ignore[arg-type]
-    assert len(result.units) == 1
+    assert result.units == []
+    assert len(result.plan_summaries) == 1
+    assert result.plan_summaries[0]["floor_plan_name"] == "Studio"
     # The probe loop tried each catalogue path in order until /api/floorplans hit.
     assert any(call.endswith("/api/floorplans") for call in page.calls)
 
@@ -340,10 +613,8 @@ async def test_bug9_probe_handles_evaluate_exception() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bug9_probe_skipped_when_captured_api_already_has_units() -> None:
-    """Bug 9: when the captured-API path already produced units, the probe
-    must NOT run (return early). Otherwise we'd double-fire the LLM cost
-    on every successful Entrata property."""
+async def test_captured_floorplan_catalogue_does_not_suppress_unit_routes() -> None:
+    """A captured floor-plan catalogue is context, not a terminal unit win."""
     captured = [
         {
             "url": "https://www.livethearch.com/Apartments/module/widgets/",
@@ -385,11 +656,14 @@ async def test_bug9_probe_skipped_when_captured_api_already_has_units() -> None:
     )
     ctx._api_responses = captured  # type: ignore[attr-defined]
     result = await EntrataAdapter().extract(page, ctx)  # type: ignore[arg-type]
-    # Captured units win; probe never ran.
-    assert len(result.units) == 1
-    assert result.units[0]["floor_plan_name"] == "From Capture"
-    assert page.calls == []
-    assert result.tier_used == "TIER_1_API_ENTRATA"
+    # Both captured and probed ids are plan ids.  The known-endpoint route was
+    # still attempted, and the richer plan catalogue survives as fallback.
+    assert result.units == []
+    assert result.plan_summaries
+    assert result.plan_summaries[0]["unit_number"] == ""
+    assert result.plan_summaries[0]["source_ids"].get("entrata_fpid")
+    assert page.calls, "captured plan rows incorrectly returned before probe"
+    assert "PLAN_LEVEL" in result.tier_used
 
 
 # ── Prospect Portal SSR-DOM recovery (2026-05-19) ────────────────────────
@@ -504,14 +778,15 @@ async def test_entrata_ssr_fallback_when_api_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_entrata_ssr_not_used_when_api_succeeds() -> None:
-    """A genuine API hit wins; SSR DOM fallback is never consulted."""
+async def test_entrata_plan_api_does_not_claim_unit_level_success() -> None:
+    """A floorplan API hit remains plan-level if no later unit route wins."""
     responses = _load_fixture("257356.json")
     adapter = EntrataAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_PPPage(_PP_CARDS), ctx)  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_API_ENTRATA"
-    assert all(u["floor_plan_name"] != "Adams" for u in result.units)
+    assert result.tier_used == "TIER_1_API_ENTRATA_PLAN_LEVEL"
+    assert result.units == []
+    assert len(result.plan_summaries) == 15
 
 
 def test_detector_routes_prospectportal_host_to_entrata() -> None:

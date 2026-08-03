@@ -1,0 +1,76 @@
+{
+  "schema_version": "propai_isolated_timeout_verification_v1",
+  "build": {
+    "cloud_build_id": "179f9cfa-7d03-4f1b-9427-0c16ec8abaa2",
+    "commit": "823ea7c",
+    "image_digest": "sha256:36463a0d7f1d1ff64767d592fb4e5e60a72aa66447cb7895f5c012a61bdac610"
+  },
+  "execution": {
+    "completed_at": "2026-08-03T01:43:16.039878Z",
+    "duration": "3m32.8s",
+    "execution": "jugnu-verify-823ea7c-rf4br",
+    "failed_count": 0,
+    "job": "jugnu-verify-823ea7c",
+    "project": "jugnu-494013",
+    "region": "us-central1",
+    "started_at": "2026-08-03T01:39:43.237209Z",
+    "succeeded_count": 1
+  },
+  "observations": [
+    {
+      "event": "property_started",
+      "property_id": "52697",
+      "timestamp": "2026-08-03T01:40:43.279651Z"
+    },
+    {
+      "event": "second_hyperbrowser_session_created",
+      "property_id": "52697",
+      "timestamp": "2026-08-03T01:40:57.584288Z"
+    },
+    {
+      "event": "supervisor_killed_wedged_child",
+      "message": "runner exceeded 150.0s wall-clock cap; killed subprocess",
+      "timestamp": "2026-08-03T01:43:10.929537Z"
+    },
+    {
+      "event": "terminal_record_materialized",
+      "property_count": 1,
+      "timestamp": "2026-08-03T01:43:11.066252Z"
+    },
+    {
+      "event": "run_artifacts_uploaded",
+      "primary_files": 6,
+      "raw_html_files": 3,
+      "timestamp": "2026-08-03T01:43:12.038789Z"
+    }
+  ],
+  "output": {
+    "extraction_snapshot_path": "diagnostics/52697/78337f9a92d8b9db71a15195f8608fbbd3b51b567c0065cc2fbe5dcacfd93ff8.extraction.json.gz",
+    "extraction_snapshot_payload_sha256": "78337f9a92d8b9db71a15195f8608fbbd3b51b567c0065cc2fbe5dcacfd93ff8",
+    "gcs_prefix": "gs://jugnu-canary/runs/2026-08-02-verify-823ea7c/",
+    "object_count": 9,
+    "property_count": 1,
+    "raw_source_manifest_path": "raw_sources/manifests/52697/a6b030695ba1775e7610c1a1b905cbdeeaed51aab36d0081171a3f164f89e1a6.json.gz",
+    "scrape_errors": [
+      "per_property_timeout:120s (shard_supervisor_fallback)",
+      "shard_runner_timeout:150s"
+    ],
+    "snapshot_count": 1,
+    "terminal_verdict": "FAILED_UNREACHABLE",
+    "unit_count": 0
+  },
+  "runtime_policy": {
+    "captcha_solver_enabled": false,
+    "fingerprint_rotation_enabled": false,
+    "flaresolverr_enabled": false,
+    "hyperbrowser_proxy_enabled": true,
+    "llm_enabled": false,
+    "web_unlocker_enabled": false
+  },
+  "verdict": "PASS_SUPERVISOR_TIMEOUT_FALLBACK",
+  "warm_profile": {
+    "destination": "gs://jugnu-canary/profiles/verify-823ea7c/52697.json",
+    "shared_store_mutated": false,
+    "source": "gs://jugnu-canary/profiles/verify-7f800ca/52697.json"
+  }
+}

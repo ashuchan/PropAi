@@ -1,0 +1,975 @@
+{
+  "accepted_count": 1,
+  "accepted_ids": [
+    540
+  ],
+  "adapter_source_git_blob": "930a0349a929066359cad0a5719350d8c5ee34f8",
+  "cohort_boundary": "current_residual_after_187_of_344_ledger",
+  "lane": "knock_residual6_current_strict_read_only",
+  "ledger": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+    "rows": 191,
+    "sha256_end": "e2327186e213817e7a1d4c6c323b40de4b9cbac8c65d54a4b367c792b7bd272a",
+    "sha256_start": "e2327186e213817e7a1d4c6c323b40de4b9cbac8c65d54a4b367c792b7bd272a",
+    "target_overlap_before": []
+  },
+  "net_new_count": 1,
+  "net_new_ids": [
+    540
+  ],
+  "policy": {
+    "captcha_solving": false,
+    "llm_calls": 0,
+    "paid_canary": false,
+    "repo_source_edits": true,
+    "shared_ledger_mutated": false,
+    "unlocker": false
+  },
+  "rejected_count": 5,
+  "rejected_ids": [
+    48946,
+    61459,
+    68497,
+    224888,
+    261116
+  ],
+  "results": [
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": false,
+        "realpage_oll_urls": [],
+        "rentcafe_present": false
+      },
+      "contamination_verdict": "pass_exact_property_native_ids_positive_rents_single_provider_property",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 61873,
+        "captcha_solving": false,
+        "final_url": "https://www.harborgroupmanagement.com/apartments/fl/jacksonville/bridgepoint/",
+        "status": 200,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [],
+      "full_local_pipeline_observation": {
+        "adapter_used": "knock",
+        "detected_pms": "knock",
+        "errors": [],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": true,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 1,
+        "units_gate": {
+          "all_rows_native_priced": true,
+          "distinct_native_ids": 1,
+          "distinct_unit_numbers": 1,
+          "duplicate_native_ids": [],
+          "native_ids_unique": true,
+          "provider_boundary_single_property": true,
+          "rows": 1,
+          "rows_with_native_id_and_number": 1,
+          "rows_with_native_id_number_and_positive_rent": 1,
+          "samples": [
+            {
+              "availability_date": "2026-08-10",
+              "floor_plan_name": "1X1",
+              "knock_unit_id": "6f34b85e-3733-4d79-8391-f742a7bf33c7",
+              "market_rent_low": 990,
+              "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2011814/units",
+              "source_property_id": "2011814",
+              "unit_number": "807"
+            }
+          ],
+          "source_property_ids": [
+            "2011814"
+          ],
+          "source_urls": [
+            "https://doorway-api.knockrentals.com/v1/property/2011814/units"
+          ]
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_urls": [
+          "https://doorway-api.knockrentals.com/v1/property/2011814/units"
+        ]
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [],
+        "strict_pass": true,
+        "subpage_hints": [],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": true,
+          "distinct_native_ids": 1,
+          "distinct_unit_numbers": 1,
+          "duplicate_native_ids": [],
+          "native_ids_unique": true,
+          "provider_boundary_single_property": true,
+          "rows": 1,
+          "rows_with_native_id_and_number": 1,
+          "rows_with_native_id_number_and_positive_rent": 1,
+          "samples": [
+            {
+              "availability_date": "2026-08-10",
+              "floor_plan_name": "1X1",
+              "knock_unit_id": "6f34b85e-3733-4d79-8391-f742a7bf33c7",
+              "market_rent_low": 990,
+              "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2011814/units",
+              "source_property_id": "2011814",
+              "unit_number": "807"
+            }
+          ],
+          "source_property_ids": [
+            "2011814"
+          ],
+          "source_urls": [
+            "https://doorway-api.knockrentals.com/v1/property/2011814/units"
+          ]
+        },
+        "winning_url": "https://doorway-api.knockrentals.com/v1/property/community/91011ebb76019d4d"
+      },
+      "knock_signals": {
+        "archived_literal_init": true,
+        "community_id": "91011ebb76019d4d",
+        "community_id_source": "current_exact_route_literal_init",
+        "live_dynamic_dni_config": true,
+        "live_literal_init": true,
+        "public_key_present": true
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "knock_unit_id": "6f34b85e-3733-4d79-8391-f742a7bf33c7",
+            "unit_number": "807"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 990
+          },
+          "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2011814/units",
+          "source_property_id": "2011814"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "page_identity": {
+        "canonical_address": "1500 Monument Rd",
+        "canonical_city": "Jacksonville",
+        "canonical_name": "Bridgepoint I",
+        "canonical_state": "FL",
+        "canonical_zip": "32225",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": false,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 540,
+      "property_identity_match": true,
+      "property_name": "Bridgepoint I",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/community/91011ebb76019d4d",
+            "via": "knock_community"
+          },
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/2011814/units",
+            "via": "knock_units"
+          }
+        ],
+        "community_id_source": "current_exact_route_literal_init",
+        "community_identity": {
+          "numeric_property_id": "2011814",
+          "provider_address": " 1500 Monument Road Jacksonville FL 32225",
+          "provider_city": "Jacksonville",
+          "provider_property_name": "(BRI) Bridgepoint",
+          "provider_state": "FL",
+          "provider_zip": "32225"
+        },
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": true,
+          "distinct_native_ids": 1,
+          "distinct_unit_numbers": 1,
+          "duplicate_native_ids": [],
+          "native_ids_unique": true,
+          "provider_boundary_single_property": true,
+          "rows": 1,
+          "rows_with_native_id_and_number": 1,
+          "rows_with_native_id_number_and_positive_rent": 1,
+          "samples": [
+            {
+              "availability_date": "2026-08-10",
+              "floor_plan_name": "1X1",
+              "knock_unit_id": "6f34b85e-3733-4d79-8391-f742a7bf33c7",
+              "market_rent_low": 990,
+              "source_api_url": "https://doorway-api.knockrentals.com/v1/property/2011814/units",
+              "source_property_id": "2011814",
+              "unit_number": "807"
+            }
+          ],
+          "source_property_ids": [
+            "2011814"
+          ],
+          "source_urls": [
+            "https://doorway-api.knockrentals.com/v1/property/2011814/units"
+          ]
+        }
+      },
+      "units": 1,
+      "website": "https://www.hgliving.com/apartments/fl/jacksonville/bridgepoint/#/"
+    },
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": false,
+        "realpage_oll_urls": [],
+        "rentcafe_present": true
+      },
+      "contamination_verdict": "not_accepted_no_full_property_bounded_native_knock_adapter_output",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 207745,
+        "captcha_solving": false,
+        "final_url": "https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb",
+        "status": 200,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "current_knock_api_has_zero_eligible_native_priced_units"
+      ],
+      "full_local_pipeline_observation": {
+        "adapter_used": "knock",
+        "detected_pms": "knock",
+        "errors": [
+          "knock-adapter: Doorway API returned no units for community_id"
+        ],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [
+          "knock-adapter: Doorway API returned no units for community_id"
+        ],
+        "strict_pass": false,
+        "subpage_hints": [
+          [
+            "https://www.wimmercommunities.com/floorplans",
+            "knock_empty_fallthrough"
+          ],
+          [
+            "https://www.wimmercommunities.com/floor-plans",
+            "knock_empty_fallthrough"
+          ],
+          [
+            "https://www.wimmercommunities.com/availability",
+            "knock_empty_fallthrough"
+          ]
+        ],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "knock_signals": {
+        "archived_literal_init": true,
+        "community_id": "f22598c11ea2c314",
+        "community_id_source": "current_exact_route_literal_init",
+        "live_dynamic_dni_config": false,
+        "live_literal_init": true,
+        "public_key_present": true
+      },
+      "native_samples": [],
+      "outcome": "REJECTED",
+      "page_identity": {
+        "canonical_address": "9208 W Allerton Ave",
+        "canonical_city": "Greenfield",
+        "canonical_name": "Westfield Apartments",
+        "canonical_state": "WI",
+        "canonical_zip": "53228",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 48946,
+      "property_identity_match": true,
+      "property_name": "Westfield Apartments",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/community/f22598c11ea2c314",
+            "via": "knock_community"
+          },
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/2007986/units",
+            "via": "knock_units"
+          }
+        ],
+        "community_id_source": "current_exact_route_literal_init",
+        "community_identity": {
+          "numeric_property_id": "2007986",
+          "provider_address": " 9208 West Allerton Avenue Greenfield WI 53228",
+          "provider_city": "Greenfield",
+          "provider_property_name": "Westfield",
+          "provider_state": "WI",
+          "provider_zip": "53228"
+        },
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "units": 0,
+      "website": "https://www.wimmercommunities.com/apartments/wi/greenfield/westfield-apartments/?utm_knock=gmb"
+    },
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": false,
+        "realpage_oll_urls": [],
+        "rentcafe_present": false
+      },
+      "contamination_verdict": "not_accepted_no_full_property_bounded_native_knock_adapter_output",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 53391,
+        "captcha_solving": false,
+        "final_url": "https://www.thiestalle.com:443/properties/oakstreet-st-cloud.html",
+        "status": 200,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "current_knock_api_has_zero_eligible_native_priced_units"
+      ],
+      "full_local_pipeline_observation": {
+        "adapter_used": "knock",
+        "detected_pms": "knock",
+        "errors": [
+          "knock-adapter: Doorway API returned no units for community_id"
+        ],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [
+          "knock-adapter: Doorway API returned no units for community_id"
+        ],
+        "strict_pass": false,
+        "subpage_hints": [
+          [
+            "http://www.thiestalle.com/floorplans",
+            "knock_empty_fallthrough"
+          ],
+          [
+            "http://www.thiestalle.com/floor-plans",
+            "knock_empty_fallthrough"
+          ],
+          [
+            "http://www.thiestalle.com/availability",
+            "knock_empty_fallthrough"
+          ]
+        ],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "knock_signals": {
+        "archived_literal_init": true,
+        "community_id": "6d3ea06cc111ec24",
+        "community_id_source": "current_exact_route_literal_init",
+        "live_dynamic_dni_config": false,
+        "live_literal_init": true,
+        "public_key_present": true
+      },
+      "native_samples": [],
+      "outcome": "REJECTED",
+      "page_identity": {
+        "canonical_address": "417 15th Ave SE",
+        "canonical_city": "St Cloud",
+        "canonical_name": "Oak Street Townhomes",
+        "canonical_state": "MN",
+        "canonical_zip": "56304",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 61459,
+      "property_identity_match": true,
+      "property_name": "Oak Street Townhomes",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/community/6d3ea06cc111ec24",
+            "via": "knock_community"
+          },
+          {
+            "status": 200,
+            "url": "https://doorway-api.knockrentals.com/v1/property/2013548/units",
+            "via": "knock_units"
+          }
+        ],
+        "community_id_source": "current_exact_route_literal_init",
+        "community_identity": {
+          "numeric_property_id": "2013548",
+          "provider_address": " 417 15th Ave SE St. Cloud MN 56304",
+          "provider_city": "St. Cloud",
+          "provider_property_name": "Oak Street Townhomes",
+          "provider_state": "MN",
+          "provider_zip": "56304"
+        },
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "units": 0,
+      "website": "http://www.thiestalle.com/properties/oakstreet-st-cloud.html"
+    },
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": false,
+        "realpage_oll_urls": [],
+        "rentcafe_present": true
+      },
+      "contamination_verdict": "not_accepted_no_full_property_bounded_native_knock_adapter_output",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 39086,
+        "captcha_solving": false,
+        "final_url": "https://www.liveatmaya.com/",
+        "status": 404,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [
+        "exact_route_http_404",
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_rentcafe_inventory_not_knock"
+      ],
+      "full_local_pipeline_observation": {
+        "adapter_used": null,
+        "detected_pms": null,
+        "errors": [],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": false,
+        "tier": null,
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "strict_pass": false,
+        "subpage_hints": [],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "knock_signals": {
+        "archived_literal_init": false,
+        "community_id": "",
+        "community_id_source": "none",
+        "live_dynamic_dni_config": false,
+        "live_literal_init": false,
+        "public_key_present": false
+      },
+      "native_samples": [],
+      "outcome": "REJECTED",
+      "page_identity": {
+        "canonical_address": "535 S Kingsley Dr",
+        "canonical_city": "Los Angeles",
+        "canonical_name": "Maya",
+        "canonical_state": "CA",
+        "canonical_zip": "90020",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 68497,
+      "property_identity_match": true,
+      "property_name": "Maya",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [],
+        "community_id_source": "none",
+        "community_identity": {},
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "units": 0,
+      "website": "http://www.liveatmaya.com/"
+    },
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": true,
+        "realpage_oll_urls": [
+          "https://1733786.onlineleasing.realpage.com/#k=27891"
+        ],
+        "rentcafe_present": false
+      },
+      "contamination_verdict": "not_accepted_no_full_property_bounded_native_knock_adapter_output",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 585210,
+        "captcha_solving": false,
+        "final_url": "https://coveatoverlakeapts.com/",
+        "status": 200,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_realpage_inventory_not_knock"
+      ],
+      "full_local_pipeline_observation": {
+        "adapter_used": "knock",
+        "detected_pms": "knock",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "strict_pass": false,
+        "subpage_hints": [],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "knock_signals": {
+        "archived_literal_init": false,
+        "community_id": "",
+        "community_id_source": "none",
+        "live_dynamic_dni_config": false,
+        "live_literal_init": false,
+        "public_key_present": false
+      },
+      "native_samples": [],
+      "outcome": "REJECTED",
+      "page_identity": {
+        "canonical_address": "1837 Berra Blvd",
+        "canonical_city": "Tooele",
+        "canonical_name": "The Cove at Overlake",
+        "canonical_state": "UT",
+        "canonical_zip": "84074",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 224888,
+      "property_identity_match": true,
+      "property_name": "The Cove at Overlake",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [],
+        "community_id_source": "none",
+        "community_identity": {},
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "units": 0,
+      "website": "http://www.coveatoverlakeapts.com/"
+    },
+    {
+      "competing_provider_signals": {
+        "knock_widget_marker_present": true,
+        "realpage_oll_present": true,
+        "realpage_oll_urls": [
+          "https://9131096aff.onlineleasing.realpage.com/"
+        ],
+        "rentcafe_present": false
+      },
+      "contamination_verdict": "not_accepted_no_full_property_bounded_native_knock_adapter_output",
+      "current_detector": {
+        "confidence": 0.9,
+        "evidence": [
+          "Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"
+        ],
+        "pms": "knock"
+      },
+      "exact_route_fetch": {
+        "body_bytes": 134567,
+        "captcha_solving": false,
+        "final_url": "https://copperpointeapts.com/",
+        "status": 200,
+        "unlocker": false
+      },
+      "explicit_rejection_reasons": [
+        "current_knock_adapter_e2e_emitted_zero_units",
+        "no_exact_route_knock_community_id",
+        "exact_page_points_to_realpage_inventory_not_knock"
+      ],
+      "full_local_pipeline_observation": {
+        "adapter_used": "knock",
+        "detected_pms": "knock",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "exception": "",
+        "llm_budget": 0,
+        "native_ids_equal_direct_adapter": true,
+        "plans": 0,
+        "strict_pass": false,
+        "tier": "TIER_1_KNOCK_API",
+        "units": 0,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "identity_evidence": {
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "source_urls": []
+      },
+      "knock_adapter_e2e": {
+        "adapter": "KnockAdapter",
+        "errors": [
+          "knock-adapter: no knockDoorway.init() call in HTML"
+        ],
+        "strict_pass": false,
+        "subpage_hints": [],
+        "tier": "TIER_1_KNOCK_API",
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        },
+        "winning_url": ""
+      },
+      "knock_signals": {
+        "archived_literal_init": false,
+        "community_id": "",
+        "community_id_source": "none",
+        "live_dynamic_dni_config": false,
+        "live_literal_init": false,
+        "public_key_present": false
+      },
+      "native_samples": [],
+      "outcome": "REJECTED",
+      "page_identity": {
+        "canonical_address": "6410 S New Braunfels Ave",
+        "canonical_city": "San Antonio",
+        "canonical_name": "Copper Pointe",
+        "canonical_state": "TX",
+        "canonical_zip": "78223",
+        "name_visible_core_normalized": true,
+        "name_visible_exact_normalized": true,
+        "property_identity_match": true,
+        "street_number_and_words_visible": true
+      },
+      "property_id": 261116,
+      "property_identity_match": true,
+      "property_name": "Copper Pointe",
+      "supplemental_current_knock_api_probe": {
+        "api_responses": [],
+        "community_id_source": "none",
+        "community_identity": {},
+        "error": "",
+        "note": "Supplemental helper output is diagnostic only; it cannot pass the required full KnockAdapter E2E gate.",
+        "strict_adapter_accept": false,
+        "units_gate": {
+          "all_rows_native_priced": false,
+          "distinct_native_ids": 0,
+          "distinct_unit_numbers": 0,
+          "duplicate_native_ids": [],
+          "native_ids_unique": false,
+          "provider_boundary_single_property": false,
+          "rows": 0,
+          "rows_with_native_id_and_number": 0,
+          "rows_with_native_id_number_and_positive_rent": 0,
+          "samples": [],
+          "source_property_ids": [],
+          "source_urls": []
+        }
+      },
+      "units": 0,
+      "website": "https://copperpointeapts.com/"
+    }
+  ],
+  "strict_gate": "HTTP 200 exact route + visible exact-property name/address + current detector selects Knock + full detect-to-adapter pipeline preserves the direct adapter's exact native row set + every row has native Knock UUID and unit number + positive rent + unique native UUIDs + one provider property boundary",
+  "target_count": 6,
+  "target_ids": [
+    540,
+    48946,
+    61459,
+    68497,
+    224888,
+    261116
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "summary": {
+    "result_type": "strict_current_entrata_published_modal_same_session",
+    "capture_timestamp_utc": "2026-08-01T13:52:44.531707+00:00",
+    "strict_unit_qualified_properties": 2,
+    "strict_unit_qualified_property_ids": [
+      22552,
+      242976
+    ],
+    "native_positive_rent_rows": 3,
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "llm_used": false,
+    "paid_canary_run": false
+  },
+  "results": [
+    {
+      "property_id": 22552,
+      "property_name": "La Vina Apartments",
+      "website": "https://www.lavinaapts.com/",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 2,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_unique_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "La Vina Apartments",
+        "canonical_address": "4601 Gerrilyn Way",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "100172727",
+        "current_listing_property_floorplan_binding": "801354",
+        "positive_rent_provenance": "unit_button_data_rent",
+        "rows_with_native_identity": 2,
+        "rows_with_native_identity_and_positive_rent": 2,
+        "source_urls": [
+          "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "208"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 3117,
+            "market_rent_high": 3117,
+            "provenance": "unit_button_data_rent"
+          },
+          "source_api_url": "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1"
+        },
+        {
+          "identity": {
+            "unit_number": "212"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 3117,
+            "market_rent_high": 3117,
+            "provenance": "unit_button_data_rent"
+          },
+          "source_api_url": "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "B1",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "887",
+          "unit_number": "208",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$3,117",
+          "market_rent_low": 3117,
+          "market_rent_high": 3117,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-03",
+          "available_date": "2026-08-03",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        },
+        {
+          "floor_plan_name": "B1",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "887",
+          "unit_number": "212",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$3,117",
+          "market_rent_low": 3117,
+          "market_rent_high": 3117,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-08-17",
+          "available_date": "2026-08-17",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": ""
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:50:36.755167+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_22552_current.json",
+        "capture_artifact_sha256": "2f58ac06ba227b98fd2ff3d0a266f82ffeaf1af42c641982c19dcf1f4dece2fb",
+        "listing_html_sha256": "0ebab21423a4cd9694b8dd5407d14bd777f6e11c7926e73568d081a4d2b7c6eb",
+        "page_html_sha256": "119e2e7939e4aa68528d7c73d07e22cfe2cb66420b3fd8d34d7c5827a49bb137",
+        "endpoint_html_sha256": "09dfa609c94e060c9c5ade93e2201bacc11a21231e5f0e25acc66e97eba41d82",
+        "published_endpoint": "https://www.lavinaapts.com/?module=check_availability&is_secure=1&property[id]=100172727&action=view_unit_spaces&property_floorplan[id]=801354&cached_rate_available=1&min_rent=3117&max_rent=3117&min_advertised_base_rent=3105&max_advertised_base_rent=3105&min_deposit=200.00&max_deposit=200.00&lease_term_name=14mo lease&popup_lease_term_name=14 month lease&move_in_date=2026-08-03&occupancy_type=conventional&unit_count=1",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": false,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    },
+    {
+      "property_id": 242976,
+      "property_name": "Kelly Farms",
+      "website": "http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk",
+      "outcome": "UNIT_QUALIFIED",
+      "units": 1,
+      "property_identity_match": true,
+      "contamination_verdict": "pass_exact_current_same_property_published_entrata_modal_native_unique_id_positive_rent",
+      "identity_evidence": {
+        "canonical_name": "Kelly Farms",
+        "canonical_address": "1280 Cinnamon Hill Lane",
+        "current_page_name_match": true,
+        "current_page_street_zip_match": true,
+        "current_listing_provider_property_binding": "648323",
+        "current_listing_property_floorplan_binding": "278303",
+        "positive_rent_provenance": "exact_floorplan_modal_header_and_page_jsonld",
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "source_urls": [
+          "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional"
+        ]
+      },
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "201"
+          },
+          "positive_rent_evidence": {
+            "market_rent_low": 1250,
+            "market_rent_high": 1250,
+            "provenance": "exact_floorplan_modal_header_and_page_jsonld"
+          },
+          "source_api_url": "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional"
+        }
+      ],
+      "native_rows": [
+        {
+          "floor_plan_name": "Kiernan - Style 2",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "741",
+          "unit_number": "201",
+          "unit_name": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "$1,250",
+          "market_rent_low": 1250,
+          "market_rent_high": 1250,
+          "deposit": "",
+          "concession": "",
+          "concession_text": null,
+          "concession_text_clean": null,
+          "_concession_quality": null,
+          "concession_value": null,
+          "concession_source": null,
+          "offer_banner": null,
+          "offer_type": null,
+          "offer_target": null,
+          "offer_value": null,
+          "offer_conditions": null,
+          "availability_status": "AVAILABLE",
+          "available_units": "",
+          "availability_date": "2026-09-01",
+          "available_date": "2026-09-01",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional",
+          "extraction_tier": "TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+          "source_ids": {},
+          "data_gaps": [],
+          "data_quality_flag": "",
+          "positive_rent_provenance": "exact_floorplan_modal_header_and_page_jsonld"
+        }
+      ],
+      "current_capture": {
+        "capture_timestamp_utc": "2026-08-01T13:50:36.711634+00:00",
+        "capture_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/hb_modal_direct_242976_current.json",
+        "capture_artifact_sha256": "649853b8c592a47af95b48e1dfc8c342feb97a80f5cf9dbba8a6fe0d2ae6c98a",
+        "listing_html_sha256": "772dbc83da053d6d5c8669a9aa4ef08e4dd1e2cc53392c65d8ce205825b8c8ac",
+        "page_html_sha256": "a9a4e51e50a78b8b6257b787cad9e1e58be2fa904df43ba94a3c974bea39f794",
+        "endpoint_html_sha256": "0bfdff592fca0aed948bccc3fa41077a3c90c546dce465497ece8f8af4208709",
+        "published_endpoint": "https://www.kellyfarms.com/?module=check_availability&is_secure=1&property[id]=648323&action=view_unit_spaces&property_floorplan[id]=278303&cached_rate_available=1&min_rent=$1,250&max_rent=$1,250&min_deposit=400.0000&max_deposit=400.0000&lease_term_name=&popup_lease_term_name=&move_in_date=2026-08-01&occupancy_type=conventional",
+        "endpoint_status": 200,
+        "session_options": {
+          "solveCaptchas": false,
+          "useStealth": false,
+          "useProxy": true,
+          "adblock": true
+        },
+        "captcha_solving": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+apartment_id,name,adapter,verdict,unit_count,plan_count,synthetic_ids,avoidable_synthetic_ids,duplicate_unit_ids,entrata_parallel_duplicates,negative_status_rows,manufactured_negative_dates,building_id_rows,rent_range_rows,unresolved_area_rows,unit_source_hashes,unarchived_unit_source_hashes,archive_source_count,snapshot_present,natural_preformat_rows
+1084,Black Hawk,rentcafe_layout_tab,SUCCESS,9,0,0,0,0,0,0,0,0,9,0,0,0,1,1,9
+2709,Wellington Place at Olde Town,generic_plan_text,SUCCESS,37,0,0,0,0,0,0,0,0,37,0,0,0,1,1,37
+4170,Beechwood,generic,SUCCESS,36,2,0,0,0,0,10,0,0,36,0,0,0,1,1,36
+4579,Laurel Crossing,entrata,SUCCESS,5,0,0,0,0,0,0,0,0,5,0,0,0,2,1,5
+5091,Rise Broadway,entrata,SUCCESS,24,0,0,0,0,0,0,0,24,24,0,10,0,11,1,24
+11130,Mercer Park,generic,SUCCESS,248,4,0,0,0,0,231,0,0,248,0,0,0,3,1,248
+12566,High Point Crossing,g5,SUCCESS,7,0,0,0,0,0,0,0,7,7,0,0,0,2,1,7
+12727,Riverway,generic,SUCCESS,152,11,0,0,0,0,139,0,0,152,0,0,0,3,1,152
+14943,Estates at Eagle's Pointe,generic_plan_text,SUCCESS_PLAN_LEVEL,0,12,0,0,0,0,0,0,0,0,0,0,0,1,1,0
+26523,Concierge Apartments,entrata,SUCCESS,53,0,0,0,0,0,0,0,0,53,0,1,0,2,1,53
+27165,Regatta Apartments Homes,entrata,SUCCESS_PLAN_LEVEL,0,10,0,0,0,0,0,0,0,0,0,0,0,3,1,0
+29448,Manor Homes of Fox Crest,entrata,SUCCESS,14,0,0,0,0,0,0,0,14,14,0,6,0,7,1,14
+32097,Clemmons Trace Village,resman,SUCCESS_PLAN_LEVEL,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0
+36168,Bennington Hills,encoreskyline_template,SUCCESS,3,0,0,0,0,0,0,0,0,3,0,0,0,1,1,3
+37065,Pointe Inverness,entrata,SUCCESS,2,0,0,0,0,0,0,0,2,2,0,2,0,3,1,2
+46108,Stratford Mill,realpage_oll,SUCCESS,68,0,0,0,0,0,0,0,68,68,0,0,0,2,1,68
+48052,Summerville Station,entrata,SUCCESS,8,0,0,0,0,0,0,0,8,8,0,4,0,5,1,8
+48092,Edgewater Village,entrata,SUCCESS,85,0,0,0,0,0,0,0,85,85,0,11,0,12,1,85
+62743,Residences at Falcon North,entrata,SUCCESS,24,0,0,0,0,0,0,0,24,24,0,4,0,5,1,24
+70238,Grace Apartments,entrata,SUCCESS_PLAN_LEVEL,0,6,0,0,0,0,0,0,0,0,0,0,0,1,1,0
+74528,Grand Oaks,generic_plan_text,SUCCESS_PLAN_LEVEL,0,3,0,0,0,0,0,0,0,0,0,0,0,1,1,0
+218893,Volta at Voyager I,repli360,SUCCESS,14,0,0,0,0,0,0,0,0,14,0,0,0,1,1,14
+226992,Forest Ridge,knock,SUCCESS,10,0,0,0,0,0,0,0,10,10,0,0,0,0,1,10
+241798,Waterford Landings,generic,SUCCESS,359,18,0,0,0,0,331,0,0,359,0,0,0,3,1,359
+272772,Hawkeye Village,generic,FAILED_NO_DATA,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0
+274909,The Sinclair II,onsite_apply,SUCCESS,4,0,0,0,0,0,0,0,4,4,0,0,0,2,1,4
+280355,Town Center Apartments,squarespace_nopms,SUCCESS,17,0,0,0,0,0,0,0,0,17,0,1,0,2,1,17
+280797,Aspire,entrata,SUCCESS,9,0,0,0,0,0,0,0,9,9,0,3,0,4,1,9

@@ -29,8 +29,10 @@ from ma_poc.pms.adapters.edificecms import (
     _avail_status,
     _rent_to_int,
     find_edificecms_property_id,
+    find_edificecms_property_ids,
     parse_edificecms_plan_summary,
     parse_edificecms_units,
+    select_edificecms_catalogue,
 )
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.detector import _detect_html_markers
@@ -70,6 +72,17 @@ def test_property_id_fallback_to_resman_apply_link() -> None:
         '?a=2071&p=b63cc3f8-3edf-4ec9-be58-8bf4a77455bf&moveInDate=4/30/2026">Apply</a>'
     )
     assert find_edificecms_property_id(html) == COBBLESTONE_UUID
+
+
+def test_property_ids_decode_html_entities_and_preserve_candidate_order() -> None:
+    first = "318beef3-c0ee-4d07-a9c7-a9624bb13238"
+    second = "e7494880-99cb-4613-9de6-06812af8bbdd"
+    html = (
+        f'<script>const x={{property_id:"{first}"}}</script>'
+        '<a href="https://lpp.myresman.com/Portal/Applicants/Availability'
+        f'?a=2071&amp;p={second}&amp;moveInDate=8/1/2026">Apply</a>'
+    )
+    assert find_edificecms_property_ids(html) == [first, second]
 
 
 def test_property_id_returns_none_when_absent() -> None:
@@ -119,6 +132,82 @@ def test_avail_status_from_unit_flags() -> None:
     # Missing both fields → conservative AVAILABLE (API would have
     # filtered it out otherwise).
     assert _avail_status({}) == "AVAILABLE"
+
+
+def test_future_on_notice_row_in_positive_roster_is_available() -> None:
+    row = {
+        "UnitLeasedStatus": "on_notice",
+        "UnitOccupancyStatus": "occupied",
+        "Availability": {"MadeReadyDate": "09/08/2026"},
+    }
+    assert _avail_status(row, capture_date="2026-08-02") == "AVAILABLE"
+
+
+def test_historical_on_notice_and_true_leased_rows_remain_unavailable() -> None:
+    historical = {
+        "UnitLeasedStatus": "on_notice",
+        "UnitOccupancyStatus": "occupied",
+        "Availability": {"MadeReadyDate": "07/01/2026"},
+    }
+    leased = {
+        "UnitLeasedStatus": "leased",
+        "UnitOccupancyStatus": "occupied",
+        "Availability": {"MadeReadyDate": "09/08/2026"},
+    }
+    assert _avail_status(historical, capture_date="2026-08-02") == "UNAVAILABLE"
+    assert _avail_status(leased, capture_date="2026-08-02") == "UNAVAILABLE"
+
+
+def test_parse_units_preserves_future_on_notice_date_and_state() -> None:
+    plan = {
+        "Id": "A2",
+        "Name": "A2",
+        "Bedroom": 1,
+        "Bathroom": 1,
+        "SquareFeet": 700,
+    }
+    rows = parse_edificecms_units(
+        plan,
+        [
+            {
+                "UnitID": "4204",
+                "MarketRent": "1650.00",
+                "UnitOccupancyStatus": "occupied",
+                "UnitLeasedStatus": "on_notice",
+                "Availability": {"MadeReadyDate": "09/08/2026"},
+            }
+        ],
+        "https://edificecms.com/units",
+        capture_date="2026-08-02",
+    )
+    assert rows[0]["availability_status"] == "AVAILABLE"
+    assert rows[0]["availability_date"] == "2026-09-08"
+
+
+def test_catalogue_selector_prefers_aggregate_over_strict_subset() -> None:
+    aggregate = {
+        "property_id": "aggregate",
+        "response": {"data": []},
+        "identity": object(),
+        "plan_ids": {"1x1", "2x2", "3x2"},
+    }
+    subset = {
+        "property_id": "subset",
+        "response": {"data": []},
+        "identity": object(),
+        "plan_ids": {"2x2", "3x2"},
+    }
+    selected, relation = select_edificecms_catalogue([aggregate, subset])
+    assert selected is aggregate
+    assert relation == "aggregate_over_strict_subset"
+
+
+def test_catalogue_selector_rejects_noncontained_sibling_sets() -> None:
+    first = {"property_id": "phase-i", "plan_ids": {"S1", "S2"}}
+    sibling = {"property_id": "phase-ii", "plan_ids": {"A1", "B1"}}
+    selected, relation = select_edificecms_catalogue([first, sibling])
+    assert selected is None
+    assert relation == "ambiguous_noncontained"
 
 
 def test_parse_units_emits_unit_level_rows() -> None:
@@ -306,3 +395,85 @@ def test_adapter_extract_misroute_falls_through() -> None:
         result = asyncio.run(adapter.extract(page=None, ctx=ctx))  # type: ignore[arg-type]
     assert result.tier_used.endswith("_NO_FINGERPRINT")
     assert fired is False, "API call fired despite missing fingerprint"
+
+
+def test_adapter_verifies_each_uuid_and_selects_matching_phase() -> None:
+    wrong = "318beef3-c0ee-4d07-a9c7-a9624bb13238"
+    correct = "e7494880-99cb-4613-9de6-06812af8bbdd"
+    html = (
+        '<script>var BUILDER_LIVE="https://beta.edificecms.com/builder/";'
+        f'const a={{property_id:"{wrong}"}};'
+        f'const b={{property_id:"{correct}"}};</script>'
+    )
+    ctx = _make_ctx(html)
+    ctx.property_name = "Turtle Dove I"
+    ctx.address = "3516 Matilda St"
+    calls: list[str] = []
+
+    async def mock_fetch_json(url: str, params: dict[str, str]) -> dict[str, Any]:
+        candidate = params.get("property_id", "")
+        if "floorplans" in url:
+            calls.append(candidate)
+            response = dict(FLOORPLANS_API)
+            response["property"] = "Turtle Dove 2" if candidate == wrong else "Turtle Dove 1"
+            return response
+        return {"status": True, "units": {params.get("u", ""): []}}
+
+    with patch("ma_poc.pms.adapters.edificecms._fetch_json", side_effect=mock_fetch_json):
+        result = asyncio.run(EdificeCmsAdapter().extract(page=None, ctx=ctx))  # type: ignore[arg-type]
+
+    assert calls[:2] == [wrong, correct]
+    assert result.tier_used == "TIER_1_API_EDIFICECMS"
+    assert correct in (result.winning_url or "")
+    assert any("PROPERTY_IDENTITY_REJECTED" in error for error in result.errors)
+    assert result.unit_source_provenance
+    assert result.unit_source_provenance[0]["identity"]["status"] == "MATCH"
+
+
+def test_adapter_selects_newport_aggregate_instead_of_subset() -> None:
+    aggregate_uuid = "a33c14d8-a587-4273-afa9-65cd7919c5d9"
+    subset_uuid = "21d5cb08-2e9d-46fc-b369-70c914588ed1"
+    html = (
+        '<script>var BUILDER_LIVE="https://beta.edificecms.com/builder/";'
+        f'const a={{property_id:"{aggregate_uuid}"}};'
+        f'const b={{property_id:"{subset_uuid}"}};</script>'
+    )
+    ctx = _make_ctx(html)
+    ctx.property_name = "Newport Village"
+    calls: list[str] = []
+
+    def plan(plan_id: str) -> dict[str, Any]:
+        return {
+            "Id": plan_id,
+            "Name": plan_id,
+            "Bedroom": 2,
+            "Bathroom": 2,
+            "SquareFeet": 1000,
+            "MarketRent": 1500,
+            "UnitsAvailable": "0",
+        }
+
+    async def mock_fetch_json(url: str, params: dict[str, str]) -> dict[str, Any]:
+        candidate = params.get("property_id", "")
+        if "floorplans" in url:
+            calls.append(candidate)
+            plan_ids = ["1x1G-nv", "2x2S-nv", "2x2-npv", "2x2G-nv", "3x2-npv"]
+            if candidate == subset_uuid:
+                plan_ids = ["2x2-npv", "3x2-npv"]
+            return {
+                "status": True,
+                "property": "Newport Village",
+                "data": [plan(plan_id) for plan_id in plan_ids],
+            }
+        raise AssertionError("zero-availability plans must not call units endpoint")
+
+    with patch("ma_poc.pms.adapters.edificecms._fetch_json", side_effect=mock_fetch_json):
+        result = asyncio.run(EdificeCmsAdapter().extract(page=None, ctx=ctx))  # type: ignore[arg-type]
+
+    assert calls == [aggregate_uuid, subset_uuid]
+    assert result.tier_used == "TIER_1_API_EDIFICECMS"
+    assert aggregate_uuid in (result.winning_url or "")
+    assert len(result.plan_summaries) == 5
+    assert any(
+        "relation=aggregate_over_strict_subset" in error for error in result.errors
+    )

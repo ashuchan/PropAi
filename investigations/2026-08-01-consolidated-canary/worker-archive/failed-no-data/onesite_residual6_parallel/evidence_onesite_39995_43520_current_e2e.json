@@ -1,0 +1,527 @@
+{
+  "assertions": {
+    "exact_three_member_boundary_run": true,
+    "focused_tests_pass": true,
+    "no_paid_or_unlocker_calls": true,
+    "pid14295_no_native_unitids_stays_nonunit": true,
+    "pid39995_exact_workflow_native_positive": true,
+    "pid43520_exact_rpfp_native_positive": true
+  },
+  "focused_test_run": {
+    "returncode": 0,
+    "stderr": "",
+    "stdout": "............................................                             [100%]\n44 passed in 0.16s"
+  },
+  "generated_at_utc": "2026-08-01T16:13:53.433568+00:00",
+  "guardrails": {
+    "captcha_solving": false,
+    "fingerprint_rotation": false,
+    "flaresolverr": false,
+    "hyperbrowser_calls": {
+      "14295": 0,
+      "39995": 0,
+      "43520": 0
+    },
+    "ledger_or_builder_modified": false,
+    "llm_enabled": false,
+    "paid_canary": false,
+    "pid38677_in_scope": false,
+    "web_unlocker_calls": 0
+  },
+  "inputs": {
+    "failed344": "/private/tmp/propai-fnd-vBkmT9/failed344.json",
+    "failed344_sha256": "992b55ec4ca4605296f4996c46bf15a39ce3543b3fb54e1c1383e7f3a1f8137c",
+    "properties": "ma_poc/config/properties.csv",
+    "properties_sha256": "4f0a12e0e3fa04993e31fe277db052f7893307c87ed7d11cb1afbc6cd04675de",
+    "source": "ma_poc/pms/adapters/onesite.py",
+    "source_sha256": "7852a08bec35f750335292979ea51076250fba6605c13612fe7754031eb7c31a",
+    "test": "ma_poc/tests/pms/adapters/test_onesite_rpfp_cws.py",
+    "test_sha256": "ad5d2b10e51840e0f1eee351cc767b212fc3b5ddcfc478a9b16fb196bbf754ad"
+  },
+  "results": [
+    {
+      "adapter": "onesite",
+      "all_emitted_rows_strict": true,
+      "canonical_address": "6220 N Murray Dr",
+      "canonical_city": "Hanahan",
+      "canonical_state": "SC",
+      "canonical_zip": "29410",
+      "configured_fetch": {
+        "body_bytes": 47712,
+        "body_sha256": "1a02f9ed03beb58f1ed88234c0105bfeaff34e415ec3d9274a3dff20931cf66b",
+        "final_url": "https://www.southpointehanahan.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "https://www.southpointehanahan.com/",
+      "detected_pms": "onesite",
+      "elapsed_ms": 1714,
+      "errors": [],
+      "native_unit_numbers_nonblank_unique": true,
+      "plan_summaries": 1,
+      "property_id": 39995,
+      "property_name": "South Pointe",
+      "samples": [
+        {
+          "floor_plan_name": "B1",
+          "market_rent_low": 1263,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9c3bfb2c-8887-41d6-9246-8088f5995b32",
+          "source_native_unit_id": "",
+          "source_partner_property_id": "",
+          "source_portal_url": "http://9067331.onlineleasing.realpage.com/",
+          "source_property_id": "5272798",
+          "source_property_provenance": "published_portal_shell",
+          "unit_number": "52"
+        }
+      ],
+      "source_api_urls": [
+        "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9c3bfb2c-8887-41d6-9246-8088f5995b32"
+      ],
+      "source_native_ids_nonblank_unique": false,
+      "source_partner_property_ids": [],
+      "source_property_ids": [
+        "5272798"
+      ],
+      "source_provenance": [
+        "published_portal_shell"
+      ],
+      "strict_native_positive_rent_rows": 1,
+      "strict_rows": [
+        {
+          "floor_plan_name": "B1",
+          "market_rent_low": 1263,
+          "source_api_url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/workflowstartup/v1/5272798/English?BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3&ClientSessionID=9c3bfb2c-8887-41d6-9246-8088f5995b32",
+          "source_native_unit_id": "",
+          "source_partner_property_id": "",
+          "source_portal_url": "http://9067331.onlineleasing.realpage.com/",
+          "source_property_id": "5272798",
+          "source_property_provenance": "published_portal_shell",
+          "unit_number": "52"
+        }
+      ],
+      "tier": "TIER_1_API_ONESITE_WORKFLOW",
+      "units": 1
+    },
+    {
+      "adapter": "onesite",
+      "all_emitted_rows_strict": true,
+      "canonical_address": "222 Blairmore Blvd E",
+      "canonical_city": "Orange Park",
+      "canonical_state": "FL",
+      "canonical_zip": "32073",
+      "configured_fetch": {
+        "body_bytes": 91591,
+        "body_sha256": "585bfc75c9f6238a345c1b6dbd8ea6ad9b4d8a11758877ba19fd95ef7fffd05c",
+        "final_url": "https://theparkatblanding.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "http://www.parkatblanding.com/",
+      "detected_pms": "onesite",
+      "elapsed_ms": 1743,
+      "errors": [],
+      "native_unit_numbers_nonblank_unique": true,
+      "plan_summaries": 0,
+      "property_id": 43520,
+      "property_name": "Park at Blanding",
+      "samples": [
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447495",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "026"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447542",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "059"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447550",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "077"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447507",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "070"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447565",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "109"
+        }
+      ],
+      "source_api_urls": [
+        "https://api.ws.realpage.com/v2/property/9259508/units"
+      ],
+      "source_native_ids_nonblank_unique": true,
+      "source_partner_property_ids": [
+        "5586626"
+      ],
+      "source_property_ids": [
+        "9259508"
+      ],
+      "source_provenance": [
+        "same_origin_rpfp_property_details"
+      ],
+      "strict_native_positive_rent_rows": 26,
+      "strict_rows": [
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447495",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "026"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447542",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "059"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447550",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "077"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447507",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "070"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447565",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "109"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447486",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "112"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447546",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "072"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447462",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "033"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447541",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "058"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447484",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "104"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447452",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "010"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447488",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "114"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447473",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "067"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447523",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "005"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447517",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "108"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447493",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "018"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447458",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "024"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447504",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "056"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447469",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "047"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447479",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "080"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447467",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "045"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447494",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "023"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447482",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "102"
+        },
+        {
+          "floor_plan_name": "2x1",
+          "market_rent_low": 1175,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447471",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "064"
+        },
+        {
+          "floor_plan_name": "2x1 Large",
+          "market_rent_low": 1300,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447516",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "107"
+        },
+        {
+          "floor_plan_name": "3x2",
+          "market_rent_low": 1249,
+          "source_api_url": "https://api.ws.realpage.com/v2/property/9259508/units",
+          "source_native_unit_id": "18447560",
+          "source_partner_property_id": "5586626",
+          "source_portal_url": "https://theparkatblanding.com/Floor-Plans.aspx",
+          "source_property_id": "9259508",
+          "source_property_provenance": "same_origin_rpfp_property_details",
+          "unit_number": "096"
+        }
+      ],
+      "tier": "TIER_1_API_ONESITE_RPFP_CWS",
+      "units": 26
+    },
+    {
+      "adapter": "onesite",
+      "all_emitted_rows_strict": false,
+      "canonical_address": "1025 Adams Cir",
+      "canonical_city": "Boulder",
+      "canonical_state": "CO",
+      "canonical_zip": "80303",
+      "configured_fetch": {
+        "body_bytes": 141249,
+        "body_sha256": "f60ad023eb00edfa1d72a371dc5e5c52c971af0ca8c32e3ff952c38811af2a9a",
+        "final_url": "https://www.myboulderapartment.com/",
+        "outcome": "OK",
+        "status": 200
+      },
+      "configured_url": "www.myboulderapartment.com",
+      "detected_pms": "onesite",
+      "elapsed_ms": 1606,
+      "errors": [
+        "No RealPage/OneSite floorplan data found in captured API responses"
+      ],
+      "native_unit_numbers_nonblank_unique": false,
+      "plan_summaries": 0,
+      "property_id": 14295,
+      "property_name": "Timber Ridge Apartment Homes",
+      "samples": [],
+      "source_api_urls": [],
+      "source_native_ids_nonblank_unique": false,
+      "source_partner_property_ids": [],
+      "source_property_ids": [],
+      "source_provenance": [],
+      "strict_native_positive_rent_rows": 0,
+      "strict_rows": [],
+      "tier": "TIER_1_API_ONESITE_NO_RESPONSE",
+      "units": 0
+    }
+  ],
+  "run_type": "current configured scrape_jugnu E2E; LLM off; direct-only; no canary",
+  "self_verified": true
+}

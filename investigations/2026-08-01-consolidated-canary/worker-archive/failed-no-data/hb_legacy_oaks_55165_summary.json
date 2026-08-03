@@ -1,0 +1,30 @@
+{
+  "property_id": 55165,
+  "property_name": "Legacy Oaks",
+  "captcha_solving": false,
+  "session_count": 1,
+  "results": [
+    {
+      "url": "https://legacyoaksapts.com/",
+      "status": 200,
+      "bytes": 180680,
+      "title": "Home - Legacy Oaks Apartments",
+      "captcha_or_challenge": true,
+      "published_inventory_url": "https://legacyoaksapts.com/unit-availability/",
+      "parsed_rows": 0,
+      "native_positive_rent_rows": 0,
+      "sample_rows": []
+    },
+    {
+      "url": "https://legacyoaksapts.com/unit-availability/",
+      "status": 200,
+      "bytes": 261245,
+      "title": "Unit Availability - Legacy Oaks Apartments",
+      "captcha_or_challenge": true,
+      "published_inventory_url": "https://legacyoaksapts.com/unit-availability/",
+      "parsed_rows": 0,
+      "native_positive_rent_rows": 0,
+      "sample_rows": []
+    }
+  ]
+}

@@ -1,0 +1,1048 @@
+{
+  "batch_label": "unknown-other21-tight",
+  "filters": {
+    "evidence_lane": "other_current_code_e2e_or_archived_replay",
+    "ledger_level": "unknown",
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.hgliving.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 4,
+      "property_id": 540,
+      "property_identity_match": false,
+      "property_name": "Bridgepoint I",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "https://www.hgliving.com/apartments/fl/jacksonville/bridgepoint/#/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "tramor.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 4,
+      "property_id": 4124,
+      "property_identity_match": false,
+      "property_name": "Tramor at Cannon Place",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "Floorplan view"
+      ],
+      "tier": "TIER_3_DOM_PLAN_LEVEL",
+      "units": 0,
+      "website": "https://tramor.com/property/tramor-cannon-place/"
+    },
+    {
+      "adapter": "apts247",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.thegrandatwestchase.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 5,
+      "property_id": 12989,
+      "property_identity_match": false,
+      "property_name": "Grand at Westchase",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "A1- The Grand Royal",
+        "B1- The Grand Central",
+        "C1- The Grand Terrace",
+        "E1- The Grand Embassy",
+        "F1- The Grand Plaza"
+      ],
+      "tier": "TIER_1_API_APTS247",
+      "units": 0,
+      "website": "https://www.thegrandatwestchase.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.lindyproperty.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 2,
+      "property_id": 18379,
+      "property_identity_match": false,
+      "property_name": "Bromley House",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "2 Bedroom / 2 Bath",
+        "Studio / 1 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://www.lindyproperty.com/property/bromley-house/"
+    },
+    {
+      "adapter": "marketapts",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 10,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 10,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.reserveatevanston.com"
+        ],
+        "source_urls": [
+          "https://www.reserveatevanston.com/floorplans"
+        ],
+        "website_host": "www.reserveatevanston.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1x1 Elite",
+          "identity": {
+            "floor_plan_id": "fd2f61cb6d60",
+            "unit_number": "A-106"
+          },
+          "source_api_url": "https://www.reserveatevanston.com/floorplans",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1x1 Elite",
+          "identity": {
+            "floor_plan_id": "fd2f61cb6d60",
+            "unit_number": "C-110"
+          },
+          "source_api_url": "https://www.reserveatevanston.com/floorplans",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 7,
+      "property_id": 32793,
+      "property_identity_match": true,
+      "property_name": "The Reserve",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1x1",
+        "1x1 A",
+        "1x1 Elite",
+        "2x1",
+        "2x1 A",
+        "2x1 Elite",
+        "2x2",
+        "2x2 Elite"
+      ],
+      "tier": "TIER_1_DOM_MARKETAPTS_B_UNIT_LEVEL",
+      "units": 10,
+      "website": "https://www.reserveatevanston.com"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 11,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 11,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "monarchatdosvientos.securecafe.com"
+        ],
+        "source_urls": [
+          "https://monarchatdosvientos.securecafe.com/onlineleasing/monarch-at-dos-vientos/availableunits.aspx"
+        ],
+        "website_host": "www.monarchatdosvientos.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan A",
+          "identity": {
+            "floor_plan_id": "343e215030de",
+            "unit_number": "0225"
+          },
+          "source_api_url": "https://monarchatdosvientos.securecafe.com/onlineleasing/monarch-at-dos-vientos/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "493505"
+          }
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Plan B1",
+          "identity": {
+            "floor_plan_id": "9b7212157598",
+            "unit_number": "0337"
+          },
+          "source_api_url": "https://monarchatdosvientos.securecafe.com/onlineleasing/monarch-at-dos-vientos/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "493506"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 38345,
+      "property_identity_match": true,
+      "property_name": "Monarch at Dos Vientos",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Plan A",
+        "Plan B1",
+        "Plan B2",
+        "Plan B3",
+        "Plan C"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 11,
+      "website": "http://www.monarchatdosvientos.com/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "meetinghouseapartments.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 7,
+      "property_id": 42371,
+      "property_identity_match": false,
+      "property_name": "Meetinghouse",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath",
+        "2 Bedroom / 2.5 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "http://meetinghouseapartments.com/"
+    },
+    {
+      "adapter": "entrata",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 7,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.theridgeatchestnuthillapts.com"
+        ],
+        "source_urls": [
+          "https://www.theridgeatchestnuthillapts.com/?module=check_availability&is_secure=1&property[id]=680388&action=view_unit_spaces&property_floorplan[id]=751452&cached_rate_available=1&min_rent=$1,164&max_rent=$1,264&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-07-31&occupancy_type=conventional&unit_count=2",
+          "https://www.theridgeatchestnuthillapts.com/?module=check_availability&is_secure=1&property[id]=680388&action=view_unit_spaces&property_floorplan[id]=751454&cached_rate_available=1&min_rent=$1,409&max_rent=$1,559&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-07-31&occupancy_type=conventional&unit_count=2"
+        ],
+        "website_host": "www.theridgeatchestnuthillapts.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "2026-08-01",
+          "floor_plan_name": "Highlander Upstairs",
+          "identity": {
+            "floor_plan_id": "4194bfd65dca",
+            "unit_number": "3862"
+          },
+          "source_api_url": "https://www.theridgeatchestnuthillapts.com/?module=check_availability&is_secure=1&property[id]=680388&action=view_unit_spaces&property_floorplan[id]=751452&cached_rate_available=1&min_rent=$1,164&max_rent=$1,264&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-07-31&occupancy_type=conventional&unit_count=2",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "2026-08-03",
+          "floor_plan_name": "Highlander Upstairs",
+          "identity": {
+            "floor_plan_id": "4194bfd65dca",
+            "unit_number": "3866"
+          },
+          "source_api_url": "https://www.theridgeatchestnuthillapts.com/?module=check_availability&is_secure=1&property[id]=680388&action=view_unit_spaces&property_floorplan[id]=751452&cached_rate_available=1&min_rent=$1,164&max_rent=$1,264&is_valid_rent=1&lease_term_name=&popup_lease_term_name=&move_in_date=2026-07-31&occupancy_type=conventional&unit_count=2",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 47750,
+      "property_identity_match": true,
+      "property_name": "The Ridge At Chestnut Hill",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Crestwood",
+        "Highlander Upstairs"
+      ],
+      "tier": "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+      "units": 7,
+      "website": "https://www.theridgeatchestnuthillapts.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 4,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 4,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "countrysideest.securecafe.com"
+        ],
+        "source_urls": [
+          "https://countrysideest.securecafe.com/onlineleasing/countryside-estates/availableunits.aspx"
+        ],
+        "website_host": "www.countrysideest.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "Greenwood",
+          "identity": {
+            "floor_plan_id": "16cb971d8480",
+            "unit_number": "121-103"
+          },
+          "source_api_url": "https://countrysideest.securecafe.com/onlineleasing/countryside-estates/availableunits.aspx",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "9/1/2026",
+          "floor_plan_name": "Hemlock",
+          "identity": {
+            "floor_plan_id": "463b01fdde92",
+            "unit_number": "101-107"
+          },
+          "source_api_url": "https://countrysideest.securecafe.com/onlineleasing/countryside-estates/availableunits.aspx",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 50172,
+      "property_identity_match": true,
+      "property_name": "Countryside Estates",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Greenwood",
+        "Hemlock",
+        "Oberlin"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 4,
+      "website": "https://www.countrysideest.com"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.liveatacornacres.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 7,
+      "property_id": 56182,
+      "property_identity_match": false,
+      "property_name": "Acorn Acres",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 1 Bath",
+        "2 Bedroom / 1.5 Bath",
+        "3 Bedroom / 1.5 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://www.liveatacornacres.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 33,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 33,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.thelandingsatbrookscity-base.com"
+        ],
+        "source_urls": [
+          "https://www.thelandingsatbrookscity-base.com/floorplans/a1",
+          "https://www.thelandingsatbrookscity-base.com/floorplans/a2",
+          "https://www.thelandingsatbrookscity-base.com/floorplans/a3",
+          "https://www.thelandingsatbrookscity-base.com/floorplans/a4",
+          "https://www.thelandingsatbrookscity-base.com/floorplans/b1"
+        ],
+        "website_host": "www.thelandingsatbrookscity-base.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "89be4edcde95",
+            "unit_number": "11203"
+          },
+          "source_api_url": "https://www.thelandingsatbrookscity-base.com/floorplans/a1",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "89be4edcde95",
+            "unit_number": "01303"
+          },
+          "source_api_url": "https://www.thelandingsatbrookscity-base.com/floorplans/a1",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 58939,
+      "property_identity_match": true,
+      "property_name": "The Landings at Brooks City-Base",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "B1",
+        "B2",
+        "B3",
+        "B4"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 33,
+      "website": "http://www.thelandingsatbrookscity-base.com/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "801polaris.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 10,
+      "property_id": 59649,
+      "property_identity_match": false,
+      "property_name": "801 Polaris",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "Beckett",
+        "Branson",
+        "Dylan",
+        "Emerson",
+        "Forbes",
+        "Lennon",
+        "Lewis",
+        "McCoy"
+      ],
+      "tier": "TIER_2_JSONLD",
+      "units": 0,
+      "website": "https://801polaris.com/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.loftsatlittlecreek.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 5,
+      "property_id": 67598,
+      "property_identity_match": false,
+      "property_name": "Lofts At Little Creek",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "http://www.loftsatlittlecreek.com/"
+    },
+    {
+      "adapter": "entrata",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.livewyeast.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 6,
+      "property_id": 68952,
+      "property_identity_match": false,
+      "property_name": "Wy' East Pointe",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "Bronze",
+        "Copper",
+        "Gold",
+        "Platinum",
+        "Platinum Plus",
+        "Silver"
+      ],
+      "tier": "TIER_1_DOM_ENTRATA_PP_SSR",
+      "units": 0,
+      "website": "https://www.livewyeast.com/"
+    },
+    {
+      "adapter": "appfolio",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [
+        "appfolio-ssr-address-filter: evidence=operator_scoped reason=filter_rejected_all_lenient_keep kept=5 dropped=0 ctx_addr='1528 Lebanon Ave' ctx_zip='62221'"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.rentandresidehere.net"
+        ],
+        "source_urls": [
+          "https://www.rentandresidehere.net/"
+        ],
+        "website_host": "www.rentandresidehere.net"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "73ea0563e0d6",
+            "unit_id": "109-north-74th-st-01-belleville-il-62223",
+            "unit_number": "01"
+          },
+          "source_api_url": "https://www.rentandresidehere.net/",
+          "source_ids": {
+            "appfolio_listing_id": "101"
+          }
+        },
+        {
+          "availability_date": "NOW",
+          "floor_plan_name": "",
+          "identity": {
+            "floor_plan_id": "e93a062dc3f9",
+            "unit_id": "722-abend-st-b-belleville-il-62220",
+            "unit_number": "B"
+          },
+          "source_api_url": "https://www.rentandresidehere.net/",
+          "source_ids": {
+            "appfolio_listing_id": "252"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 72542,
+      "property_identity_match": true,
+      "property_name": "Reside Here",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [],
+      "tier": "TIER_1_DOM_APPFOLIO_SSR",
+      "units": 5,
+      "website": "http://www.rentandresidehere.net/"
+    },
+    {
+      "adapter": "rentvision",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 32,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 32,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.thedistrictatcypresswaters.com"
+        ],
+        "source_urls": [
+          "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/parsons-green-th-a1g",
+          "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a1",
+          "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a4",
+          "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a5",
+          "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a6"
+        ],
+        "website_host": "www.thedistrictatcypresswaters.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "Scotch Creek Sycamore Park A1",
+          "identity": {
+            "floor_plan_id": "ca041cf54364",
+            "unit_number": "04-0220"
+          },
+          "source_api_url": "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a1",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "Scotch Creek Sycamore Park A1",
+          "identity": {
+            "floor_plan_id": "ca041cf54364",
+            "unit_number": "03-0314"
+          },
+          "source_api_url": "https://www.thedistrictatcypresswaters.com/floorplans/one-bedroom/scotch-creek-sycamore-park-a1",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 217738,
+      "property_identity_match": true,
+      "property_name": "The District at Cypress Water (Scotch Creek)",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Parsons Green Th A1g",
+        "Parsons Green Th B2",
+        "Parsons Green Th C1",
+        "Scotch Creek Sycamore Park A1",
+        "Scotch Creek Sycamore Park A4",
+        "Scotch Creek Sycamore Park A5",
+        "Scotch Creek Sycamore Park A6",
+        "Scotch Creek Sycamore Park B1"
+      ],
+      "tier": "TIER_3_DOM_RENTVISION_UNIT_LEVEL",
+      "units": 32,
+      "website": "http://www.thedistrictatcypresswaters.com/"
+    },
+    {
+      "adapter": "generic",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "Generic parser found no units in captured API responses"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "heritagepropertyrentals.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 2,
+      "property_id": 237787,
+      "property_identity_match": false,
+      "property_name": "Heritage Amity Commons",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "View"
+      ],
+      "tier": "TIER_3_DOM",
+      "units": 0,
+      "website": "http://heritagepropertyrentals.com/heritage-amity-commons-overview/"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.pedcorliving.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 5,
+      "property_id": 254122,
+      "property_identity_match": false,
+      "property_name": "Avril Cambridge Village",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath",
+        "3 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://www.pedcorliving.com/apartments/avril-cambridge-village"
+    },
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "rows_with_native_identity": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "banyanonwashington.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 16,
+      "property_id": 258661,
+      "property_identity_match": false,
+      "property_name": "Banyan on Washington",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "1 Bedroom / 1 Bath",
+        "2 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://banyanonwashington.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 5,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 5,
+        "same_host": true,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "www.linqatsouthmountain.com"
+        ],
+        "source_urls": [
+          "https://www.linqatsouthmountain.com/floorplans/1x1-679-sf",
+          "https://www.linqatsouthmountain.com/floorplans/3x2.5-1%2c430-sf"
+        ],
+        "website_host": "www.linqatsouthmountain.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1x1 679 SF",
+          "identity": {
+            "floor_plan_id": "cd65d1d0faf1",
+            "unit_number": "55"
+          },
+          "source_api_url": "https://www.linqatsouthmountain.com/floorplans/1x1-679-sf",
+          "source_ids": {}
+        },
+        {
+          "availability_date": "",
+          "floor_plan_name": "1x1 679 SF",
+          "identity": {
+            "floor_plan_id": "cd65d1d0faf1",
+            "unit_number": "15"
+          },
+          "source_api_url": "https://www.linqatsouthmountain.com/floorplans/1x1-679-sf",
+          "source_ids": {}
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 260697,
+      "property_identity_match": true,
+      "property_name": "LINQ at South Mountain",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1x1 679 SF",
+        "3x2.5 1,430 SF"
+      ],
+      "tier": "TIER_1_DOM_RENTCAFE_NESTIN",
+      "units": 5,
+      "website": "https://www.linqatsouthmountain.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "unknown-other21-tight",
+      "canonical_metadata_joined": true,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "distinct_unit_numbers": 12,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "rows_with_native_identity": 12,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "hudsonbishopscreek.securecafe.com"
+        ],
+        "source_urls": [
+          "https://hudsonbishopscreek.securecafe.com/onlineleasing/hudson-bishop-creek/availableunits.aspx"
+        ],
+        "website_host": "www.hudsonbishopscreek.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "9/7/2026",
+          "floor_plan_name": "A1D",
+          "identity": {
+            "floor_plan_id": "4b7d9a6e8ac9",
+            "unit_number": "1005-105"
+          },
+          "source_api_url": "https://hudsonbishopscreek.securecafe.com/onlineleasing/hudson-bishop-creek/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "4846136"
+          }
+        },
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "B2A",
+          "identity": {
+            "floor_plan_id": "e29f513127d5",
+            "unit_number": "1005-202"
+          },
+          "source_api_url": "https://hudsonbishopscreek.securecafe.com/onlineleasing/hudson-bishop-creek/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "4846137"
+          }
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 293741,
+      "property_identity_match": true,
+      "property_name": "Hudson Bishops Creek",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1D",
+        "B2A",
+        "B2B",
+        "B2E",
+        "C2A"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 12,
+      "website": "https://www.hudsonbishopscreek.com/"
+    }
+  ]
+}

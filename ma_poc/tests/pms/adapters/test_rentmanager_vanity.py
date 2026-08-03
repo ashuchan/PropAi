@@ -68,6 +68,50 @@ def test_parse_live_wilmingtonpointe_fixture() -> None:
     assert int(u0["market_rent_low"]) > 0
 
 
+def test_parse_live_wilmingtonpointe_fixture_emits_only_available_apartments() -> None:
+    """The fixture has 189 priced physical rows but only 29 are actionable."""
+    html = (FIXTURES / "rentmanager_vanity_wilmingtonpointe.html").read_text()
+    rows = parse_rentmanager_vanity_html(
+        html,
+        "https://www.wilmingtonpointe.com",
+    )
+    apartments = [row for row in rows if row.get("unit_number")]
+
+    assert len(apartments) == 29
+    assert all(row["extraction_tier"].endswith("_VANITY_UNIT") for row in apartments)
+    assert all(int(row["market_rent_low"]) > 0 for row in apartments)
+    assert len({row["unit_number"] for row in apartments}) == 29
+
+    plan_rows = [row for row in rows if not row.get("unit_number")]
+    assert sum(int(row.get("available_units") or 0) for row in plan_rows) == 29
+
+
+def test_vanity_inner_row_rejects_disabled_not_available_unit() -> None:
+    html = """
+    <div class="suite-group" data-bedrooms="1">
+      <h3 class="suite-group-type">A1</h3>
+      <div class="suite-group-bath">1</div>
+      <div class="suite-group-sqft">700</div>
+      <div class="suite-group-rate">$1,200</div>
+      <div class="suite-group-suites">
+        <div class="suite" data-suite-id="1001">
+          <div class="suite-type item">101</div>
+          <div class="suite-bath item">1</div>
+          <div class="suite-sqft item">700</div>
+          <div class="suite-rate item">$1,200</div>
+          <div class="suite-availability item">
+            <span class="btn not-available disabled">Not Available</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+    rows = parse_rentmanager_vanity_html(html, "u")
+    assert len(rows) == 1
+    assert rows[0]["unit_number"] == ""
+    assert rows[0]["available_units"] == ""
+
+
 def test_parse_skips_zero_rate_placeholder_groups() -> None:
     """RentManager emits empty placeholder ``.suite-group`` for every
     bedroom bucket (rate=$0). Parser must skip those."""

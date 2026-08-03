@@ -7,6 +7,8 @@ vacancy variants) and loftsatlittlecreek.com/floorplans (price-range +
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from ma_poc.pms.adapters import get_adapter
@@ -419,6 +421,46 @@ def test_parse_rentvision_unit_table_skips_no_digit_units() -> None:
     assert parse_rentvision_unit_table(html, "https://x/floorplans/studio/s", "") == []
 
 
+def test_parse_rentvision_detail_dimensions_enrich_native_units() -> None:
+    """Fetch-only runs must retain the detail page's plan dimensions.
+
+    Without these fields the parent retry gate classifies a real native-unit
+    roster as ``no_area`` and can replace it with generic plan cards.
+    """
+    from ma_poc.pms.adapters.rentvision import parse_rentvision_unit_table
+    from ma_poc.validation.schema_gate import (
+        property_has_area_signal,
+        property_has_rent_signal,
+        property_passes_quality_gate,
+    )
+
+    html = (
+        "<h1>1 Bed, 1.5 Bath</h1>"
+        '<div class="floorplanSquareFootage">'
+        "<span>Square Footage:</span> 610 to - 655 square feet"
+        "</div>"
+        '<tr><th class="left wrap">3717D</th>'
+        '<td class="standard identifiable-links right"><span>$964</span></td>'
+        '<td class="standard unit-availability">'
+        "Available on <span>August 8, 2026</span></td></tr>"
+    )
+
+    units = parse_rentvision_unit_table(
+        html,
+        "https://x.test/floorplans/one-bedroom/1bed-1bath",
+        "",
+    )
+
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"] == "1 Bed, 1.5 Bath"
+    assert units[0]["bedrooms"] == "1"
+    assert units[0]["bathrooms"] == "1.5"
+    assert units[0]["sqft"] == "610"
+    assert property_passes_quality_gate(units)
+    assert property_has_rent_signal(units)
+    assert property_has_area_signal(units)
+
+
 def test_parse_rentvision_unit_table_rejects_garbage_dates() -> None:
     """Malformed "Available on" date strings → availability_date empty
     (parser must not crash, must not invent an ISO date)."""
@@ -489,6 +531,39 @@ async def test_adapter_drill_end_to_end(monkeypatch) -> None:
     assert u["unit_number"] == "622-102"
     assert u["market_rent_low"] == 1249
     assert u["availability_date"] == "2026-05-26"
+
+
+@pytest.mark.asyncio
+async def test_detail_pages_reuse_one_client_with_bounded_concurrency(
+    monkeypatch,
+) -> None:
+    """A large plan grid uses one client and never exceeds the bound."""
+    active = 0
+    peak = 0
+    client_ids: set[int] = set()
+
+    async def _mock_detail(url: str, *, client: object | None = None) -> str:
+        nonlocal active, peak
+        assert client is not None
+        client_ids.add(id(client))
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return f"html:{url}"
+
+    monkeypatch.setattr(
+        RentVisionAdapter,
+        "_fetch_detail_html",
+        staticmethod(_mock_detail),
+    )
+    urls = [f"https://example.test/floorplans/one-bedroom/p{i}" for i in range(5)]
+
+    pages = await RentVisionAdapter._fetch_detail_pages(urls, max_concurrency=2)
+
+    assert pages == [(url, f"html:{url}") for url in urls]
+    assert len(client_ids) == 1
+    assert peak == 2
 
 
 @pytest.mark.asyncio

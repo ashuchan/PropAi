@@ -95,6 +95,7 @@ def download_prefix(
     client = client or storage.Client()
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    bucket = client.bucket(bucket_name)
     count = 0
     for blob in client.list_blobs(bucket_name, prefix=prefix):
         # Strip prefix → relative path; skip "directory placeholders" (empty)
@@ -103,7 +104,21 @@ def download_prefix(
             continue
         local = dest_dir / rel
         local.parent.mkdir(parents=True, exist_ok=True)
-        blob.download_to_filename(str(local))
+        try:
+            blob.download_to_filename(str(local))
+        except Exception as exc:
+            # ``list_blobs`` returns a generation-pinned Blob. During a
+            # parallel canary another shard can replace that profile between
+            # listing and download, making the pinned generation return 404
+            # even though a newer object exists. Retry exactly once through a
+            # fresh, unpinned handle; permanent errors still propagate.
+            log.info(
+                "download generation changed for gs://%s/%s; retrying latest: %s",
+                bucket_name,
+                blob.name,
+                exc,
+            )
+            bucket.blob(blob.name).download_to_filename(str(local))
         count += 1
     log.info("downloaded %d objects from %s → %s", count, uri_prefix, dest_dir)
     return count

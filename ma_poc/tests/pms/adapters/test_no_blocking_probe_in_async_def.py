@@ -8,10 +8,11 @@ with a byte-identical failure set. Those two off-loads are the fix for the
 property 305s against a 600s cap → the timeout victims rotate between runs),
 and nothing in the suite would have caught a refactor putting them back.
 
-``_probe.probe_get`` / ``web_unlocker_get`` / ``hb_raw_get`` are blocking
-``urllib.request.urlopen`` calls. Called bare inside a coroutine they park the
-WHOLE event loop — every other property in the shard included — for the full
-timeout.
+``_probe.probe_get`` and ``web_unlocker_get`` are blocking transport calls.
+Called bare inside a coroutine they park the WHOLE event loop — every other
+property in the shard included — for the full timeout. ``hb_raw_get`` is an
+async Playwright coroutine and must be awaited normally (never sent to a worker
+thread).
 
 Scope: a RATCHET, not a clean sweep. 40-odd such sites exist across ma_poc and
 fixing them all is a separate piece of work; this test pins the functions that
@@ -30,7 +31,7 @@ import pytest
 _MA_POC = Path(__file__).resolve().parents[3]
 
 #: Blocking helpers that must never be called bare from a coroutine.
-_BLOCKING = {"probe_get", "web_unlocker_get", "hb_raw_get"}
+_BLOCKING = {"probe_get", "web_unlocker_get"}
 
 #: ``(relative path, coroutine name)`` — every async function whose blocking
 #: probes have been deliberately off-loaded. Each entry is a fix that a
@@ -40,6 +41,12 @@ _CLEAN_COROUTINES: list[tuple[str, str]] = [
     # loop starvation per property, on a path that fires on ~1,344 properties.
     ("pms/adapters/rentcafe.py", "_try_rentcafe_securecafe_probe"),
     ("pms/adapters/onesite.py", "_probe_onesite_workflowstartup"),
+    # Modern Jonah per-plan pages: direct public HTML is cheaper than a
+    # browser click, but its curl_cffi transport must stay off the event loop.
+    ("pms/adapters/encoreskyline_template.py", "_probe_public_html"),
+    # Entrata's SSR cascade fans out across conventional indexes and plan
+    # detail pages; a bare curl call here starves every concurrent property.
+    ("pms/adapters/entrata.py", "_entrata_static_fetch"),
     # 4 sequential probes plus one per drill page, on the 51%-SecureCafe
     # plan-level cohort the 2026-07-25 RCA was about.
     ("pms/adapters/rentcafe_layout_tab.py", "_extract_code_only"),
@@ -118,3 +125,12 @@ def test_the_guard_can_actually_fail() -> None:
         assert found == [(3, "probe_get")], found
     finally:
         tmp.unlink()
+
+
+def test_hb_raw_get_remains_async() -> None:
+    """Prevent the async HB seam from silently becoming a blocking helper."""
+    import inspect
+
+    from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+    assert inspect.iscoroutinefunction(hb_raw_get)

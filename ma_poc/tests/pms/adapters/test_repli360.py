@@ -188,6 +188,61 @@ def test_parse_str_html_future_dated_unit_is_available() -> None:
     assert u["market_rent_low"] == 2365
 
 
+def test_waitlist_sentinel_becomes_undated_plan_evidence_not_a_unit() -> None:
+    from datetime import UTC, datetime
+
+    from ma_poc.scripts.runners.jugnu import _format_v2_unit
+
+    html = """
+    <table><tr class="unitlisting 33759999 lease_term_wrap_33759999"
+      data-apartmentid="33759999" data-available_date="2026-08-02">
+      <td><span class="mobile_rrac">Unit Number</span>
+          <b class="unitNumber">WAIT147S</b></td>
+      <td><span class="mobile_rrac">Starting At</span>Call for Pricing</td>
+      <td><span class="mobile_rrac">Availability</span>--</td>
+      <td><a href="javascript:void(0)">Contact</a></td>
+    </tr></table>
+    """
+
+    [row] = parse_repli360_str(html, "https://app.repli360.com/admin/getUnitListByFloor")
+
+    assert row["unit_number"] == ""
+    assert row["is_floor_plan_level"] is True
+    assert row["availability_status"] == "WAITLIST"
+    assert row["availability_date"] == ""
+    assert "repli360_unit_id" not in row["source_ids"]
+
+    output = _format_v2_unit(
+        row,
+        datetime(2026, 8, 2, 12, tzinfo=UTC),
+        "river-oaks",
+    )
+    assert output["availability_status"] == "WAITLIST"
+    assert output["available_date"] is None
+    assert output["unit_id"] is None
+
+
+def test_physical_row_preserves_native_repli_identity() -> None:
+    html = """
+    <table><tr class="unitlisting 33752567 lease_term_wrap_33752567"
+      data-apartmentid="33752567" data-available_date="2026-09-15">
+      <td><span class="mobile_rrac">Unit Number</span>
+          <b class="unitNumber">1238</b></td>
+      <td><span class="mobile_rrac">Starting At</span>
+          <span class="unit_price_value">$1,925</span></td>
+      <td><span class="mobile_rrac">Availability</span>09/15/2026</td>
+      <td><a href="https://example.securecafe.com/apply?UnitID=33752567">Lease Now</a></td>
+    </tr></table>
+    """
+
+    [row] = parse_repli360_str(html, "https://app.repli360.com/admin/getUnitListByFloor")
+
+    assert row["unit_number"] == "1238"
+    assert row["unit_name"] == "1238"
+    assert row["source_ids"]["repli360_unit_id"] == "33752567"
+    assert row["unit_id"] == "33752567"
+
+
 def test_parse_str_html_empty_and_malformed() -> None:
     assert parse_repli360_str("", "x") == []
     assert parse_repli360_str("<html><body>no units</body></html>", "x") == []

@@ -100,6 +100,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from dataclasses import field as _dc_field
 from typing import Any, Final
+from urllib.parse import urlsplit
+from uuid import UUID
 
 from ma_poc.extraction.canonical import (
     BATHS_KEYS,
@@ -151,6 +153,12 @@ _SANITY_DROPPED_KEY: Final[str] = "_sanity_dropped"
 #: consumer or test changes shape).
 _SANITY_CLAMPED_KEY: Final[str] = "_sanity_clamped"
 
+#: Source-qualified exception records.  Unlike ``_sanity_clamped`` these are
+#: values the absolute bounds accepted and a weaker cross-field heuristic would
+#: have destroyed, but which exact typed first-party provenance proved.  The V2
+#: formatters surface the area record so the exception is never silent.
+_SANITY_PRESERVED_KEY: Final[str] = "_sanity_preserved"
+
 
 # ── Clamp evidence: reason codes ─────────────────────────────────────────────
 
@@ -165,6 +173,10 @@ REASON_ABOVE_MAX: Final[str] = "ABOVE_MAX"
 #: Cross-field: sqft is inside [150, 10000] but impossibly small for the
 #: (trusted) bed count — the ``_SQFT_FLOOR_BY_BEDS`` pass.
 REASON_IMPLAUSIBLE_FOR_BEDS: Final[str] = "IMPLAUSIBLE_FOR_BEDS"
+
+#: The typed source is stronger evidence than the bedroom-relative heuristic.
+#: This does not and must not bypass absolute field bounds.
+REASON_TRUSTED_TYPED_FIRST_PARTY: Final[str] = "TRUSTED_TYPED_FIRST_PARTY_FIELD"
 
 #: Tier label used when nothing in scope identified the producing tier.
 UNKNOWN_TIER: Final[str] = "UNKNOWN"
@@ -690,6 +702,21 @@ def _sanitize_sqft_vs_beds(
     floor = _SQFT_FLOOR_BY_BEDS.get(beds_int)
     if floor is None or sqft >= floor:
         return
+    trusted = _trusted_typed_fortresstech_area(unit, sqft)
+    if trusted is not None:
+        preserved: list[dict[str, Any]] = unit.setdefault(_SANITY_PRESERVED_KEY, [])
+        record = {
+            "field": "area",
+            "decision": "PRESERVED",
+            "reason": REASON_TRUSTED_TYPED_FIRST_PARTY,
+            "value": float(sqft),
+            "heuristic_floor": float(floor),
+            **trusted,
+        }
+        # Idempotency: a second sanity pass must not duplicate the evidence.
+        if record not in preserved:
+            preserved.append(record)
+        return
     # Record before destroying — same rule as _sanitize_field. The upper
     # bound is open here (the rule is "too small for this bed count"), so
     # the recorded bounds are (floor_for_beds, +inf).
@@ -707,6 +734,86 @@ def _sanitize_sqft_vs_beds(
     label = "area_implausible_for_beds"
     if label not in dropped:
         dropped.append(label)
+
+
+def _trusted_typed_fortresstech_area(
+    unit: dict[str, Any], sqft: float
+) -> dict[str, Any] | None:
+    """Validate the one evidence-backed typed-area exception.
+
+    This deliberately does not trust a tier string by itself.  The adapter's
+    marker, exact FortressTech roster host/path, org/property UUID pair, native
+    unit UUID, row ``source_ids`` and current value must all agree.  Any missing
+    or mismatched component falls back to the ordinary bedroom-relative clamp.
+    """
+    marker = unit.get("_trusted_typed_area")
+    if not isinstance(marker, dict):
+        return None
+    if str(unit.get("extraction_tier") or "") != "TIER_1_SSR_FORTRESSTECH":
+        return None
+    if marker.get("provider") != "fortresstech":
+        return None
+    if marker.get("field") != "floorPlanSquareFeet":
+        return None
+    try:
+        if float(marker.get("value")) != float(sqft):
+            return None
+    except (TypeError, ValueError):
+        return None
+
+    source_url = str(marker.get("source_url") or "")
+    try:
+        parsed = urlsplit(source_url)
+    except (TypeError, ValueError):
+        return None
+    if (parsed.hostname or "").casefold() not in {
+        "availability.fortresstech.io",
+        "www.availability.fortresstech.io",
+        "embed.fortresstech.io",
+        "www.embed.fortresstech.io",
+    }:
+        return None
+    path_parts = [part for part in (parsed.path or "").split("/") if part]
+    if len(path_parts) != 3 or path_parts[0] != "unit-availability":
+        return None
+    try:
+        url_org = str(UUID(path_parts[1]))
+        url_property = str(UUID(path_parts[2]))
+        marker_org = str(UUID(str(marker.get("org_id") or "")))
+        marker_property = str(UUID(str(marker.get("property_id") or "")))
+        marker_unit = str(UUID(str(marker.get("unit_id") or "")))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if (marker_org, marker_property) != (url_org, url_property):
+        return None
+
+    source_ids = unit.get("source_ids")
+    if not isinstance(source_ids, dict):
+        return None
+    try:
+        source_org = str(UUID(str(source_ids.get("fortresstech_org_id") or "")))
+        source_property = str(
+            UUID(str(source_ids.get("fortresstech_property_id") or ""))
+        )
+        source_unit = str(UUID(str(source_ids.get("fortresstech_unit_id") or "")))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if (source_org, source_property, source_unit) != (
+        url_org,
+        url_property,
+        marker_unit,
+    ):
+        return None
+
+    return {
+        "raw_value": marker.get("value"),
+        "provider": "fortresstech",
+        "source_field": "floorPlanSquareFeet",
+        "source_url": source_url,
+        "org_id": url_org,
+        "property_id": url_property,
+        "unit_id": marker_unit,
+    }
 
 
 def sanity_bound(

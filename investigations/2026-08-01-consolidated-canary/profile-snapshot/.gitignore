@@ -1,0 +1,3 @@
+# Raw profiles may contain public vendor query credentials. The generation and
+# SHA-256 manifest is retained; raw payloads remain a local/GCS replay artifact.
+profiles/*.json

@@ -1,0 +1,19 @@
+{
+  "solve_captchas": false,
+  "results": [
+    {
+      "property_id": 43995,
+      "url": "https://hamiltonhall.scullycompany.com/?module=check_availability&is_secure=1&property%5Bid%5D=100003046&action=view_unit_spaces",
+      "status": 400,
+      "body_bytes": 11,
+      "saved": true
+    },
+    {
+      "property_id": 63191,
+      "url": "https://avenir.scullycompany.com/?module=check_availability&is_secure=1&property%5Bid%5D=100002834&action=view_unit_spaces",
+      "status": 400,
+      "body_bytes": 11,
+      "saved": true
+    }
+  ]
+}

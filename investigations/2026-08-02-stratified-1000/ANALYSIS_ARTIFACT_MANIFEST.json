@@ -1,0 +1,3421 @@
+{
+  "exclusions": [
+    "this manifest (to avoid recursive hashing)",
+    "git-ignored one-time GCP run mirrors",
+    "raw profiles and credential-bearing payloads",
+    "bytecode, local databases, dependency directories, and caches"
+  ],
+  "files": [
+    {
+      "bytes": 18328,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/current_live_property_audit.csv",
+      "sha256": "d9c95a77910947ffaa851d8d8bac48c2b3fcec643e56893f38069b673888820b"
+    },
+    {
+      "bytes": 1040495,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/current_live_unit_evidence.csv",
+      "sha256": "88232f2b1c05df0403d8ec67452da06a42eda81ad96f6f19550e0eae6a02c165"
+    },
+    {
+      "bytes": 1739,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/five_family_pipeline_summary.csv",
+      "sha256": "10f5c548702a695f903d425563d8d920f184ffc9ba5093d691c46eeda3a26088"
+    },
+    {
+      "bytes": 19547,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/july31_separate_denominator_property_ledger.csv",
+      "sha256": "5dcebff18497fbae4d3daef2118716e37a0a61537f998fbff50c77c55b75e204"
+    },
+    {
+      "bytes": 96242,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/run_no_rp_oracle_live_audit.py",
+      "sha256": "7f390b6cb1f2b8edb33f04be069cf8584f2882c231a98ff5de76a9fed9af9543"
+    },
+    {
+      "bytes": 20625,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/summary.json",
+      "sha256": "2cb6b3dc859df0e1a344379f84ddf0d6df18af7f4388ab090c7347dc9c662350"
+    },
+    {
+      "bytes": 1953,
+      "path": "investigations/2026-08-01-availability-date/no_rp_oracle_live_audit/tier_summary.csv",
+      "sha256": "1c5bd17ff770ba1250354784545dee0559f3be3429ac1faae1ddc6097807360e"
+    },
+    {
+      "bytes": 6592,
+      "path": "investigations/2026-08-01-availability-date/project_formatter_impact.py",
+      "sha256": "07a04e78c71604f387447bd617793ca8fdfc644db55891b9e1e156cf2b995231"
+    },
+    {
+      "bytes": 2378,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/POST_FIX_LOCAL_VALIDATION.md",
+      "sha256": "95e6b2433aa2838fd2a5aa8f47bc8b6a96df098b918aa0364382e2d5b88a51c5"
+    },
+    {
+      "bytes": 998,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/SUMMARY.md",
+      "sha256": "c8031053eb069d56e5fdad27fe6d07f28e012e4bc2affa3e39bb67c3a19df4b1"
+    },
+    {
+      "bytes": 1610,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/adapter_summary.csv",
+      "sha256": "d9a188172391aadbc89ab82fee0296f234baef9c42031297bdd391230a0aa9b4"
+    },
+    {
+      "bytes": 4453,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/adapter_summary.json",
+      "sha256": "bc906b672f5a5b033f676fc7e6f41f922d5db95f54e25fbc1e4e939d59e63cff"
+    },
+    {
+      "bytes": 21324,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/property_level_audit.csv",
+      "sha256": "94f2f40258b3a04786f00b58ce3fdf421ebcfdffda1edeb3c459ff6d78126b1b"
+    },
+    {
+      "bytes": 45719,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/property_level_audit.json",
+      "sha256": "f73a619979dca70334d83f1fb3c793f1fd8ea414d4d4fc1f18d1fce226191476"
+    },
+    {
+      "bytes": 34717,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/run_live_audit.py",
+      "sha256": "cde1043a1a8a6e571f182b42b4cd05001c4de8cf50b72e98b87b08640230a85f"
+    },
+    {
+      "bytes": 9869,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/summary.json",
+      "sha256": "faaea34df46ae7563344c5ab4c2510fa58390204b2aa05796e54ad79f08eb1f0"
+    },
+    {
+      "bytes": 1157397,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/unit_level_evidence.csv",
+      "sha256": "5b23d8283a6b52c1060464b080522cdc14ef674b76b329972d90e4e51e6848a3"
+    },
+    {
+      "bytes": 1919554,
+      "path": "investigations/2026-08-01-availability-date/scrape_date_only_tier_live_audit/unit_level_evidence.json",
+      "sha256": "4beac5f00f7bde1a94bda424c9737a2d1148a29326d3fc6cdb7472a8859716ce"
+    },
+    {
+      "bytes": 84292,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/current_live_property_audit.csv",
+      "sha256": "806f9427fb335c0a3863b6d2f53cc9e9af8f38a99697210dd60443b55740f5a2"
+    },
+    {
+      "bytes": 293875,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/current_live_unit_manifest.csv",
+      "sha256": "96cf3ca2412ae737a9928fca9146a653f60abe6a023132edbb855f663eadc080"
+    },
+    {
+      "bytes": 109946,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/july31_securecafe_target_cohort.csv",
+      "sha256": "185c2df653a09d30adef6b7d7ec3510f5d3af452ef59900d2e7fc0593a95f10a"
+    },
+    {
+      "bytes": 1011,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/manual_three_property_validation.csv",
+      "sha256": "3b5c307b406b1efcba9bc7ab622a4b61a4115f76117eabe964492c0e371061a8"
+    },
+    {
+      "bytes": 1932,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/manual_three_property_validation.json",
+      "sha256": "7b0bf49d34ed234182d2aed814f837dca4a50a4f32ee849a0220c17461d1d1f1"
+    },
+    {
+      "bytes": 36618,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/run_securecafe_live_audit.py",
+      "sha256": "e81b092188f476d98e0881c6f9701ec63acc5ab604ea864d4706a3d3b90f0d68"
+    },
+    {
+      "bytes": 6444,
+      "path": "investigations/2026-08-01-availability-date/securecafe_live_audit/summary.json",
+      "sha256": "c2757c95497dc5e61e65ec0d52d818f81d913c60a6911c9eda9c8729f889f3b4"
+    },
+    {
+      "bytes": 756,
+      "path": "investigations/2026-08-01-consolidated-canary/.gitignore",
+      "sha256": "e504365dc20c8a3129a65fdef2a1e8d59208b7515d3c773b68bf787826cbf607"
+    },
+    {
+      "bytes": 21887,
+      "path": "investigations/2026-08-01-consolidated-canary/ADAPTER_COVERAGE_MATRIX.md",
+      "sha256": "474beb7a45fe63bab0e5be3356f569079cd03191002c1948528362e639da156c"
+    },
+    {
+      "bytes": 225215,
+      "path": "investigations/2026-08-01-consolidated-canary/ADAPTER_DATA_QUALITY_FINDINGS.md",
+      "sha256": "9f0c779b1648dd47ccdf578e625770a32ae4130e4feebe34a3272a0f22ec0ab7"
+    },
+    {
+      "bytes": 77629,
+      "path": "investigations/2026-08-01-consolidated-canary/ADAPTER_DATA_QUALITY_FIX_PLAN.md",
+      "sha256": "c2f6b17f394f93bdef2d864773053e32a10efc1b1fe10c429e6873040a2ec97c"
+    },
+    {
+      "bytes": 12319,
+      "path": "investigations/2026-08-01-consolidated-canary/AFFECTED386_OUTPUT_FIXES_2026-08-02.md",
+      "sha256": "d41c46381af25e0fe234db64c683a4dab114895ab302377b12c2f91bd8d7d94f"
+    },
+    {
+      "bytes": 3874,
+      "path": "investigations/2026-08-01-consolidated-canary/LOCAL_REGRESSION_AND_FOCUSED_CANARY.md",
+      "sha256": "c41ab7750ad7ddb10a1a31202e6daf625f480b8ad0b18ef376d047a2d3b7dec6"
+    },
+    {
+      "bytes": 6347,
+      "path": "investigations/2026-08-01-consolidated-canary/PROPERTY_IDENTITY_AND_JULY_PROFILE_VETTING.md",
+      "sha256": "c6e17de69d4e8074b9a3edd850c0e9d24bf0dc71a015ace95bfcc1102d9eabdf"
+    },
+    {
+      "bytes": 6855,
+      "path": "investigations/2026-08-01-consolidated-canary/README.md",
+      "sha256": "4249557e513ea30bd9391ca034a07722e64731f37c27d967b4838fda889d3850"
+    },
+    {
+      "bytes": 7999,
+      "path": "investigations/2026-08-01-consolidated-canary/RECOVERY_REPLAY_HARDENING_2026-08-02.md",
+      "sha256": "7769d337ebdc32a5064bcd1ce0823bb103ecc918eda639af2efb8e39e80dc581"
+    },
+    {
+      "bytes": 112949,
+      "path": "investigations/2026-08-01-consolidated-canary/SHA256SUMS.json",
+      "sha256": "dd69bbebf6e09bf82d966bfa02af391ccafed98f42cf2f7b2dbfcfa5d4afef44"
+    },
+    {
+      "bytes": 6390,
+      "path": "investigations/2026-08-01-consolidated-canary/STRICT_WARM_PROFILE_CANDIDATE_V2.md",
+      "sha256": "20d9178b92d76fef9f8a19948d6048fb874efd194cb703cc6af6784344666968"
+    },
+    {
+      "bytes": 8782,
+      "path": "investigations/2026-08-01-consolidated-canary/STRICT_WARM_PROFILE_IDENTITY_AUDIT.md",
+      "sha256": "4e02829df4fdaadafd22ce6ab7f7cd72cc7c6ee9d1a50a8d440abe7ca1a12f39"
+    },
+    {
+      "bytes": 3156,
+      "path": "investigations/2026-08-01-consolidated-canary/WORKER_STATE.json",
+      "sha256": "8b5df415424eeef572d6908557c3e30403176cf418751c080fd7508d6294b4a0"
+    },
+    {
+      "bytes": 1619,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/README.md",
+      "sha256": "8490d7793f4a87e5a87380871681c5637a811bfc8b0c8ffe5208dc91ca76eaf2"
+    },
+    {
+      "bytes": 758,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/SHA256SUMS.json",
+      "sha256": "7c15f006c6c40e0ffb1cb94d8ff4ba79522214b1d7696d68348314670b8514fa"
+    },
+    {
+      "bytes": 193314,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/affected_properties.csv",
+      "sha256": "a25e5cf9b6ec198a0235476ec4571a70a0ebd26c36fad8958a4728f500b5d796"
+    },
+    {
+      "bytes": 291909,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/affected_properties.jsonl",
+      "sha256": "70f8f6edc0d88f3069df4fb003cd5006758edfc430bc406c28b3400c4be26052"
+    },
+    {
+      "bytes": 28194,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/finding_coverage.json",
+      "sha256": "7804961d49df4ffa792f8e0b14803ac82dfd932eb87ed4311cd22566fae8ce65"
+    },
+    {
+      "bytes": 767,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/future_launch_contract.json",
+      "sha256": "3522ede6dab0fff66169a487ea8f35423011884874ad9357b6e506bd2a6e7072"
+    },
+    {
+      "bytes": 55169,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/launch_index.csv",
+      "sha256": "d348c87fd9f5a9143e1c4f7349a8bc045ec1c6bf85bcf5b00e4bcf5b191e0dd9"
+    },
+    {
+      "bytes": 45491,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/launch_properties.csv",
+      "sha256": "4a6c32d8595831b11699b274cf6921abf66ecbce075638df9a1171776155b2fe"
+    },
+    {
+      "bytes": 1990,
+      "path": "investigations/2026-08-01-consolidated-canary/affected-property-manifest-v1/manifest_summary.json",
+      "sha256": "d31d8944cff013189f145a8f5693ee4d5a60db7b6e4d41643520b029e7f0d5e4"
+    },
+    {
+      "bytes": 31259,
+      "path": "investigations/2026-08-01-consolidated-canary/build_affected_property_manifest.py",
+      "sha256": "b8837165639cacc253a2822a9f8dafe24af1d0c93741fad572d59d3bae43b468"
+    },
+    {
+      "bytes": 1619,
+      "path": "investigations/2026-08-01-consolidated-canary/build_archive_manifest.py",
+      "sha256": "0e180bc19237ba855deb00629330da030e5316735ee77313ce92ce2dbaced1a4"
+    },
+    {
+      "bytes": 4551,
+      "path": "investigations/2026-08-01-consolidated-canary/focused-output-contract-canary-v1.json",
+      "sha256": "ef4fc454d34e3f06a298735fee234a307b8a89e75ed8a473dc20ac691ea4c35d"
+    },
+    {
+      "bytes": 7842176,
+      "path": "investigations/2026-08-01-consolidated-canary/gcp-evidence-audit-v1/archive-evidence-ledger.jsonl",
+      "sha256": "8dfbece0fd0d0e309b686c573ca3de9e6680b460295797b2277143e2b4ef3b3b"
+    },
+    {
+      "bytes": 3053,
+      "path": "investigations/2026-08-01-consolidated-canary/gcp-evidence-audit-v1/summary.json",
+      "sha256": "4c7f3b6dc35d62391749aa17b7b7b750f37596d1698357dc4c8c050acabf2492"
+    },
+    {
+      "bytes": 897582,
+      "path": "investigations/2026-08-01-consolidated-canary/july-vetted-profile-snapshot-v1/promotion_manifest.json",
+      "sha256": "4d08a3cbe2655b12b7d102aadccd323141976eb9a6132345943f37b465658063"
+    },
+    {
+      "bytes": 1888336,
+      "path": "investigations/2026-08-01-consolidated-canary/july-vetted-profile-snapshot-v1/promotion_manifest_execute.json",
+      "sha256": "b746d9e0092cd85ef0892683a82478f04af80e60d9018035794751e5c4a0bbde"
+    },
+    {
+      "bytes": 1875822,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v1/live-winner-ledger.jsonl",
+      "sha256": "7bf2036f44e9cef0927146ba5ea60670a7835c1c6b14ee0f452245f419a200ff"
+    },
+    {
+      "bytes": 764,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v1/summary.json",
+      "sha256": "6b08164fabcbfd75738c0f1d940bdcb0cf7c0bb21bfe93bfe39292d0cbc7d11e"
+    },
+    {
+      "bytes": 179953,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-appfolio/live-winner-ledger.jsonl",
+      "sha256": "1da033448715f008346680ea2e6a0fd8f3618af95af6ad6e75364c33dca5a3aa"
+    },
+    {
+      "bytes": 539,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-appfolio/summary.json",
+      "sha256": "dde269d22c86b3a7fc138b58f66bc72f4d74cf6cd09684736c48c4b632133928"
+    },
+    {
+      "bytes": 6545,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-krc/live-winner-ledger.jsonl",
+      "sha256": "1285f08b72f5041f4e572280cacd3badfd5c413bf48e1f65053076b007e7324d"
+    },
+    {
+      "bytes": 527,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-krc/summary.json",
+      "sha256": "cad658bd6523e4fc974b5509526b4a52eeaf307b7ee56e6b41ddc9a694f39e28"
+    },
+    {
+      "bytes": 2218,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/appfolio/live-winner-ledger.jsonl",
+      "sha256": "74d959fa20f388d41c15fc8da07262708e3db32f9deff8a2cf4441d0614b0828"
+    },
+    {
+      "bytes": 504,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/appfolio/summary.json",
+      "sha256": "9d97f97816d6b5f094d190762cf1d61350e796a12900168d2c3c06f76dfdc439"
+    },
+    {
+      "bytes": 1827,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/inventory_g5marketingcloud_com/live-winner-ledger.jsonl",
+      "sha256": "cca2207d0881b20e55e45078480fd1f1951fdf0141172f94dbd4c0786f220e1b"
+    },
+    {
+      "bytes": 531,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/inventory_g5marketingcloud_com/summary.json",
+      "sha256": "fa3d1362f711fe2b2c918b132abfd51797427a2e8dc9637cf89582f08bcc1410"
+    },
+    {
+      "bytes": 1904,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/realpage/live-winner-ledger.jsonl",
+      "sha256": "9780597dbacf9624b8ef98578b5412f48f316639546ff149067fc8b7da94da48"
+    },
+    {
+      "bytes": 527,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/realpage/summary.json",
+      "sha256": "98fdb499351bebd8ac62ec161afc7523ba9f73bbda2d7089a6b6d2bd9d4744c9"
+    },
+    {
+      "bytes": 2364,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/rentcafe/live-winner-ledger.jsonl",
+      "sha256": "3d3f8bdcb1c0a1e0da936e0c5f0419e72831bd126db8ad24da4f38e334eefd19"
+    },
+    {
+      "bytes": 502,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/rentcafe/summary.json",
+      "sha256": "76061137f410d0430f234159188365dd9fc6af68599cd134e8d1bd7d0fa4dcca"
+    },
+    {
+      "bytes": 2170,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/resman/live-winner-ledger.jsonl",
+      "sha256": "62fffbbcfc86ef6365539ef9969202b9819b4d92ac1939b9b136fcd60eb54cfb"
+    },
+    {
+      "bytes": 502,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/resman/summary.json",
+      "sha256": "f88ac8a6c1742174aa8b8996871fd39bb40a1c7583185da660778abe7adcf4e6"
+    },
+    {
+      "bytes": 1596,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/www_on_site_com/live-winner-ledger.jsonl",
+      "sha256": "a91abd7a9a1c2b6d71c4cffdc2aa769d932944a784a4a289bd6b7c50fba4057b"
+    },
+    {
+      "bytes": 532,
+      "path": "investigations/2026-08-01-consolidated-canary/live-winner-samples/www_on_site_com/summary.json",
+      "sha256": "9a2317306592557b4150f32a874e89e7eb185d5d71f18c59664cce0bbd9539cc"
+    },
+    {
+      "bytes": 176,
+      "path": "investigations/2026-08-01-consolidated-canary/profile-snapshot/.gitignore",
+      "sha256": "6a35e0b9de5413e2a0d0b11671a3bde2f42e8c8dc7985a3657ab1211d78cdc1e"
+    },
+    {
+      "bytes": 66253,
+      "path": "investigations/2026-08-01-consolidated-canary/profile-snapshot/promotion_manifest.json",
+      "sha256": "259c11e82280dc2260e7f02b8ea2523285f04f7e792e80298637f5ba42bd8f7c"
+    },
+    {
+      "bytes": 136175,
+      "path": "investigations/2026-08-01-consolidated-canary/profile-snapshot/promotion_manifest_execute.json",
+      "sha256": "de1c3ae8ec4a544f3ce551abb3f1ab96e9f14c5f2aa1f1e859e1f850e098c841"
+    },
+    {
+      "bytes": 1520,
+      "path": "investigations/2026-08-01-consolidated-canary/shared_profile_coverage_audit.json",
+      "sha256": "b340ccb8f319260eb1060e9500ceafad5b41f85d1f9001eaf1c561efa5d944f9"
+    },
+    {
+      "bytes": 1987165,
+      "path": "investigations/2026-08-01-consolidated-canary/strict-warm-profile-candidate-v2/strict-profile-ledger.jsonl",
+      "sha256": "d15d8ad39072caf28fcc613faa5ec3054d640f032fcab0c50c46ba3ccebafe2d"
+    },
+    {
+      "bytes": 793,
+      "path": "investigations/2026-08-01-consolidated-canary/strict-warm-profile-candidate-v2/summary.json",
+      "sha256": "dc10f77bf22386a28b132b69d01fbbbaa75bf8196c9f2f9df8782fb61939982c"
+    },
+    {
+      "bytes": 1239829,
+      "path": "investigations/2026-08-01-consolidated-canary/warm-profile-identity-audit-v1/route-ledger.jsonl",
+      "sha256": "757331deb9538790d3a19cfb3276ee4505d93efdd1b85053b9218c1810272c6b"
+    },
+    {
+      "bytes": 37180,
+      "path": "investigations/2026-08-01-consolidated-canary/warm-profile-identity-audit-v1/summary.json",
+      "sha256": "92c263e64465c9287be9d85d8c21ab2ad8be9aa83c623d13f3321e9e4eafbcaa"
+    },
+    {
+      "bytes": 24652,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/acorn_56182_current_rentvision/evidence_acorn_56182_full_scrape_jugnu_3x.json",
+      "sha256": "556a96ae523e5c57ad3cb77b3c49cb185a23fb5ab722891372b43fa41f8e35b2"
+    },
+    {
+      "bytes": 13493,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/acorn_56182_current_rentvision/materialize_acorn_56182_full_e2e.py",
+      "sha256": "a400ada2842e38b9b275521c55e36ba4a8a10399afa53b477b4e1fc066009acd"
+    },
+    {
+      "bytes": 156,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_headers.txt",
+      "sha256": "5063d8fbfa67021e816af0d6a609a7099041896a0f2d6e520346ef8b48aafdaf"
+    },
+    {
+      "bytes": 2612,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/annaberg_1765_nesthub_implementation_proposal.md",
+      "sha256": "dce870b6681e4130d4a87d054da117a7ceb522eebce83e6615a50625f7bfe257"
+    },
+    {
+      "bytes": 50782,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/evidence_annaberg_1765_nesthub_discovery.json",
+      "sha256": "09e98651f9dafeafce55578927c4b31dd0c780d7d404b06ebc8472d84f20f232"
+    },
+    {
+      "bytes": 73834,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/evidence_annaberg_1765_nesthub_implementation_e2e.json",
+      "sha256": "16d69745e8ee359aad7296c4e7d7cecfcdf652b720e1d5ac84b0e05c83d9ce27"
+    },
+    {
+      "bytes": 30218,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/materialize_annaberg_nesthub_discovery.py",
+      "sha256": "5fdd04775764a1e15c514055c049837bf3abef052c72f3d07c36a9084b98c925"
+    },
+    {
+      "bytes": 21625,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/materialize_annaberg_nesthub_implementation.py",
+      "sha256": "9a268c940b385bed5e007e0af8f8509ec97c23cb2694666d27110e227cad8e89"
+    },
+    {
+      "bytes": 4954,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/annaberg_nesthub_lane/refresh_annaberg_current_source_hashes.py",
+      "sha256": "ba3fe8ac99867c6982495ca29e71f25b983fbf10c7a1412117b1d2cb34244a8c"
+    },
+    {
+      "bytes": 16622,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/evidence_appfolio_generic_appfolio_current_strict.json",
+      "sha256": "84f10492e76030565cfa83c1b50f00f90e9e5295444efa23aac601fe96521bf9"
+    },
+    {
+      "bytes": 159143,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/evidence_appfolio_generic_current_strict_consolidated.json",
+      "sha256": "e8230284eeb7d29920f371a074c9f2d023bbefa7bc3cfa48eabce78ca2027fdb"
+    },
+    {
+      "bytes": 142576,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/evidence_appfolio_generic_generic_current_strict.json",
+      "sha256": "a93bc526c7c9ee535a0924cd34cb86609d73b9eeb0cf9faf0b2c163211889aa9"
+    },
+    {
+      "bytes": 8172,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_appfolio_collections.py",
+      "sha256": "347aef2585dfa93ca9dab30f84feab1e5eaa985b87f8dd59c07632400aaaaa41"
+    },
+    {
+      "bytes": 5776,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_live.py",
+      "sha256": "cb5c650c5c677829bb36ba0c3ca83162a4913fe751a3085636f190c31b503870"
+    },
+    {
+      "bytes": 4156,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_probe_targets.py",
+      "sha256": "74cc7eb4d59e845b9c8fe07ca480e7825ed28f04295d60b93571f386a11f4b54"
+    },
+    {
+      "bytes": 3120,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_probe_targets2.py",
+      "sha256": "cb46b27b4c8494df7f531d95c35d33874caf70f8441dd30356581e8a188301c0"
+    },
+    {
+      "bytes": 3337,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_probe_targets3.py",
+      "sha256": "8894b3284d44806d739cabab173d01e5de674dbdf083aeba9d6689a29558c8ad"
+    },
+    {
+      "bytes": 1312,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/fetch_union_chat_settings.py",
+      "sha256": "5db6f1e587347be1bd91de457af6c9ddfe1ac3c434582c9f4f246fc9b4328092"
+    },
+    {
+      "bytes": 368,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/probe_sentral_bundle.py",
+      "sha256": "8fbe74700d795caac97f9068dfa0bacaed5d40875c9e3b4d92b6f26ed2f2a9dd"
+    },
+    {
+      "bytes": 1239,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/strict_appfolio_generic_net_new_ids.json",
+      "sha256": "7caad69234941eccbf1cc9164f7f1159fd0e5279b4ece547ac7066e6b06e36ab"
+    },
+    {
+      "bytes": 9721,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/strict_appfolio_generic_net_new_ledger_rows.csv",
+      "sha256": "ff76145af5b932cff0565e456e267350064e775a6cfd59fe20d9dac14714814b"
+    },
+    {
+      "bytes": 8163,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/validate_appfolio_strict.py",
+      "sha256": "a3ed7f3e2601d7dde28c7fbb57e2bc4abe6728d53c23e254c211a4a7f9904110"
+    },
+    {
+      "bytes": 43796,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_generic_lane/validate_generic_strict.py",
+      "sha256": "1984235648546e03784aeb327b27e2e11be524cf80e39336abdcfa16b681a816"
+    },
+    {
+      "bytes": 7107,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_remaining10_probe.py",
+      "sha256": "e06bcaaf8459ed7c4e7489395e6f10ce7e9194b605d3dd22e6044c7349cb3ccd"
+    },
+    {
+      "bytes": 14869,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_wix_residual_lane/evidence_appfolio_wix_residual_current_strict_consolidated_192.json",
+      "sha256": "05b7c16ff7742e9ec51aa5d94ab9bf658b805a77476d3eadf2eda3816dacb284"
+    },
+    {
+      "bytes": 20309,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_wix_residual_lane/run_current_full_e2e.py",
+      "sha256": "3b250889f77466948b272ce26de185d8d570c26027c0f4f453da89116c3ffe7b"
+    },
+    {
+      "bytes": 1773,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_wix_residual_lane/strict_appfolio_wix_residual_net_new_ids_192.json",
+      "sha256": "7602a326c39f32d460db20083c3340d18404d15c55d820cbc614958a257350be"
+    },
+    {
+      "bytes": 9043,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_wix_residual_lane/validate_lc_sobro_repeat3.py",
+      "sha256": "902afd135a2347a2b0c5569c9a60cecf5be84031a3742a1f94e9eadae671a211"
+    },
+    {
+      "bytes": 9111,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/appfolio_wix_residual_lane/validate_stadium_repeat3.py",
+      "sha256": "cf66abc4a063e4a416cff708391b02a842e289c5ddcc4eb53b4f6b60efbaf647"
+    },
+    {
+      "bytes": 10471,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/arthaus_yardi_proxy_current_e2e.py",
+      "sha256": "41e67db499698e77b269cc3395ed294c01f163884b03e9df6ad8f6dded2f33a3"
+    },
+    {
+      "bytes": 10066,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/aster_appfolio_detail_lane/evidence_aster_274886_current_appfolio_e2e.json",
+      "sha256": "8c7d9a0318da57e0e18c466051ba820362b9d93cfd968029005339041083ac55"
+    },
+    {
+      "bytes": 9866,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/aster_appfolio_detail_lane/evidence_shape.json",
+      "sha256": "27ce7e51aa752345e4ec686d26535adaf23a6a22d00ed6cb3941aae6dad12556"
+    },
+    {
+      "bytes": 14802,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/aster_appfolio_detail_lane/materialize_aster_274886_current_appfolio_e2e.py",
+      "sha256": "974c470abf60007493c6d862d58bb01a5c82bfd3b0f5475f6d42d0962c471fbb"
+    },
+    {
+      "bytes": 7719,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/FINAL_READOUT.md",
+      "sha256": "8ea1feb3173520560db2a4d38d4bcc030aa543b300ea5acb03c2cc1285adaed9"
+    },
+    {
+      "bytes": 18203,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/current_live_property_audit.csv",
+      "sha256": "9ba5de77066b9c1e639217140500ce8589f217623b0f0df332e58cb6bf171df9"
+    },
+    {
+      "bytes": 996913,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/current_live_unit_evidence.csv",
+      "sha256": "9542d54d8f6548c281dcdae7a45f6bfd8b99e76d9023f9de75de3af71ca06476"
+    },
+    {
+      "bytes": 1739,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/five_family_pipeline_summary.csv",
+      "sha256": "5040790125b14019b2521f3de43402e2365ff75307e654978fea10fc7c8985b7"
+    },
+    {
+      "bytes": 19547,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/july31_separate_denominator_property_ledger.csv",
+      "sha256": "5dcebff18497fbae4d3daef2118716e37a0a61537f998fbff50c77c55b75e204"
+    },
+    {
+      "bytes": 20567,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/summary.json",
+      "sha256": "ee611bb44fd23e59e97545102abf6c263418d0e511e69a08cb790669ed462629"
+    },
+    {
+      "bytes": 1953,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/tier_summary.csv",
+      "sha256": "4ea9c457c65ac51bfc3ea8e153db909c01962675c1724df37831bd18b9f6ed39"
+    },
+    {
+      "bytes": 4902,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/trace_jugnu_formatter.py",
+      "sha256": "c73525235a1f28bc693cb46d2d9d280881e8d3055e4c6bb67daf91c5290da19d"
+    },
+    {
+      "bytes": 18915,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/current_live_property_audit.csv",
+      "sha256": "6dff5411161738f3f92dfc1fbc4c25bcae72f335a65f9f4b7ad927111f01c7c3"
+    },
+    {
+      "bytes": 1396130,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/current_live_unit_evidence.csv",
+      "sha256": "2d5125eaa795078ef70a1aad9f23b22b440e3863ae3a1064b60c410830c391f7"
+    },
+    {
+      "bytes": 1741,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/five_family_pipeline_summary.csv",
+      "sha256": "41631e816109bfd4e9962b43ebdb6deb7b0a0b7410fa43ce96ab21177298acc2"
+    },
+    {
+      "bytes": 86394,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/jugnu_formatter_trace.csv",
+      "sha256": "eb5b0410e8a54b2f46370adc9e11a8727237c8b1053538fb52efa3f9bc686aa9"
+    },
+    {
+      "bytes": 1021,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/jugnu_formatter_trace_summary.json",
+      "sha256": "77e481beca62668073578da6b239477a0af38e7fcab9e9281c6feed41923b1ee"
+    },
+    {
+      "bytes": 19547,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/july31_separate_denominator_property_ledger.csv",
+      "sha256": "5dcebff18497fbae4d3daef2118716e37a0a61537f998fbff50c77c55b75e204"
+    },
+    {
+      "bytes": 20711,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/summary.json",
+      "sha256": "27a67f387331a6f133bdbcb62f7010f2d87ef0fedab2d745caaeda4a2cd4dbf0"
+    },
+    {
+      "bytes": 1956,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/availability_date_residual_tiers/with_hyperbrowser/tier_summary.csv",
+      "sha256": "6a5f4bdc0527c1243006d153adeb5fcb3e52a1b131a21eac8144a812c8dcd7d3"
+    },
+    {
+      "bytes": 74171,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/bradley_willow_rebrand_lane/evidence_bradley_willow_275898_current_strict.json",
+      "sha256": "2c4cd2202ba4d80b63cf9d7f6c6dc1d5230dc157d4c064eebaa186eba4385940"
+    },
+    {
+      "bytes": 28185,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/bradley_willow_rebrand_lane/materialize_bradley_willow_275898_current_strict.py",
+      "sha256": "b2b7d9068abd03032d3564839d8455ca6eae1712fc6e40cc568962e6c55f6af8"
+    },
+    {
+      "bytes": 5894,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/build_centennial_sightmap_evidence.py",
+      "sha256": "765a995cef423bbb7a1c76ed0835c6587dfb48351bc044a548835c4dd63a0937"
+    },
+    {
+      "bytes": 207405,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/build_current_strict_ledger.py",
+      "sha256": "e60e4831a6d863b1b78044e2b5c0a4f13d9943abbc86e5d9320a5fa35503d9bb"
+    },
+    {
+      "bytes": 25846,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/build_rentmanager_strict_audit.py",
+      "sha256": "17a5b1b52c039323e0d2c1052a46f3fe0f493ad50f00acce5930b8034ebe8564"
+    },
+    {
+      "bytes": 6015,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/build_strict99_false_positive_consolidated.py",
+      "sha256": "916a41ba31f92bce68f98dced00ba34530007989c1384b893adc51f548258cb3"
+    },
+    {
+      "bytes": 2295,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/capture_js_network.py",
+      "sha256": "0b883bc31d8be25ae430265ebc2705ea524942835f06f29be209116b609e1df5"
+    },
+    {
+      "bytes": 3479,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/clear_run_gables_lane/diagnose_clear_run_e2e.py",
+      "sha256": "2e5f743662c7d421b43bfcfa16010ae2cfb78dc776af37ea132b0213ae030e34"
+    },
+    {
+      "bytes": 103245,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/clear_run_gables_lane/evidence_clear_run_4756_current_strict.json",
+      "sha256": "08ba1604a92e5d37773dbd0641de390ff5baf512f4e38631bad34b113bdb6d74"
+    },
+    {
+      "bytes": 28639,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/clear_run_gables_lane/materialize_clear_run_4756_current_strict.py",
+      "sha256": "53c3aa0810280362754801e75e444cc2ff629182ee5878f6d33350c067d34303"
+    },
+    {
+      "bytes": 37851,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/cortland_oakrow_lane/evidence_oakrow_25489_configured_e2e.json",
+      "sha256": "212e494e5b3ef65524936da7b4663af70f90cce8d5bfbbf1d1af331d7e752aa8"
+    },
+    {
+      "bytes": 7411,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/cortland_oakrow_lane/hb_oakrow_identity_probe.py",
+      "sha256": "1da04fc4941190c748ace4b2aceb7e4730a65d6a308db70d9f9bd0dfdaef0ff7"
+    },
+    {
+      "bytes": 19433,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/cortland_oakrow_lane/materialize_oakrow_25489_configured_e2e.py",
+      "sha256": "b8877d946ebb4695289db6e032ece5e32563c25d09d2a58d6f9678927b46c450"
+    },
+    {
+      "bytes": 114269,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/current_official_migrations_three/evidence_current_official_migrations_three_strict.json",
+      "sha256": "29ae8de17ebbc77398a9dc85c3b7453872bd1627f1ca4ef9382a2fa8fd65c8b2"
+    },
+    {
+      "bytes": 46034,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/current_official_migrations_three/materialize_current_official_migrations_three.py",
+      "sha256": "26e088c1fdd28d31357cab86bb74c1f1f30e20779168bae90a9bd8a94aea5a2a"
+    },
+    {
+      "bytes": 2329,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/debug_scrape_route.py",
+      "sha256": "a876962a0ae4eb24b2c0639851b3c4974c3c624883603579cd9e098516254316"
+    },
+    {
+      "bytes": 5669,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/doorloop_park_place_current_e2e.py",
+      "sha256": "18325f34feabad12b73082c073b54aeef9275840f2748cde34e15b9f9ed7e0cc"
+    },
+    {
+      "bytes": 9346,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/edgefield_48075_hb_lane/evidence_edgefield_48075_configured_e2e.json",
+      "sha256": "a2af8d4d44e574fff2633fef685d2424b3c42c920d01adaaea6f3c142a65c2a0"
+    },
+    {
+      "bytes": 11729,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/edgefield_48075_hb_lane/materialize_configured_e2e.py",
+      "sha256": "df4526a96e63aefad8d8524ecc27b38d09f882c5597a0ce802104f32ea5e4c3e"
+    },
+    {
+      "bytes": 7875,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/edgefield_48075_hb_lane/probe_configured_current.py",
+      "sha256": "e625d805e551ea3568358d720aad56dcecf24fe93a8810a0d83a281d5edf8528"
+    },
+    {
+      "bytes": 6640,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/edgefield_48075_hb_lane/probe_final_landing_raw.py",
+      "sha256": "16fc41c4783096351ec297175ba66d2f9eff434cb2889d5c0ed9ee9309bfd65f"
+    },
+    {
+      "bytes": 1905,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/edgefield_48075_hb_lane/proposal_edgefield_48075_strict_admission.json",
+      "sha256": "e226ee52d64d133586d60374d044fad42a5c4ee800958d4be3dd6d0a32bf098f"
+    },
+    {
+      "bytes": 6423,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/build_entrata_snippet_strict.py",
+      "sha256": "07acec0f8eae42cf2122edce0b091247b3961ac579a003510a9a20bf7c8a6dcb"
+    },
+    {
+      "bytes": 24585,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/encore_deep_routes.py",
+      "sha256": "8d19b5dc168ed4a9206895ec7a49c81b7058b0d2e9869fa22c7dd88d7e849ba3"
+    },
+    {
+      "bytes": 14560,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/encore_e2e.py",
+      "sha256": "2de3ed2fe4832bc0380f75411037bda2ad688a6825f13ba7b222a87da5eacd89"
+    },
+    {
+      "bytes": 6277,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/encore_probe.py",
+      "sha256": "1253c43b8d8c8f2711951f9729f1a8466bd20df742270367ecd8c943d83262a8"
+    },
+    {
+      "bytes": 19568,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/evidence_entrata_snippet_cluster_current_strict.json",
+      "sha256": "9baef129a958ff4e5ee48d86ab7cf666779ff45fcf27e7dd2125f7701d73e6fa"
+    },
+    {
+      "bytes": 3016,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/evidence_westwood_betternoi_current_full.json",
+      "sha256": "1c473f8c8177640b54ff9b1bb5403d438379d5f59966ec23cca24a6fd484b943"
+    },
+    {
+      "bytes": 24436,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/knock_agent/audit_knock_residual_current.py",
+      "sha256": "27d303bb00296561685a71cc7589336638a34839cd6fbfec15074499767736fe"
+    },
+    {
+      "bytes": 33657,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/knock_agent/evidence_knock_residual6_current_strict.json",
+      "sha256": "6ec3ae4187115d4681c1000c8f731dee1a6840c50f5704b0ee867585c929e791"
+    },
+    {
+      "bytes": 252,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/knock_agent/strict_knock_residual6_net_new_ids.json",
+      "sha256": "14c928adffabdc161d50d168837d9dbfee171f833e31ace2efccc8801a3598bf"
+    },
+    {
+      "bytes": 1468,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/knock_agent/strict_knock_residual6_rejections.json",
+      "sha256": "90ab019ce3e2c922b7c256679a583753542156013a45860094b7ade2910f6f6f"
+    },
+    {
+      "bytes": 10496,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/validate_entrata_snippet_cluster_current_full.py",
+      "sha256": "9372bd0b4514ca90eccc402542e7df74731fa7c447c5a9a175d513bbc7c53f5e"
+    },
+    {
+      "bytes": 10387,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/validate_westwood_betternoi_current_full.py",
+      "sha256": "3d14913438f6f50142d43e2c3484009c8f77d2fdbc543f3795a2038e16af366e"
+    },
+    {
+      "bytes": 11416,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/encore_knock_lane/validate_westwood_betternoi_strict.py",
+      "sha256": "e0e46945081cb33c6d35b55896ec367354315910e45f83703a4c145a47307993"
+    },
+    {
+      "bytes": 5347,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_bulk_e2e.py",
+      "sha256": "7c84df3e65c95f04c7840f07695cc6a64f7bf5a9d277c7adda388482f67a2003"
+    },
+    {
+      "bytes": 430,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_pp3.csv",
+      "sha256": "df9cfe8feaa92e51d7c47752339fc37560feb53ef5b8a2d9716e1357bae2d9a4"
+    },
+    {
+      "bytes": 20455,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/audit_entrata_residual_direct.py",
+      "sha256": "830a6ad426555fbe811e78732b684abc6e082fe09b131d5975887180f4b72b20"
+    },
+    {
+      "bytes": 7181,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_30101_current_full_scraper_hb.json",
+      "sha256": "b05aac438ee5e88a1a53ae04208ea9815eeed5b6291077285f617b369036961f"
+    },
+    {
+      "bytes": 8958,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_aventura_5735_current_strict.json",
+      "sha256": "45b591567d3b5c7687df42a5738fdc2fc3e55bb08cce83b14d3bf19832a348f5"
+    },
+    {
+      "bytes": 9103,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_barberton_46915_current_strict.json",
+      "sha256": "7a8d72e48634cbb91444ac7c9211b1e42f9e9f71992002f3579474242b8319b9"
+    },
+    {
+      "bytes": 10361,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_boro_phipps_26736_current_strict.json",
+      "sha256": "7ec3052ce0979ea2b4435592785619a4f2eb1361e0b4a681cb7e9018140727e3"
+    },
+    {
+      "bytes": 10024,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_enclave_35192_current_strict.json",
+      "sha256": "fdf817d505d15d788b7aaa1cb7b2f0a9b4760c650de564ef41923fcbe21aa571"
+    },
+    {
+      "bytes": 47378,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_1375_lakewood_current_strict.json",
+      "sha256": "22e482bfca6c396fe54822e1a7de093f58a64b8ef6d44935070605419480a168"
+    },
+    {
+      "bytes": 6232,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_18764_current_strict.json",
+      "sha256": "7a614a68943ca5de84d018ad00fd84b93740d6e8fc29f68218c79b1ea58867c4"
+    },
+    {
+      "bytes": 20997,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_19877_current_strict.json",
+      "sha256": "3240faa17aed25bf8947773b592ccc75c97518b43ca0aaa4313f347963a12ada"
+    },
+    {
+      "bytes": 22508,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_247119_remaining29_current_strict.json",
+      "sha256": "b470045bd04f04af2a9d2c6dfe17aaa8bc056eb731f7b4b9ab3cf61b9e23add0"
+    },
+    {
+      "bytes": 3817,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_257761_current_strict.json",
+      "sha256": "8060bea6e81f95230ca6aa69573c49efe3deddab049ff2162f980f72be293707"
+    },
+    {
+      "bytes": 57070,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_276162_remaining29_current_strict.json",
+      "sha256": "77ec53b8f42e7e0710b9e58e39e16a5136612da45e7657efabaa8e9158ec838d"
+    },
+    {
+      "bytes": 73272,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_298586_gateway_lofts_current_strict.json",
+      "sha256": "7a0ddebe83faf61d72cf10cd47b27cff03e39a378b8579d8ac3cbd47916702f2"
+    },
+    {
+      "bytes": 6042,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_40398_canyon_springs_current_strict.json",
+      "sha256": "839f5da5ca6f63f8811e4604a02a53d69851471d6b870044340c999cf93941a9"
+    },
+    {
+      "bytes": 19095,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_43908_remaining29_current_strict.json",
+      "sha256": "e37aec2bb3e899b4e5bd67ba4af518602ab46c485661198817538dd819902511"
+    },
+    {
+      "bytes": 21874,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_46257_current_strict.json",
+      "sha256": "c94bf2d24b7aaaae1cec3a4b6ae04baaf6a78ff9c40f8656e5fc50959940332a"
+    },
+    {
+      "bytes": 4234,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_54936_current_strict.json",
+      "sha256": "72617d1e49fdd393129efe04fbad42d43094e15707aff8a4d6ac9392d3da4d9c"
+    },
+    {
+      "bytes": 8959,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_67684_two_light_current_strict.json",
+      "sha256": "6e80739696d94cf68a2dbee9787170cbc37a474cecc31058274afc9c7d7fd90c"
+    },
+    {
+      "bytes": 82212,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_70993_remaining29_current_strict.json",
+      "sha256": "3dc150680ab11dbf4a7661f84102474cd7e38faeed86181114f8eb4008f28db1"
+    },
+    {
+      "bytes": 76061,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_72391_lumina_current_strict.json",
+      "sha256": "7cb13bebcfdb776c0293262777d9442b2369dbbd2bdec6ca764e537cc462665b"
+    },
+    {
+      "bytes": 7919,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_9473_village_cliffs_current_strict.json",
+      "sha256": "e4304900edbbc36686e86ab8da12f2328176d3834ad485cc2869c524367f7e44"
+    },
+    {
+      "bytes": 172041,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_embedded_direct_current_strict.json",
+      "sha256": "587de8346d88d4cf5f8121868e8b4f319aaf4353139b95c02f013cb2ff8e3e83"
+    },
+    {
+      "bytes": 17417,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_profile_details_hb_strict.json",
+      "sha256": "34bf783f07fe1bbe728c608e4124070d8145c90b7396c448b23b1366bb2baa34"
+    },
+    {
+      "bytes": 371530,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_remaining29_current_strict_consolidated.json",
+      "sha256": "8f742c0e10719135c75d3d29053405f1635e4c8c4d72353546d04fa07285621a"
+    },
+    {
+      "bytes": 97941,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_remaining29_hb_batch2_strict.json",
+      "sha256": "74d35b1fb8a50ff34b637b385db90bd4eb5f9f3d7a35a72e3496ec318bef04a5"
+    },
+    {
+      "bytes": 148609,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_remaining29_hb_batch3_positive_replay_strict.json",
+      "sha256": "a104ff51a3a974395d32c8894bae0c7a666b598a0715138893c46333ffda0750"
+    },
+    {
+      "bytes": 105143,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_residual_current_direct_audit.json",
+      "sha256": "499ac1c7f77816fc5bcebd070d66f4ec25de1f5811afdcc751de780bcafc44eb"
+    },
+    {
+      "bytes": 77595,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_residual_current_strict_consolidated.json",
+      "sha256": "067a82d0b7106f9048481b1d97d09a8c5009370463fdf8566edfbe0ffbb7804f"
+    },
+    {
+      "bytes": 57785,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_entrata_residual_followup_hb_strict.json",
+      "sha256": "b1974d34209c2465468b4054be272a79084c3e51fb4a5ee619c5c759cdae842f"
+    },
+    {
+      "bytes": 4245,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_harpers_mill_234772_current_strict.json",
+      "sha256": "07d914edea01aaa3bf78ab875222691da01761e580b0db47dc6602830ade81d9"
+    },
+    {
+      "bytes": 11760,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_hb_unknown_rentcafe_two_current_strict.json",
+      "sha256": "bdd58adaed031005829f3db2f98030032b5c991baf990769b56d4a7e3e8a31c6"
+    },
+    {
+      "bytes": 12669,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_lavina_kelly_current_strict.json",
+      "sha256": "72e3f307c4ececc0a940c1bc900852461d7b79736f630ac2ce569f12729d9876"
+    },
+    {
+      "bytes": 4641,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_millennium_appfolio_current_strict.json",
+      "sha256": "0c7e7ca265c4b134e8b93b77b58986a5a556ba2cde289ed7b05b18023204a6b2"
+    },
+    {
+      "bytes": 5907,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_park_creek_9297_current_strict.json",
+      "sha256": "5cf83b022c28618b8574a9ae27270b119b54f94b7cf8f517f06ee82bcd93495a"
+    },
+    {
+      "bytes": 12681,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_plan_only_modal_pair_current_strict.json",
+      "sha256": "425b35b81736a589bfede9289a2a9ae73aee8cd5ca24f8ad19ea8528477063ee"
+    },
+    {
+      "bytes": 8655,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_quiet_waters_20672_current_strict.json",
+      "sha256": "94ae8d05c9056f653db60bdf02eeec458db4bb92298e72fff8e9a2adbe89da26"
+    },
+    {
+      "bytes": 9246,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_strata_239274_current_strict.json",
+      "sha256": "04c40fdd0deaaf4ff9078c3d565bf9971c16f8acee7ca5df9ccfde15f051b444"
+    },
+    {
+      "bytes": 18768,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_tribeca_leaseleads_current_full_strict.json",
+      "sha256": "c8094db87258ea48062bd6a1e95a597106aefeed37a873224c94b01f9d03b566"
+    },
+    {
+      "bytes": 39837,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_tuscany_22986_beans_map_configured_e2e_3x.json",
+      "sha256": "beb54359175d11c0c09da26370eb80c6f8bdad7e0532fdbe24c45608b8a6b27d"
+    },
+    {
+      "bytes": 5308,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/evidence_village_park_mri_current_full_strict.json",
+      "sha256": "a0079ca290cafbb2772d3dfec772015072aa1538a509f1713c9280b5d4f43b7b"
+    },
+    {
+      "bytes": 6790,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/hb_deep_inspect_one.py",
+      "sha256": "cc31faa8778b160bf1a98af49cd78b141a18958b746c04591bc843e4cae533e2"
+    },
+    {
+      "bytes": 8270,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/hb_entrata_modal_direct_probe.py",
+      "sha256": "aae5a961b0c4308d9224fbc13d0316988c5c377769213f3daecf235ce54efac1"
+    },
+    {
+      "bytes": 13751,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/hb_entrata_profile_detail_audit.py",
+      "sha256": "faad2bf3f33775a1cedebcda06c06dfbf288bd07930db100f20f11a8a9c77d0f"
+    },
+    {
+      "bytes": 19321,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/hb_entrata_residual_followup_audit.py",
+      "sha256": "9a29cd7bd632515fd5b0f3e16eed5e6139c3539d44699490b2eb30237b3124de"
+    },
+    {
+      "bytes": 9221,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/hb_unknown_rentcafe_high_value3_current_full.py",
+      "sha256": "fdf5ef47a17aa0d463bd583e7914aad219acf20e685f7be4ae444f9f4ba8a187"
+    },
+    {
+      "bytes": 7751,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_aventura_current_strict.py",
+      "sha256": "3d2751012c30f4f8811238779d06d4edfbad6b56c05464aacf373aecac611450"
+    },
+    {
+      "bytes": 7435,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_barberton_current_strict.py",
+      "sha256": "33e1a4ab803dff13172a2cf412b6c432b2fb92f3dacde93f0b669bc131f3d60b"
+    },
+    {
+      "bytes": 6786,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_boro_phipps_current_strict.py",
+      "sha256": "640b82ca5a92fb85dc1dc0c1e0c451788d2426af94714fc50725330f250bed0e"
+    },
+    {
+      "bytes": 6305,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_enclave_current_strict.py",
+      "sha256": "cab697e317320850ac237e69c45d2ad4a8ca960af01969e54e655a3f013b35bc"
+    },
+    {
+      "bytes": 21599,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_entrata_residual_strict.py",
+      "sha256": "2a5a5358a53b3111c1da2ceccecfbf9a93f778bb02a4ba2f797de118a35f7ff4"
+    },
+    {
+      "bytes": 6307,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_harpers_mill_current_strict.py",
+      "sha256": "aa9c6d234c043cbee3050797c518627367c950dc5a584e4b652740d1236b083c"
+    },
+    {
+      "bytes": 8088,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_hb_unknown_rentcafe_two_strict.py",
+      "sha256": "ae579e05f7a6eb682f184c1a16922b53440e2ab5ec150848f1db0ad1ecf74be2"
+    },
+    {
+      "bytes": 10425,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_lavina_kelly_current_strict.py",
+      "sha256": "7edc07002942b19da956144e42e2610c05ac9848fe09eb7c905f5601753e4708"
+    },
+    {
+      "bytes": 11508,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_millennium_appfolio_strict.py",
+      "sha256": "72dfcc186b66d0c35779a2f6f6c1b2d412ef4ae4ffc8aa067282b0244036c9b7"
+    },
+    {
+      "bytes": 6413,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_park_creek_current_strict.py",
+      "sha256": "2ce9ec8e4de8ee34970ac19895f23d76c90b417f273c302ebf99c32e2d4068eb"
+    },
+    {
+      "bytes": 8382,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_plan_only_modal_pair_current_strict.py",
+      "sha256": "3cd0a5b2bc5aeba135f667c3e94e10cd6c6b11320fcf76e099261f5259298302"
+    },
+    {
+      "bytes": 7770,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_quiet_waters_current_strict.py",
+      "sha256": "3b4132cb434e004a9dc18500ac06f1397829c62c0834aa57aa472db12fcbff90"
+    },
+    {
+      "bytes": 11844,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_remaining29_strict.py",
+      "sha256": "ff9e5a642d40dec890b5fa4a4c251670359b38b6e09f2431ccef847516f57937"
+    },
+    {
+      "bytes": 6614,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_strata_current_strict.py",
+      "sha256": "5bc99d2c89198498e4e920d0500f8b3be4c5e88839a8dee22ce963bc63dbe1ca"
+    },
+    {
+      "bytes": 9373,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_tribeca_leaseleads_strict.py",
+      "sha256": "b2c4c957f87b7f7e174244a54a28531c4457a403de9e490357fa7a1c5a8e82b8"
+    },
+    {
+      "bytes": 13827,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/materialize_tuscany_22986_beans_map_e2e.py",
+      "sha256": "a7f7ea9982963a40795c16c1340f39bda7641d952fa4d1243e1b591fdba62566"
+    },
+    {
+      "bytes": 3634,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/probe_30101_current_hb_helper.py",
+      "sha256": "88b070797d63c7d51e9a57adc02ec730e129db72fcea079755484b0684ce00ea"
+    },
+    {
+      "bytes": 4785,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/run_hb_entrata_followup_batch.py",
+      "sha256": "cc958114605a0c6f80d750345e308539680db5ba0ed0b44517c3da36af0a30fc"
+    },
+    {
+      "bytes": 10277,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/scan_remaining_entrata_current_full_direct.py",
+      "sha256": "610b7c218c8cd2a966228b2bddcc29741f5bb5a035f084ed8a12f39b129f51bb"
+    },
+    {
+      "bytes": 9461,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/scan_rentcafe_floorplans_current_full_direct.py",
+      "sha256": "ea30feecfec8e87577469cf844c6238c66a9dc237ff62097ada48e8252d570c3"
+    },
+    {
+      "bytes": 1464,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/strict_entrata_lakewood_net_new_ledger_rows.csv",
+      "sha256": "2e80f6586866c29e1da450759fd625ca7a723f3fdf5573c730f89b190a03b730"
+    },
+    {
+      "bytes": 817,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/strict_entrata_lakewood_net_new_summary.json",
+      "sha256": "2af73c0d5e8871e30705b12cd1a20c3551bd2be0991252f82edc2d9aaa04d926"
+    },
+    {
+      "bytes": 624,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/strict_entrata_remaining29_net_new_ids.json",
+      "sha256": "19d6fe57505d69808998ece52eb9efed21be48fdee749f07c3d440c8bff6b223"
+    },
+    {
+      "bytes": 6049,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/strict_entrata_residual_net_new_ledger_rows.csv",
+      "sha256": "dcb829a30d4cddcf5b170454b54e0dde1746d7eb8daafa9211da51d79177367b"
+    },
+    {
+      "bytes": 960,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/strict_entrata_residual_net_new_summary.json",
+      "sha256": "d550bfeb13717df9890d4eb13f5b6488d4eac790e1e0b8cdc9ff1cbd3dc52f0f"
+    },
+    {
+      "bytes": 9706,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_30101_current_full_scraper_hb.py",
+      "sha256": "556cda666093a5196188d60dd72f035847b1dddb010e56d5df649cd06a152808"
+    },
+    {
+      "bytes": 9452,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_canyon_springs_strict.py",
+      "sha256": "84b8e7f4754fa24ae762d0244f067428715f3295a8382e727b7e97763b4c2da9"
+    },
+    {
+      "bytes": 17473,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_embedded_entrata_direct_strict.py",
+      "sha256": "96095d6a44b79440777d4efcf4c94761bdc1b77cb2bd6ac60cb850fd86da6cb2"
+    },
+    {
+      "bytes": 14883,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_lakewood_strict.py",
+      "sha256": "9fb83fa2ed888ef8e19c5ba6bb9c05b79d1e8fffb0a9402bbf38184942f7ae25"
+    },
+    {
+      "bytes": 9223,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_two_light_strict.py",
+      "sha256": "14326408843ec9ce2077c1d3355cd67ac9c589bd751250e0bf6e841e63da3a8e"
+    },
+    {
+      "bytes": 13009,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/entrata_residual_lane/validate_village_park_mri_current_full.py",
+      "sha256": "9d4c8875f156a464f16817d4b61ce1aef4f5f8e6689a7b43bc554e3c7a2b32a1"
+    },
+    {
+      "bytes": 1705,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_3dplans_bellagio_262964.json",
+      "sha256": "d76606d61c749ca65f1f11124ab168da45c6c340e398ab7d089e6c83325f2033"
+    },
+    {
+      "bytes": 10325,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_appfolio4_address_audit.json",
+      "sha256": "e2a63089485cb65b49be010044cff308018507326c7015dd870f7d91a03215a2"
+    },
+    {
+      "bytes": 11392,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_appfolio4_strict_address_revalidate.json",
+      "sha256": "760c7c66ad490af740d7bc018e1b0f8d73964e201db0fa535cece83cd06bc626"
+    },
+    {
+      "bytes": 9318,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_arthaus_yardi_proxy_current_e2e.json",
+      "sha256": "85e593749f320ea383124fee4108148e2ef80767a556393738ff6612025feb43"
+    },
+    {
+      "bytes": 3850,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_centennial_sightmap_strict.json",
+      "sha256": "e1c223e9f4000ece3e1e8298d22e37be5f0f781431b6037bc66f44576656ea8a"
+    },
+    {
+      "bytes": 4795,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_doorloop_park_place_current_e2e.json",
+      "sha256": "b2462640eed82f441f3726d051e1eb82656a0fa474519cf8ce846d79773d4ec9"
+    },
+    {
+      "bytes": 18325,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_encoreskyline_residual9_current_e2e_root.json",
+      "sha256": "277f9c4edc66bf523b0b00ad53d4092692c93fc8c2fd195be1b2c97ac1cc96bd"
+    },
+    {
+      "bytes": 771069,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_g5_browser3.json",
+      "sha256": "daf2acf5603900133722fec3b85688cefbc3e30b498f9cb5818985b0f3f23458"
+    },
+    {
+      "bytes": 6302,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_hb_provider_55165.py",
+      "sha256": "673110f22cd425edf7e138d5036bc2f33814dd64c08b716c2db25779003b7762"
+    },
+    {
+      "bytes": 12666,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_knock_jonah_redirect3_strict.json",
+      "sha256": "f687e078ce78509b7fdea1f4e698fd0197f50e29fc9f348a677e22e061492e8a"
+    },
+    {
+      "bytes": 1202,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_live_direct_rerun.py",
+      "sha256": "cefd41ab6c5605eb68e25b5abdda6dcabc6d8bb4f9cbb7ac3502c7b94b7383d9"
+    },
+    {
+      "bytes": 30844,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite8_property_boundary_revalidate.json",
+      "sha256": "ff0ec2d89a25728fe4565dca22e3d6a42a7bf3836f2fad6ec7d36bd19082f7c3"
+    },
+    {
+      "bytes": 82413,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite_6274_direct.json",
+      "sha256": "3b4e9a539ef3b0cb1f3ed1933b23310b6edd591dfb0585a413b37b89098f7eed"
+    },
+    {
+      "bytes": 4175,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite_blvd45_boundary_revalidate.json",
+      "sha256": "3bce8f83df84e1ecbc6345e126dd841a86887c60cbf080fcbd914b54d7137c09"
+    },
+    {
+      "bytes": 22187,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite_prior12_recheck.json",
+      "sha256": "ba03fcc7ea00b67a60358dfc60ad4c192f3cf0781651734c21525833b98be44e"
+    },
+    {
+      "bytes": 22603,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite_residual7_property_boundary.json",
+      "sha256": "12236a3c3c2e946557d684d34fbdd548730a453a55d0b7f9daf48d4ad0a398f2"
+    },
+    {
+      "bytes": 4235,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_onesite_standard_leander_boundary_revalidate.json",
+      "sha256": "05195efc63034fce1329308fe321996c932e50ed9d9df8e63a678ad72c256746"
+    },
+    {
+      "bytes": 35549,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_provider_residual28_current_probe.json",
+      "sha256": "efc98a359832247689d6250fd33be0ac091d9e0dcabd989fac4c8bfdf42617f7"
+    },
+    {
+      "bytes": 14761,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_applicant_shell6_current.json",
+      "sha256": "1c1847996de65f7c3768fb6409e86358e2b77721886175b5a84af881c2aec825"
+    },
+    {
+      "bytes": 7518,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_applicant_vanity_proof2.json",
+      "sha256": "b3d7cd081996d465a7aca1202ec9d16fe3789300ee0414dea97ed20288c61924"
+    },
+    {
+      "bytes": 13990,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_boundary_regression3.json",
+      "sha256": "0c4d0f8482ba202f6461871a16e44e42c441672dbd64dffdc8567026f5d51ea4"
+    },
+    {
+      "bytes": 3907,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_enclave_free_path.json",
+      "sha256": "f68e6d964d6c2f0a13da18bcbe62f911c904d13c338d33fa718a116870522c4e"
+    },
+    {
+      "bytes": 11557,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_live_direct5.json",
+      "sha256": "da17a8b5f4e2927f1d5513222da7a103cac2479b4baaa65946132be06e4268c7"
+    },
+    {
+      "bytes": 5108,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_meetinghouse_routing_e2e.json",
+      "sha256": "219efaee95616cd1d59da7dd7e65eb9b53795670e68e194be782b108278da2a5"
+    },
+    {
+      "bytes": 24209,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_nestin_remaining13_current.json",
+      "sha256": "cc619730090dd4a32c71ccd870739e052c3d16b89daa8f577e257c8439d0afb9"
+    },
+    {
+      "bytes": 9372,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_published_routing_e2e.json",
+      "sha256": "13fdfd334b8992dda0a99208b2a2fa7f07558e63117721b6933157d964b76460"
+    },
+    {
+      "bytes": 9352,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_published_theme3.json",
+      "sha256": "599877103dd1e7c6ad77b2676bdd8ba092dda8b3b84a1005cbb26daf92654f44"
+    },
+    {
+      "bytes": 25980,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_residual12_current.json",
+      "sha256": "772d1b317ca6f51437a3b13c0058c27b2e89fe9d27b87814e2a2a64fdb743a9f"
+    },
+    {
+      "bytes": 55956,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_residual24_direct_only.json",
+      "sha256": "d2bbf2e576bbcf3ed5d8c9eefb3fd696a2191d18c33a61721a0b2b83dddf8f69"
+    },
+    {
+      "bytes": 6187,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentcafe_siteground_hb3.json",
+      "sha256": "1b27fb43a1f47833437ef19c378eecec35ba72003c33e9d4ab3322dbfb840d1c"
+    },
+    {
+      "bytes": 1844,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentmanager_26527_tight.json",
+      "sha256": "5814b7d68f28d26918e9646a1fab8ce7b49d100ec24ab49ae9d11fa44caa1ff3"
+    },
+    {
+      "bytes": 3810,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentmanager_49096_current_revalidate.json",
+      "sha256": "4ac715f851d396f04f9d5e532c19c966c6902869f8708ea4aed5a65b49c55f55"
+    },
+    {
+      "bytes": 5040,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentmanager_55165_current_hb_e2e.json",
+      "sha256": "4cced378fbd6bf52b167b2a03f3abb563e0e8fa51983e470d8e0e7b02c58010a"
+    },
+    {
+      "bytes": 4141,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentmanager_77794_current_revalidate.json",
+      "sha256": "a1dc9451279a481e25eb311935f3a34dd33fac6d4e6ba241b133fd6debc423f1"
+    },
+    {
+      "bytes": 9612,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rentmanager_iloveleasing_residual4_current.json",
+      "sha256": "13ceaef76e17445cf4e43183046b3ea88520df4888ec000ffeb95b8cd52963a1"
+    },
+    {
+      "bytes": 26941,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_rerun.py",
+      "sha256": "bc733faed952d505423101a2b0d78059fc6b5f9976961e3f658557b1ad802c07"
+    },
+    {
+      "bytes": 26931,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_residual_appfolio15_direct.json",
+      "sha256": "b3bfc89a86352ebf1d09a99d2f7f1c2d4005d03092ff161dd0855800bd210722"
+    },
+    {
+      "bytes": 32991,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_residual_rentmanager17_current_e2e.json",
+      "sha256": "04acb6ba78a05d402640663c94c676cf5240779d411386b87b9c6d3fcaec7a9d"
+    },
+    {
+      "bytes": 71106,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_residual_rentmanager17_strict_audit.json",
+      "sha256": "057ed33209bc19a01790e362f2d6d3a5361e2238265dea24fbde99372137f87e"
+    },
+    {
+      "bytes": 66910,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_residual_unknown48_direct.json",
+      "sha256": "ce94aa5e0df4aac012c720dc8393743d292bd371d08cf5a6d14cc12f4d44c27b"
+    },
+    {
+      "bytes": 24011,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_residual_wix_squarespace13_direct.json",
+      "sha256": "9bcd5d0ef89929f9bb4d4389d446cd81d1036295e3ad3b54fe2c5f1e6c95e14e"
+    },
+    {
+      "bytes": 7061,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_securecafe_boundary2_revalidate.json",
+      "sha256": "a741abe48c6f49416a271eb9aa215bd45a3f5e4a3eca8e71c2a9af61040de6bf"
+    },
+    {
+      "bytes": 29702,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_securecafe_priority11_applicant.json",
+      "sha256": "a3cb09f50420d7a123bbad125d2d33783a0eecbe2093838cdba4bbd35317d39e"
+    },
+    {
+      "bytes": 28304,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_securecafe_priority11_direct_revalidate.json",
+      "sha256": "0673983dd57723ec9e3c20a16a71f3ddd6764b63e60582be5fd0c130008da6ed"
+    },
+    {
+      "bytes": 23746,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_securecafe_remaining12_direct.json",
+      "sha256": "8225f85434933561312c870657f215cd666d72b041ec1f02645965f8e1da1937"
+    },
+    {
+      "bytes": 4664,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_spherexx_281149_current_revalidate.json",
+      "sha256": "646ec2eef8cdbe5fccda214763c98f604c432970253aff0dd269c7f2128fa7da"
+    },
+    {
+      "bytes": 130609,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive50_consolidated.json",
+      "sha256": "9d23c7d229e2a7dcde2c1ddb6489f6399f078803b1cfd75d239215621217c58a"
+    },
+    {
+      "bytes": 98756,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive50_current_local.json",
+      "sha256": "d1ace68b4499322bae43242b73650ed2fb1d26e6fad8eb9984ead328bc86d150"
+    },
+    {
+      "bytes": 6745,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_entrata3_hb.json",
+      "sha256": "cff505d8b3f0c856846f4dc1b2aefa7ed6405f2a24d952bca39a399d8608fcca"
+    },
+    {
+      "bytes": 6005,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_entrata4_hb.json",
+      "sha256": "8f7d07a0df0df7321313218aa84c1ab5a54b1e4b7e937562f9bf9734e111836b"
+    },
+    {
+      "bytes": 744,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_entrata_68952_hb.json",
+      "sha256": "c409cc2d62808f727ba7c1d5fd4b99cc30d8be38b76716a67db172b0163baa6b"
+    },
+    {
+      "bytes": 6886,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_gsc5_live.json",
+      "sha256": "1153d1d27bbd351db8dc77efdf9a4128cb18b1d4016bae9a244a6fb653d02f68"
+    },
+    {
+      "bytes": 37140,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_live_priority15.json",
+      "sha256": "1b4af22761518eb8546b965b89991e188997b2fdee09e8c71737e76fad8e2a43"
+    },
+    {
+      "bytes": 44723,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_strict99_false_positive_live_remaining23.json",
+      "sha256": "47ca06fa40e22e9069b566cd58b55736dd52af7710dce0973ca1c4c4e613286f"
+    },
+    {
+      "bytes": 2238,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unit_generic1_tight.json",
+      "sha256": "8e38caa6616c7d2c7a8d22513f5695776fb1356c04dfa30135a53892eb631f4c"
+    },
+    {
+      "bytes": 6017,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unit_jonah6.json",
+      "sha256": "0170c0f0a3d45a0afc5af19aa6977161a95afc236250cf4c60039a9ecaecdcf7"
+    },
+    {
+      "bytes": 55408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unit_rentcafe31.json",
+      "sha256": "f7b8e2c24ef6c5a28a8c141174e675bdbc8490e915a1f9eee35e36ab45c1d9e0"
+    },
+    {
+      "bytes": 64285,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unit_rentcafe31_tight.json",
+      "sha256": "8fc4c1e562af4be4d17094ad7cbd69e05c25d3f8e69ce1d801c0648a4e4d5d70"
+    },
+    {
+      "bytes": 35141,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown49_current_fetch.json",
+      "sha256": "81bb45b6e5eee121b89848cc12829f9341255d05f0f2c58d1a372aeb9be48650"
+    },
+    {
+      "bytes": 75767,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown49_current_redetection.json",
+      "sha256": "7e01cf0e508ae119aa7fec72344ac10ccab5e1ea39c5d72ec3b960b959f6f62f"
+    },
+    {
+      "bytes": 32796,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown49_redetection.json",
+      "sha256": "f9e1bb28864e8b153ee3b76b7f4e35d834fce1e739c6866c7529de6bc35c1ca8"
+    },
+    {
+      "bytes": 116801,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown49_strict.json",
+      "sha256": "5fd7b1b7138a916482f8970911ab261bd312d86ddb2dab39a694d2bcf1e7d4b8"
+    },
+    {
+      "bytes": 3950,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown_entrata3_tight.json",
+      "sha256": "c39142c2bd8e7995738bb596424a69f048de66e33e804e78e860ba9f7a2a6e2e"
+    },
+    {
+      "bytes": 32863,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown_onesite20_tight.json",
+      "sha256": "0900d1e064142fdbbdcd3154abf102335e267ffc96c646824a151fdd93477939"
+    },
+    {
+      "bytes": 35755,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown_other21_tight.json",
+      "sha256": "a122b664a135e8e93b8709b73cd4e88306d4a148f278c4af6b15669624ca3dc4"
+    },
+    {
+      "bytes": 13765,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_unknown_page_local9_tight.json",
+      "sha256": "839250b6a5dcc735cb0d52dc484247d66ffa0ac1a8c547faec1b2db14815cb54"
+    },
+    {
+      "bytes": 53046,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_vendor_tail30_current_adapter.json",
+      "sha256": "9dfb33fca826a9845fcb1ca2455d19ad1dd6e7db67481f5c5826d93c51f53114"
+    },
+    {
+      "bytes": 122154,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/evidence_vendor_tail30_strict.json",
+      "sha256": "055981166b334b7417154cd698acd0e31d7542f7bf6f5c41b778176c54ecf4e3"
+    },
+    {
+      "bytes": 64436,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/failed344.csv",
+      "sha256": "f0f110b43fda0d269331afe683eaf76f57b0bf734af78500f2f84d25a9bb0b06"
+    },
+    {
+      "bytes": 163264,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/failed344.jsonl",
+      "sha256": "f5a84cb13659ff5a986d421111dc630a6cc629a9d4d44938d43cf0b2939d9ade"
+    },
+    {
+      "bytes": 37156,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/failed344_input.csv",
+      "sha256": "85e81210a666aca7b783b85b533c446d0aec51d7c3e728b0a7828f2abbe1c2d2"
+    },
+    {
+      "bytes": 2006,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/fetch_unknown49_current.py",
+      "sha256": "9bb4c609e866b710f1295eee561a19cb39f1b9890bbfc9cd9ab4aef39f48a5f7"
+    },
+    {
+      "bytes": 11231,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/full_pipeline_remaining_discovery.py",
+      "sha256": "73f324e610ddda79482bed77cd5ece4a698b72619542060850d18e009859b283"
+    },
+    {
+      "bytes": 3613,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_arthaus_jack_london_api_probe.py",
+      "sha256": "5915b3925dd175c760629ac73d25dcefd71a3917b5867d1d75da9fefd3ec2ba3"
+    },
+    {
+      "bytes": 1578,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_arthaus_provider_capture.py",
+      "sha256": "6f3b0706ad9a334717baadc8a484c73d78531d06d80c4d380dcb3aa8f12aa27e"
+    },
+    {
+      "bytes": 4625,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_arthaus_yardi_cluster_probe.py",
+      "sha256": "6b905930a1e08cca1369fc920ee6e444ab10adf59b78133b9c19f58261c9399b"
+    },
+    {
+      "bytes": 4632,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_blocked_unknown3_current_probe.py",
+      "sha256": "95e9303af4b6c5a33b93ee5d4311b7d11d9828e249d57a6d76083d00d5e6d40c"
+    },
+    {
+      "bytes": 2181,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_blocked_unknown3_current_probe/summary.json",
+      "sha256": "9945b8c1bb90ca794da5cb3a1b0e5ded9bd6185dbb88e8834beb96ee213a6adc"
+    },
+    {
+      "bytes": 9761,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_entrata_native_sweep.py",
+      "sha256": "9cc35cf74b3ec5c2d34bde00c102bd245b74ee450d227df433f561728e10e501"
+    },
+    {
+      "bytes": 8256,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_exact_blocked5_root_probe.py",
+      "sha256": "a55d1597325159828072f059a9208e0397e3ee8ee4d1a7d4551e6b778e2d7a15"
+    },
+    {
+      "bytes": 2704,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_exact_blocked5_root_probe/summary.json",
+      "sha256": "655271217548d8e753c853d1daff29a349abf6a17c876af6b106ce2468c864c4"
+    },
+    {
+      "bytes": 4666,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_exact_entrata_audit.py",
+      "sha256": "7058b4d73563c64b5c21c0928ae53105d19323c923ed910aa29991043f2880e2"
+    },
+    {
+      "bytes": 1165,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_harbinwood_594_summary.json",
+      "sha256": "bd62e127735e3281de0e7d923a81cf0fadba47dee604a8ab2deb9d8351d31882"
+    },
+    {
+      "bytes": 866,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_legacy_oaks_55165_summary.json",
+      "sha256": "e7fce157f28ba7d44dfc2b3bda225fb4bcdd21aa7282d5e92342dd96e47dae1f"
+    },
+    {
+      "bytes": 3817,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_harbinwood_594.py",
+      "sha256": "fd1a402f15ab286b11cede32b0ada16fd4147850be6b9e84b56513964c834c9c"
+    },
+    {
+      "bytes": 3466,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_legacy_oaks_55165.py",
+      "sha256": "e1b0e5c667a382b6197e302d899f5f2e7dab83bbf155d4799928d42f607c2166"
+    },
+    {
+      "bytes": 4130,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_maya_68497.py",
+      "sha256": "923da88a8c480c4205ebc6f002f364fd6ec7aa73de23d881c881e54e4288ae31"
+    },
+    {
+      "bytes": 3814,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_rentcafe_hosted_pair.py",
+      "sha256": "32e727fe84bad2b57267cb56cde74fd1b1d94368e8405637fc53436fcf1ea414"
+    },
+    {
+      "bytes": 2619,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_riverfalls_8654.py",
+      "sha256": "5ae3a6fd52af84db7700ddbbccd0903f0b9e7e73350c0744090cf9320714f6ed"
+    },
+    {
+      "bytes": 1829,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_scully.py",
+      "sha256": "8cdf4b36361b989cfdb15f9d06db1fd8f606516dd7dd70ab740cd7e3854a2af7"
+    },
+    {
+      "bytes": 1269,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_scully_8119.py",
+      "sha256": "9a9cf7a5a03c901746cf92d15dd6fab274aa1294e9f9cacbbb73bc8064e09f9b"
+    },
+    {
+      "bytes": 1757,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_spherexx_legacy_cluster.py",
+      "sha256": "ded5fe7133def4daf8eea9c6513aadebfb277c6cfb3668ee2661d92518aa39c2"
+    },
+    {
+      "bytes": 2612,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_tamarron_34362.py",
+      "sha256": "01bdba7c3049e2e9ebe81dfe4e9a2a50bc43f4f959d4026e6a0586432c03360b"
+    },
+    {
+      "bytes": 2830,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_town_commons_244756.py",
+      "sha256": "bd268321d7b6cc45dc4c52b07949a2a63db8960b53ad777e1104124814c3ca95"
+    },
+    {
+      "bytes": 1254,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_probe_zillow_park.py",
+      "sha256": "fe03c55089a594b164beda944eb29ba16325c7b492b90611a4d8657a4732733f"
+    },
+    {
+      "bytes": 3042,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_rentcafe_hosted_pair/summary.json",
+      "sha256": "9a905de586457d8e974366b656d280e101b9749658cd7977e63da2db482b69ab"
+    },
+    {
+      "bytes": 730,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_riverfalls_8654/summary.json",
+      "sha256": "56d1b53c440726ea86d74d74d3848cc3991404cf9ef83d50ed251d45891fa90e"
+    },
+    {
+      "bytes": 1468,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_63191_43995_summary.json",
+      "sha256": "ace5b31396b12a8ef0a76ce1f2583a97db76f6c18e8077ea1584381def9279ce"
+    },
+    {
+      "bytes": 698,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_8119_summary.json",
+      "sha256": "78c28ea2005c8c776e18d10b546a63939e09dd2f1177e035212f5f210ef5b940"
+    },
+    {
+      "bytes": 1372,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_availability_probe.py",
+      "sha256": "36dc9d1c17319095c7cec0652536c5021483d55465a106232b92f6dce02ef68e"
+    },
+    {
+      "bytes": 545,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_availability_probe/summary.json",
+      "sha256": "d01f012d96a9a0b4a24ccee5b3a881919ca31ad492153edc31c1e8c8f85a8c5c"
+    },
+    {
+      "bytes": 4758,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_detail3_one_session.py",
+      "sha256": "24c17115fab653dc15b42325d1a7f62215a018f63bb7df7f2df13534bba3a222"
+    },
+    {
+      "bytes": 1278,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_portal_probe.py",
+      "sha256": "dc73c8dfb85de4129038a98cf87a9b7491443cf6b8e6e03c8eca98c2c74698b3"
+    },
+    {
+      "bytes": 465,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_portal_probe/summary.json",
+      "sha256": "739ed69b656f6097eefbdc271745ebc872c9078bcd6bbd07c9d7d0341cb20a3a"
+    },
+    {
+      "bytes": 1362,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_quotes_probe.py",
+      "sha256": "355202e26b30bef0497ea05013a74fe5bc84792a1ba2be4f226392f3007e1720"
+    },
+    {
+      "bytes": 549,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_quotes_probe/summary.json",
+      "sha256": "e67aea1fb0111692df517ddaaf2684e17a19df84ba9687664d6b5c5bfeaf0057"
+    },
+    {
+      "bytes": 6021,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_residual3_detail_probe.py",
+      "sha256": "dd3f23367143112506bf4eb0a4f45e4e0e834ff48cc0e0f8a899608c0580790d"
+    },
+    {
+      "bytes": 5927,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_residual3_detail_probe/capture_current_parent_boundaries.py",
+      "sha256": "d4a02f5141b44f0d71719ec1d081673dab9dd35ec6dc0c6027e5deea05228766"
+    },
+    {
+      "bytes": 53360,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_residual3_detail_probe/evidence_scully_three_current_strict.json",
+      "sha256": "a71976d4dd0ff260bbab66575067b9743fcd00c93616b29e0c869df6c45ff076"
+    },
+    {
+      "bytes": 15334,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_residual3_detail_probe/materialize_scully_current_strict.py",
+      "sha256": "5afa538470849c8790c1d90282d08d3b19e874ff6bb34605b398d9bede203cc7"
+    },
+    {
+      "bytes": 40212,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_scully_residual3_detail_probe/summary.json",
+      "sha256": "d34851ee3ab660c8ac6d1bb9d7153b73c27ea4f58cddf259c2d4a5179955c2f2"
+    },
+    {
+      "bytes": 1985,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_securecafe_residual3.py",
+      "sha256": "b5c15a61e30b9594c6c0554be348e9d08ffb5ac173e6294bbabfd573f64df1a8"
+    },
+    {
+      "bytes": 1146,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_securecafe_residual3/summary.json",
+      "sha256": "a1e6e71a241e115f9361fd54a6c429449d489cfa60851b3dee3d4cc874a505d2"
+    },
+    {
+      "bytes": 2281,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_securecafe_residual5.py",
+      "sha256": "7e59eb258e7718b89733fc0a09f68fda50894444746567657cab38b94919d30c"
+    },
+    {
+      "bytes": 1853,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_securecafe_residual5/summary.json",
+      "sha256": "0ac6e0a61939414747dcf2d4f18e7d4cbe86156a9a38dd97004dfc0632fe0f7e"
+    },
+    {
+      "bytes": 909,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_spherexx_legacy_cluster_summary.json",
+      "sha256": "9d81234b99f638153387da10a712cedd40305dee4eb596a08c061e2908383cef"
+    },
+    {
+      "bytes": 3855,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_tamarron_34362/summary.json",
+      "sha256": "9e5dd7fb05eeabffae08d570a12e4291b6738bd6854400e5a8d42d1475df94ca"
+    },
+    {
+      "bytes": 1243,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_town_commons_244756_summary.json",
+      "sha256": "49cfafa66bc0ad6e74d8acc487aba0579468087fd106f2fb345f43d026fdfe17"
+    },
+    {
+      "bytes": 1407,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_unknown_high_value5_probe.py",
+      "sha256": "ce44bdd304337f34bc5af5313691a1b99dd34012f286a86380c1ad3fd9964e6d"
+    },
+    {
+      "bytes": 905,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_unknown_high_value5_probe/summary.json",
+      "sha256": "3f5e2da35096e8bf3789875625520c02362d3a92810fab7fa8b367d8244fb983"
+    },
+    {
+      "bytes": 2531,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_wix_doorloop_current_probe.py",
+      "sha256": "1bcd1e0dc6dde6850507e9264a40228d5356628bc848b728dbf6746683e2e3f5"
+    },
+    {
+      "bytes": 100174,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_wix_doorloop_current_probe/summary.json",
+      "sha256": "d8c7694429e10120fbd41bfdccaa94699af278008b09fdc91d852f278c81aba6"
+    },
+    {
+      "bytes": 298,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/hb_zillow_park_38378/summary.json",
+      "sha256": "2f26d80fdc431c4909afd9968aa66d2b4cd1aed7008e79008205ea2637054347"
+    },
+    {
+      "bytes": 9201,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/knock_jonah_redirect3_live_e2e.py",
+      "sha256": "7d671327361926f492da5fef113f1cd64931d6babcac05d399c3390b624b01d7"
+    },
+    {
+      "bytes": 2235,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/knock_migration_screen_current.py",
+      "sha256": "2588357cf0676dfb553d025fd107a86866a6b6d236ecb97bd2c58c6f71c553be"
+    },
+    {
+      "bytes": 4521,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/live30lancaster_securecafe_hb.py",
+      "sha256": "7c2c79c5aa5d1e5618163cf603191e293793ef4b161905e27e0cd642d147f0ba"
+    },
+    {
+      "bytes": 13109,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/livebh_portfolio_redirect_guard/evidence_livebh_city_landing_fail_closed.json",
+      "sha256": "469078ab564d785e9ef3643484f08762a4b63914712309c16118da30a7caa3bb"
+    },
+    {
+      "bytes": 8379,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/livebh_portfolio_redirect_guard/materialize_livebh_fail_closed_evidence.py",
+      "sha256": "529ad3c4d4877e8bbd93ef24bdbe82d3cea89d5d4521455658be4a7914b2529c"
+    },
+    {
+      "bytes": 10180,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/materialize_strict99.py",
+      "sha256": "33d91d65044fdbd271313812f8ec4fb8561f463db40f0b5bce24aa96da3a24a0"
+    },
+    {
+      "bytes": 25923,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/materialize_unknown49_strict.py",
+      "sha256": "fa8085b2d08d083bfdd59ff3c51e9fcc5519fb27023c4da58c655669b75d20f2"
+    },
+    {
+      "bytes": 28635,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/materialize_vendor_tail30_strict.py",
+      "sha256": "725722571178298cb99a80654cc44901a817b3297b5d6478f80544a20eadc064"
+    },
+    {
+      "bytes": 1651,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/maya_current_hb_probe/summary.json",
+      "sha256": "509d45cd4d6f70624dda5b8f1b63733cc756b1db266af087933d004ca5270f8b"
+    },
+    {
+      "bytes": 6665,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/no_adapter_bulk_e2e.py",
+      "sha256": "47fc4c6e0dc2580914fe5d4c347035b8416216ea18080f476abc814d4ba34317"
+    },
+    {
+      "bytes": 8676,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/offline_page_local_delta.py",
+      "sha256": "c3a7502d5234efa24b5868a50d3bfdb4002fe3f114862c337230a6b136873171"
+    },
+    {
+      "bytes": 3727,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_bulk_e2e.py",
+      "sha256": "fe646731b69f1bdbaeece45ef58226f3570906d679289e951049327a211b0674"
+    },
+    {
+      "bytes": 1042,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_live_probe.py",
+      "sha256": "f7b12dddbf132960b97848f6ddec000fa50c61e8b3a458d5fb4c1917eeefc64b"
+    },
+    {
+      "bytes": 13589,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/direct_route_probe.py",
+      "sha256": "592175364b0a87253dc3d752fc5d7c374e9673c6eb35dd8615c01df44d173000"
+    },
+    {
+      "bytes": 22565,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/evidence_onesite_39995_43520_current_e2e.json",
+      "sha256": "02454288c7edb4bf2689dfb7da19c172b3af5be96dc20fd6d30a54d47e3b37eb"
+    },
+    {
+      "bytes": 32653,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/evidence_onesite_residual6_strict_discovery.json",
+      "sha256": "9e0fe723610d927e05672759cb0ac65010d2e2082cdaa24bd1b907e2e3d10e92"
+    },
+    {
+      "bytes": 7500,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/evidence_tor_view_38677_page_local_e2e.json",
+      "sha256": "4bf9f3c9e99aa03d448309a5c97d5f6ac8d37389cf25436ddf3c9a6014d6455b"
+    },
+    {
+      "bytes": 5791,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/hb_southern_pine_clean_probe.py",
+      "sha256": "a763dc568d584251c836e3221d5847a1426c853db73e77db720f6e8c3269b371"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/ledger_hashes_pass1.txt",
+      "sha256": "400d63cc70c3b2e06d7d55d1d065bf7065832db07eb0fbe48fbd42808247823d"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/ledger_hashes_pass2.txt",
+      "sha256": "400d63cc70c3b2e06d7d55d1d065bf7065832db07eb0fbe48fbd42808247823d"
+    },
+    {
+      "bytes": 19658,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/materialize_strict_discovery.py",
+      "sha256": "f2f101079d6d7c9c16d776ac445f70f03e12f905e38fede41d519d429a225ba7"
+    },
+    {
+      "bytes": 13836,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/validate_onesite_39995_43520_current_e2e.py",
+      "sha256": "299d0846b8d7307a8325c771d311eb54f4a4365dddfeb33f5b9509b8d95fe99f"
+    },
+    {
+      "bytes": 12173,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/onesite_residual6_parallel/validate_tor_view_38677_page_local_e2e.py",
+      "sha256": "d250570e2ab1f725af6ddbcf77071e619483568e855e1ba9d6c08cafd97d316e"
+    },
+    {
+      "bytes": 120729,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/evidence_park_northside_38378_showmojo_discovery.json",
+      "sha256": "71c0dd5d3863c0f3aa94b04f783114625060c769a173e4f28f7074da03334687"
+    },
+    {
+      "bytes": 132031,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/evidence_park_northside_38378_showmojo_implementation_e2e.json",
+      "sha256": "3396c364d36f4b7c36479350cb80ed7dd00d5cab145eb214ff55e08ee0ece495"
+    },
+    {
+      "bytes": 1247,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/independent_replay_admission_38378.json",
+      "sha256": "c5d811bb81f21b39040fc678ed36b14df46933b7db49f439a078e14bde2403e4"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/ledger_hashes_pass1.txt",
+      "sha256": "78d088e0e11cad0591e4efc8554351238e687c854ed58bbdd15e323c28202906"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/ledger_hashes_pass2.txt",
+      "sha256": "78d088e0e11cad0591e4efc8554351238e687c854ed58bbdd15e323c28202906"
+    },
+    {
+      "bytes": 28619,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/materialize_park_northside_showmojo.py",
+      "sha256": "5e3c5cf0d10ba1f39566f60b34477e9054e5c0af13434788682b9ad118cc538f"
+    },
+    {
+      "bytes": 18879,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/materialize_park_northside_showmojo_implementation.py",
+      "sha256": "29cb0ed9d3b579158cf7e7526a9d00da0820768698ad6e678e4d14c0c3e5830b"
+    },
+    {
+      "bytes": 2157,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/park_northside_showmojo_implementation_proposal.md",
+      "sha256": "9b12368991579065f2856d71506d6c6f0123cb7dfa91c15aabbc2abceb364166"
+    },
+    {
+      "bytes": 5657,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/park_northside_showmojo_lane/showmojo_summary.json",
+      "sha256": "444b84a9843fee22083a2b35266e2775cab006bddc826b27d712854d31da4e26"
+    },
+    {
+      "bytes": 21931,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/pedcor_residual_parallel/audit_pedcor_application_links.py",
+      "sha256": "e44a0555bfa1d131b8607bbebe2f4d7c9c278796a798bf2ebf9f79a2312d9ffd"
+    },
+    {
+      "bytes": 750,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/post_ledger_strict_supplement.csv",
+      "sha256": "b51ab404e9780a5cef0df8eb4d73bbf769b37eed8ebf01888b31d3f0b69b5317"
+    },
+    {
+      "bytes": 5034,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/probe_configured_hb_property.py",
+      "sha256": "5082c8caa2976838b8c6c465e7c0e8e9ddb020aa07fd54f7c559255b3a54c561"
+    },
+    {
+      "bytes": 6395,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/probe_g5_browser.py",
+      "sha256": "b1db7dfb07d4b2c7a6dfa9b928b4465843f70163b876d254cef0617cc1f07855"
+    },
+    {
+      "bytes": 3068,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/probe_onesite_6274.py",
+      "sha256": "3853e9ab4ec37db7c9352afc92c7e43cf48ee93349c13f79c7b0cc61851fc573"
+    },
+    {
+      "bytes": 3684,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/probe_revive_lakes_hb.py",
+      "sha256": "e0f6183c42b55fb3c0ea0b3ca11dc1ef3273a42dff5ac90ea478acc718eb241b"
+    },
+    {
+      "bytes": 10188,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/provider_residual28_live_e2e.py",
+      "sha256": "9c5227d5e26bdf096f9c8d10f69605b2aea6fa9257a80e116cc324ea8bc40399"
+    },
+    {
+      "bytes": 28662,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_avana_sightmap_current_e2e.json",
+      "sha256": "b8f3a761ccb9553facad42e160c615646ea38b48f6ed03de96799efb8624a89c"
+    },
+    {
+      "bytes": 12668,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_copper_onesite_collision_current_e2e.json",
+      "sha256": "ef09e1eed55b8343804e31f55a3e2275be17a23acbfd592938e5d85843d168d1"
+    },
+    {
+      "bytes": 17034,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_edgewater_entrata_current_strict_replay.json",
+      "sha256": "211a23167a74594ed794605dc832ada1fba146556bc81d1dd048b67b0999e524"
+    },
+    {
+      "bytes": 6476,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_knock_unknown_two_current_e2e.json",
+      "sha256": "b74c760eaed973327733854d2ad948e1c8d8087992410053cc311342c977be98"
+    },
+    {
+      "bytes": 32115,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_ollr_detector_current_source_full_pipeline9.json",
+      "sha256": "355ecc3f7dc9ad00934ba29c8a997ec03c8a22c9bbdea8b84e238bd15bdd4d17"
+    },
+    {
+      "bytes": 33121,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_ollr_detector_injection_full_pipeline9.json",
+      "sha256": "54e5d2aa4f57220b5eb117c188cba9660a01a8bd0c7699de7f462301ad7d9141"
+    },
+    {
+      "bytes": 60760,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_realpage_onesite_remaining11_current_strict.json",
+      "sha256": "f7150350fd46a49580abdd43971163c4af492da243a323f214e9a274577b136f"
+    },
+    {
+      "bytes": 18556,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/evidence_rentcafe_rentmanager_three_current_e2e.json",
+      "sha256": "fab49904b4ba5eb106ae2c1eb8c36aeffb2b84a4f999c9a04380d24049e74bbb"
+    },
+    {
+      "bytes": 14218,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/knock_unknown_two_current_e2e.py",
+      "sha256": "e593844a254ea4ea59934e29859a55d11032b08f5912e42af0cc06e00589ca05"
+    },
+    {
+      "bytes": 15368,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/ollr_detector_injection_validation.py",
+      "sha256": "2a92eea280236dab539f7dbfcf8d53b9dda623ee6789175d933823454c143f92"
+    },
+    {
+      "bytes": 30160,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/run_strict_audit.py",
+      "sha256": "8603f0dfd3a04a88e19cedea52ec48268c3e8b5ba2fd5733e02b3267430bf16a"
+    },
+    {
+      "bytes": 10253,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/scan_remaining_current_pipeline.py",
+      "sha256": "108d8fef2f08bfd18e732d4beb5a2ebcb01d078e0199092f5849110377c6f75a"
+    },
+    {
+      "bytes": 846,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/strict_realpage_onesite_net_new_ids.json",
+      "sha256": "62c7234905a299af81b1066af1f13aa0e74b4a2edbdc6218aa14aaaea1ef10c7"
+    },
+    {
+      "bytes": 13784,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/validate_avana_sightmap_current_e2e.py",
+      "sha256": "d834ad7eb0cb7b15589251fbcc998402d38d22e7182bad85b68a2f7910f027ea"
+    },
+    {
+      "bytes": 14752,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/validate_copper_onesite_collision_current_e2e.py",
+      "sha256": "24faaf2b57517344dea499180972184b1c880b6a4527582b45c6b3324575473f"
+    },
+    {
+      "bytes": 12684,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/validate_edgewater_entrata_current_e2e.py",
+      "sha256": "0e2889dbad7a94a120c54fabe1955ae6821fc7411834e76ec3eb0057ceb1b8e3"
+    },
+    {
+      "bytes": 12760,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/validate_edgewater_entrata_current_strict_replay.py",
+      "sha256": "8059191c8b757d14c1cdf91f42c9ebec20a249b69f5d471193318cee17ce1ec4"
+    },
+    {
+      "bytes": 20923,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/realpage_onesite_residual_lane/validate_rentcafe_rentmanager_three_current_e2e.py",
+      "sha256": "a5b0c61f587146b662780096e06a17eca4c027eda1c11d707eed3f7de9fc5f80"
+    },
+    {
+      "bytes": 2140,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/redetect_unknown49.py",
+      "sha256": "65b57620bd8af459aea423b7e74fb3218d977cfda4aa7b943fa08a89fceb91ff"
+    },
+    {
+      "bytes": 2536,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/redetect_unknown49_current.py",
+      "sha256": "70cc5fb6affdd84e3df3799b4da504ee8fbcccaee1e6f10dd26a3b971bc4cddf"
+    },
+    {
+      "bytes": 5734,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_bulk_e2e.py",
+      "sha256": "5c5003aa6493404ea1bccbb00ab4923ec703962ecbd77251f48a40988155c679"
+    },
+    {
+      "bytes": 27660,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_hosted_table_lane/evidence_tamarron_34362_current_strict.json",
+      "sha256": "598ffa1e618a06780acbdc0008a435e11d1b8e5703665ffd12970cedefae200d"
+    },
+    {
+      "bytes": 19612,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_hosted_table_lane/materialize_tamarron_34362_current_strict.py",
+      "sha256": "7dd73c22a28571d5b06c58044a83259d4ee209d8ec03547a555b49fd676cb7f3"
+    },
+    {
+      "bytes": 6986,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_residual_parallel/direct_adapter_residual.py",
+      "sha256": "ed737baeb0399dbaf663310b405a45068f95f9012cb4d865d23d3a3173dfd267"
+    },
+    {
+      "bytes": 6859,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_residual_parallel/direct_probe.py",
+      "sha256": "1aae1798619fc863dc9f16bf2fcdd6dbae8d11888109af86b5f21edf28cfd9b2"
+    },
+    {
+      "bytes": 13284,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_residual_parallel/validate_262799_full_scrape_jugnu_e2e.py",
+      "sha256": "4064bbd3e68b0714195212e1cc93789460da346cd6e7b9f5643f3ed50dbda3dc"
+    },
+    {
+      "bytes": 5041,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentcafe_residual_parallel/validate_funnel_three_live.py",
+      "sha256": "0659a2d987a89f723ecde35e0ea11d488c7b30759f4c425ab1b32f63e6eacd5b"
+    },
+    {
+      "bytes": 7193,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rentmanager_remaining13_probe.py",
+      "sha256": "c85e0e017c2118b9903e7c0d35dba111a313a65d261778205741757a59035102"
+    },
+    {
+      "bytes": 68997,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/resman_grand_lane/evidence_grand_westchase_current_strict.json",
+      "sha256": "d9177d9db5e910d951605b64f6fb0585cb0ef9a7d2aa5e86569c386e8032da03"
+    },
+    {
+      "bytes": 13484,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/resman_grand_lane/run_and_materialize_current_strict.py",
+      "sha256": "6377ebb2091989be63ff40f892161bb8e286657650d920b9391b954e4d3f0257"
+    },
+    {
+      "bytes": 1861,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/rhr_headers.txt",
+      "sha256": "58579ea38d85bf24e38da718e8b8ff4306641164469076cd5a5dcb7ad0dc7141"
+    },
+    {
+      "bytes": 11420,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverfalls_migration_lane/evidence_riverfalls_8654_current_strict.json",
+      "sha256": "88bc973d8e7171e4d231104f48a3816344f3289c73f4e2e5a7a740cb322b7774"
+    },
+    {
+      "bytes": 20023,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverfalls_migration_lane/validate_riverfalls_8654_current_strict.py",
+      "sha256": "004093d9d0433248147848f586a210b0668dd5ec5e218523846d4767d4ef5143"
+    },
+    {
+      "bytes": 42550,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverplace_migration_lane/evidence_riverplace_64068_current_strict.json",
+      "sha256": "8e00d1b256c9e847cda8ab9ffc31ba7627f1e45d54a49860aad9968439c9cc9f"
+    },
+    {
+      "bytes": 22203,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverplace_migration_lane/materialize_riverplace_64068_current_strict.py",
+      "sha256": "9fa10c254bd610e0914590fbeae623c1334fad37325da5c3f00aba837e503c77"
+    },
+    {
+      "bytes": 28604,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverwalk_wimmer_lane/evidence_riverwalk_71534_current_strict.json",
+      "sha256": "e122c886b97a29d34ffc2b55bee5f93f7c1a46fa237e3f9d1cebd06a511e45a6"
+    },
+    {
+      "bytes": 7407,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverwalk_wimmer_lane/evidence_riverwalk_71534_stale_guard_e2e.json",
+      "sha256": "a60cc6badbc814ce238e7f2813fb1f6d08263b35a30bb9540666588d7a0106ef"
+    },
+    {
+      "bytes": 13199,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverwalk_wimmer_lane/materialize_riverwalk_71534_current_strict.py",
+      "sha256": "fc0c5505bd668978a3d6bf618e5fd38eaab705476a5b254bbc4c2cabc165dedd"
+    },
+    {
+      "bytes": 9558,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/riverwalk_wimmer_lane/materialize_riverwalk_71534_stale_guard_e2e.py",
+      "sha256": "3c1489be27c44d6e620cd0a6b8c47ebd8a4fa749e3f03c9350a25492bba0362f"
+    },
+    {
+      "bytes": 56033,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/run-entrata-pp3/v2/runs/2026-07-31-fnd-entrata-pp3/events.jsonl",
+      "sha256": "ffa4adfe7678613ea02a4e30284e2bffee0708bfaca9e01daa27326ad1d90abb"
+    },
+    {
+      "bytes": 5737,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/run_scully_current_configured_e2e.py",
+      "sha256": "f7fee22193571b1fe05f1b53d74f07b8cd54f15c4cecfa84d81ca0719ba5d816"
+    },
+    {
+      "bytes": 892,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/run_with_hb_key.py",
+      "sha256": "5e6cdc30dbf065a5f549e1a26a4dd28ede40c2e695f65d9c9c6fdbfc8965f568"
+    },
+    {
+      "bytes": 6605,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/scan_remaining113_direct.py",
+      "sha256": "442a739fc62a2ed5f59a93a19ff7c53fa809deac7de64b68bb482347028a99f2"
+    },
+    {
+      "bytes": 5640,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/securecafe_hb_remainder_lane/probe_securecafe_hb3.py",
+      "sha256": "72787a8db8bb22b887a71f2d17f5f2a3d7b17724ae7dba9f80032acadf93d582"
+    },
+    {
+      "bytes": 21320,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/static_residence_lane/evidence_1515_park_place_261580_current_strict.json",
+      "sha256": "dc856005e9d0fe438bdc701e38802a6fc9ee330f9656126ec040416bf39baf33"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/static_residence_lane/ledger_hashes_pass1.txt",
+      "sha256": "8c615df7e60ad414eac7942cf40b3fc162ede4bf8194f028d58b6a99618036e6"
+    },
+    {
+      "bytes": 408,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/static_residence_lane/ledger_hashes_pass2.txt",
+      "sha256": "8c615df7e60ad414eac7942cf40b3fc162ede4bf8194f028d58b6a99618036e6"
+    },
+    {
+      "bytes": 17862,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/static_residence_lane/materialize_1515_park_place_current_e2e.py",
+      "sha256": "09303d3b6e5a41a540d42815b6321d20690643bac31d6381d69197b2e8a09ba3"
+    },
+    {
+      "bytes": 12628,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict99_authoritative_ledger.csv",
+      "sha256": "3f6ee8e1ad56de282685fe2d5755857e8cb24f87bab433241784ec7bd3ecba97"
+    },
+    {
+      "bytes": 8350,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict99_gsc5_live_e2e.py",
+      "sha256": "fde30b7ac428a2e55f3abf50199c3b1efe4b20acfa00d24725bb3d07bd1a6dbf"
+    },
+    {
+      "bytes": 7356,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict99_live_direct_probe.py",
+      "sha256": "c184ee3ca2bd0e4b62cea2f5b6f507f424998d52ae5a571f7ff4a2a066786ea6"
+    },
+    {
+      "bytes": 1724,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict99_reconciliation_summary.json",
+      "sha256": "2b92dc8b068dd93656cafb5e8449b664b6d319d483ae617a1df46e0f2dbb9027"
+    },
+    {
+      "bytes": 34852,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict99_residual245_classification.csv",
+      "sha256": "b71374ba05924d5f9fd0f64f9d92f91f4b62d4e5ceed357a0682f0657142a4a5"
+    },
+    {
+      "bytes": 135365,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_recovery_ledger_current.csv",
+      "sha256": "475f209464568dbc9e8c4bf9ddccb694241b297e3d37b2820b4fbf2877f352f7"
+    },
+    {
+      "bytes": 5255,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_recovery_ledger_current_summary.json",
+      "sha256": "ce0bff2916d6a2fd5d980d914816c53e3ffebebe0e688c41b78a4892909c1d55"
+    },
+    {
+      "bytes": 13689,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_recovery_remaining_current.csv",
+      "sha256": "c9fa90cd26322ce717100f8727bc3d0b45aede0c82c263aaad44c42e8aacc167"
+    },
+    {
+      "bytes": 4112,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_unknown49_ledger_rows.csv",
+      "sha256": "71f4c8293ad3dda7304a3e4d7a1271346316ec634cca812341ab44c2d4ad1da4"
+    },
+    {
+      "bytes": 4112,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_unknown49_net_new_ledger_rows.csv",
+      "sha256": "71f4c8293ad3dda7304a3e4d7a1271346316ec634cca812341ab44c2d4ad1da4"
+    },
+    {
+      "bytes": 7018,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_vendor_tail30_ledger_rows.csv",
+      "sha256": "5c87682cd2dba13b8818b5f663d0ceffca261112f609d86e2bdf2070b697fa6b"
+    },
+    {
+      "bytes": 704,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/strict_vendor_tail30_net_new_ledger_rows.csv",
+      "sha256": "c8b5de4b6902b65858832c95b09982686a1d867efcbef284a0690198117fb175"
+    },
+    {
+      "bytes": 34244,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/agent_a/audit_unknown_residual17_current.py",
+      "sha256": "ae5fe15f794772d88ad04144d3ba7082548e547e300ff6a69f29f6461f5fe62b"
+    },
+    {
+      "bytes": 65878,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/agent_a/evidence_unknown_residual17_current_strict.json",
+      "sha256": "86740bc0d5dcc673d432033a55cf511fdff2c1904f8148562f335be1b86833da"
+    },
+    {
+      "bytes": 3492,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/agent_a/unknown_residual17_explicit_rejections.json",
+      "sha256": "f64bef661629f501e53ef1df6d14025b0f3bd074a66f3cf9d5a50295284048d3"
+    },
+    {
+      "bytes": 292,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/agent_a/unknown_residual17_net_new_ids.json",
+      "sha256": "a26a7bab9a5e2b54a6b511793b84c0b4c17c7a3ce06311e4b8bffab34af7645e"
+    },
+    {
+      "bytes": 2766,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/evidence_charter_club_mri_current_e2e.json",
+      "sha256": "664840e46353b261d781d71f8c3334e2fe6615f977decddf2b793715aebc9cb8"
+    },
+    {
+      "bytes": 5452,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/evidence_pepper_tree_yotta_current_e2e.json",
+      "sha256": "e7552272530bdc40f5f5ebdfa522a29b972a508193fb070910a4eb8f0fa35916"
+    },
+    {
+      "bytes": 94848,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/evidence_unknown_residual35_current_strict_consolidated.json",
+      "sha256": "1036977a9e807ac4478858be2a4e70688fcaab16dea2b95ab173b415e0664941"
+    },
+    {
+      "bytes": 9034,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/audit_mri_three_current.py",
+      "sha256": "f3fe8993f9fc983667ed662181608809230692cd18d488d23fb1004ad55f3af4"
+    },
+    {
+      "bytes": 3798,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/evidence_19245_tenzen_current_strict.json",
+      "sha256": "7e5883c080d0903a24d540bf896b356c8721aeb7917c2fff4618c431b8fe1877"
+    },
+    {
+      "bytes": 8337,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/evidence_mri_three_current_probe.json",
+      "sha256": "21dbf95e3b526898924d88fb2cb550d2e1a0f6dd28dcbbc1ee5c169e2662490c"
+    },
+    {
+      "bytes": 35199,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/evidence_unknown_residual_local18_current_strict.json",
+      "sha256": "3bcab89c5df952078c3978d74cee8887f00c5574a763519b393dd3cd4b8accc8"
+    },
+    {
+      "bytes": 11660,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/materialize_local18_strict.py",
+      "sha256": "85b4e8fe75fc7e7533d75adcb70b7b462940ae0e205134941f63740ef9fe5e61"
+    },
+    {
+      "bytes": 8429,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/probe_current_pages.py",
+      "sha256": "ecdf1fff0860cbd3bd1f88994990ebc0c52af8734e2b501d1736fc39eacb09d6"
+    },
+    {
+      "bytes": 3142,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/strict_unknown_residual_local18_net_new_ids.json",
+      "sha256": "de20cda647ed4047637adc12954d9ac6e8168a0eeacdece2021c9a4ca6c2d230"
+    },
+    {
+      "bytes": 30566,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/strict_unknown_residual_local18_rejections.json",
+      "sha256": "a3a0b4f580214e7bd45d78a9077b47e329c7cae95ae771beecd2121a5b9dd80d"
+    },
+    {
+      "bytes": 10471,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/local_b/validate_tenzen_strict.py",
+      "sha256": "1bf8a7fc58cbf7ca8eb8674b1ce5326403b57887284336a48ec5a5dd09e0fd01"
+    },
+    {
+      "bytes": 11874,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/materialize_unknown35_strict.py",
+      "sha256": "fc444bbefdff27ac8fbf8be4ba11abfdf544c90c83bb231f0369b43db88f65e0"
+    },
+    {
+      "bytes": 460,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/strict_unknown_residual35_net_new_ids.json",
+      "sha256": "0f242cae084770b1cccc9722e94515f814d20579fe5dd134d594bd88f2fa4c51"
+    },
+    {
+      "bytes": 75614,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/strict_unknown_residual35_rejections.json",
+      "sha256": "906cc263e30966d4073437865294dac62f76bb14c64f41f374f4c442f1e9a394"
+    },
+    {
+      "bytes": 9840,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/validate_charter_club_mri_current_e2e.py",
+      "sha256": "f8739358032006aa48ec23c404e1f16c55e034dc92125fc70e295968f1ee6162"
+    },
+    {
+      "bytes": 9724,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_residual_lane/validate_pepper_tree_yotta_current_e2e.py",
+      "sha256": "79eb0a1fc0b573bb4c90d8d126ca7da85506d639d25994566dd84f8bc901aba9"
+    },
+    {
+      "bytes": 11743,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_wix_parallel/probe_onesite_candidate_direct_strict.py",
+      "sha256": "4eb716cb7548bca8b268fd17ba333a5f5e8c6b7772c2cc29ebd23af66e0b3fcb"
+    },
+    {
+      "bytes": 7948,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_wix_parallel/probe_tropicana_oll_hb.py",
+      "sha256": "828a2a26d4fa09c46f29e0b175441d9d3fc0de6417da4bc599f822c6a4e6bdc4"
+    },
+    {
+      "bytes": 10377,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_wix_parallel/probe_tropicana_onesite_direct.py",
+      "sha256": "ee5b3c6159acd8f90edf4ed0095b1e3128b806189940cd2c3625bc17db4544bd"
+    },
+    {
+      "bytes": 8247,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_wix_parallel/screen_remaining_unknown_wix_current.py",
+      "sha256": "2a3e538eb379980d171d520ef50f4de854117ef76e95b54c66a5584b364ad373"
+    },
+    {
+      "bytes": 14807,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/unknown_wix_parallel/validate_22964_current_configured_scrape_jugnu_e2e.py",
+      "sha256": "377e6bad13a639b65520431da006a81a44f0f8fde1db6caabec6d55dca5e831e"
+    },
+    {
+      "bytes": 25928,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/vintage_grove_migration_lane/evidence_vintage_grove_42554_current_strict.json",
+      "sha256": "f656e7c990159870e693bcb764f912ee134c1278d6bb9111df414f7f5e2931b4"
+    },
+    {
+      "bytes": 17910,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/vintage_grove_migration_lane/materialize_vintage_grove_42554_current_strict.py",
+      "sha256": "1ff67485c4052a527de86e2e574bad0a62d08763f127b9113d729650b8c03a2e"
+    },
+    {
+      "bytes": 558,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/failed-no-data/zillow_park_headers.txt",
+      "sha256": "7c97ef182dc509648df900ac11f3b3c5d9e48d3d50103c470127c8727ffb8f80"
+    },
+    {
+      "bytes": 1055,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/POST_LEDGER_STATE.md",
+      "sha256": "4be3691459852924af97b0c8b88f8d1c431967900597cd2c19a95fa03449fa47"
+    },
+    {
+      "bytes": 5853,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/audit_full549_v2_gcs.py",
+      "sha256": "50be2033a3e134fe6554e8f6fd2e9f30b2afeb3720b74e4b40e3f5c4b0a5ec01"
+    },
+    {
+      "bytes": 2219,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/build_full549_job.rb",
+      "sha256": "0f5821666c4c02987211d47e5cfa4e5a9af70612692a239a6ea0a136d89303ea"
+    },
+    {
+      "bytes": 1734,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_0/report.json",
+      "sha256": "389f2392fb8dd62699714e563fd27262d4b058e01fec2926e3d68676d1da5e1f"
+    },
+    {
+      "bytes": 1718,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_1/report.json",
+      "sha256": "4a743e572548ac66f162972a935ff3c204d87f3894e882fd8c58d537f59bd0a0"
+    },
+    {
+      "bytes": 1639,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_10/report.json",
+      "sha256": "b073f6a7823ed2935c85db2d903a623390977d76e18af5c78adb401b0224679e"
+    },
+    {
+      "bytes": 1827,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_11/report.json",
+      "sha256": "dd547d0a264f53886b4620f325dd5e369cb2986227e25324e442497b794bde5b"
+    },
+    {
+      "bytes": 1789,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_12/report.json",
+      "sha256": "0feb0d4bc695ae1d6d8f2feb838a239f7d1a885526f83f5b0f9ea87078dbe9fd"
+    },
+    {
+      "bytes": 1591,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_13/report.json",
+      "sha256": "76ff9783d6105316cc1364e0ea286f3a5099604da73f0de198a201972b2ffe83"
+    },
+    {
+      "bytes": 1600,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_14/report.json",
+      "sha256": "47ddf1f8cb219db4dfe883521633f1608fb4cc311157da88ce3de0b192aa2fed"
+    },
+    {
+      "bytes": 1624,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_15/report.json",
+      "sha256": "02638af53f16dbbd52261ef9cb7f51ffe97bb6d921a23235cd420aa499315ae6"
+    },
+    {
+      "bytes": 1606,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_16/report.json",
+      "sha256": "6e91a95204d9fc2c94426442c8e53507e6d3dd16db4b5f354710211c598256eb"
+    },
+    {
+      "bytes": 1453,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_17/report.json",
+      "sha256": "976b470ccf1a4e1b9c07c113d55c8a653774f254a508008c1190a0fec5860ca4"
+    },
+    {
+      "bytes": 1751,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_18/report.json",
+      "sha256": "6c0c8d993a8660cdac013a601f888c6ae720277d651dab613037e4932637e7d1"
+    },
+    {
+      "bytes": 1566,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_19/report.json",
+      "sha256": "6d9818be48ebb0d91fd99a7c709d614e8895d2d8abf480fa079fea7cd863c03a"
+    },
+    {
+      "bytes": 1656,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_2/report.json",
+      "sha256": "2843e3468cedc75cf17452843e6b978b9d4d5195a3b824e90b84fb79219a5b72"
+    },
+    {
+      "bytes": 1672,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_20/report.json",
+      "sha256": "a2f6ead89a2187dc922c6f1ed938f40dae576f44dd96c43f21a66a144fa56d6b"
+    },
+    {
+      "bytes": 1704,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_21/report.json",
+      "sha256": "8a50d5e598b1ce8cb3601177507f704455b8a093d962f77fecd9070c85de6fc5"
+    },
+    {
+      "bytes": 1644,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_22/report.json",
+      "sha256": "a445586641c42563abee40906a09e6cf71db650789ea0044e903cb6071586f92"
+    },
+    {
+      "bytes": 1693,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_23/report.json",
+      "sha256": "05d7d460201baec3030e3461a91a65a363b5329aefeccd6f77c1fceb5b9ba82e"
+    },
+    {
+      "bytes": 1728,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_24/report.json",
+      "sha256": "cc71a34bf358c4730d71510dcc03b4bffbdefc25d19974f6a3cc2e6b581cbcee"
+    },
+    {
+      "bytes": 1589,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_25/report.json",
+      "sha256": "9d0637144b721d4e38b55ac0946d0d28b7eb2950fdbe8bafccebb41d3ec7bb5b"
+    },
+    {
+      "bytes": 1723,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_26/report.json",
+      "sha256": "fa74d1a117dc00ca651b282d24f610085a1e801e3c6b1444b472b3903409b84b"
+    },
+    {
+      "bytes": 1582,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_27/report.json",
+      "sha256": "5c989986c87fa34c894d39efb64fb16af5c9fe8331430230561e0a01e82bc56c"
+    },
+    {
+      "bytes": 1579,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_28/report.json",
+      "sha256": "7aa0b8f61c78be9e7b9a20d2405fc1cfc12ec62a85936a03ff4585a61d889790"
+    },
+    {
+      "bytes": 1664,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_29/report.json",
+      "sha256": "45de83db96672ee83f9d42998b6713f38ea170c115445766126febbb3633587f"
+    },
+    {
+      "bytes": 1681,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_3/report.json",
+      "sha256": "6d3e72a6766cc00ce5dedf96e6396d99d9bfcdfb0228a36ef9f1cefb5ffb3d04"
+    },
+    {
+      "bytes": 1761,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_30/report.json",
+      "sha256": "ac906db6aee54c4bd3ddfb4f32b6c3294b411feeb14fe24e9aaeaf54aa79bad3"
+    },
+    {
+      "bytes": 1757,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_31/report.json",
+      "sha256": "879a8f5f0c2f016e8935ddf3696769c2fc90b188e872e04c205d2c0f15176d40"
+    },
+    {
+      "bytes": 1633,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_32/report.json",
+      "sha256": "0d1e5e46016f418e45d6324f490fa439c6c43dc4aa137851c022455a870efd8d"
+    },
+    {
+      "bytes": 1768,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_33/report.json",
+      "sha256": "6699d2f206d8d5fe2a80cfe5e9c1e8a8232037893c41f66d9874a52e291c7ac8"
+    },
+    {
+      "bytes": 1771,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_34/report.json",
+      "sha256": "7a0485886db4ac744d8b0dda1754ee5e206307a62e6deeeeb526a34a12eec1fe"
+    },
+    {
+      "bytes": 1820,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_35/report.json",
+      "sha256": "d15ed693e41e34bd634257aa62688f0a3e9c69c887cc9c6378a9c3c646cd0592"
+    },
+    {
+      "bytes": 1668,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_36/report.json",
+      "sha256": "b58f5ba1a5f8dc7437e533b21d5c391a15e794bbe03cd79109afe18ecc403740"
+    },
+    {
+      "bytes": 1560,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_37/report.json",
+      "sha256": "0363a2a4a0797c966e22cf13cd32ccc42cd0f5a9fc8cc44256068bfd34e17434"
+    },
+    {
+      "bytes": 1597,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_38/report.json",
+      "sha256": "7b4e0c38ba43ee12884c1712f0facb4ed9bd04bb08a11b582a02f9e4a6112598"
+    },
+    {
+      "bytes": 1757,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_39/report.json",
+      "sha256": "b7cb4f09905e03ddb132e49213efe8399e44352d63c51448472787eb930fb09c"
+    },
+    {
+      "bytes": 1770,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_4/report.json",
+      "sha256": "cda0b7b3087b5794260995f08af7a0b1df323edf0fabd49e6b9511168b106400"
+    },
+    {
+      "bytes": 1540,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_40/report.json",
+      "sha256": "23a1d0280478ad625c78bbbf4facdba1b2c88b52a9f69ab475a1cd70e4f855ed"
+    },
+    {
+      "bytes": 1578,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_41/report.json",
+      "sha256": "1c30e9327feb4cce29408debe54db27926b0a0f229d364630a73db29ab3573e8"
+    },
+    {
+      "bytes": 1553,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_42/report.json",
+      "sha256": "d7758d4cc509db3b3adbb7a59765c8628a3b00d2dcf7904c80fa90934dcd5d4e"
+    },
+    {
+      "bytes": 1778,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_43/report.json",
+      "sha256": "f3abe9108ddaa06285dc371e0645f468992631c4cff766a5956003e2810d02ea"
+    },
+    {
+      "bytes": 1767,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_44/report.json",
+      "sha256": "95b236d6a08a94530356386c7e11b030ae71bc6f1291cc157f187771c16de8bd"
+    },
+    {
+      "bytes": 1783,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_45/report.json",
+      "sha256": "77e2e783da8ad9966cfa2a0a864bc6ae275c9cc5b47da13534bad84aa49f00d8"
+    },
+    {
+      "bytes": 1693,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_46/report.json",
+      "sha256": "b20f29b475f1a8ef4b77f19ba5db48e9d3f9c2403ffe1f0dc54b1176c15f4e5e"
+    },
+    {
+      "bytes": 1566,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_47/report.json",
+      "sha256": "6e99e3b3e8ced289a10b0f8159f8fd9078c38fdc8a72a21c7187d6003d849192"
+    },
+    {
+      "bytes": 1588,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_48/report.json",
+      "sha256": "08a1927480cc112c98fe1d96c76bfb45dc391307f6d56d7b7afc96d5e49bb0b1"
+    },
+    {
+      "bytes": 1612,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_49/report.json",
+      "sha256": "365f9ecb89da3cd414a04c644ca16f38662151d786097368f2e126594e2984b2"
+    },
+    {
+      "bytes": 1630,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_5/report.json",
+      "sha256": "316263703932aca3864bb2dc32acffc4febca753b38b11f9698fe1a7fa9ecfba"
+    },
+    {
+      "bytes": 1602,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_50/report.json",
+      "sha256": "d24b136fe2600a092683426e6e45a5903bcc60d283e472e063582abf9bd29329"
+    },
+    {
+      "bytes": 1564,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_51/report.json",
+      "sha256": "295683b171e6e3cd7c329c7e4921d4d4f76b1061950ccaa420c90ee5955cb0ac"
+    },
+    {
+      "bytes": 1578,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_52/report.json",
+      "sha256": "ac83409ab0f94bac4ab648a75a3705ba34668cd8c3ebbadb3ad9fe582bbabba0"
+    },
+    {
+      "bytes": 1629,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_53/report.json",
+      "sha256": "d54182aad12ab0e645a15571f5d3c669174b1e09b77d727846e5f5c6283488bc"
+    },
+    {
+      "bytes": 1556,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_54/report.json",
+      "sha256": "53d249d7ab1921696f977402b2376a5a7d0a4d0334325d91dc1d1ea6ba7bdd19"
+    },
+    {
+      "bytes": 1714,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_55/report.json",
+      "sha256": "df83c23eb52d36b4a1341181eb137971a36ec4bb9a3d0410172e3474e21259f7"
+    },
+    {
+      "bytes": 1680,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_56/report.json",
+      "sha256": "3076ea6ce9d1af5d2e0c9e464d176434adc328bc6bf6c04968fefb3acca30c85"
+    },
+    {
+      "bytes": 1703,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_57/report.json",
+      "sha256": "d414c6adc5f36cb78e093111824aec9c850f41b148baa2c2eed95d96e0d2e8ee"
+    },
+    {
+      "bytes": 1525,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_58/report.json",
+      "sha256": "df04f48f5b50784cf1bc002203aa878c22ae30c9d65ab11bd1e9ad59e6d736dd"
+    },
+    {
+      "bytes": 1601,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_59/report.json",
+      "sha256": "bd7335f994a243afcb790843016c316f73541368f4c522a591a0baee78c69183"
+    },
+    {
+      "bytes": 1715,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_6/report.json",
+      "sha256": "7915d365499f87f439db4d22446245cd27dd70d809a61c36bb992305383359e2"
+    },
+    {
+      "bytes": 1568,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_60/report.json",
+      "sha256": "01a5450c75a758eca89148f57d02b1acb5c6fb3bb25494cc6f68ea0466249e58"
+    },
+    {
+      "bytes": 1607,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_61/report.json",
+      "sha256": "7f87b6269c443c704b17244c6bc833555f3c4b59cc166cda668c2d0f98a197c0"
+    },
+    {
+      "bytes": 1560,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_62/report.json",
+      "sha256": "6b07532dd99e5c8484b110c7cd263f9ac66a8f40beeead82cd522847987e42ad"
+    },
+    {
+      "bytes": 1618,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_63/report.json",
+      "sha256": "d50f1bfe10baac56556ca6282ada9751392378add7bbba1208409be07ab854f8"
+    },
+    {
+      "bytes": 1574,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_64/report.json",
+      "sha256": "f08e89970b959dcf7a9e66e491e74bf931b4334d2680d601bd1f286212426819"
+    },
+    {
+      "bytes": 1571,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_65/report.json",
+      "sha256": "bcc034fd7050c03da9294c9709fed3df97160f7eb02cdb3c2660df79e457457c"
+    },
+    {
+      "bytes": 1661,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_66/report.json",
+      "sha256": "cb813a46c6d742c4e5344e0638dfba284069e8315584e4ecf3e0dffa389fe31a"
+    },
+    {
+      "bytes": 1534,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_67/report.json",
+      "sha256": "0572f580719ea6ede067a2273956614d116e279e9869213bf9f5f5788c8a654d"
+    },
+    {
+      "bytes": 1571,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_68/report.json",
+      "sha256": "ec8a25c9e118b5f2f94fb183020c955225a0f5997fc321f9571b0f32b3e22381"
+    },
+    {
+      "bytes": 1600,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_69/report.json",
+      "sha256": "90791b3569fa79bcd9f231408ccd327adcf350acc5224317f318561a7466f738"
+    },
+    {
+      "bytes": 1754,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_7/report.json",
+      "sha256": "0b5451524dedf2c89805bde595ef7b7a61cfe31d7dc75f03815579097df000eb"
+    },
+    {
+      "bytes": 1581,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_70/report.json",
+      "sha256": "133104a3786a001c36cc1c3426826017944e709380ee684375727c061789c6e5"
+    },
+    {
+      "bytes": 1472,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_71/report.json",
+      "sha256": "f1e0311c7665994dba99e00ab8c70a83ed1cd75454ebaee5d65f808a41276f97"
+    },
+    {
+      "bytes": 1523,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_72/report.json",
+      "sha256": "e9bcba6f79fbe1863fc874d91df4bc2ef7721f1d2091bf7cb80e4574f5c39d04"
+    },
+    {
+      "bytes": 1532,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_73/report.json",
+      "sha256": "c322e6ba94301b69d4293f2a9b8d2b478786cca7bde48c9bb1d9dc51300083d4"
+    },
+    {
+      "bytes": 1728,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_74/report.json",
+      "sha256": "1ef763fca1bb777f3e8bfe42cdd20294d57a82854cc89dd08298f2ac07a79d4b"
+    },
+    {
+      "bytes": 1716,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_75/report.json",
+      "sha256": "f3b5691e770a31e05c3b8e0a90726663229d310bff623b568ea293a054a454d6"
+    },
+    {
+      "bytes": 1619,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_76/report.json",
+      "sha256": "4e27cb524615e4e97fd363ead584fe6d387ea5d1fba35c9819cb92735b185d99"
+    },
+    {
+      "bytes": 1576,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_77/report.json",
+      "sha256": "5d03fd32258a0ff9e9c9c3c85284bfa54f1e5a67d8261277f482f942fe2b8045"
+    },
+    {
+      "bytes": 1619,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_78/report.json",
+      "sha256": "a2c04a2ac11a24d6ec99fdebabb36024fc820077bb06f98fb35fbef64a21c01a"
+    },
+    {
+      "bytes": 1678,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_80/report.json",
+      "sha256": "57cf6e510968ed76debaa68bd436124ececce7b0f724014c5834932a67d99746"
+    },
+    {
+      "bytes": 1598,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_81/report.json",
+      "sha256": "1c91e4787736d01b8eb3b557bc85ffc14831f5c353c3b2fe62d39307075cd974"
+    },
+    {
+      "bytes": 1613,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_82/report.json",
+      "sha256": "85029f9fdb182c666ecd6bb56101209cf89195627fb5c8afc880ed31b34adc4e"
+    },
+    {
+      "bytes": 1645,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_83/report.json",
+      "sha256": "d1c9d5b8bf4b8fa9206f42e6d87ad8466e4bac9cca942d1086856e3048a58a7e"
+    },
+    {
+      "bytes": 1577,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_84/report.json",
+      "sha256": "c53730f43549493b344c7b58ccfdeb7e21bf4093e0089504ee3a02aa4328faf7"
+    },
+    {
+      "bytes": 1501,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_85/report.json",
+      "sha256": "c455fb26cf25bc2ac4f24ad262e7d70c8854face874bf98c6c50916abcba7515"
+    },
+    {
+      "bytes": 1668,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_86/report.json",
+      "sha256": "2922dc8621a78b9b4bde87adeb936e65d15605c752077214cf8cc70dec2198ad"
+    },
+    {
+      "bytes": 1653,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_87/report.json",
+      "sha256": "1d891f1a656c16899956c404fbfadc050e77197e67a9cf4f322ce34ee1d56dbf"
+    },
+    {
+      "bytes": 1646,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_88/report.json",
+      "sha256": "ddd86b44dc4990fa600f4e93d826c19dcf24ecb89d90a325ce7fe2ebaf9a3262"
+    },
+    {
+      "bytes": 1569,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_89/report.json",
+      "sha256": "f746975157329c377e5baf3dc2dac6215b13cedfa5ba8a211b6af0fdf6a1ba9a"
+    },
+    {
+      "bytes": 1611,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_9/report.json",
+      "sha256": "4ae26087286fdf887e0d9fa69b1fd9e2aa2d3b78160dc997a64f888b982bad4c"
+    },
+    {
+      "bytes": 1730,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_90/report.json",
+      "sha256": "e4b4a939c166234a724fb3259df4312384d65050663c29f04828bc817c2c7a46"
+    },
+    {
+      "bytes": 1579,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_91/report.json",
+      "sha256": "a0512a2bc7f477a2a60cc51bc0720caaea0158e86d8256beba9ee5be7d7059e0"
+    },
+    {
+      "bytes": 1664,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_92/report.json",
+      "sha256": "cf59d04c0a8bc791f1d311fc4ef1d7862e65b11a238940b9c2f03a9965f467a3"
+    },
+    {
+      "bytes": 1610,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_93/report.json",
+      "sha256": "84cae099b89acd1cb66fb2cf5274538cd5d350343f09c69f0edd2216b2c3c64f"
+    },
+    {
+      "bytes": 1765,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_94/report.json",
+      "sha256": "9905691cce4e2391d3bee43cf326c724894756c3927ae35a8225586a551fe3c3"
+    },
+    {
+      "bytes": 1541,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_95/report.json",
+      "sha256": "fd3b46a7801093f8b838c72f2e511426e4bf19568ca78a1244df890e3500cbf2"
+    },
+    {
+      "bytes": 1599,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_96/report.json",
+      "sha256": "c5e7a121d250de1a589fb8300f456ec3ca2ab7e8b994ef4fc0c55611dcad6bf6"
+    },
+    {
+      "bytes": 1539,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_97/report.json",
+      "sha256": "6c3d06fb3105847ebfc01c5b4f1d17f443e77501041854ff429482b5a0a06004"
+    },
+    {
+      "bytes": 1503,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_98/report.json",
+      "sha256": "f026e842203f22d6d61684fbbc03b00e39784ca1aaaf2483a4039bd60f8ffea1"
+    },
+    {
+      "bytes": 1619,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/canary-reports/shard_99/report.json",
+      "sha256": "fbbec2d4bf3835382fda2989ad4a8c1fa17b3291d237a7bb09fcf8f5843aa7cc"
+    },
+    {
+      "bytes": 6645,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/full549-v2-job.yaml",
+      "sha256": "64096b86f1ed41777ee79dc3a58618ee574a9345316c9d9eee7d616a5d865240"
+    },
+    {
+      "bytes": 5825,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/full549_v2_strict_output_audit.json",
+      "sha256": "6ff15ea6e1d70800e5707d554b7a481fdea01e703beceff27113f20461c28a0f"
+    },
+    {
+      "bytes": 54377,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/plan60_549.csv",
+      "sha256": "b40f11a8329c751e6d1ba4bf7eda16e8139eb3422c2acb3de0856dae8755e0c8"
+    },
+    {
+      "bytes": 28731,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/propai-plan60-authoritative-ledger-2026-07-31.tsv",
+      "sha256": "b428382a1ff33375cca65f7088eff566b2a1be02792a8e5cbb33e50eff1afb6f"
+    },
+    {
+      "bytes": 38934,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/propai-plan60-remaining-opportunities-2026-07-31.tsv",
+      "sha256": "2d07bc85c61068782931eaf2d41f9f70c2552773adc3eaabcdf82e5be354d336"
+    },
+    {
+      "bytes": 11332,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/reference_stale_profile_promotion.py",
+      "sha256": "2fd12a31d5ba6b1595c6eca871356cdfa8850c4510e9606446de34ec27c55bb9"
+    },
+    {
+      "bytes": 1876,
+      "path": "investigations/2026-08-01-consolidated-canary/worker-archive/plan-to-unit/strict_303_ids.txt",
+      "sha256": "0889197f4a65bf335ce3665252f17cf2a8394091aa13ccbcbda7d625a476cd83"
+    },
+    {
+      "bytes": 2795,
+      "path": "investigations/2026-08-01-failed-no-data/EASTON_NORTH_SECURECAFE_SIBLING_GUARDRAIL.md",
+      "sha256": "91a14fcc029a8e1dd4754264737cec67fff97559373bbcfb1937c1f8d4d2cbe8"
+    },
+    {
+      "bytes": 1627,
+      "path": "investigations/2026-08-01-failed-no-data/MRI_PROSPECTCONNECT_WAITLIST_PLAN_GUARDRAIL.md",
+      "sha256": "ed9f3914b4688fb11ef5101450324a25367cab699b772c214d46feef9c8d317b"
+    },
+    {
+      "bytes": 4189,
+      "path": "investigations/2026-08-01-failed-no-data/PEDCOR_BETTERNOI_IDENTITY_GUARDRAIL.md",
+      "sha256": "cc642c7c30a42830db77c385fbe2540ce454bec92a542c7bcb1004f932588a38"
+    },
+    {
+      "bytes": 2297,
+      "path": "investigations/2026-08-01-failed-no-data/RENTCAFE_WAITLIST_SENTINEL_GUARDRAIL.md",
+      "sha256": "c14fa612f4556ad42559bc07f4f4b76c652c862fef5b43196875cdc954d6a3db"
+    },
+    {
+      "bytes": 9015,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/cohort29.csv",
+      "sha256": "c7d1b022d784e227f740d62e8d6084c9476a4a0ae9b8d9131f2c53e68e32a870"
+    },
+    {
+      "bytes": 60415,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/direct_route_audit.csv",
+      "sha256": "8888982e8518bc42c3883d00ce8f04e94067155e5e64c254d8313a0782352e58"
+    },
+    {
+      "bytes": 35746,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/219752.html.gz",
+      "sha256": "53c3f8ddf23ba29286e2f5cc29db59b4cc76a1a69019221ff0a60e1f9c326dba"
+    },
+    {
+      "bytes": 644,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/219752.network.json",
+      "sha256": "10dbe410db86e6deab08f664eceb79be5163c096f5a863cbfd607e380c52584e"
+    },
+    {
+      "bytes": 101727,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/220907.html.gz",
+      "sha256": "22d28c1bd1012ba933a849e66e10611a91fb82b600b5ff06aefc271efb4691d6"
+    },
+    {
+      "bytes": 1074,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/220907.network.json",
+      "sha256": "be6709daaa37ffebe15218cd0f818ebefeed3943652cf926767766e9e8119a5e"
+    },
+    {
+      "bytes": 16400,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/58546.html.gz",
+      "sha256": "b715fe76a21dac2188b001b3758b524757d7ff62af58056a806e29f4bf5c760c"
+    },
+    {
+      "bytes": 3,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_raw/58546.network.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "bytes": 3999,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/hb_priority3_summary.json",
+      "sha256": "97ade423279082e2d05358e4a8d1d7786e70ef1833aa99e9debbf9bbb89f0e75"
+    },
+    {
+      "bytes": 9954,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/notable_strict_rejections.json",
+      "sha256": "d74872af4fbd9efe7ddc8a3efb47751b09676bb84fdb63452ace1834d79ec529"
+    },
+    {
+      "bytes": 8180,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/run_hb_priority3.py",
+      "sha256": "d0584d8d5f2cf9b9228415f8ec6de54a1a60010c85081b436a69447159c2ad75"
+    },
+    {
+      "bytes": 35856,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/run_rentcafe_remaining29_audit.py",
+      "sha256": "6b404758ec8363f5ef02d2ba59b139b53834a81f9f8d98fc93dc6ba9acf8c90f"
+    },
+    {
+      "bytes": 8183,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/strict_net_new_recoveries.csv",
+      "sha256": "ce59e27da0f0cc92bebe441e50aaae14005b1dc9eb8b41966dea016ba2cc3deb"
+    },
+    {
+      "bytes": 23097,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/strict_net_new_recoveries.json",
+      "sha256": "639cd4ebd2babbd5509f3c6e497514a7a81388d7b368341a7a7a924468bc473e"
+    },
+    {
+      "bytes": 1703,
+      "path": "investigations/2026-08-01-failed-no-data/rentcafe_remaining29/summary.json",
+      "sha256": "3cca51a1056970bc2523be2482befb7561652286fd296d9e3306a5dcf876ce59"
+    },
+    {
+      "bytes": 27039,
+      "path": "investigations/2026-08-02-stratified-1000/CONSOLIDATED_RELEASE_README.md",
+      "sha256": "efc60b6e78fe86badeaea04f0235c6112ff5ac06dcfc68738aa0826771b18b8a"
+    },
+    {
+      "bytes": 2805,
+      "path": "investigations/2026-08-02-stratified-1000/FINAL_REGRESSION_GATE.json",
+      "sha256": "ffb795d5587cbb3b28f3e9c706769e475aef74564fbdef373e66ec0606a0b28d"
+    },
+    {
+      "bytes": 3138,
+      "path": "investigations/2026-08-02-stratified-1000/README.md",
+      "sha256": "3b4e47df0c7139e9d641b1d662f30e3051a325e87127c29954f065e0e64831ed"
+    },
+    {
+      "bytes": 72519,
+      "path": "investigations/2026-08-02-stratified-1000/audit_stratified_canary.py",
+      "sha256": "5090a38291a024f740fda80b3724eb722fdb713b5771bc12f04154f05b51e248"
+    },
+    {
+      "bytes": 25507,
+      "path": "investigations/2026-08-02-stratified-1000/audit_verification_canary.py",
+      "sha256": "a7868d82c2bd7c695ef5a59f6fc73f58ec1bad76c33dd68c9619aabda4ae5ad5"
+    },
+    {
+      "bytes": 2769,
+      "path": "investigations/2026-08-02-stratified-1000/build_analysis_artifact_manifest.py",
+      "sha256": "6de30ada8132f242847ab183dee49b64bfe0d8204a2d0e5305f1b5626a8914eb"
+    },
+    {
+      "bytes": 2483,
+      "path": "investigations/2026-08-02-stratified-1000/build_cloud_run_job.rb",
+      "sha256": "dc0e9245fa2f90a62eaf10b2372810740d78bfbfe0c865d52ab3d91fbe546bfa"
+    },
+    {
+      "bytes": 21629,
+      "path": "investigations/2026-08-02-stratified-1000/build_stratified_sample.py",
+      "sha256": "28e275f9d16f27b3ad6b780f5b3391dc291cfa3e458e74bb1d682127fe80fffa"
+    },
+    {
+      "bytes": 3004,
+      "path": "investigations/2026-08-02-stratified-1000/build_verification_job.rb",
+      "sha256": "d73cd1e31ca9615688b7113e0857bd423ced1a93da758fa3bf20083688b9eb9b"
+    },
+    {
+      "bytes": 7181,
+      "path": "investigations/2026-08-02-stratified-1000/build_verification_manifest.py",
+      "sha256": "2ebf05a297263f3f85bc238dd6e6f6c423b3cb5b465afab6407bed92ef158f2d"
+    },
+    {
+      "bytes": 6478,
+      "path": "investigations/2026-08-02-stratified-1000/cloud-run-job.yaml",
+      "sha256": "5a5510e977b0ee1094d36edb875efb87d67eb94ea7007cc3959ba05baed4aa93"
+    },
+    {
+      "bytes": 1218,
+      "path": "investigations/2026-08-02-stratified-1000/launch-manifest.json",
+      "sha256": "26de22832a5faa5b8c4ffdf2989954e76be944707231474264af9c602b32ed6d"
+    },
+    {
+      "bytes": 554,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/SHA256SUMS.json",
+      "sha256": "e1b00df15f4f0396d98049aeb97d97d952eedccd10450eaf5fbe48259b6daf94"
+    },
+    {
+      "bytes": 1935,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/adapter_coverage.csv",
+      "sha256": "f27b6d29e571b19fdbbf0d98409bbd57583cbe0d1278aa3198bcc24b72f94bef"
+    },
+    {
+      "bytes": 95918,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/profile_seed_copy_manifest.csv",
+      "sha256": "732b1161f66e9162c38015df546d193677ee2fa9e1584674b59843cce9f3bbe8"
+    },
+    {
+      "bytes": 107902,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/properties.csv",
+      "sha256": "41ce82615ba1f03492fe6056267ca1f8b7446f26c2ba6c670cd6362c8ab9dd27"
+    },
+    {
+      "bytes": 336,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/property_type_coverage.csv",
+      "sha256": "9032713092457bb16cef658eb5787aec1273bfb3d11a077cf5d3f92d9e8993b2"
+    },
+    {
+      "bytes": 269295,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/sample_ledger.csv",
+      "sha256": "a7ce389d6d06861187235193c349296ce5c7672965c385042e0eb2e510026618"
+    },
+    {
+      "bytes": 1605,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/state_coverage.csv",
+      "sha256": "3f27e64366e28ba4db621b72d95783f85707eef66e711871f49deff7f634a0c6"
+    },
+    {
+      "bytes": 3144,
+      "path": "investigations/2026-08-02-stratified-1000/manifest-v1/summary.json",
+      "sha256": "e12726a1e4f30b8b345299f92b59bb78dfbabf05ae783db41f8e2693d614ebc6"
+    },
+    {
+      "bytes": 2630,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/POST_RUN_AUDIT.md",
+      "sha256": "0c68cdaa535a25b491e32baf8269611d9e55e780ca9c216776289f206a872337"
+    },
+    {
+      "bytes": 3883,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/adapter-result-matrix.csv",
+      "sha256": "d356b7d2ec868fda406b1ac3a047e1bccff10122bb44a324560b0f5b7fc1c31e"
+    },
+    {
+      "bytes": 5382,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/adapter-route-coverage-matrix.csv",
+      "sha256": "f0dbeaf94e04dd6f2a975bb4c3d04f74e152955dfff08e09a37168b57fb8967c"
+    },
+    {
+      "bytes": 78430,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/data-quality-issues.csv",
+      "sha256": "e7a7c9253f30ebef9765b67c9b34f9226218640ab31a655285ebb1f5f12aa26c"
+    },
+    {
+      "bytes": 15243,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/finding-validation.csv",
+      "sha256": "14d2de50862d4b3bbf4fd3ed1c545b714964fcc99dd6803f67d75d5341ae0419"
+    },
+    {
+      "bytes": 2425,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/post-run-summary.json",
+      "sha256": "5204a36a46fc8e3466771fe2124cb08d4e4f2b7ca8e002bedaa2ffed9f480346"
+    },
+    {
+      "bytes": 142477,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/property-ledger.csv",
+      "sha256": "b03e5266ddb964936e62c9082f9715a336da90ef68ab1c5dfca5b1daf824b162"
+    },
+    {
+      "bytes": 638,
+      "path": "investigations/2026-08-02-stratified-1000/post-run-audit/property-type-transitions.csv",
+      "sha256": "065093437e91359008c7fb68167622c763e43c6aff08a7d9911dc6cb9997fedd"
+    },
+    {
+      "bytes": 564,
+      "path": "investigations/2026-08-02-stratified-1000/regression-test-gate.json",
+      "sha256": "14df088adbbfb7d11a157c543fa46ed5c7b1bc2b8a8556d14e2f6ce2bcdfeb9c"
+    },
+    {
+      "bytes": 3019,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/README.md",
+      "sha256": "1a2da7872d63cc624c9088c88cc57bada8fb464ddf3fac0977d63aa5eb1b18ff"
+    },
+    {
+      "bytes": 543,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/SHA256SUMS.json",
+      "sha256": "97aa85a154406e6d0f3b21c8311ef73e05ca1e17a51c7b7723949634ba42b3f8"
+    },
+    {
+      "bytes": 6458,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/cloud-run-job.yaml",
+      "sha256": "2140dff0899addbf5e1d9d61a0bcb95b6d1b4a1a0c93da99fcbba4dcbb09edda"
+    },
+    {
+      "bytes": 1858,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/README.md",
+      "sha256": "27ae26d53f76d72b27de4228afed84577a39aff900a3b74ce88cc90cd7065e01"
+    },
+    {
+      "bytes": 1268,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/REPORT.md",
+      "sha256": "ae29a7e5bf4aefee110effddc6c43e3cb3f3b4d3f2726cda7371ad85aa72c6ee"
+    },
+    {
+      "bytes": 433,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/cluster-summary.csv",
+      "sha256": "349dc96845984dc8fa156906aed639f7ec36530206fff9ead142f4252c46f006"
+    },
+    {
+      "bytes": 184,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/issues.csv",
+      "sha256": "bb93075dbf4a68f3e331276d89a0d938b13cf3f1e11e7c5d1f635fe9c3e75c1b"
+    },
+    {
+      "bytes": 2569,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/property-observations.csv",
+      "sha256": "7a1324c84232e20131911ebe4216dfb6a5ec90f138dd0a3790ec67a9cbc8c376"
+    },
+    {
+      "bytes": 2701,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/summary.json",
+      "sha256": "a7520c8a1d0c3dfbf4e419ba5b0d6ce5eff8829180d0e9e0e2f1766947590191"
+    },
+    {
+      "bytes": 7576,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/interim-28-analysis/verification-cases.csv",
+      "sha256": "4ae884e31706a566fc42394f33ec6106cf9ea234c6f7f3416dd1d9ddfe5b0e27"
+    },
+    {
+      "bytes": 1486,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/launch-manifest.json",
+      "sha256": "dba5940b2e046de5ecd4e6244c168e23c0227ef96402fbdbc34a505d5ab1942e"
+    },
+    {
+      "bytes": 1335,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/REPORT.md",
+      "sha256": "50abbd73a07f0d2567f517737937affcc8dd6861770050fee0f6c21fd9ae57e5"
+    },
+    {
+      "bytes": 438,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/cluster-summary.csv",
+      "sha256": "d6465610371c77fac98a05a7a17698771534ed8913b69ade79e87fbafcab5aff"
+    },
+    {
+      "bytes": 74,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/issues.csv",
+      "sha256": "6e484d29c47779b509c2a47aff6d43297480251a0c740139db862958fec49e3c"
+    },
+    {
+      "bytes": 2649,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/property-observations.csv",
+      "sha256": "914d11d407934ab67d18c195821a47c03991a89d0e9709f7f85f7e5fa2601402"
+    },
+    {
+      "bytes": 6202,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/summary.json",
+      "sha256": "1c75d5c2b50c30ea9c98f24cd09cfcd16d748cd795047e7e8ff4bbaa10d3b465"
+    },
+    {
+      "bytes": 7601,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/post-run-verification/verification-cases.csv",
+      "sha256": "7939090601ab585da35129229c9c48a2bf2cc054b23565c64ffdcccc0202b63e"
+    },
+    {
+      "bytes": 3067,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/properties.csv",
+      "sha256": "26d074a211e1150678760dfe2f071240541d1cf379dc2bec4b6951fd95823a32"
+    },
+    {
+      "bytes": 1970,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/README.md",
+      "sha256": "9e9f9c172b7ed1dff70fc041f808c1b1e9ce50c206f34a35ea4659ffcc319d53"
+    },
+    {
+      "bytes": 1751,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/attempt-2-823ea7c/README.md",
+      "sha256": "752f6284334d38de6a7b118c42054816ec687bc5ea0c80809db86efc31fb549d"
+    },
+    {
+      "bytes": 6606,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/attempt-2-823ea7c/cloud-run-job.yaml",
+      "sha256": "8d3aa7b96cbd70437d73bf66dfc053a369fd56ca1285b6e6d4e2e34ff89ef7fa"
+    },
+    {
+      "bytes": 2615,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/attempt-2-823ea7c/execution-evidence.json",
+      "sha256": "a6e5b53de84aba398ee56a0418011476ad750de38c9ec217d14fd1778bc4a326"
+    },
+    {
+      "bytes": 3223,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/attempt-2-823ea7c/launch-manifest.json",
+      "sha256": "758eed51548207349503a061e8887738ff8e3cf8f7f69e7c753678852b922d82"
+    },
+    {
+      "bytes": 133,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/attempt-2-823ea7c/properties.csv",
+      "sha256": "292870d8248429a9c0dceb1a7b8c584d2e289117aa9b4e968a721bbfd0a93138"
+    },
+    {
+      "bytes": 1168,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/cancelled-attempt-evidence.json",
+      "sha256": "0819d6b010ca2069718c052f817c9223e47a1f8c72818858b886da9d785789f6"
+    },
+    {
+      "bytes": 1153,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/cancelled-execution-evidence.json",
+      "sha256": "6606ea872a90478acd2dffdbab59a2a7f4f6198032118056f3b45acdb6079ce1"
+    },
+    {
+      "bytes": 6530,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/cloud-run-job.yaml",
+      "sha256": "ac60a99e5098c254edd48caa5b3c0e45e8911dabe096bc5062a72ffb9d051bb3"
+    },
+    {
+      "bytes": 2515,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/launch-manifest.json",
+      "sha256": "043df9f2c5a53da8b12f17684480cac1da5e8c06811b6613e0e2d6142aa7a365"
+    },
+    {
+      "bytes": 133,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/retry-pid52697/properties.csv",
+      "sha256": "292870d8248429a9c0dceb1a7b8c584d2e289117aa9b4e968a721bbfd0a93138"
+    },
+    {
+      "bytes": 485,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/summary.json",
+      "sha256": "6377e8ea28e8fdabb19e4c2d10f4a859d4d1016faf1ca0462f8ff5143cc80c27"
+    },
+    {
+      "bytes": 10867,
+      "path": "investigations/2026-08-02-stratified-1000/verification-v1/verification-ledger.csv",
+      "sha256": "34bbfc05e663d97c9e571240bafee6e9cf0241cb75cd6499d339858a2808fd61"
+    }
+  ],
+  "manifest_version": "propai_campaign_analysis_artifacts_v1",
+  "scope": {
+    "file_count": 680,
+    "roots": {
+      "investigations/2026-08-01-availability-date": 25,
+      "investigations/2026-08-01-consolidated-canary": 576,
+      "investigations/2026-08-01-failed-no-data": 19,
+      "investigations/2026-08-02-stratified-1000": 60
+    },
+    "total_bytes": 35601761
+  }
+}

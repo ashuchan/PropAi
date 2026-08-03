@@ -1,0 +1,130 @@
+{
+  "rejections": [
+    {
+      "property_id": 1617,
+      "property_name": "Crossing at Riverlake",
+      "reasons": [
+        "exact_route_fetch_error"
+      ]
+    },
+    {
+      "property_id": 4124,
+      "property_name": "Tramor at Cannon Place",
+      "reasons": [
+        "current_full_scraper_e2e_emitted_zero_units",
+        "current_source_is_plan_level_only"
+      ]
+    },
+    {
+      "property_id": 16509,
+      "property_name": "Brooklawn Gardens",
+      "reasons": [
+        "exact_route_fetch_error"
+      ]
+    },
+    {
+      "property_id": 22962,
+      "property_name": "Fox Lane",
+      "reasons": [
+        "current_full_scraper_e2e_emitted_zero_units"
+      ]
+    },
+    {
+      "property_id": 24982,
+      "property_name": "Fisher Building",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "configured_property_host_redirects_to_nonpayment_suspension"
+      ]
+    },
+    {
+      "property_id": 32978,
+      "property_name": "Camden Vineyards",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "current_source_is_plan_level_only"
+      ]
+    },
+    {
+      "property_id": 34362,
+      "property_name": "Tamarron",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "http_200_body_too_small_for_property_inventory"
+      ]
+    },
+    {
+      "property_id": 34785,
+      "property_name": "Pepper Tree",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "yotta_public_api_has_native_rows_but_current_entrypoint_e2e_and_source_id_preservation_fail"
+      ]
+    },
+    {
+      "property_id": 39198,
+      "property_name": "Vista De Palmas Apartments",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units",
+        "network_security_interstitial_not_property_content"
+      ]
+    },
+    {
+      "property_id": 42554,
+      "property_name": "Vintage Grove Apartments",
+      "reasons": [
+        "exact_route_fetch_error"
+      ]
+    },
+    {
+      "property_id": 48075,
+      "property_name": "Edgefield",
+      "reasons": [
+        "exact_route_http_202"
+      ]
+    },
+    {
+      "property_id": 52541,
+      "property_name": "Woodbridge Manor",
+      "reasons": [
+        "current_full_scraper_e2e_emitted_zero_units"
+      ]
+    },
+    {
+      "property_id": 53932,
+      "property_name": "Misty Hollow",
+      "reasons": [
+        "exact_route_http_403"
+      ]
+    },
+    {
+      "property_id": 75314,
+      "property_name": "Village Park at Paladin",
+      "reasons": [
+        "exact_route_http_202"
+      ]
+    },
+    {
+      "property_id": 235473,
+      "property_name": "Rooftop 252",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units"
+      ]
+    },
+    {
+      "property_id": 272772,
+      "property_name": "Hawkeye Village",
+      "reasons": [
+        "exact_property_identity_not_proven_on_final_content",
+        "current_full_scraper_e2e_emitted_zero_units"
+      ]
+    }
+  ],
+  "source_artifact": "/private/tmp/propai-fnd-vBkmT9/unknown_residual_lane/agent_a/evidence_unknown_residual17_current_strict.json"
+}

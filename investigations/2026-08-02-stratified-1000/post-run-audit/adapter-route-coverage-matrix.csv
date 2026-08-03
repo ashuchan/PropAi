@@ -1,0 +1,65 @@
+target_adapter,sample_properties,output_records,target_route_exercised_properties,unit_successes,plan_successes,failed_no_data,critical_issues,high_issues,observed_winners,runtime_status
+amli,11,11,11,11,0,0,0,0,"{""amli"": 11}",EXERCISED
+appfolio,34,34,34,31,2,1,0,0,"{""appfolio"": 34}",EXERCISED
+apts247,22,22,22,20,2,0,0,0,"{""apts247"": 22}",EXERCISED
+aspensquare,8,8,5,8,0,0,0,0,"{""aspensquare"": 5, ""knock"": 3}",EXERCISED
+avalonbay,7,7,7,7,0,0,0,0,"{""avalonbay"": 7}",EXERCISED
+betternoi_public,1,1,1,1,0,0,0,0,"{""betternoi_public"": 1}",EXERCISED
+camden,16,16,14,16,0,0,0,0,"{""camden"": 14, ""generic"": 2}",EXERCISED
+cortland,7,7,7,7,0,0,0,0,"{""cortland"": 7}",EXERCISED
+edificecms,5,5,5,5,0,0,0,0,"{""edificecms"": 5}",EXERCISED
+encore_jonah,6,6,0,6,0,0,0,0,"{""encoreskyline_template"": 2, ""sightmap"": 4}",NOT_EXERCISED
+encoreskyline_template,15,15,11,12,1,1,1,0,"{""encoreskyline_template"": 11, ""sightmap"": 4}",FAIL_OUTPUT_CONTRACT
+entrata,59,59,51,48,3,2,121,3,"{""UNATTRIBUTED"": 6, ""entrata"": 51, ""generic"": 1, ""sightmap"": 1}",FAIL_OUTPUT_CONTRACT
+equity,26,26,24,23,1,1,0,0,"{""UNATTRIBUTED"": 1, ""equity"": 24, ""generic"": 1}",EXERCISED
+equity_apartments,3,3,0,3,0,0,0,0,"{""equity"": 3}",NOT_EXERCISED
+essex,27,27,27,21,0,6,0,0,"{""essex"": 27}",EXERCISED
+fortresstech,10,10,10,10,0,0,0,0,"{""fortresstech"": 10}",EXERCISED
+funnel,16,16,11,14,1,1,0,0,"{""funnel"": 11, ""rentcafe"": 4, ""sightmap"": 1}",EXERCISED
+funnel_spaces,3,3,1,3,0,0,0,0,"{""funnel"": 1, ""rentcafe"": 2}",EXERCISED
+g5,17,17,17,15,0,1,1,0,"{""g5"": 14, ""spherexx"": 3}",FAIL_OUTPUT_CONTRACT
+generic,49,49,33,30,11,2,9,100,"{""UNATTRIBUTED"": 1, ""appfolio"": 1, ""equity"": 1, ""generic"": 33, ""generic_plan_text"": 1, ""onsite_apply"": 10, ""resman"": 2}",FAIL_OUTPUT_CONTRACT
+generic_plan_text,30,30,27,22,7,1,0,0,"{""generic"": 1, ""generic_plan_text"": 27, ""onsite_apply"": 1, ""rentcafe"": 1}",EXERCISED
+generic_spherexx,3,3,0,3,0,0,0,0,"{""generic"": 2, ""rentmanager"": 1}",NOT_EXERCISED
+harbor_group,3,3,0,2,1,0,0,0,"{""generic"": 2, ""knock"": 1}",NOT_EXERCISED
+imt_spaces,2,2,0,1,0,1,0,0,"{""sightmap"": 2}",NOT_EXERCISED
+irvine,13,13,13,13,0,0,0,0,"{""irvine"": 13}",EXERCISED
+jonah_ssr,1,1,1,1,0,0,0,0,"{""rentcafe"": 1}",EXERCISED
+knock,68,68,68,65,1,1,1,0,"{""knock"": 68}",FAIL_OUTPUT_CONTRACT
+maac,9,9,9,9,0,0,0,0,"{""maac"": 9}",EXERCISED
+marketapts,29,29,29,29,0,0,0,0,"{""marketapts"": 29}",EXERCISED
+mri_prospectconnect,11,11,4,10,0,0,0,0,"{""UNATTRIBUTED"": 1, ""knock"": 6, ""mri_prospectconnect"": 4}",EXERCISED
+nesthub_public,1,1,1,1,0,0,0,0,"{""nesthub_public"": 1}",EXERCISED
+non_registry,4,4,4,4,0,0,0,0,"{""betternoi_public"": 1, ""nesthub_public"": 1, ""showmojo_public"": 1, ""static_residence_table"": 1}",EXERCISED
+onesite,23,23,18,20,1,1,0,0,"{""UNATTRIBUTED"": 1, ""knock"": 1, ""onesite"": 18, ""sightmap"": 3}",EXERCISED
+onesite_workflow,3,3,0,2,1,0,0,0,"{""generic_plan_text"": 1, ""rentcafe"": 2}",NOT_EXERCISED
+onsite_apply,62,62,52,58,2,2,1,3,"{""UNATTRIBUTED"": 1, ""generic"": 2, ""onsite_apply"": 52, ""rentcafe"": 7}",FAIL_OUTPUT_CONTRACT
+realpage_cws,7,7,7,7,0,0,0,0,"{""realpage_cws"": 7}",EXERCISED
+realpage_getunits,6,6,0,6,0,0,0,0,"{""realpage_oll"": 6}",NOT_EXERCISED
+realpage_oll,22,22,21,18,2,1,1,0,"{""realpage_cws"": 1, ""realpage_oll"": 21}",FAIL_OUTPUT_CONTRACT
+reinhold,1,1,0,1,0,0,0,0,"{""rentcafe"": 1}",NOT_EXERCISED
+rentaladdress,1,1,1,0,1,0,0,0,"{""rentaladdress"": 1}",EXERCISED
+rentcafe,251,251,235,239,5,7,0,0,"{""funnel"": 1, ""generic_plan_text"": 1, ""knock"": 4, ""rentcafe"": 234, ""rentcafe_layout_tab"": 1, ""sightmap"": 10}",EXERCISED
+rentcafe_applicant,3,3,2,2,0,1,0,0,"{""rentcafe"": 3}",EXERCISED
+rentcafe_layout_tab,12,12,4,10,0,2,1,3,"{""UNATTRIBUTED"": 1, ""generic_plan_text"": 1, ""rentcafe"": 6, ""rentcafe_layout_tab"": 4}",FAIL_OUTPUT_CONTRACT
+rentcafe_unit_roster,3,3,0,3,0,0,0,0,"{""rentcafe"": 3}",NOT_EXERCISED
+rentmanager,8,8,8,5,1,2,0,0,"{""rentmanager"": 8}",EXERCISED
+rentmanager_iloveleasing,1,1,1,1,0,0,0,0,"{""rentmanager"": 1}",EXERCISED
+rentvision,7,7,6,7,0,0,0,0,"{""knock"": 1, ""rentvision"": 6}",EXERCISED
+repli360,14,14,14,12,0,1,1,0,"{""repli360"": 14}",FAIL_OUTPUT_CONTRACT
+residentservices365,10,10,9,9,1,0,0,0,"{""rentcafe"": 1, ""residentservices365"": 9}",EXERCISED
+resman,15,15,14,13,2,0,1,3,"{""UNATTRIBUTED"": 1, ""resman"": 14}",FAIL_OUTPUT_CONTRACT
+securecafe,10,10,10,10,0,0,0,0,"{""rentcafe"": 10}",EXERCISED
+shared_formatter,4,4,4,4,0,0,0,0,"{""resman"": 4}",EXERCISED
+showmojo_public,1,1,1,1,0,0,0,0,"{""showmojo_public"": 1}",EXERCISED
+sightmap,42,42,38,39,0,2,0,0,"{""encoreskyline_template"": 1, ""entrata"": 1, ""equity"": 2, ""rentcafe"": 1, ""sightmap"": 37}",EXERCISED
+spherexx,6,6,6,5,0,1,0,0,"{""spherexx"": 6}",EXERCISED
+squarespace_nopms,6,6,6,6,0,0,0,17,"{""squarespace_nopms"": 6}",FAIL_OUTPUT_CONTRACT
+static_residence_table,1,1,1,1,0,0,0,0,"{""static_residence_table"": 1}",EXERCISED
+thinkreside,2,2,2,1,1,0,0,0,"{""thinkreside"": 2}",EXERCISED
+touchtour,3,3,0,3,0,0,0,0,"{""sightmap"": 3}",NOT_EXERCISED
+udr,20,20,19,20,0,0,0,0,"{""generic"": 1, ""generic_plan_text"": 19}",EXERCISED
+venterra,6,6,2,6,0,0,0,0,"{""sightmap"": 4, ""venterra"": 2}",EXERCISED
+wix_floor_plans,3,3,3,2,1,0,0,0,"{""wix_floor_plans"": 3}",EXERCISED
+wix_nopms,18,18,18,9,7,2,0,0,"{""wix_nopms"": 18}",EXERCISED
+yotta,3,3,3,3,0,0,0,0,"{""yotta"": 3}",EXERCISED

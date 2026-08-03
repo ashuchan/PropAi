@@ -1,0 +1,51 @@
+{
+  "property_id": 34362,
+  "url": "https://www.rentcafe.com/apartments/az/phoenix/tamarron-apartments-2/default.aspx",
+  "status": 200,
+  "body_bytes": 439119,
+  "body_sha256": "fb0b2ec2033f13f2a29dd4799b250a32b9c0bf466fa83c4a84b291264cf75852",
+  "identity": {
+    "name_visible": true,
+    "street_visible": true,
+    "city_zip_visible": true
+  },
+  "provider_markers": [
+    "rentcafe",
+    "onlineleasing",
+    "myolepropertyid",
+    "unitid",
+    "floorplanid",
+    "fp-unit"
+  ],
+  "candidate_urls": [
+    "https://cdngeneral.rentcafe.com/content/images/details-page-ds/floorplan-image-placeholder.svg",
+    "https://cdngeneral.rentcafe.com/content/images/equal-housing-opportunity.png",
+    "https://cdngeneral.rentcafe.com/dmslivecafe/2/3131/Decron_Corp_PMS-01.png?crop=(0,0,300,60)&amp;cropxunits=300&amp;cropyunits=60&amp;width=75&amp;quality=90",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011615\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011627\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011629\\u0026FloorPlanID=4259395\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47011643\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012237\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/02/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012270\\u0026FloorPlanID=4259393\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012524\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/03/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012544\\u0026FloorPlanID=4259399\\u0026header=1\\u0026MoveInDate=09/24/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012611\\u0026FloorPlanID=4259397\\u0026header=1\\u0026MoveInDate=08/08/2026&#x27",
+    "https://www.rentcafe.com/onlineleasing/apartmentsforrent/oleapplication.aspx?Stepname=RentalOptions\\u0026myOlePropertyId=1505175\\u0026UnitID=47012616\\u0026FloorPlanID=4259401\\u0026header=1\\u0026MoveInDate=08/22/2026&#x27",
+    "https://www.rentcafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+    "https://www.rentcafe.com/storage-units/us/az/gilbert/",
+    "https://www.rentcafe.com/storage-units/us/az/glendale/",
+    "https://www.rentcafe.com/storage-units/us/az/mesa/",
+    "https://www.rentcafe.com/storage-units/us/az/phoenix/",
+    "https://www.rentcafe.com/storage-units/us/az/scottsdale/",
+    "https://www.rentcafe.com/storage-units/us/az/tucson/"
+  ],
+  "hyperbrowser_sessions": 1,
+  "session_options": {
+    "solve_captchas": false,
+    "stealth": false,
+    "fingerprint_rotation": false,
+    "residential_proxy": true
+  },
+  "llm": false,
+  "paid_canary": false
+}

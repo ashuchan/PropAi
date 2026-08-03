@@ -281,6 +281,13 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # plan index at /floorplans; Pattern-B (ascent) puts plan cards
     # on the home page but per-plan drills are also at /floorplans/{slug}.
     "thinkreside": ("/floorplans", "/floor-plans", "/availability"),
+    # Direct multi-tenant leasing portals.  Their configured URL normally
+    # already carries the property identifier and succeeds without a hop; these
+    # unscoped landing paths are only a fail-closed fallback after an empty
+    # adapter result.  Both adapters refuse them unless a sole community/DBA
+    # identifier remains present, so they cannot emit a portfolio roster.
+    "mri_prospectconnect": ("/Search/Index/",),
+    "yotta": ("/pages/HomePage.aspx",),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

@@ -1,0 +1,62 @@
+{
+  "batch_label": "rentmanager-26527-tight",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      26527
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "generic_plan_text",
+      "batch_label": "rentmanager-26527-tight",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "generic_plan_text: static-body fallback (no live page evaluate)"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "finelivingapts.com"
+      },
+      "identity_samples": [],
+      "outcome": "PLAN_ONLY",
+      "plans": 13,
+      "property_id": 26527,
+      "property_identity_match": false,
+      "property_name": "Aquila Park",
+      "raw_extractor_outcome": "PLANS",
+      "sample_plan_names": [
+        "102 Bedroom / 2 Bath",
+        "103 Bedroom / 1 Bath",
+        "110 Bedroom / 2 Bath",
+        "114 Bedroom / 2 Bath",
+        "115 Bedroom / 2 Bath",
+        "202 Bedroom / 2 Bath",
+        "204 Bedroom / 2 Bath",
+        "215 Bedroom / 2 Bath"
+      ],
+      "tier": "TIER_1_DOM_GENERIC_PLAN_TEXT",
+      "units": 0,
+      "website": "https://finelivingapts.com/"
+    }
+  ]
+}

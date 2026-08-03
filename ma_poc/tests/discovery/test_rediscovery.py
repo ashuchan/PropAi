@@ -58,6 +58,13 @@ AMBIG_SITEMAP = b"""<?xml version="1.0" encoding="UTF-8"?>
   <url><loc>https://mgmt.example.com/apartments/willow-creek</loc></url>
 </urlset>"""
 
+GSC_HARBOUR_SITEMAP = b"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://gscapts.com/apartments/florida/harbour-pointe/</loc></url>
+  <url><loc>https://gscapts.com/apartments/florida/harbour-pointe-apartment-homes/</loc></url>
+  <url><loc>https://gscapts.com/apartments/florida/bradenton-reserve/</loc></url>
+</urlset>"""
+
 # A rebranded single-property site that embeds a RentCafe leasing widget.
 REBRAND_HTML = (
     b"<html><head><title>The Huntington Apartments</title></head><body>"
@@ -223,6 +230,78 @@ async def test_engine_ambiguous_withheld_for_precision() -> None:
     assert res.status is RediscoveryStatus.AMBIGUOUS
     assert res.rediscovered_url is None
     assert res.runner_up_score >= 90.0
+
+
+async def test_engine_lexical_tie_resolves_only_when_redirect_disproves_rival() -> None:
+    """Real GSC shape: stale short slug redirects to a generic state index."""
+    old = "http://www.gscapts.com/apartments/Bradenton_FL/zip_34210/gsc/15388"
+    short = "https://gscapts.com/apartments/florida/harbour-pointe/"
+    canonical = (
+        "https://gscapts.com/apartments/florida/"
+        "harbour-pointe-apartment-homes/"
+    )
+    fetcher = FakeFetcher(
+        {
+            old: _page(200, "https://gscapts.com/", b"<html>portfolio</html>"),
+            "https://gscapts.com/sitemap.xml": _page(
+                200, "https://gscapts.com/sitemap.xml", GSC_HARBOUR_SITEMAP
+            ),
+            short: _page(200, "https://gscapts.com/apartments/florida/", b"index"),
+            canonical: _page(200, canonical, b"property"),
+        }
+    )
+    result = await RediscoveryEngine(fetcher).rediscover(
+        RediscoveryEntry("6477", "Harbour Pointe", old)
+    )
+    assert result.status is RediscoveryStatus.RESOLVED
+    assert result.rediscovered_url == canonical
+    assert result.method is RediscoveryMethod.MGMT_SITEMAP
+
+
+async def test_engine_same_name_tie_uses_explicit_city_and_state() -> None:
+    """Live GSC collision: FL Harbour Pointe vs GA Harbor Pointe."""
+    old = "http://www.gscapts.com/apartments/Bradenton_FL/zip_34210/gsc/15388"
+    florida = (
+        "https://gscapts.com/apartments/florida/"
+        "harbour-pointe-apartment-homes/"
+    )
+    georgia = "https://gscapts.com/apartments/georgia/harbor-pointe/"
+    florida_body = (
+        b'<script type="application/ld+json">{"addressLocality":"Bradenton",'
+        b'"addressRegion":"FL","postalCode":"34210"}</script>'
+        + b" Harbour Pointe apartments Bradenton " * 80
+    )
+    georgia_body = (
+        b'<script type="application/ld+json">{"addressLocality":"Moultrie",'
+        b'"addressRegion":"GA","postalCode":"31768"}</script>'
+        + b" Harbor Pointe apartments Moultrie " * 80
+    )
+    live_tie_sitemap = (
+        '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"<url><loc>{florida}</loc></url><url><loc>{georgia}</loc></url>"
+        "</urlset>"
+    ).encode()
+    fetcher = FakeFetcher(
+        {
+            old: _page(200, "https://gscapts.com/", b"<html>portfolio</html>"),
+            "https://gscapts.com/sitemap.xml": _page(
+                200, "https://gscapts.com/sitemap.xml", live_tie_sitemap
+            ),
+            florida: _page(200, florida, florida_body),
+            georgia: _page(200, georgia, georgia_body),
+        }
+    )
+    result = await RediscoveryEngine(fetcher).rediscover(
+        RediscoveryEntry(
+            "6477",
+            "Harbour Pointe",
+            old,
+            city="Bradenton",
+            state="FL",
+        )
+    )
+    assert result.status is RediscoveryStatus.RESOLVED
+    assert result.rediscovered_url == florida
 
 
 async def test_engine_no_match_when_property_absent_from_portfolio() -> None:

@@ -119,32 +119,39 @@ def parse_venterra_units(body: str, url: str) -> list[dict[str, Any]]:
         available = str(u.get("unit_available") or "").strip() == "1"
         special = str(u.get("unit_specials_message") or "").strip()
 
+        native_unit_code = str(u.get("unit_code") or "").strip()
         source_ids: dict[str, Any] = {}
-        if u.get("unit_code"):
-            source_ids["venterra_unit_code"] = u.get("unit_code")
+        if native_unit_code:
+            source_ids["venterra_unit_code"] = native_unit_code
         if plan:
             source_ids["floorplan_code"] = plan
 
-        out.append(
-            make_unit_dict(
-                floor_plan_name=plan,
-                bed_label=bed_label_from(beds, plan),
-                bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(u.get("unit_bathrooms") or "").strip(),
-                sqft=str(_int_or_none(u.get("unit_sqft")) or "") or "",
-                unit_number=unit_no,
-                floor=floor_m.group(1) if floor_m else "",
-                rent_low=rent_low,
-                rent_high=rent_high,
-                rent_range=format_rent_range(rent_low, rent_high),
-                concession_text=special or None,
-                availability_status="AVAILABLE" if available else "UNAVAILABLE",
-                availability_date=str(u.get("unit_available_on") or "").strip(),
-                source_api_url=url,
-                extraction_tier="TIER_1_DOM_VENTERRA",
-                source_ids=source_ids or None,
-            )
+        row = make_unit_dict(
+            floor_plan_name=plan,
+            bed_label=bed_label_from(beds, plan),
+            bedrooms=str(beds) if beds is not None else "",
+            bathrooms=str(u.get("unit_bathrooms") or "").strip(),
+            sqft=str(_int_or_none(u.get("unit_sqft")) or "") or "",
+            unit_number=unit_no,
+            unit_name=unit_no,
+            floor=floor_m.group(1) if floor_m else "",
+            rent_low=rent_low,
+            rent_high=rent_high,
+            rent_range=format_rent_range(rent_low, rent_high),
+            concession_text=special or None,
+            availability_status="AVAILABLE" if available else "UNAVAILABLE",
+            availability_date=str(u.get("unit_available_on") or "").strip(),
+            source_api_url=url,
+            extraction_tier="TIER_1_DOM_VENTERRA",
+            source_ids=source_ids or None,
         )
+        # ``unit_name`` is only the short public apartment label and repeats
+        # across buildings.  Venterra's property-scoped ``unit_code`` is the
+        # complete, unique physical key (for example KY4MP-2602-202 versus
+        # KY4MP-2634-202), so make it canonical before any deduplication.
+        if native_unit_code:
+            row["unit_id"] = native_unit_code
+        out.append(row)
     return out
 
 
@@ -196,9 +203,7 @@ class VenterraAdapter:
         pp = post_process(rows, property_id=getattr(ctx, "property_id", None))
         if pp.n_admitted <= 0:
             result.confidence = 0.0
-            result.errors.append(
-                f"venterra: {len(rows)} rows failed unit_validity post-process"
-            )
+            result.errors.append(f"venterra: {len(rows)} rows failed unit_validity post-process")
             return result
         result.units = pp.admitted
         result.plan_summaries = pp.plan_summaries

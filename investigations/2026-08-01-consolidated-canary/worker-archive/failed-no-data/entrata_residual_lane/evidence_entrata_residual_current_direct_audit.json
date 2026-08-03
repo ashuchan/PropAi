@@ -1,0 +1,2142 @@
+{
+  "summary": {
+    "result_type": "current_direct_static_entrata_residual_audit",
+    "capture_timestamp_utc": "2026-08-01T09:04:43.412387+00:00",
+    "cohort_properties": 29,
+    "strict_unit_qualified_properties": 0,
+    "strict_unit_qualified_property_ids": [],
+    "native_positive_rent_rows": 0,
+    "hyperbrowser_sessions_used": 0,
+    "outcome_counts": {
+      "DIRECT_INDEX_BLOCKED_OR_EMPTY": 16,
+      "NO_UNIQUE_EXACT_ROUTE": 10,
+      "PLAN_ONLY_CURRENT": 3
+    }
+  },
+  "results": [
+    {
+      "property_id": 3169,
+      "property_name": "Avana Court",
+      "website": "https://www.avanacourt.com/",
+      "address": "3800 Club Dr",
+      "rp_oracle_native_unit_rows": 60,
+      "prior_disposition": "strict99_false_positive_reintroduced",
+      "archived_body_bytes": 152455,
+      "candidate_url": "https://www.avanacourt.com/duluth/avana-court/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.avanacourt.com/duluth/avana-court/conventional/"
+      ],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "PLAN_ONLY_CURRENT",
+      "units": 0,
+      "plans": 9,
+      "identity": {
+        "name_match": true,
+        "address_match": true,
+        "city_state_zip_match": true,
+        "url_name_match": true,
+        "prior_strict_route": false,
+        "pass": true
+      },
+      "property_identity_match": true,
+      "contamination_verdict": "no_strict_native_positive_rent_rows",
+      "index_final_url": "https://www.avanacourt.com/duluth/avana-court/conventional/",
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://www.avanacourt.com/duluth/avana-court/conventional/",
+          "body_bytes": 217771,
+          "body_sha256": "946538d6b0608e12262f4f8f0e2b8ad38b5e696db900adf08b9cd24e67d8789e",
+          "accepted": true
+        }
+      ],
+      "published_plan_links": [
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767743/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767440/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-610-sf-767392/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-720-sf-767398/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-1130-sf-767404/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-with-den-1245-sf-767410/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1250-sf-767416/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-with-den-1300-sf-767422/fp_name/occupancy_type/conventional/",
+        "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1300-sf-767428/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767743&cached_rate_available=1&min_rent=$990&max_rent=$3,982&min_advertised_base_rent=929&max_advertised_base_rent=3921&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767440&cached_rate_available=1&min_rent=$985&max_rent=$4,018&min_advertised_base_rent=924&max_advertised_base_rent=3957&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767392&cached_rate_available=1&min_rent=$1,044&max_rent=$4,416&min_advertised_base_rent=983&max_advertised_base_rent=4355&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767398&cached_rate_available=1&min_rent=$1,238&max_rent=$5,297&min_advertised_base_rent=1177&max_advertised_base_rent=5236&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767410&cached_rate_available=1&min_rent=$1,453&max_rent=$4,429&min_advertised_base_rent=1392&max_advertised_base_rent=4368&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767416&cached_rate_available=1&min_rent=$1,547&max_rent=$4,225&min_advertised_base_rent=1486&max_advertised_base_rent=4164&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767422&cached_rate_available=1&min_rent=$1,327&max_rent=$5,475&min_advertised_base_rent=1266&max_advertised_base_rent=5414&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+        "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767428&cached_rate_available=1&min_rent=$1,467&max_rent=$5,034&min_advertised_base_rent=1406&max_advertised_base_rent=4973&min_deposit=500.00&max_deposit=500.00&lease_term_name=12mo"
+      ],
+      "detail_fetches": [
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767743&cached_rate_available=1&min_rent=$990&max_rent=$3,982&min_advertised_base_rent=929&max_advertised_base_rent=3921&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 400,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767743&cached_rate_available=1&min_rent=$990&max_rent=$3,982&min_advertised_base_rent=929&max_advertised_base_rent=3921&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 400,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767743&cached_rate_available=1&min_rent=$990&max_rent=$3,982&min_advertised_base_rent=929&max_advertised_base_rent=3921&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767440&cached_rate_available=1&min_rent=$985&max_rent=$4,018&min_advertised_base_rent=924&max_advertised_base_rent=3957&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767440&cached_rate_available=1&min_rent=$985&max_rent=$4,018&min_advertised_base_rent=924&max_advertised_base_rent=3957&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7418,
+              "body_sha256": "7a86395deabff15d0bd057aa792a2920d675c65c99da259874e896b38376b407",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767440&cached_rate_available=1&min_rent=$985&max_rent=$4,018&min_advertised_base_rent=924&max_advertised_base_rent=3957&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7418,
+              "body_sha256": "6b1d473889c7a83ed3961dcec5d24a75d1ed6b75ab13e88f52f5b253abd22f2e",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767392&cached_rate_available=1&min_rent=$1,044&max_rent=$4,416&min_advertised_base_rent=983&max_advertised_base_rent=4355&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767392&cached_rate_available=1&min_rent=$1,044&max_rent=$4,416&min_advertised_base_rent=983&max_advertised_base_rent=4355&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7451,
+              "body_sha256": "033ffa6a8b0db4b2ef631ee156fcb505f7e5d391e89006c3d6586af3a21087bc",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767392&cached_rate_available=1&min_rent=$1,044&max_rent=$4,416&min_advertised_base_rent=983&max_advertised_base_rent=4355&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7451,
+              "body_sha256": "b4fee6a18ea34c6094944d11e8f061a78a6bd78b3d4f30a9750ec42523a40961",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767398&cached_rate_available=1&min_rent=$1,238&max_rent=$5,297&min_advertised_base_rent=1177&max_advertised_base_rent=5236&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767398&cached_rate_available=1&min_rent=$1,238&max_rent=$5,297&min_advertised_base_rent=1177&max_advertised_base_rent=5236&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7454,
+              "body_sha256": "71acc570cb121b02d5932a21f529804f0f6c41816fd6d264aa76fc598f81163f",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767398&cached_rate_available=1&min_rent=$1,238&max_rent=$5,297&min_advertised_base_rent=1177&max_advertised_base_rent=5236&min_deposit=500.00&max_deposit=500.00&lease_term_name=14mo",
+              "body_bytes": 7476,
+              "body_sha256": "2bb199e111c82fabb104ccb33667ae24e58d4ca668518de7242c084b7f27c78e",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767410&cached_rate_available=1&min_rent=$1,453&max_rent=$4,429&min_advertised_base_rent=1392&max_advertised_base_rent=4368&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767410&cached_rate_available=1&min_rent=$1,453&max_rent=$4,429&min_advertised_base_rent=1392&max_advertised_base_rent=4368&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+              "body_bytes": 7476,
+              "body_sha256": "e97dae94ca925cd94655dfcb1c8ccfb3487371fe61014faa96c38b396f557aa8",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767410&cached_rate_available=1&min_rent=$1,453&max_rent=$4,429&min_advertised_base_rent=1392&max_advertised_base_rent=4368&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+              "body_bytes": 7454,
+              "body_sha256": "6efceab811a30af2947019407307a66d8877aa3b655fb1fc83e7c950b98adbf5",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767416&cached_rate_available=1&min_rent=$1,547&max_rent=$4,225&min_advertised_base_rent=1486&max_advertised_base_rent=4164&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767416&cached_rate_available=1&min_rent=$1,547&max_rent=$4,225&min_advertised_base_rent=1486&max_advertised_base_rent=4164&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+              "body_bytes": 7538,
+              "body_sha256": "d7930480619e42e6d7aff0d561a6373ef629bdc8026e23f7392ee1d5df8bb78d",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767416&cached_rate_available=1&min_rent=$1,547&max_rent=$4,225&min_advertised_base_rent=1486&max_advertised_base_rent=4164&min_deposit=500.00&max_deposit=500.00&is_valid_rent=1&lease_term_name=13mo",
+              "body_bytes": 7538,
+              "body_sha256": "6ba282543031ae29ac3e1784d4087138f96d45f376537cd1d3dfa5a363d3330c",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767422&cached_rate_available=1&min_rent=$1,327&max_rent=$5,475&min_advertised_base_rent=1266&max_advertised_base_rent=5414&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767422&cached_rate_available=1&min_rent=$1,327&max_rent=$5,475&min_advertised_base_rent=1266&max_advertised_base_rent=5414&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+              "body_bytes": 7454,
+              "body_sha256": "f4840a9d65cdab1482433c7e0dd83ab82bc005ab63c57ccfd038ff78daa81533",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767422&cached_rate_available=1&min_rent=$1,327&max_rent=$5,475&min_advertised_base_rent=1266&max_advertised_base_rent=5414&min_deposit=500.00&max_deposit=500.00&lease_term_name=13mo",
+              "body_bytes": 7454,
+              "body_sha256": "899b150d0c4b13e68910c6c0813debe30606dcbd653ea40c0a2737ec8028cfc2",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767428&cached_rate_available=1&min_rent=$1,467&max_rent=$5,034&min_advertised_base_rent=1406&max_advertised_base_rent=4973&min_deposit=500.00&max_deposit=500.00&lease_term_name=12mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767428&cached_rate_available=1&min_rent=$1,467&max_rent=$5,034&min_advertised_base_rent=1406&max_advertised_base_rent=4973&min_deposit=500.00&max_deposit=500.00&lease_term_name=12mo",
+              "body_bytes": 7454,
+              "body_sha256": "a38292ed7c0831e7edd08088ba5217606247bca647d140645b0b7bf88e614b2e",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/?module=check_availability&is_secure=1&property[id]=1116441&action=view_unit_spaces&property_floorplan[id]=767428&cached_rate_available=1&min_rent=$1,467&max_rent=$5,034&min_advertised_base_rent=1406&max_advertised_base_rent=4973&min_deposit=500.00&max_deposit=500.00&lease_term_name=12mo",
+              "body_bytes": 7454,
+              "body_sha256": "0e7bfa734aabdee4ac134901f607da3f959e738d0a2d8413e87f035ab2e9ae78",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767743/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767743/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6353,
+              "body_sha256": "974d661dae3d9a545bf408e8fc8c8fc0dcedae86fd0501d5e4bc9afb19ebcf3c",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767743/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6353,
+              "body_sha256": "b2439a48443256699fc15982c5fcc0c39dda83c02be23af052693846ef09f7eb",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767440/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767440/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6353,
+              "body_sha256": "dd4598c10dee045d935d34679731de8fd2c15fbdc507329349bcd82713564885",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/studio-550-sf-767440/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6353,
+              "body_sha256": "a1f729bc256492cc1fd2ac113a14d237d4f89352fca5fcce835db765f3942af8",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-610-sf-767392/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-610-sf-767392/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6416,
+              "body_sha256": "a2ebf5f3865bfed78aadfc48de930d91c3353b4fd8e36917fd0b0c47db5d20c3",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-610-sf-767392/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6416,
+              "body_sha256": "cb261d985339bcaceaffaf2e677db87bf6b01c1904dafdae54ec81535a076dfe",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-720-sf-767398/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-720-sf-767398/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6394,
+              "body_sha256": "e32a353c37fe7fb760a6a3b458fec478f0d4665e405dca54a5d5b4f1dcfa791a",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/one-bedroom-one-bath-720-sf-767398/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6416,
+              "body_sha256": "8512b3e70f52012d4d22cd75bfa54767012d517c6e8d3dec6d264876783f064f",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-1130-sf-767404/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-1130-sf-767404/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "2fe856973379734628209b8246900e13c4ae610b5f6cf24876723cdf406b6d07",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-1130-sf-767404/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "96fa8e9fdcd889f1a0382591fe9caecca2288ef70823732dbfbb0fb80252138a",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-with-den-1245-sf-767410/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-with-den-1245-sf-767410/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6446,
+              "body_sha256": "6aecbfc09fbdcb02aac4b6b0283465be5db58746f03fd05a673cf2e7cb7abcfe",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-one-bath-with-den-1245-sf-767410/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6446,
+              "body_sha256": "cf7c7e07a6b92cdf97b4dbb1f26291d552db7b6a173ff6e2930c709aba34527c",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1250-sf-767416/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1250-sf-767416/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "2d343c92beeea358164f4ae24e146d2f3383470dcb70c0ddca33ba51c4b46ee3",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1250-sf-767416/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "b3218dbabaf7f7ffe3c0d63dc937eafd6543e251fd55eeedb1ddefaa8746beac",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-with-den-1300-sf-767422/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-with-den-1300-sf-767422/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6446,
+              "body_sha256": "255d7cff0682370ef52a7485c39738e0220307691f4cc75b68386a5d0d4e4ae3",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-with-den-1300-sf-767422/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6446,
+              "body_sha256": "62778ff40e30e9393d13bd3863eff07b68aed624249f43e7c99a5c3e16e3cde5",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1300-sf-767428/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1300-sf-767428/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "41952948aae1ed1362a01dc1671a29c9949b43bb718b11dc092fdfb296747ab6",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.avanacourt.com/duluth/avana-court/floorplans/two-bedroom-two-bath-1300-sf-767428/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6419,
+              "body_sha256": "10511f84c662503eda37bf597f326056a6bba1d5604e4a91e032253ed17eeb43",
+              "accepted": false
+            }
+          ]
+        }
+      ],
+      "detail_fetches_complete": false,
+      "parser_counts": {
+        "https://www.avanacourt.com/duluth/avana-court/conventional/": {
+          "parse_entrata_pp_unit_cards": 0,
+          "parse_entrata_pp_jd_fp_cards": 0,
+          "parse_entrata_modern_units_data": 0
+        }
+      },
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "native_source_id_rows": 0,
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 5735,
+      "property_name": "Aventura Apartments",
+      "website": "https://aventuraorlandoapartments.prospectportal.com/",
+      "address": "5300 Cinderlane Pkwy",
+      "rp_oracle_native_unit_rows": 5,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 141231,
+      "candidate_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 22.16,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 2,
+          "property_id": 5735,
+          "property_identity_match": true,
+          "property_name": "Aventura Apartments",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://aventuraorlandoapartments.prospectportal.com/",
+          "winning_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch2.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 18.55,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 2,
+          "property_id": 5735,
+          "property_identity_match": true,
+          "property_name": "Aventura Apartments",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://aventuraorlandoapartments.prospectportal.com/",
+          "winning_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "PLAN_ONLY_CURRENT",
+      "units": 0,
+      "plans": 2,
+      "identity": {
+        "name_match": true,
+        "address_match": true,
+        "city_state_zip_match": true,
+        "url_name_match": true,
+        "prior_strict_route": false,
+        "pass": true
+      },
+      "property_identity_match": true,
+      "contamination_verdict": "no_strict_native_positive_rent_rows",
+      "index_final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/",
+          "body_bytes": 157092,
+          "body_sha256": "278bbc246b5bd54d0a4d3dd91bd6224f7915b6caffb443875d80602943f6f440",
+          "accepted": true
+        }
+      ],
+      "published_plan_links": [
+        "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/1-bed-1-bath-816985/fp_name/occupancy_type/conventional/",
+        "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/2-bed-2-bath-816984/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://aventuraorlandoapartments.prospectportal.com/?module=check_availability&is_secure=1&property[id]=1025951&action=view_unit_spaces&property_floorplan[id]=816984&cached_rate_available=1&min_rent=$1,580&max_rent=$1,630&min_advertised_base_rent=1880&max_advertised_base_rent=1930&min_deposit=1000.0000&max_deposit=5000.0000&lease_term_name=14mo"
+      ],
+      "detail_fetches": [
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://aventuraorlandoapartments.prospectportal.com/?module=check_availability&is_secure=1&property[id]=1025951&action=view_unit_spaces&property_floorplan[id]=816984&cached_rate_available=1&min_rent=$1,580&max_rent=$1,630&min_advertised_base_rent=1880&max_advertised_base_rent=1930&min_deposit=1000.0000&max_deposit=5000.0000&lease_term_name=14mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 400,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/?module=check_availability&is_secure=1&property[id]=1025951&action=view_unit_spaces&property_floorplan[id]=816984&cached_rate_available=1&min_rent=$1,580&max_rent=$1,630&min_advertised_base_rent=1880&max_advertised_base_rent=1930&min_deposit=1000.0000&max_deposit=5000.0000&lease_term_name=14mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 400,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/?module=check_availability&is_secure=1&property[id]=1025951&action=view_unit_spaces&property_floorplan[id]=816984&cached_rate_available=1&min_rent=$1,580&max_rent=$1,630&min_advertised_base_rent=1880&max_advertised_base_rent=1930&min_deposit=1000.0000&max_deposit=5000.0000&lease_term_name=14mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/1-bed-1-bath-816985/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 200,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/1-bed-1-bath-816985/fp_name/occupancy_type/conventional/",
+              "body_bytes": 145290,
+              "body_sha256": "947551cbbbb5e6c3756c6a162fda73ce063c92287a315830b4e8517c6986c181",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/1-bed-1-bath-816985/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6512,
+              "body_sha256": "9b7dfa35b23adb339b7eb0da9412f7b0431dd35928d02f25a3c2fa92ca076a74",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/2-bed-2-bath-816984/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/2-bed-2-bath-816984/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6512,
+              "body_sha256": "022eee402292353066efc874a1d87080a52ce72aa9dbd1b78d15eac5aa5babf4",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/floorplans/2-bed-2-bath-816984/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6512,
+              "body_sha256": "bc3ecb5473d00d49518edc38112108cbafadf1e5bd29e79e3ffb8bc4ad0603a3",
+              "accepted": false
+            }
+          ]
+        }
+      ],
+      "detail_fetches_complete": false,
+      "parser_counts": {
+        "https://aventuraorlandoapartments.prospectportal.com/orlando/aventura-orlando-apartments/conventional/": {
+          "parse_entrata_pp_unit_cards": 0,
+          "parse_entrata_pp_jd_fp_cards": 0,
+          "parse_entrata_modern_units_data": 0
+        }
+      },
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "native_source_id_rows": 0,
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 7980,
+      "property_name": "Tesota Morningside",
+      "website": "https://www.tesotamorningside.com/",
+      "address": "3958 Montgomery Blvd NE",
+      "rp_oracle_native_unit_rows": 11,
+      "prior_disposition": "strict99_false_positive_reintroduced",
+      "archived_body_bytes": 227709,
+      "candidate_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/"
+      ],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "PLAN_ONLY_CURRENT",
+      "units": 0,
+      "plans": 6,
+      "identity": {
+        "name_match": true,
+        "address_match": true,
+        "city_state_zip_match": true,
+        "url_name_match": true,
+        "prior_strict_route": false,
+        "pass": true
+      },
+      "property_identity_match": true,
+      "contamination_verdict": "no_strict_native_positive_rent_rows",
+      "index_final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/",
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 200,
+          "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/",
+          "body_bytes": 178483,
+          "body_sha256": "4a044a5562c3d5a133c3b542c36c6a3dd548a90d5ec0cc0185d06e8f7c7f05b6",
+          "accepted": true
+        }
+      ],
+      "published_plan_links": [
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1a-844423/fp_name/occupancy_type/conventional/",
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1ar-844425/fp_name/occupancy_type/conventional/",
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2a-844427/fp_name/occupancy_type/conventional/",
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2ar-844429/fp_name/occupancy_type/conventional/",
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2b-844431/fp_name/occupancy_type/conventional/",
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2br-844433/fp_name/occupancy_type/conventional/"
+      ],
+      "published_vus_links": [
+        "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+        "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844425&cached_rate_available=1&min_rent=$1,055.50&max_rent=$1,055.50&min_advertised_base_rent=1019&max_advertised_base_rent=1019&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+        "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844429&cached_rate_available=1&min_rent=$1,262.50&max_rent=$1,262.50&min_advertised_base_rent=1226&max_advertised_base_rent=1226&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+        "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844431&cached_rate_available=1&min_rent=$1,228.50&max_rent=$1,228.50&min_advertised_base_rent=1192&max_advertised_base_rent=1192&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo"
+      ],
+      "detail_fetches": [
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844423&cached_rate_available=1&min_rent=$971.50&max_rent=$971.50&min_advertised_base_rent=935&max_advertised_base_rent=935&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844425&cached_rate_available=1&min_rent=$1,055.50&max_rent=$1,055.50&min_advertised_base_rent=1019&max_advertised_base_rent=1019&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844425&cached_rate_available=1&min_rent=$1,055.50&max_rent=$1,055.50&min_advertised_base_rent=1019&max_advertised_base_rent=1019&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844425&cached_rate_available=1&min_rent=$1,055.50&max_rent=$1,055.50&min_advertised_base_rent=1019&max_advertised_base_rent=1019&min_deposit=350.00&max_deposit=350.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844429&cached_rate_available=1&min_rent=$1,262.50&max_rent=$1,262.50&min_advertised_base_rent=1226&max_advertised_base_rent=1226&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844429&cached_rate_available=1&min_rent=$1,262.50&max_rent=$1,262.50&min_advertised_base_rent=1226&max_advertised_base_rent=1226&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 400,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844429&cached_rate_available=1&min_rent=$1,262.50&max_rent=$1,262.50&min_advertised_base_rent=1226&max_advertised_base_rent=1226&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 11,
+              "body_sha256": "7c41b898c5da0cfa4aa049b65ef50248bce9a72d24bef4c723786431921b75aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "view_unit_spaces",
+          "url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844431&cached_rate_available=1&min_rent=$1,228.50&max_rent=$1,228.50&min_advertised_base_rent=1192&max_advertised_base_rent=1192&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844431&cached_rate_available=1&min_rent=$1,228.50&max_rent=$1,228.50&min_advertised_base_rent=1192&max_advertised_base_rent=1192&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 7585,
+              "body_sha256": "f3bb1e1e5b087b8dd85d33b9a016002674a196f1827f599aa7e8397b42261485",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/?module=check_availability&is_secure=1&property[id]=1271493&action=view_unit_spaces&property_floorplan[id]=844431&cached_rate_available=1&min_rent=$1,228.50&max_rent=$1,228.50&min_advertised_base_rent=1192&max_advertised_base_rent=1192&min_deposit=450.00&max_deposit=450.00&is_valid_rent=1&lease_term_name=12mo",
+              "body_bytes": 7585,
+              "body_sha256": "ac1c0fe8fd3e6560cb7e88c372e502796b064f642f80b96b0dc884bdf89bec0f",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1a-844423/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1a-844423/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "07b0195d91822ed1ec4cebb5882c9956e5ab787da380527fe9fc69a4711062cc",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1a-844423/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "5b004f851c541834dcd9b8fd9c0ec051c8968639273cb64dbabe7af0b7251ce6",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1ar-844425/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1ar-844425/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "39f7c39ad5011d8a82a15474cad86cc0efe9ef87333fab577f9e4bc348f4de51",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/a1ar-844425/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "31696c7e6c594c0d509fc5f13fea244f7c79d3319c25d05e81cf63dad6f31fa0",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2a-844427/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2a-844427/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "e8701cb5dfdda1c086ade2af04ca9d4cb2f0f8c69b34302564daa9b332fcf259",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2a-844427/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "f3e60ccd59234228eb49d7fc1b2f219b32f2a1248291a62921f35eb56e1a59eb",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2ar-844429/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2ar-844429/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "049827d0c16b31bfa111aa31c0b780cc17a9d86fa15448825a3d27a0afdb244f",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2ar-844429/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "b16eda582fcca019e142dc36a98bb64d423c3a90e0f14b9ac726322efc3ef528",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2b-844431/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2b-844431/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "a74bceaff896636c55a023cabe9ef9d3cd7ed899efd5975d4d59d026b89ac80a",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2b-844431/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6387,
+              "body_sha256": "381f54656248d3479040c879ff3a57acd21f6e577f28d9dd7f1b87b1751899aa",
+              "accepted": false
+            }
+          ]
+        },
+        {
+          "kind": "plan_detail",
+          "url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2br-844433/fp_name/occupancy_type/conventional/",
+          "final_url": "",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2br-844433/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "f2dcbfc693265005522c9d239013f996861bb3189fbc7e633b677a5c8c6624ff",
+              "accepted": false
+            },
+            {
+              "attempt": 2,
+              "status_code": 429,
+              "final_url": "https://www.tesotamorningside.com/albuquerque/tesota-morningside/floorplans/b2br-844433/fp_name/occupancy_type/conventional/",
+              "body_bytes": 6390,
+              "body_sha256": "c57338b22e7b458332883c0124de167c8e4f4ecefe0af1fa1dc8fc1c485e3375",
+              "accepted": false
+            }
+          ]
+        }
+      ],
+      "detail_fetches_complete": false,
+      "parser_counts": {
+        "https://www.tesotamorningside.com/albuquerque/tesota-morningside/conventional/": {
+          "parse_entrata_pp_unit_cards": 0,
+          "parse_entrata_pp_jd_fp_cards": 0,
+          "parse_entrata_modern_units_data": 0
+        }
+      },
+      "native_identity_rows": 0,
+      "native_positive_rent_rows": 0,
+      "native_source_id_rows": 0,
+      "source_urls": [],
+      "native_rows": []
+    },
+    {
+      "property_id": 9297,
+      "property_name": "Park Creek Manor",
+      "website": "https://www.parkcreekmanor.com/",
+      "address": "2520 Coombs Creek Dr",
+      "rp_oracle_native_unit_rows": 16,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 140535,
+      "candidate_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 27.43,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 13,
+          "property_id": 9297,
+          "property_identity_match": true,
+          "property_name": "Park Creek Manor",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.parkcreekmanor.com/",
+          "winning_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "body_bytes": 6133,
+          "body_sha256": "f83e48b07681d8a625a3440d03059874b8f27c7254efd4650e3b59149a3ef501",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.parkcreekmanor.com/dallas/park-creek-manor-apartments/conventional/",
+          "body_bytes": 6133,
+          "body_sha256": "50ad337e811f400f40650f0a45c01b25b0fe05bf2be5eb9355fb78cbe24eee4c",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 9473,
+      "property_name": "The Village Cliffs",
+      "website": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+      "address": "8610 Southwestern Blvd",
+      "rp_oracle_native_unit_rows": 8,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 479504,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 20672,
+      "property_name": "Quiet Waters Landing",
+      "website": "https://www.quietwaterslanding.com/",
+      "address": "1293 Thom Ct",
+      "rp_oracle_native_unit_rows": 30,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 165060,
+      "candidate_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 31.51,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 7,
+          "property_id": 20672,
+          "property_identity_match": true,
+          "property_name": "Quiet Waters Landing",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.quietwaterslanding.com/",
+          "winning_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 38.09,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 7,
+          "property_id": 20672,
+          "property_identity_match": true,
+          "property_name": "Quiet Waters Landing",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.quietwaterslanding.com/",
+          "winning_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_sample3.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "body_bytes": 6125,
+          "body_sha256": "252fa546eae31f51d5ea81f026b27e51e5b518f007d2eba65b10038f7aeb4e5d",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.quietwaterslanding.com/annapolis/quiet-waters-landing/conventional/",
+          "body_bytes": 6146,
+          "body_sha256": "2267ac2acdc10ea80722bc86299b8b806392986859460b01e7ff15641aad72f6",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 22382,
+      "property_name": "4418 Spruce Street",
+      "website": "https://www.livecampusapts.com/property/4418-spruce-street/?search-parameters=1&start_date=0&end_date=9999999999&price_min=0&price_max=10000",
+      "address": "4418 Spruce St",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 303356,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 22552,
+      "property_name": "La Vina Apartments",
+      "website": "https://www.lavinaapts.com/",
+      "address": "4601 Gerrilyn Way",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 148476,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [
+        "https://www.lavinaapts.com/livermore/la-vina/conventional/",
+        "https://mylavina.prospectportal.com/livermore/la-vina/conventional/"
+      ],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 22986,
+      "property_name": "Tuscany Hills",
+      "website": "http://www.tuscanyhillsapartments.com/",
+      "address": "715 Ash Ln",
+      "rp_oracle_native_unit_rows": 18,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 232810,
+      "candidate_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 18.5,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "EMPTY",
+          "plans": 0,
+          "property_id": 22986,
+          "property_identity_match": true,
+          "property_name": "Tuscany Hills",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.tuscanyhillsapartments.com/",
+          "winning_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch1.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 18.71,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "EMPTY",
+          "plans": 0,
+          "property_id": 22986,
+          "property_identity_match": true,
+          "property_name": "Tuscany Hills",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.tuscanyhillsapartments.com/",
+          "winning_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "body_bytes": 6165,
+          "body_sha256": "8721fac32285d15effa04f2885b2fbb23458c1bf6d7ca97522f4d41013f7d5ac",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.tuscanyhillsapartments.com/san-marcos/tuscany-hills-apartments/conventional/",
+          "body_bytes": 6144,
+          "body_sha256": "38f20f46de93b9e7ac551cb6f57f3ba16c72d2d1521d15a6990181d06dfe0925",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 26736,
+      "property_name": "The Boro - Phipps",
+      "website": "https://www.theboroapartments.com/?switch_cls%5Bid%5D=64893&utm_source=gmb&utm_medium=organic&oll_switch_cls%5Bid%5D=64893&oll_utm_source=gmb&oll_utm_medium=organic",
+      "address": "3460 Kingsboro Rd NE",
+      "rp_oracle_native_unit_rows": 25,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 135826,
+      "candidate_url": "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+        "https://theboro.prospectportal.com/atlanta/kingsboro-luxury-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 12.47,
+          "failure_reason": "CROSS_ORIGIN_REDIRECT_REJECTED",
+          "matched_url": "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+          "native_samples": [],
+          "outcome": "EMPTY",
+          "plans": 0,
+          "property_id": 26736,
+          "property_identity_match": true,
+          "property_name": "The Boro - Phipps",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.theboroapartments.com/?switch_cls%5Bid%5D=64893&utm_source=gmb&utm_medium=organic&oll_switch_cls%5Bid%5D=64893&oll_utm_source=gmb&oll_utm_medium=organic",
+          "winning_url": "",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+          "body_bytes": 6095,
+          "body_sha256": "8e4a1f84b599071ca896e3410ce0a5fc0794a60362c912b046394516d241de48",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://theboro.prospectportal.com/atlanta/phipps-place/conventional/",
+          "body_bytes": 6074,
+          "body_sha256": "793bf3cfbe932509b7a72a9ea693354555344536e90b400210aac13dce51266a",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 30101,
+      "property_name": "Apartments at Bel Air",
+      "website": "https://www.seasonsbelair.com/",
+      "address": "1001 Todd Rd",
+      "rp_oracle_native_unit_rows": 72,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 157023,
+      "candidate_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 21.51,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 17,
+          "property_id": 30101,
+          "property_identity_match": true,
+          "property_name": "Apartments at Bel Air",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.seasonsbelair.com/",
+          "winning_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch1.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+          "body_bytes": 6095,
+          "body_sha256": "5d6a374798fa422deb3f016a8936b148d0f0d7662eaaf60262e33ccbabd4b007",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.aptsatbelair.com/bel-air/apartments-at-bel-air/conventional/",
+          "body_bytes": 6095,
+          "body_sha256": "2cab4f5b14515aa9fd4c194922b081bc1e4c9521c117ffa18eff2b0c9494e48d",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 35192,
+      "property_name": "Enclave on Golden Triangle",
+      "website": "http://www.enclaveongoldentriangle.com/",
+      "address": "5001 Golden Triangle Boulevard",
+      "rp_oracle_native_unit_rows": 21,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 258825,
+      "candidate_url": "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "elapsed_session_seconds": 639.86,
+          "matched_url": "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 35192,
+          "property_name": "Enclave on Golden Triangle",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch2.json"
+        },
+        {
+          "elapsed_session_seconds": 619.95,
+          "matched_url": "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 35192,
+          "property_name": "Enclave on Golden Triangle",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/",
+          "body_bytes": 6172,
+          "body_sha256": "4c85b45f34db6125c61c3878e21015867d0ae0a66672daae9a80dd17ac2775b7",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.enclaveongoldentriangle.com/fort-worth/enclave-on-golden-triangle/conventional/",
+          "body_bytes": 6193,
+          "body_sha256": "8ca0b9850d311ec915f456a5e42ab433e7e3373052e03f1e065496f5c5374aa8",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 36530,
+      "property_name": "The Point at Monroe Place",
+      "website": "https://www.thepointatmonroeplace.com/",
+      "address": "2300 Woodland Crossing Dr",
+      "rp_oracle_native_unit_rows": 10,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 142822,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 42085,
+      "property_name": "Revive Apartments",
+      "website": "https://www.reviveapartments.com/",
+      "address": "2341 58th Ave E",
+      "rp_oracle_native_unit_rows": 30,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 188342,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [
+        "https://www.lakesatfife.com/fife/the-lakes/conventional/"
+      ],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 43908,
+      "property_name": "ReNew Johnson Creek",
+      "website": "https://www.renewjohnsoncreek.com/",
+      "address": "12435 SE Linwood Ave",
+      "rp_oracle_native_unit_rows": 12,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 141691,
+      "candidate_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "elapsed_session_seconds": 630.42,
+          "matched_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 43908,
+          "property_name": "ReNew Johnson Creek",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch2.json"
+        },
+        {
+          "elapsed_session_seconds": 610.84,
+          "matched_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 43908,
+          "property_name": "ReNew Johnson Creek",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+          "body_bytes": 6121,
+          "body_sha256": "a78a5a00a41bf089d381be63640dea5c9936a31427f4195e6d6b31b782c5e7b0",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.renewjohnsoncreek.com/milwaukie/renew-johnson-creek/conventional/",
+          "body_bytes": 6142,
+          "body_sha256": "193464ae6b9aad3216f0546ffe41d75ec83a8c25ecb6356e2d0294f78d20f425",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 46036,
+      "property_name": "Serengeti Springs",
+      "website": "http://www.serengetisprings.com",
+      "address": "7898 Serenera Way",
+      "rp_oracle_native_unit_rows": 13,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 147533,
+      "candidate_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": true,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 28.2,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 6,
+          "property_id": 46036,
+          "property_identity_match": true,
+          "property_name": "Serengeti Springs",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.serengetisprings.com",
+          "winning_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        },
+        {
+          "attempted": true,
+          "complete": true,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 29.71,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 6,
+          "property_id": 46036,
+          "property_identity_match": true,
+          "property_name": "Serengeti Springs",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.serengetisprings.com",
+          "winning_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "body_bytes": 6216,
+          "body_sha256": "7104b0e4150127c417a05fd5b1c6f0b99923ab40222e97249569cb3009bf09fb",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.serengetisprings.com/west-jordan-ut-apartments/serengeti-springs-apartments/conventional/",
+          "body_bytes": 6216,
+          "body_sha256": "441e424e7d8bd10b9ccb5ab84b1847242d29f3eab1c3772089f5e1c5994b4b02",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 48092,
+      "property_name": "Edgewater Village",
+      "website": "https://www.edgewatervillageapts.com/",
+      "address": "5500 Weslo Willow Dr",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 149141,
+      "candidate_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "elapsed_session_seconds": 675.38,
+          "matched_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 48092,
+          "property_name": "Edgewater Village",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch2.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "body_bytes": 6143,
+          "body_sha256": "86377807c019e1b897ea296269fd29d08a2f7f5a123b826b94a68ecc7f95472b",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.edgewatervillage-apts.com/greensboro/edgewater-village/conventional/",
+          "body_bytes": 6143,
+          "body_sha256": "0af39623f730820c97cc1d19af013b70b54a08f1b81a34f2fab969bebcf81577",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 54798,
+      "property_name": "The Point at Abington",
+      "website": "https://www.thepointatabington.com/",
+      "address": "12 Forsyth Dr",
+      "rp_oracle_native_unit_rows": 8,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 142866,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 68952,
+      "property_name": "Wy' East Pointe",
+      "website": "https://www.livewyeast.com/",
+      "address": "812 SE 136th Ave",
+      "rp_oracle_native_unit_rows": 10,
+      "prior_disposition": "strict99_false_positive_reintroduced",
+      "archived_body_bytes": 203160,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [
+        "https://www.livewyeast.com/vancouver-vancouver/wyeast-pointe-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 69912,
+      "property_name": "Creekwood",
+      "website": "http://www.creekwoodapartmenthomes.com/",
+      "address": "22294 City Center Dr",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 156858,
+      "candidate_url": "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": true,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 20.49,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 5,
+          "property_id": 69912,
+          "property_identity_match": true,
+          "property_name": "Creekwood",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.creekwoodapartmenthomes.com/",
+          "winning_url": "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/",
+          "body_bytes": 6091,
+          "body_sha256": "a9c11c3920cac8b5799ec2cc4a25f41e942d65b6cf703c9027b864b336196338",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.creekwoodapartmenthomes.com/hayward/creekwood/conventional/",
+          "body_bytes": 6091,
+          "body_sha256": "ea6fff550e81c4d034292654265e2943ba5b016c90c89eb8cae33bc5ee94249d",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 70993,
+      "property_name": "Modera Mosaic",
+      "website": "https://www.moderamosaic.com/",
+      "address": "2920 District Ave",
+      "rp_oracle_native_unit_rows": 17,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 152103,
+      "candidate_url": "https://moderamosaic.com/fairfax/modera-mosaic/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://moderamosaic.com/fairfax/modera-mosaic/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 21.47,
+          "failure_reason": "CROSS_ORIGIN_REDIRECT_REJECTED",
+          "matched_url": "https://moderamosaic.com/fairfax/modera-mosaic/conventional/",
+          "native_samples": [],
+          "outcome": "EMPTY",
+          "plans": 0,
+          "property_id": 70993,
+          "property_identity_match": true,
+          "property_name": "Modera Mosaic",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.moderamosaic.com/",
+          "winning_url": "",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch1.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://moderamosaic.com/fairfax/modera-mosaic/conventional/",
+          "body_bytes": 6045,
+          "body_sha256": "e9b50edc9dbb5253422f3b5c01dffe315905d6bb77af41b86eeab7deb735c886",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://moderamosaic.com/fairfax/modera-mosaic/conventional/",
+          "body_bytes": 6067,
+          "body_sha256": "0bd6258c3dce33e3c37f6aeee9828b7dee0718b8413280e7f86f7668ee608cee",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 72391,
+      "property_name": "Lumina",
+      "website": "https://liveatlumina.com/",
+      "address": "301 Washington St",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 184465,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 74872,
+      "property_name": "Heather Ridge",
+      "website": "http://heatherridgeapts.net/",
+      "address": "454 Heather Dr N",
+      "rp_oracle_native_unit_rows": 23,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 140418,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    },
+    {
+      "property_id": 234772,
+      "property_name": "The Pointe at Harpers Mill",
+      "website": "http://www.liveattp.com/",
+      "address": "600 Harpers Mill Rd",
+      "rp_oracle_native_unit_rows": 10,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 147977,
+      "candidate_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 28.08,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 6,
+          "property_id": 234772,
+          "property_identity_match": true,
+          "property_name": "The Pointe at Harpers Mill",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.liveattp.com/",
+          "winning_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch2.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 40.12,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 6,
+          "property_id": 234772,
+          "property_identity_match": true,
+          "property_name": "The Pointe at Harpers Mill",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.liveattp.com/",
+          "winning_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "body_bytes": 6121,
+          "body_sha256": "c656a950d2ed14627d970fe19599250a0b7f41262ac0ea9479dae753273e5f78",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.liveattp.com/millersville/the-pointe-at-harpers-mill/conventional/",
+          "body_bytes": 6142,
+          "body_sha256": "30cbe3beeffa86b186e829d0395b0c91288dbe9e045e5f75a86fbcc36ff1397c",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 239274,
+      "property_name": "Strata on California",
+      "website": "http://www.strataoncalifornia.com",
+      "address": "6312 California Ave SW",
+      "rp_oracle_native_unit_rows": 5,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 136316,
+      "candidate_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 23.05,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 2,
+          "property_id": 239274,
+          "property_identity_match": true,
+          "property_name": "Strata on California",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.strataoncalifornia.com",
+          "winning_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 14.97,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 2,
+          "property_id": 239274,
+          "property_identity_match": true,
+          "property_name": "Strata on California",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.strataoncalifornia.com",
+          "winning_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "body_bytes": 6119,
+          "body_sha256": "a8096055514bb4382438492268816040f7c9b2af7ea8a31017ced9d8ebf2f3f0",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.strataoncalifornia.com/seattle/strata-on-california/conventional/",
+          "body_bytes": 6119,
+          "body_sha256": "1454732507167b9a23dea41aba2c9fe671825d3ff0fde353729e1d3314ed34d6",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 242976,
+      "property_name": "Kelly Farms",
+      "website": "http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk",
+      "address": "1280 Cinnamon Hill Ln",
+      "rp_oracle_native_unit_rows": 21,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 158842,
+      "candidate_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 39.41,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 21,
+          "property_id": 242976,
+          "property_identity_match": true,
+          "property_name": "Kelly Farms",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk",
+          "winning_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        },
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 40.63,
+          "failure_reason": "NO_NATIVE_UNIT_ROSTER",
+          "matched_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "native_samples": [],
+          "outcome": "PLAN_ONLY",
+          "plans": 21,
+          "property_id": 242976,
+          "property_identity_match": true,
+          "property_name": "Kelly Farms",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "http://www.kellyfarms.com/?fbclid=IwAR3Ht2UTDJGEhVJqHMlcBmpL_RXbUH4u9mVSJ-Z1gopj5mzcXzrLI4u3ilk",
+          "winning_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "body_bytes": 6099,
+          "body_sha256": "9a70734419acef516bf69b181223a11761983b54630f4ce040e91d3fb6b312c7",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.kellyfarms.com/columbia/kelly-farms-apartments/conventional/",
+          "body_bytes": 6099,
+          "body_sha256": "7a20a2458bbba89ce7b80be5aec1b513e8d3e260d34f4e7099b0c8dbf0147d96",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 247119,
+      "property_name": "Riverside Place",
+      "website": "https://www.riversidegp.com/",
+      "address": "2800 NE Green Oaks Blvd",
+      "rp_oracle_native_unit_rows": 18,
+      "prior_disposition": "hyperbrowser_exact_entrata_anchor_pending_native_unit_drill",
+      "archived_body_bytes": 147189,
+      "candidate_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "elapsed_session_seconds": 658.63,
+          "matched_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+          "outcome": "TIMEOUT",
+          "plans": 0,
+          "property_id": 247119,
+          "property_name": "Riverside Place",
+          "session_calls": 1,
+          "units": 0,
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_root_remaining14.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+          "body_bytes": 6148,
+          "body_sha256": "5a2588f6f297a13b6f0ca6d6fa00979c78e03d23da75d2b7f0948049e345edb4",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://www.riversidegp.com/grand-prairie/riverside-place-apartments/conventional/",
+          "body_bytes": 6148,
+          "body_sha256": "e5188073e649fb60bf9f8c1c538c771d23478c70c982b3a54f8d3f4c9992e35e",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 276162,
+      "property_name": "Modera Academical Village I",
+      "website": "https://www.moderaacademicalvillage.com/",
+      "address": "3440 SW 76 Ter",
+      "rp_oracle_native_unit_rows": 23,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 247269,
+      "candidate_url": "https://moderaacademicalvillage.com/davie/modera-academical-village/conventional/",
+      "candidate_basis": "unique_published_property_name_match",
+      "observed_conventional_urls": [
+        "https://moderaacademicalvillage.com/davie/modera-academical-village/conventional/"
+      ],
+      "prior_hb_evidence": [
+        {
+          "attempted": true,
+          "complete": false,
+          "contamination_verdict": "no_native_units",
+          "elapsed_session_seconds": 18.42,
+          "failure_reason": "CROSS_ORIGIN_REDIRECT_REJECTED",
+          "matched_url": "https://moderaacademicalvillage.com/davie/modera-academical-village/conventional/",
+          "native_samples": [],
+          "outcome": "EMPTY",
+          "plans": 0,
+          "property_id": 276162,
+          "property_identity_match": true,
+          "property_name": "Modera Academical Village I",
+          "session_calls": 1,
+          "source_urls": [],
+          "units": 0,
+          "website": "https://www.moderaacademicalvillage.com/",
+          "winning_url": "",
+          "artifact": "/private/tmp/propai-fnd-vBkmT9/hb_entrata_sweep_batch3.json"
+        }
+      ],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "DIRECT_INDEX_BLOCKED_OR_EMPTY",
+      "units": 0,
+      "index_attempts": [
+        {
+          "attempt": 1,
+          "status_code": 429,
+          "final_url": "https://moderaacademicalvillage.com/davie/modera-academical-village/conventional/",
+          "body_bytes": 6129,
+          "body_sha256": "ccf4f30a0b51e79cfbd22b6a6a506a4ab5fabbc75ebb71759a3a9394eb61db5a",
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "status_code": 429,
+          "final_url": "https://moderaacademicalvillage.com/davie/modera-academical-village/conventional/",
+          "body_bytes": 6129,
+          "body_sha256": "ae990ba7818029949d6811aaefeacebc09a712e08262dfbdbcc7f9b7d7a3a956",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "property_id": 298586,
+      "property_name": "Gateway Lofts Lexington",
+      "website": "https://gatewayloftslexington.com/",
+      "address": "380 Virginia Ave",
+      "rp_oracle_native_unit_rows": 0,
+      "prior_disposition": "residual_unconverted",
+      "archived_body_bytes": 220694,
+      "candidate_url": "",
+      "candidate_basis": "no_unique_exact_property_route",
+      "observed_conventional_urls": [],
+      "prior_hb_evidence": [],
+      "hyperbrowser_sessions_used": 0,
+      "outcome": "NO_UNIQUE_EXACT_ROUTE",
+      "units": 0
+    }
+  ]
+}

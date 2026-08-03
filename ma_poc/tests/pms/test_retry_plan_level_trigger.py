@@ -20,9 +20,8 @@ point where "try the other signals we detected" pays.
 
 Two halves are tested:
   * the TRIGGER fires on plan-level rows and stays quiet on real units
-  * the WIN CONDITION refuses to swap plan-level for plan-level, which would
-    relabel the tier without adding an apartment and could discard a better
-    baseline
+  * the WIN CONDITION requires a canonical apartment for every initial
+    trigger, while plan-only retry output remains fallback data
 """
 
 from __future__ import annotations
@@ -90,11 +89,9 @@ def test_empty_units_is_not_plan_level() -> None:
 
 
 def _wins(new_units: list[dict], trigger: str | None) -> bool:
-    """Mirror of _retry_win_condition_for, minus the quality/rent gates that
-    are exercised by the existing Path-B tests."""
-    if trigger == "plan_level_only":
-        return not _rows_are_plan_level(new_units)
-    return True
+    """Mirror of the canonical-unit rule, minus quality/rent gates."""
+    del trigger  # every trigger deliberately shares the same rule
+    return bool(new_units) and not _rows_are_plan_level(new_units)
 
 
 def test_plan_level_retry_must_return_unit_level_to_win() -> None:
@@ -108,12 +105,15 @@ def test_plan_level_retry_must_return_unit_level_to_win() -> None:
     assert _wins(real_roster, "plan_level_only") is True
 
 
-def test_other_triggers_keep_the_original_win_rule() -> None:
-    """An empty_exit retry that returns plan-level rows IS an improvement on
-    nothing — the tightened rule must apply only to plan_level_only."""
+def test_other_triggers_also_require_unit_level_to_win() -> None:
+    """Plan cards improve an empty result only as fallback, never unit success."""
     plan_rows = [{"floor_plan_name": "X1", "rent_low": 1400}]
-    assert _wins(plan_rows, "empty_exit") is True
-    assert _wins(plan_rows, None) is True
+    assert _wins(plan_rows, "empty_exit") is False
+    assert _wins(plan_rows, "quality_gate") is False
+    assert _wins(plan_rows, None) is False
+
+    real_roster = [{"unit_number": "311", "rent_low": 2670}]
+    assert _wins(real_roster, "empty_exit") is True
 
 
 # ── Wiring: the trigger is reachable and the retry is on by default ─────────

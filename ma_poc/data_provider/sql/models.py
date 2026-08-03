@@ -109,13 +109,60 @@ class UnitRow(Base):
     # variation was inflating the apparent plan count. Nullable for the
     # backfill window; populated at write time after Phase 3.
     floor_plan_id: Mapped[str | None] = mapped_column(String(16))
+    # Provider/display identity before the collision-safe ``unit_id`` rewrite.
+    # Keeping both makes the output auditable without weakening the composite
+    # (property, unit_id) state key already used in production.
+    source_unit_id: Mapped[str | None] = mapped_column(String(512))
+    canonical_unit_id: Mapped[str | None] = mapped_column(String(512))
+    unit_name: Mapped[str | None] = mapped_column(String(1024))
+    floor: Mapped[str | None] = mapped_column(String(128))
+    building: Mapped[str | None] = mapped_column(String(1024))
+    building_id: Mapped[str | None] = mapped_column(String(512))
+    building_id_source: Mapped[str | None] = mapped_column(String(256))
+    floor_plan_name_provenance: Mapped[str | None] = mapped_column(String(128))
     area: Mapped[int | None] = mapped_column(Integer)
+    # Null-native area companion; legacy ``area=-1`` remains unchanged.
+    area_sqft: Mapped[int | None] = mapped_column(Integer)
+    area_is_published: Mapped[bool | None] = mapped_column(Boolean)
+    area_low: Mapped[int | None] = mapped_column(Integer)
+    area_high: Mapped[int | None] = mapped_column(Integer)
+    area_range: Mapped[str | None] = mapped_column(String(64))
+    area_range_raw: Mapped[str | None] = mapped_column(Text)
+    area_value_type: Mapped[str | None] = mapped_column(String(32))
+    area_provenance: Mapped[str | None] = mapped_column(String(128))
+    area_source_url: Mapped[str | None] = mapped_column(Text)
     rent_low: Mapped[float | None] = mapped_column(Float)
     rent_high: Mapped[float | None] = mapped_column(Float)
+    rent_range: Mapped[str | None] = mapped_column(String(128))
+    rent_range_raw: Mapped[str | None] = mapped_column(Text)
+    rent_is_range: Mapped[bool | None] = mapped_column(Boolean)
+    rent_provenance: Mapped[str | None] = mapped_column(String(64))
     date_captured: Mapped[str | None] = mapped_column(String(32))
     available_date: Mapped[str | None] = mapped_column(String(32))
+    available_date_raw: Mapped[str | None] = mapped_column(Text)
+    availability_date_provenance: Mapped[str | None] = mapped_column(String(64))
+    availability_status: Mapped[str | None] = mapped_column(String(64))
     lease_term: Mapped[int | None] = mapped_column(Integer)
     move_in_date: Mapped[str | None] = mapped_column(String(32))
+    extraction_tier: Mapped[str | None] = mapped_column(String(128))
+    source_ids: Mapped[Any | None] = mapped_column(JSON)
+    source_response_sha256: Mapped[str | None] = mapped_column(String(64))
+    source_response_url: Mapped[str | None] = mapped_column(Text)
+    source_record_locator: Mapped[str | None] = mapped_column(Text)
+    source_parent_record_locator: Mapped[str | None] = mapped_column(Text)
+    source_asset_url: Mapped[str | None] = mapped_column(Text)
+    source_asset_sha256: Mapped[str | None] = mapped_column(String(64))
+    identity_quality: Mapped[str | None] = mapped_column(String(64))
+    unit_id_aliases: Mapped[Any | None] = mapped_column(JSON)
+    unit_id_alias_sources: Mapped[Any | None] = mapped_column(JSON)
+
+    # Versioned, property-scoped day-to-day join key. It is deliberately not
+    # the primary key yet: the affected-386 run proves within-run uniqueness,
+    # while a two-day replay is still required before changing merge identity.
+    unit_history_key: Mapped[str | None] = mapped_column(String(72), index=True)
+    unit_history_key_basis: Mapped[str | None] = mapped_column(Text)
+    unit_history_key_quality: Mapped[str | None] = mapped_column(String(64))
+    unit_history_key_version: Mapped[str | None] = mapped_column(String(16))
 
     # ── State-tracking (no v2 equivalent) ───────────────────────────────
     first_seen_date: Mapped[str | None] = mapped_column(String(16))

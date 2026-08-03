@@ -1,0 +1,52 @@
+{
+  "guardrails": {
+    "solve_captchas": false,
+    "web_unlocker": false,
+    "flaresolverr": false,
+    "fingerprint_rotation": false,
+    "paid_canary": false
+  },
+  "results": [
+    {
+      "property_id": 27080,
+      "url": "https://oxfordrealtygroup.securecafe.com/onlineleasing/easton-north/oleapplication.aspx?stepname=floorplan",
+      "status": 200,
+      "body_bytes": 78816,
+      "sha256": "07eca8a585874c7d1bf7216d09351eca28d59fa16ccd6fe7b1aae44c2eb51102",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 225886,
+      "url": "https://casabaywoodapts.securecafeapplicant.com/onlineleasing/content3/access/casa-baywood/floorplans",
+      "status": 200,
+      "body_bytes": 2822,
+      "sha256": "e210363b1f47dcea3285608f40ab178ebdff42039194085367c995af50c92c04",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 231543,
+      "url": "https://autumnhills-bestrentnj.securecafe.com/onlineleasing/village-at-autumn-hills/availableunits.aspx?myolepropertyid=1026013&floorPlans=3429401",
+      "status": 200,
+      "body_bytes": 186305,
+      "sha256": "91a0b3c6e55bc36b2feeb94e51203692a28707878bdca5022f0a0ec0b75a28e4",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 266766,
+      "url": "https://101oxford.securecafe.com/onlineleasing/101-w-oxford/availableunits.aspx",
+      "status": 200,
+      "body_bytes": 99510,
+      "sha256": "0a84c76d5890f92f5da113dce52968b488a489583e702502ace6edbd7ceb723c",
+      "hyperbrowser_sessions": 1
+    },
+    {
+      "property_id": 289338,
+      "url": "https://201walnut.securecafe.com/onlineleasing/201-walnut-avenue/availableunits.aspx",
+      "status": 200,
+      "body_bytes": 92869,
+      "sha256": "5748f76a92a8b808baa98afcffa50f6a346368373309f079b6150042aba6e4fe",
+      "hyperbrowser_sessions": 1
+    }
+  ],
+  "hyperbrowser_sessions": 5
+}

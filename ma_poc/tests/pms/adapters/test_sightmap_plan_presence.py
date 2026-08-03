@@ -19,7 +19,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ma_poc.pms.adapters.sightmap import parse_sightmap_payload
+from ma_poc.pms.adapters.sightmap import (
+    _is_degenerate_internal_floor_plan,
+    parse_sightmap_payload,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sightmap"
 
@@ -54,3 +57,82 @@ def test_hudson_emits_all_30_plans_including_empty_ones() -> None:
         assert p["rent_range"] == ""
         assert p["unit_number"] == ""
         assert p["source_ids"].get("sightmap_floor_plan_id")
+
+
+def test_250_high_temp_record_is_a_provable_internal_placeholder() -> None:
+    assert _is_degenerate_internal_floor_plan(
+        {
+            "id": "442397",
+            "name": "TEMP",
+            "filter_label": "Coming Soon",
+            "bedroom_count": 0,
+            "bathroom_count": 0,
+            "image_url": None,
+        }
+    )
+
+
+def test_temp_name_alone_never_triggers_placeholder_rejection() -> None:
+    assert not _is_degenerate_internal_floor_plan(
+        {"name": "TEMP", "bedroom_count": 1, "bathroom_count": 1}
+    )
+    assert not _is_degenerate_internal_floor_plan(
+        {
+            "name": "TEMP",
+            "bedroom_count": 0,
+            "bathroom_count": 0,
+            "min_rent": 1800,
+        }
+    )
+    assert not _is_degenerate_internal_floor_plan(
+        {"name": "Coming Soon", "bedroom_count": 0, "bathroom_count": 0}
+    )
+
+
+def test_parser_drops_only_degenerate_temp_and_keeps_real_empty_plan() -> None:
+    payload = {
+        "data": {
+            "units": [
+                {
+                    "id": "unit-1",
+                    "floor_plan_id": "plan-live",
+                    "unit_number": "1201",
+                    "area": 700,
+                    "price": 2100,
+                    "available_on": "2026-09-01",
+                }
+            ],
+            "floor_plans": [
+                {
+                    "id": "plan-live",
+                    "name": "Flat No. 10",
+                    "bedroom_count": 1,
+                    "bathroom_count": 1,
+                },
+                {
+                    "id": "442397",
+                    "name": "TEMP",
+                    "filter_label": "Coming Soon",
+                    "bedroom_count": 0,
+                    "bathroom_count": 0,
+                },
+                {
+                    "id": "plan-empty",
+                    "name": "Penthouse No. 21",
+                    "bedroom_count": 2,
+                    "bathroom_count": 2,
+                },
+            ],
+        }
+    }
+    rows, dropped = parse_sightmap_payload(payload, "https://sightmap.test/api")
+    assert dropped == 0
+    assert {row["floor_plan_name"] for row in rows} == {
+        "Flat No. 10",
+        "Penthouse No. 21",
+    }
+    presence = [
+        row for row in rows if row.get("data_quality_flag") == "SIGHTMAP_PLAN_PRESENCE"
+    ]
+    assert len(presence) == 1
+    assert presence[0]["source_ids"] == {"sightmap_floor_plan_id": "plan-empty"}

@@ -1,0 +1,26 @@
+{
+  "result_type": "net_new_strict_entrata_residual",
+  "net_new_properties": 8,
+  "net_new_property_ids": [
+    1375,
+    18764,
+    19877,
+    40398,
+    46257,
+    54936,
+    67684,
+    257761
+  ],
+  "net_new_native_positive_rent_rows": 45,
+  "overlap_with_latest_ledger": 0,
+  "latest_ledger_path": "/private/tmp/propai-fnd-vBkmT9/strict_recovery_ledger_current.csv",
+  "latest_ledger_sha256": "08d27e44831c17a30d1eb0cd726c4ad119b977342cb1b78b729feb8a6784fa30",
+  "latest_ledger_rows": 147,
+  "latest_ledger_unique_property_ids": 147,
+  "shared_ledger_modified": false,
+  "new_hyperbrowser_sessions_this_lane": 8,
+  "captcha_solving": false,
+  "paid_canary": false,
+  "consolidated_evidence_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/evidence_entrata_residual_current_strict_consolidated.json",
+  "net_new_ledger_rows_artifact": "/private/tmp/propai-fnd-vBkmT9/entrata_residual_lane/strict_entrata_residual_net_new_ledger_rows.csv"
+}

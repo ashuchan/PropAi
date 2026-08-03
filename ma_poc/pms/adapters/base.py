@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 
+# Adapter-row marker for a bounded source whose entire public inventory surface
+# has been parsed and proven to publish plans only.  This is deliberately opt-in:
+# ordinary plan rows must not bypass the publish-ceiling rent-token guard merely
+# because an extractor found some floor-plan cards.
+VERIFIED_PLAN_ONLY_SURFACE_KEY = "_verified_plan_only_surface"
+
+
 @dataclass
 class AdapterContext:
     base_url: str
@@ -67,10 +74,19 @@ class AdapterResult:
     tier_used: str = ""
     winning_url: str | None = None
     api_responses: list[dict[str, Any]] = field(default_factory=list)
+    # Additional source bodies that contributed fields but are not JSON/XHR
+    # API captures.  The runner archives these content-addressed and removes
+    # the body from the public property document; unit rows retain only the
+    # SHA-256, sanitised URL and record locator needed to retrieve the source.
+    html_responses: list[dict[str, Any]] = field(default_factory=list)
+    asset_responses: list[dict[str, Any]] = field(default_factory=list)
     blocked_endpoints: list[tuple[str, str]] = field(default_factory=list)
     llm_field_mappings: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     confidence: float = 0.0
+    # Exact response(s) that produced the admitted units.  Bodies are never
+    # persisted here: only a hash, sanitised URL, count and identity verdict.
+    unit_source_provenance: list[dict[str, Any]] = field(default_factory=list)
 
 
 @runtime_checkable

@@ -1,0 +1,67 @@
+{
+  "snapshot": {
+    "strict_unique_recovered_properties": 192,
+    "ledger_sha256": "cae354f94c95160693b3ac6f8398ecae9b239fd23ff0aa0eb1ab180741645da8",
+    "remaining_sha256": "2921bec79df9251d735e92c90f16485d475c8861c51d937370ffde88e4ef72d4"
+  },
+  "strict_accept_ids": [
+    19538
+  ],
+  "strict_net_new_ids": [
+    19538
+  ],
+  "strict_net_new_count": 1,
+  "reconciliation": {
+    "19538": {
+      "absent_from_ledger": true,
+      "present_in_remaining": true
+    }
+  },
+  "evidence": {
+    "path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/stadium_current_full_pipeline_repeat3.json",
+    "sha256": "7baaaa808376f07297cb3b671d01a545b342ee4a427a93c7d8d7ee6e51717bda",
+    "configured_route_full_pipeline_repeats": 3,
+    "strict_rows_each_repeat": 3,
+    "native_listing_ids": [
+      "949",
+      "1005",
+      "1006"
+    ],
+    "source_url": "https://abbottpropertiesmultifamily.appfolio.com/listings",
+    "exact_property_address": "2999 Woodway Dr SW, Huntsville, AL 35805",
+    "account_roster_rows": 46,
+    "exact_address_rows": 3,
+    "sibling_rows_dropped": 43,
+    "web_unlocker_calls": 0,
+    "hyperbrowser_calls": 0,
+    "llm_enabled": false
+  },
+  "explicit_reject_ids": [
+    3788,
+    23494,
+    25443,
+    44955,
+    46179,
+    47845,
+    47909,
+    56567,
+    69282,
+    71345,
+    118965,
+    237787,
+    241145,
+    251514,
+    260761,
+    263732,
+    271721,
+    282696
+  ],
+  "explicit_reject_count": 18,
+  "lc_sobro_repeat_gate": {
+    "property_id": 251514,
+    "strict_passes": 0,
+    "repeat_count": 3,
+    "evidence_path": "/private/tmp/propai-fnd-vBkmT9/appfolio_wix_residual_lane/lc_sobro_current_full_pipeline_repeat3.json",
+    "evidence_sha256": "3d98bfeb59ced832f70fec8ddc1f7914fdf6da45e3cd27e6702f84e9218990b8"
+  }
+}

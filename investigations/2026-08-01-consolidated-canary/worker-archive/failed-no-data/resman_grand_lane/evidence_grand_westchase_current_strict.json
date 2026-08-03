@@ -1,0 +1,1879 @@
+{
+  "results": [
+    {
+      "configured_pipeline": {
+        "adapter": "resman",
+        "body_diagnostics": {
+          "candidate_url_count": 144,
+          "filesusr_html_urls": [],
+          "provider_markers": [
+            "myresman.com"
+          ],
+          "provider_urls_in_body": [
+            "https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054",
+            "https://richmark.myresman.com/Portal/Access/SignIn/GRAND"
+          ],
+          "published_inventory_urls": [
+            "https://www.thegrandatwestchase.com/floorplans/"
+          ],
+          "title": "Grand at Westchase - Apartments for Rent in Houston, TX"
+        },
+        "canonical_address": "10881 Richmond Ave.",
+        "canonical_city": "Houston",
+        "canonical_state": "TX",
+        "canonical_zip": "77042",
+        "cohort_url": "https://www.thegrandatwestchase.com/",
+        "configured_fetch": {
+          "attempts": 1,
+          "body_bytes": 109150,
+          "final_url": "https://www.thegrandatwestchase.com/",
+          "outcome": "OK",
+          "status": 200
+        },
+        "configured_url": "https://www.thegrandatwestchase.com/",
+        "current_detected_pms": "resman",
+        "elapsed_ms": 2867,
+        "emitted_samples": [
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 810,
+            "market_rent_low": 810,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1502"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1504"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1610"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 815,
+            "market_rent_low": 815,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1612"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1613"
+          }
+        ],
+        "emitted_unit_rows": 38,
+        "errors": [],
+        "exception": "",
+        "fallback_chain": [
+          "apts247",
+          "retry:resman"
+        ],
+        "link_hop_from": "",
+        "link_hop_success": false,
+        "llm_interactions": [],
+        "native_identity_rows": 38,
+        "plan_rows": 0,
+        "plan_samples": [],
+        "prior_disposition": "strict99_false_positive_reintroduced",
+        "property_id": 12989,
+        "property_name": "Grand at Westchase",
+        "remaining_adapter": "apts247",
+        "rp_oracle_distinct_floorplans": 10,
+        "rp_oracle_native_unit_rows": 41,
+        "source_adapter_0731": "",
+        "source_property_ids": [],
+        "source_urls": [
+          "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        ],
+        "strict_accept": false,
+        "strict_native_positive_rent_rows": 38,
+        "strict_rejection": "candidate_requires_exact_property_boundary_audit",
+        "strict_shape_rows": [
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 810,
+            "market_rent_low": 810,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1502"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1504"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1610"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 815,
+            "market_rent_low": 815,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1612"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1613"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1E",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1512"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1E",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1514"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1E",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1516"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1E",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1517"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1E",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1513"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1",
+            "market_rent_high": 900,
+            "market_rent_low": 900,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "206"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1",
+            "market_rent_high": 935,
+            "market_rent_low": 935,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "212"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1",
+            "market_rent_high": 900,
+            "market_rent_low": 900,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "306"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1",
+            "market_rent_high": 900,
+            "market_rent_low": 900,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "402"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1",
+            "market_rent_high": 900,
+            "market_rent_low": 900,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "806"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1E",
+            "market_rent_high": 885,
+            "market_rent_low": 885,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "204"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1E",
+            "market_rent_high": 880,
+            "market_rent_low": 880,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "409"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1E",
+            "market_rent_high": 885,
+            "market_rent_low": 885,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "422"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1E",
+            "market_rent_high": 850,
+            "market_rent_low": 850,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1414"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "B1E",
+            "market_rent_high": 895,
+            "market_rent_low": 895,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "570",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1806"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1",
+            "market_rent_high": 965,
+            "market_rent_low": 965,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1115"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1",
+            "market_rent_high": 925,
+            "market_rent_low": 925,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "115"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1E",
+            "market_rent_high": 910,
+            "market_rent_low": 910,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "106"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1E",
+            "market_rent_high": 960,
+            "market_rent_low": 960,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "107"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1E",
+            "market_rent_high": 920,
+            "market_rent_low": 920,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1103"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1E",
+            "market_rent_high": 920,
+            "market_rent_low": 920,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1106"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "C1E",
+            "market_rent_high": 920,
+            "market_rent_low": 920,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "633",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1114"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "E1 Floor Plan",
+            "market_rent_high": 1080,
+            "market_rent_low": 1080,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "804",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "710"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "E1 Floor Plan",
+            "market_rent_high": 1080,
+            "market_rent_low": 1080,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "804",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "714"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "E1E",
+            "market_rent_high": 1030,
+            "market_rent_low": 1030,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "804",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "704"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "E1E",
+            "market_rent_high": 1065,
+            "market_rent_low": 1065,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "804",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "503"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1",
+            "market_rent_high": 1170,
+            "market_rent_low": 1170,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1316"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1",
+            "market_rent_high": 1170,
+            "market_rent_low": 1170,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "906"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1E",
+            "market_rent_high": 1125,
+            "market_rent_low": 1125,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "904"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1E",
+            "market_rent_high": 1080,
+            "market_rent_low": 1080,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "905"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1E",
+            "market_rent_high": 1115,
+            "market_rent_low": 1115,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "914"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1E",
+            "market_rent_high": 1080,
+            "market_rent_low": 1080,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1216"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "F1E",
+            "market_rent_high": 1080,
+            "market_rent_low": 1080,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "885",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1006"
+          }
+        ],
+        "strict_shape_samples": [
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 810,
+            "market_rent_low": 810,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1502"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1504"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1610"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 815,
+            "market_rent_low": 815,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1612"
+          },
+          {
+            "address": "",
+            "floor_plan_name": "A1",
+            "market_rent_high": 775,
+            "market_rent_low": 775,
+            "native_unit_id": "",
+            "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+            "source_ids": {},
+            "source_property_id": "",
+            "source_property_name": "",
+            "sqft": "510",
+            "unit_id": "",
+            "unit_name": "",
+            "unit_number": "1613"
+          }
+        ],
+        "tier": "TIER_1_API_RESMAN",
+        "tier_attempts": [],
+        "winning_page_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+      },
+      "contamination_verdict": "pass_exact_configured_property_published_single_resman_applicant_same_tenant_account_property_guid_full_pipeline_native_priced_units",
+      "current_parent_capture": {
+        "body_sha256": "606b1a2fca578489b51c1fc751c10aabbe1144f955327540c5879dad633ec80c",
+        "final_url": "https://www.thegrandatwestchase.com/",
+        "raw_artifact": "/private/tmp/propai-fnd-vBkmT9/resman_grand_lane/12989_current_parent.html.gz",
+        "raw_artifact_sha256": "0ed0d118dd4e5a63f9dacd0b508474ff1ceb0de34c78222f26636b8d2d556256",
+        "status": 200
+      },
+      "current_provider_capture": {
+        "body_sha256": "56eff6b3a12793518c7529fcf0c8584dd41d91b06e22f2e2351b8d7a9c39d189",
+        "exact_match_to_configured_pipeline": true,
+        "final_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+        "raw_artifact": "/private/tmp/propai-fnd-vBkmT9/resman_grand_lane/12989_current_resman_availability.html.gz",
+        "raw_artifact_sha256": "23defb6c3aa1540b26482d611bef398035c233e406e274ce240b89b996ceebd5",
+        "raw_native_positive_rent_rows": 38,
+        "status": 200
+      },
+      "identity_evidence": {
+        "canonical_address": "10881 Richmond Ave.",
+        "canonical_name": "Grand at Westchase",
+        "configured_pipeline_apts247_plan_only_then_resman_unit_retry": true,
+        "current_parent_name_address_city_zip_match": true,
+        "distinct_unit_numbers": 38,
+        "provider_page_exact_property_name_match": true,
+        "provider_property_guid": "4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+        "rows_with_native_identity": 38,
+        "rows_with_native_identity_and_positive_rent": 38,
+        "same_tenant_same_account_availability_redirect": true,
+        "single_published_property_scoped_applicant_url": "https://richmark.myresman.com/Portal/Applicants/New/GRAND?a=1054",
+        "source_urls": [
+          "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        ]
+      },
+      "live_cluster_controls": [
+        {
+          "adapter": "apts247",
+          "detector_candidates": [
+            {
+              "confidence": 0.9,
+              "pms": "apts247"
+            },
+            {
+              "confidence": 0.85,
+              "pms": "resman"
+            }
+          ],
+          "final_url": "https://www.encoreonmustangapts.com/",
+          "label": "Encore on Mustang",
+          "native_positive_rent_rows": 10,
+          "property_id": "9186",
+          "tier": "TIER_1_API_APTS247",
+          "url": "https://www.encoreonmustangapts.com/",
+          "verdict": "primary_apts247_unit_roster_preserved_no_resman_retry_needed",
+          "winning_url": "https://www.encoreonmustangapts.com/api/v1/floorplans/?api_key=b7295ca5a2e768ac626242e3e1f7c08a0366782b"
+        },
+        {
+          "adapter": "apts247",
+          "detector_candidates": [
+            {
+              "confidence": 0.9,
+              "pms": "apts247"
+            },
+            {
+              "confidence": 0.86,
+              "pms": "resman"
+            },
+            {
+              "confidence": 0.85,
+              "pms": "encoreskyline_template"
+            }
+          ],
+          "final_url": "https://www.crossingsatberkleysquare.com/",
+          "label": "Crossings at Berkley Square",
+          "native_positive_rent_rows": 14,
+          "property_id": "live_control",
+          "tier": "TIER_1_API_APTS247",
+          "url": "https://www.crossingsatberkleysquare.com/",
+          "verdict": "primary_apts247_unit_roster_preserved_no_resman_retry_needed",
+          "winning_url": "https://www.crossingsatberkleysquare.com/api/v1/floorplans/?api_key=613a6c2d7d9b8fc404c1c87ea852beab9b32f937"
+        }
+      ],
+      "native_rows": [
+        {
+          "address": "",
+          "floor_plan_name": "A1",
+          "market_rent_high": 810,
+          "market_rent_low": 810,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1502"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1504"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1610"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1",
+          "market_rent_high": 815,
+          "market_rent_low": 815,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1612"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1613"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1E",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1512"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1E",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1514"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1E",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1516"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1E",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1517"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "A1E",
+          "market_rent_high": 775,
+          "market_rent_low": 775,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "510",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1513"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1",
+          "market_rent_high": 900,
+          "market_rent_low": 900,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "206"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1",
+          "market_rent_high": 935,
+          "market_rent_low": 935,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "212"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1",
+          "market_rent_high": 900,
+          "market_rent_low": 900,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "306"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1",
+          "market_rent_high": 900,
+          "market_rent_low": 900,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "402"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1",
+          "market_rent_high": 900,
+          "market_rent_low": 900,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "806"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1E",
+          "market_rent_high": 885,
+          "market_rent_low": 885,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "204"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1E",
+          "market_rent_high": 880,
+          "market_rent_low": 880,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "409"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1E",
+          "market_rent_high": 885,
+          "market_rent_low": 885,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "422"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1E",
+          "market_rent_high": 850,
+          "market_rent_low": 850,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1414"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "B1E",
+          "market_rent_high": 895,
+          "market_rent_low": 895,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "570",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1806"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1",
+          "market_rent_high": 965,
+          "market_rent_low": 965,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1115"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1",
+          "market_rent_high": 925,
+          "market_rent_low": 925,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "115"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1E",
+          "market_rent_high": 910,
+          "market_rent_low": 910,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "106"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1E",
+          "market_rent_high": 960,
+          "market_rent_low": 960,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "107"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1E",
+          "market_rent_high": 920,
+          "market_rent_low": 920,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1103"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1E",
+          "market_rent_high": 920,
+          "market_rent_low": 920,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1106"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "C1E",
+          "market_rent_high": 920,
+          "market_rent_low": 920,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "633",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1114"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "E1 Floor Plan",
+          "market_rent_high": 1080,
+          "market_rent_low": 1080,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "804",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "710"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "E1 Floor Plan",
+          "market_rent_high": 1080,
+          "market_rent_low": 1080,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "804",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "714"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "E1E",
+          "market_rent_high": 1030,
+          "market_rent_low": 1030,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "804",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "704"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "E1E",
+          "market_rent_high": 1065,
+          "market_rent_low": 1065,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "804",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "503"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1",
+          "market_rent_high": 1170,
+          "market_rent_low": 1170,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1316"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1",
+          "market_rent_high": 1170,
+          "market_rent_low": 1170,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "906"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1E",
+          "market_rent_high": 1125,
+          "market_rent_low": 1125,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "904"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1E",
+          "market_rent_high": 1080,
+          "market_rent_low": 1080,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "905"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1E",
+          "market_rent_high": 1115,
+          "market_rent_low": 1115,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "914"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1E",
+          "market_rent_high": 1080,
+          "market_rent_low": 1080,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1216"
+        },
+        {
+          "address": "",
+          "floor_plan_name": "F1E",
+          "market_rent_high": 1080,
+          "market_rent_low": 1080,
+          "native_unit_id": "",
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b",
+          "source_ids": {},
+          "source_property_id": "",
+          "source_property_name": "",
+          "sqft": "885",
+          "unit_id": "",
+          "unit_name": "",
+          "unit_number": "1006"
+        }
+      ],
+      "native_samples": [
+        {
+          "identity": {
+            "unit_number": "1502"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 810,
+            "market_rent_low": 810
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1504"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1610"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1612"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 815,
+            "market_rent_low": 815
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1613"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1512"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1514"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1516"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1517"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1513"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 775,
+            "market_rent_low": 775
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "206"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 900,
+            "market_rent_low": 900
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "212"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 935,
+            "market_rent_low": 935
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "306"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 900,
+            "market_rent_low": 900
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "402"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 900,
+            "market_rent_low": 900
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "806"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 900,
+            "market_rent_low": 900
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "204"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 885,
+            "market_rent_low": 885
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "409"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 880,
+            "market_rent_low": 880
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "422"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 885,
+            "market_rent_low": 885
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1414"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 850,
+            "market_rent_low": 850
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1806"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 895,
+            "market_rent_low": 895
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1115"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 965,
+            "market_rent_low": 965
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "115"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 925,
+            "market_rent_low": 925
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "106"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 910,
+            "market_rent_low": 910
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "107"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 960,
+            "market_rent_low": 960
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1103"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 920,
+            "market_rent_low": 920
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1106"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 920,
+            "market_rent_low": 920
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1114"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 920,
+            "market_rent_low": 920
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "710"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1080,
+            "market_rent_low": 1080
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "714"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1080,
+            "market_rent_low": 1080
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "704"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1030,
+            "market_rent_low": 1030
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "503"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1065,
+            "market_rent_low": 1065
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1316"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1170,
+            "market_rent_low": 1170
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "906"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1170,
+            "market_rent_low": 1170
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "904"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1125,
+            "market_rent_low": 1125
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "905"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1080,
+            "market_rent_low": 1080
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "914"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1115,
+            "market_rent_low": 1115
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1216"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1080,
+            "market_rent_low": 1080
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        },
+        {
+          "identity": {
+            "unit_number": "1006"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1080,
+            "market_rent_low": 1080
+          },
+          "source_api_url": "https://richmark.myresman.com/Portal/Applicants/Availability?a=1054&p=4afd1e5f-0f76-4bc3-b81b-fc4f0f66056b"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "property_id": 12989,
+      "property_identity_match": true,
+      "property_name": "Grand at Westchase",
+      "units": 38,
+      "website": "https://www.thegrandatwestchase.com/"
+    }
+  ],
+  "summary": {
+    "captcha_solving": false,
+    "capture_timestamp_utc": "2026-08-01T13:55:30.378998+00:00",
+    "critical_source_sha256": {
+      "ma_poc/pms/adapters/apts247.py": "f9f899e4e151ccbdd58ab4a0f5a9107438b812a9ae49b1fe3f0002ef77eff4eb",
+      "ma_poc/pms/adapters/resman.py": "3ab9babaf4ae5da1929e4f25652c7ef1b3a9715d2ec543561c21411882f8d253",
+      "ma_poc/pms/detector.py": "48ebf6f88454f0ef71d557d00d1d879dcac62a5aaea727d584a7b16520f8706a",
+      "ma_poc/pms/scraper.py": "2548c63156d664610771594680838fa435fced47f7320ac03c62deb7bef98c8e"
+    },
+    "environment": {
+      "COMPLIANCE_MODE": "1",
+      "ENABLE_BODY_RESOLVER": "false",
+      "ENABLE_CRAWL_GET_GATE": "false",
+      "ENABLE_DC_PROXY_TIER": "false",
+      "ENABLE_ENTRATA_PLAN_RENDER": "false",
+      "ENABLE_FLARESOLVERR_TIER": "false",
+      "ENABLE_PLAN_UNIT_RENDER": "false",
+      "ENABLE_RENDER_ON_EMPTY": "false",
+      "ENABLE_RESIDENTIAL_RENDER_TIER": "false",
+      "ENABLE_RESIDENTIAL_TIER": "false",
+      "ENABLE_TIER4_LLM": "false",
+      "ENABLE_TIER_ESCALATION": "false",
+      "ENABLE_UNLOCKER_TIER": "false",
+      "FETCH_BACKEND": "brightdata",
+      "PROBE_PROXY_URL": "",
+      "PROXY_POOL_URLS": "",
+      "RENDER_BACKEND": "local"
+    },
+    "fingerprint_rotation": false,
+    "hyperbrowser": false,
+    "live_cluster_properties_probed": 3,
+    "live_positive_apts247_primary_controls": 2,
+    "llm_used": false,
+    "native_positive_rent_rows": 38,
+    "paid_canary_run": false,
+    "result_type": "strict_current_grand_westchase_apts247_resman_retry",
+    "strict_unit_qualified_properties": 1,
+    "strict_unit_qualified_property_ids": [
+      12989
+    ],
+    "web_unlocker": false,
+    "web_unlocker_call_count": 0
+  }
+}

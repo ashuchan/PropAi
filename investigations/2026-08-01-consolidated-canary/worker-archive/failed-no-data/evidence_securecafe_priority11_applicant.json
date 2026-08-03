@@ -1,0 +1,832 @@
+{
+  "batch_label": "securecafe-priority11-applicant",
+  "filters": {
+    "evidence_lane": "",
+    "ledger_level": "",
+    "property_ids": [
+      594,
+      22658,
+      27725,
+      28174,
+      42576,
+      61979,
+      69558,
+      234581,
+      239094,
+      240595,
+      262799
+    ],
+    "source_adapter": ""
+  },
+  "results": [
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": ""
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 594,
+      "property_identity_match": false,
+      "property_name": "Harbinwood",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "www.harbinwoodbyelon.com"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [
+          "1338225"
+        ],
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "1338225"
+        ],
+        "row_property_names": [
+          "countryridge"
+        ],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "countryridge.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://countryridge.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1338225&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.countryridge.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "10/07/2026",
+          "floor_plan_name": "2 Bedroom Townhome",
+          "identity": {
+            "floor_plan_id": "80e4d8c8ce6c",
+            "unit_number": "1701"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1125,
+            "market_rent_low": 1125
+          },
+          "source_api_url": "https://countryridge.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1338225&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "28605263",
+            "securecafe_floorplan_id": "3573895"
+          },
+          "source_property_id": "1338225",
+          "source_property_name": "Country Ridge Townhomes"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 22658,
+      "property_identity_match": false,
+      "property_name": "Country Ridge Townhomes",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "2 Bedroom Townhome"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 1,
+      "website": "https://www.countryridge.com"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 1,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 1,
+        "rows_with_native_identity_and_positive_rent": 1,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": true,
+        "source_hosts": [
+          "gardensofpinecrestapartments.securecafe.com"
+        ],
+        "source_urls": [
+          "https://gardensofpinecrestapartments.securecafe.com/onlineleasing/gardens-of-pinecrest/availableunits.aspx"
+        ],
+        "website_host": "www.gardensofpinecrestapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "",
+          "floor_plan_name": "1 BED 1 BATH",
+          "identity": {
+            "floor_plan_id": "5b235d9424c4",
+            "unit_number": "K2"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1900,
+            "market_rent_low": 1900
+          },
+          "source_api_url": "https://gardensofpinecrestapartments.securecafe.com/onlineleasing/gardens-of-pinecrest/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "3180186"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 27725,
+      "property_identity_match": true,
+      "property_name": "The Gardens of Pinecrest",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 BED 1 BATH"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 1,
+      "website": "https://www.gardensofpinecrestapartments.com/?rcstdid=MzI%3d-GJOvflXLv8M%3d&_yTrackUser=ODc4MjE0MDU4IzE4OTE0MjUzNDM%3d-q3%2b9PtfoQ%2bo%3d&_yTrackVisit=MTU4OTQ5NDE0MyMxODI1ODI1MTU3-j1vbMVdjJw8%3d&_yTrackReqDT=22311420200708"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [
+          "1160396"
+        ],
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [
+          "1160396"
+        ],
+        "row_property_names": [
+          "pinewoodscircle"
+        ],
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "pinewoodsvillage.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://pinewoodsvillage.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1160396&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.pinewoodsvillage.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "06/29/2026",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "identity": {
+            "floor_plan_id": "626b86548294",
+            "unit_number": "05-204"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1350,
+            "market_rent_low": 1350
+          },
+          "source_api_url": "https://pinewoodsvillage.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1160396&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "20666106",
+            "securecafe_floorplan_id": "3252276"
+          },
+          "source_property_id": "1160396",
+          "source_property_name": "Pinewoods Circle"
+        },
+        {
+          "availability_date": "05/19/2026",
+          "floor_plan_name": "2 Bed 2 Bath",
+          "identity": {
+            "floor_plan_id": "626b86548294",
+            "unit_number": "09-205"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1350,
+            "market_rent_low": 1350
+          },
+          "source_api_url": "https://pinewoodsvillage.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=1160396&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "20666155",
+            "securecafe_floorplan_id": "3252276"
+          },
+          "source_property_id": "1160396",
+          "source_property_name": "Pinewoods Circle"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 28174,
+      "property_identity_match": false,
+      "property_name": "Pinewoods Circle",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "2 Bed 2 Bath",
+        "3 Bed 2 Bath"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 7,
+      "website": "http://www.pinewoodsvillage.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": true,
+        "applicant_property_match": true,
+        "applicant_query_ids": [
+          "544401"
+        ],
+        "distinct_unit_numbers": 29,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "544401"
+        ],
+        "row_property_names": [
+          "fenwaytriangle"
+        ],
+        "rows_with_native_identity": 29,
+        "rows_with_native_identity_and_positive_rent": 29,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "fenwaytriangle.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://fenwaytriangle.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=544401&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "fenwaytriangle.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "07/30/2026",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "04864b9df2f0",
+            "unit_number": "807"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 6131,
+            "market_rent_low": 3796
+          },
+          "source_api_url": "https://fenwaytriangle.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=544401&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "16405974",
+            "securecafe_floorplan_id": "2161209"
+          },
+          "source_property_id": "544401",
+          "source_property_name": "Fenway Triangle"
+        },
+        {
+          "availability_date": "07/30/2026",
+          "floor_plan_name": "Studio",
+          "identity": {
+            "floor_plan_id": "04864b9df2f0",
+            "unit_number": "907"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 5889,
+            "market_rent_low": 3646
+          },
+          "source_api_url": "https://fenwaytriangle.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=544401&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "16406007",
+            "securecafe_floorplan_id": "2161209"
+          },
+          "source_property_id": "544401",
+          "source_property_name": "Fenway Triangle"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 0,
+      "property_id": 42576,
+      "property_identity_match": true,
+      "property_name": "Fenway Triangle",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1 bedroom",
+        "2 bedroom",
+        "3 bedroom",
+        "Studio"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 29,
+      "website": "https://fenwaytriangle.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.villamilano.us"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 61979,
+      "property_identity_match": false,
+      "property_name": "Villa Milano",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.villamilano.us/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "no_native_units",
+      "errors": [
+        "RENTCAFE_NO_RESPONSE: no network responses captured during page load"
+      ],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 0,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 0,
+        "rows_with_native_identity_and_positive_rent": 0,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [],
+        "source_urls": [],
+        "website_host": "www.goldberg-realty.com"
+      },
+      "identity_samples": [],
+      "outcome": "EMPTY",
+      "plans": 0,
+      "property_id": 69558,
+      "property_identity_match": false,
+      "property_name": "Spring Hill Apartments",
+      "raw_extractor_outcome": "EMPTY",
+      "sample_plan_names": [],
+      "tier": "TIER_1_API_RENTCAFE_NO_RESPONSE",
+      "units": 0,
+      "website": "https://www.goldberg-realty.com/spring-hill-apartments/default.aspx?_yTrackUser=NjYxMjI5OTY5IzE0NTQ0NTc5MTc=-lDwvxVr1Jx8=&_yTrackVisit=MTQ4NjYyNzQ2OCM2NDQ2Nzc2ODg%3d-W7HwJRKaxxE%3d&_yTrackReqDT=05551420201206"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": true,
+        "applicant_property_match": true,
+        "applicant_query_ids": [
+          "622474"
+        ],
+        "distinct_unit_numbers": 9,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "622474"
+        ],
+        "row_property_names": [
+          "georgetowncrossing"
+        ],
+        "rows_with_native_identity": 9,
+        "rows_with_native_identity_and_positive_rent": 9,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "georgetowncrossing-triplecrowncorp.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://georgetowncrossing-triplecrowncorp.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=622474&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.triplecrowncorp.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/27/2026",
+          "floor_plan_name": "The Kingston",
+          "identity": {
+            "floor_plan_id": "ebdde3dfffb8",
+            "unit_number": "731C-GTC"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1969,
+            "market_rent_low": 1852
+          },
+          "source_api_url": "https://georgetowncrossing-triplecrowncorp.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=622474&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "10714863",
+            "securecafe_floorplan_id": "2292071"
+          },
+          "source_property_id": "622474",
+          "source_property_name": "Georgetown Crossing"
+        },
+        {
+          "availability_date": "08/28/2026",
+          "floor_plan_name": "The Kingston",
+          "identity": {
+            "floor_plan_id": "ebdde3dfffb8",
+            "unit_number": "502G-GTC"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1947,
+            "market_rent_low": 1832
+          },
+          "source_api_url": "https://georgetowncrossing-triplecrowncorp.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=622474&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "10714784",
+            "securecafe_floorplan_id": "2292071"
+          },
+          "source_property_id": "622474",
+          "source_property_name": "Georgetown Crossing"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 3,
+      "property_id": 234581,
+      "property_identity_match": true,
+      "property_name": "Georgetown Crossing",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "The Hampton",
+        "The Hampton A",
+        "The Kingston",
+        "The Kingston A",
+        "The Yorkshire",
+        "The Yorkshire A"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 9,
+      "website": "https://www.triplecrowncorp.com/company/locations/georgetown-crossing/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "pass_property_scoped_native_identity",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": true,
+        "applicant_property_match": true,
+        "applicant_query_ids": [
+          "450410"
+        ],
+        "distinct_unit_numbers": 7,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "450410"
+        ],
+        "row_property_names": [
+          "zanderplace"
+        ],
+        "rows_with_native_identity": 7,
+        "rows_with_native_identity_and_positive_rent": 7,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "zanderplace.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://zanderplace.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=450410&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.zanderplace.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "08/01/2026",
+          "floor_plan_name": "A",
+          "identity": {
+            "floor_plan_id": "ec77092fb2aa",
+            "unit_number": "212"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1745,
+            "market_rent_low": 1745
+          },
+          "source_api_url": "https://zanderplace.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=450410&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "21153313",
+            "securecafe_floorplan_id": "2193465"
+          },
+          "source_property_id": "450410",
+          "source_property_name": "Zander Place"
+        },
+        {
+          "availability_date": "08/01/2026",
+          "floor_plan_name": "A",
+          "identity": {
+            "floor_plan_id": "ec77092fb2aa",
+            "unit_number": "312"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1745,
+            "market_rent_low": 1745
+          },
+          "source_api_url": "https://zanderplace.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=450410&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "21153328",
+            "securecafe_floorplan_id": "2193465"
+          },
+          "source_property_id": "450410",
+          "source_property_name": "Zander Place"
+        }
+      ],
+      "outcome": "UNIT_QUALIFIED",
+      "plans": 4,
+      "property_id": 239094,
+      "property_identity_match": true,
+      "property_name": "Zander Place",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "1C1NP (Surface Lot Parking)",
+        "1CNP (Surface Lot Parking Only)",
+        "A",
+        "A1",
+        "B",
+        "D",
+        "E",
+        "E1"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 7,
+      "website": "http://www.zanderplace.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [
+          "296857"
+        ],
+        "distinct_unit_numbers": 4,
+        "property_name_consistent": true,
+        "row_addresses": [],
+        "row_property_ids": [
+          "296857"
+        ],
+        "row_property_names": [
+          "stockbridgetrails"
+        ],
+        "rows_with_native_identity": 4,
+        "rows_with_native_identity_and_positive_rent": 4,
+        "same_host": false,
+        "securecafe_exact_base_harvested": false,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "stockbridgetrailsapartments.securecafeapplicant.com"
+        ],
+        "source_urls": [
+          "https://stockbridgetrailsapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=296857&RequestBeforeLogin=true&isPropertyList=false"
+        ],
+        "website_host": "www.stockbridgetrailsapartments.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "09/01/2026",
+          "floor_plan_name": "Style A",
+          "identity": {
+            "floor_plan_id": "99e09550fbc3",
+            "unit_number": "319_213"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1240,
+            "market_rent_low": 1240
+          },
+          "source_api_url": "https://stockbridgetrailsapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=296857&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "4145016",
+            "securecafe_floorplan_id": "2052883"
+          },
+          "source_property_id": "296857",
+          "source_property_name": "Stockbridge Trails"
+        },
+        {
+          "availability_date": "04/15/2026",
+          "floor_plan_name": "Style F",
+          "identity": {
+            "floor_plan_id": "429f6176ba7b",
+            "unit_number": "319_307"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 1695,
+            "market_rent_low": 1695
+          },
+          "source_api_url": "https://stockbridgetrailsapartments.securecafeapplicant.com/onlineleasing/api/floorplan/getfloorplanandavailableunits?propertyId=296857&RequestBeforeLogin=true&isPropertyList=false",
+          "source_ids": {
+            "securecafe_apartment_id": "4145024",
+            "securecafe_floorplan_id": "2190098"
+          },
+          "source_property_id": "296857",
+          "source_property_name": "Stockbridge Trails"
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 12,
+      "property_id": 240595,
+      "property_identity_match": false,
+      "property_name": "Stockbridge Trails",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "Style A",
+        "Style B",
+        "Style C",
+        "Style C-S",
+        "Style D",
+        "Style E1",
+        "Style E2",
+        "Style F"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_APPLICANT_FLOORPLANS_V2_DIRECT",
+      "units": 4,
+      "website": "https://www.stockbridgetrailsapartments.com/"
+    },
+    {
+      "adapter": "rentcafe",
+      "batch_label": "securecafe-priority11-applicant",
+      "canonical_metadata_joined": false,
+      "contamination_verdict": "unverified_property_boundary",
+      "errors": [],
+      "identity_evidence": {
+        "address_conflict": false,
+        "address_matches": false,
+        "applicant_base_harvested": false,
+        "applicant_property_match": false,
+        "applicant_query_ids": [],
+        "distinct_unit_numbers": 74,
+        "property_name_consistent": false,
+        "row_addresses": [],
+        "row_property_ids": [],
+        "row_property_names": [],
+        "rows_with_native_identity": 74,
+        "rows_with_native_identity_and_positive_rent": 73,
+        "same_host": false,
+        "securecafe_exact_base_harvested": true,
+        "securecafe_property_match": false,
+        "source_hosts": [
+          "preserveatdeercreek-living.securecafe.com"
+        ],
+        "source_urls": [
+          "https://preserveatdeercreek-living.securecafe.com/onlineleasing/palm-haven/availableunits.aspx"
+        ],
+        "website_host": "www.dermotcompany.com"
+      },
+      "identity_samples": [
+        {
+          "availability_date": "Available",
+          "floor_plan_name": "A1",
+          "identity": {
+            "floor_plan_id": "8e9a18de33eb",
+            "unit_number": "14-115"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3003,
+            "market_rent_low": 1812
+          },
+          "source_api_url": "https://preserveatdeercreek-living.securecafe.com/onlineleasing/palm-haven/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5244691"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        },
+        {
+          "availability_date": "12/31/2026",
+          "floor_plan_name": "A2",
+          "identity": {
+            "floor_plan_id": "f20ea45bcd0b",
+            "unit_number": "09-116"
+          },
+          "positive_rent_evidence": {
+            "market_rent_high": 3801,
+            "market_rent_low": 2313
+          },
+          "source_api_url": "https://preserveatdeercreek-living.securecafe.com/onlineleasing/palm-haven/availableunits.aspx",
+          "source_ids": {
+            "securecafe_floorplan_id": "5244695"
+          },
+          "source_property_id": "",
+          "source_property_name": ""
+        }
+      ],
+      "outcome": "UNIT_UNVERIFIED",
+      "plans": 0,
+      "property_id": 262799,
+      "property_identity_match": false,
+      "property_name": "220 East 72nd",
+      "raw_extractor_outcome": "UNITS",
+      "sample_plan_names": [
+        "A1",
+        "A2",
+        "A3",
+        "A3GKR",
+        "A4",
+        "A5",
+        "B1",
+        "B2"
+      ],
+      "tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+      "units": 74,
+      "website": "https://www.dermotcompany.com/building/220-east-72nd-street#availability"
+    }
+  ]
+}

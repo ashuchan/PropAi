@@ -1,0 +1,163 @@
+{
+  "cluster_status": {
+    "dead_entry_salvage": "PARTIAL_RUNTIME_EXERCISED",
+    "entrata_parallel_roster": "PASS_RUNTIME_EXERCISED",
+    "identity_natural_id": "PASS_RUNTIME_EXERCISED",
+    "managebuilding_archive": "PASS_RUNTIME_EXERCISED",
+    "negative_status_date": "PASS_RUNTIME_EXERCISED",
+    "timeout_diagnostics": "PARTIAL_RUNTIME_EXERCISED"
+  },
+  "conclusion": "PARTIAL_RUNTIME_COVERAGE",
+  "incomplete_clusters": [
+    "dead_entry_salvage",
+    "timeout_diagnostics"
+  ],
+  "issues": {
+    "code_counts": {},
+    "severity_counts": {}
+  },
+  "launch": {
+    "build": {
+      "cloud_build_id": "9f5c3eb4-ea28-4eea-abc0-88d54afe5c68",
+      "commit": "7f800ca",
+      "image_digest": "sha256:ae62e4ec3235d303530bb680b0c8e15d3d753c14b5d81397bfc72b0a28648ea0",
+      "image_uri": "us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:ae62e4ec3235d303530bb680b0c8e15d3d753c14b5d81397bfc72b0a28648ea0"
+    },
+    "execution": {
+      "execution": "jugnu-verify-7f800ca-thfcv",
+      "fetch_backend": "hyperbrowser",
+      "job": "jugnu-verify-7f800ca",
+      "llm_enabled": false,
+      "parallelism": 29,
+      "project": "jugnu-494013",
+      "region": "us-central1",
+      "run_output": "gs://jugnu-canary/runs/2026-08-02-verify-7f800ca/",
+      "task_count": 29
+    },
+    "input": {
+      "properties_csv": "gs://jugnu-canary/property-list/verify-7f800ca.csv",
+      "properties_csv_generation": "1785717713013573",
+      "properties_sha256": "26d074a211e1150678760dfe2f071240541d1cf379dc2bec4b6951fd95823a32",
+      "property_count": 29,
+      "verification_case_count": 31
+    },
+    "runtime_policy": {
+      "captcha_solver_enabled": false,
+      "dc_proxy_enabled": false,
+      "fingerprint_rotation_enabled": false,
+      "flaresolverr_enabled": false,
+      "hyperbrowser_proxy_enabled": true,
+      "web_unlocker_enabled": false
+    },
+    "warm_profiles": {
+      "bootstrap_profiles": 2,
+      "destination": "gs://jugnu-canary/profiles/verify-7f800ca/",
+      "profiles_copied": 27,
+      "shared_store_mutated": false,
+      "source": "gs://jugnu-canary/profiles/strat1000-ff7b377/"
+    }
+  },
+  "results": {
+    "building_id_rows": 255,
+    "rent_range_rows": 1188,
+    "snapshots": 29,
+    "synthetic_id_rows": 0,
+    "unit_rows": 1188,
+    "unresolved_area_rows": 0,
+    "verdict_counts": {
+      "FAILED_NO_DATA": 1,
+      "FAILED_UNREACHABLE": 1,
+      "SUCCESS": 22,
+      "SUCCESS_PLAN_LEVEL": 5
+    }
+  },
+  "run": {
+    "duplicate_properties": [],
+    "expected_properties": 29,
+    "missing_properties": [],
+    "output_properties": 29,
+    "unexpected_properties": []
+  },
+  "supplemental_launches": [
+    {
+      "build": {
+        "cloud_build_id": "179f9cfa-7d03-4f1b-9427-0c16ec8abaa2",
+        "commit": "823ea7c",
+        "finish_time": "2026-08-03T01:36:19.776169Z",
+        "image_digest": "sha256:36463a0d7f1d1ff64767d592fb4e5e60a72aa66447cb7895f5c012a61bdac610",
+        "image_uri": "us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:36463a0d7f1d1ff64767d592fb4e5e60a72aa66447cb7895f5c012a61bdac610",
+        "status": "SUCCESS"
+      },
+      "execution": {
+        "completed_at": "2026-08-03T01:43:16.039878Z",
+        "created_at": "2026-08-03T01:38:52.184319Z",
+        "duration": "3m32.8s",
+        "execution": "jugnu-verify-823ea7c-rf4br",
+        "failed_count": 0,
+        "fetch_backend": "hyperbrowser",
+        "job": "jugnu-verify-823ea7c",
+        "llm_enabled": false,
+        "parallelism": 1,
+        "project": "jugnu-494013",
+        "property_timeout_seconds": 120,
+        "region": "us-central1",
+        "run_output": "gs://jugnu-canary/runs/2026-08-02-verify-823ea7c/",
+        "shard_runner_timeout_seconds": 150,
+        "started_at": "2026-08-03T01:39:43.237209Z",
+        "status": "SUCCESS",
+        "succeeded_count": 1,
+        "task_count": 1,
+        "task_timeout_seconds": 900
+      },
+      "input": {
+        "properties_csv": "gs://jugnu-canary/property-list/verify-823ea7c.csv",
+        "properties_csv_generation": "1785720327884242",
+        "properties_csv_md5_base64": "TpPQz27O1xM6TOMsMPAXig==",
+        "properties_sha256": "292870d8248429a9c0dceb1a7b8c584d2e289117aa9b4e968a721bbfd0a93138",
+        "property_count": 1,
+        "property_id": "52697"
+      },
+      "retry_of": {
+        "disproved_commit": "ed94525",
+        "disproved_execution": "jugnu-verify-ed94525-xsj2x",
+        "disproved_execution_completion_time": "2026-08-03T01:20:23.388533Z",
+        "reason": "the wedged child event loop never reached its in-process cancellation cleanup"
+      },
+      "runtime_policy": {
+        "captcha_solver_enabled": false,
+        "dc_proxy_enabled": false,
+        "fingerprint_rotation_enabled": false,
+        "flaresolverr_enabled": false,
+        "hyperbrowser_proxy_enabled": true,
+        "hyperbrowser_stealth_enabled": false,
+        "web_unlocker_enabled": false
+      },
+      "verification": {
+        "combined_audit": "../../post-run-verification/summary.json",
+        "extraction_snapshot": "diagnostics/52697/78337f9a92d8b9db71a15195f8608fbbd3b51b567c0065cc2fbe5dcacfd93ff8.extraction.json.gz",
+        "materialized_at": "2026-08-03T01:43:11.066252Z",
+        "output_object_count": 9,
+        "property_id": "52697",
+        "raw_source_manifest": "raw_sources/manifests/52697/a6b030695ba1775e7610c1a1b905cbdeeaed51aab36d0081171a3f164f89e1a6.json.gz",
+        "runner_killed_at": "2026-08-03T01:43:10.929537Z",
+        "scrape_errors": [
+          "per_property_timeout:120s (shard_supervisor_fallback)",
+          "shard_runner_timeout:150s"
+        ],
+        "snapshot_count": 1,
+        "supervisor_timeout_fallback_materialized": true,
+        "terminal_record_count": 1,
+        "terminal_verdict": "FAILED_UNREACHABLE",
+        "unit_count": 0
+      },
+      "warm_profile": {
+        "destination": "gs://jugnu-canary/profiles/verify-823ea7c/52697.json",
+        "destination_generation": "1785720327800700",
+        "md5_base64": "YQY96t8Qao3PB7T19OTXnQ==",
+        "shared_store_mutated": false,
+        "source": "gs://jugnu-canary/profiles/verify-7f800ca/52697.json",
+        "source_generation": "1785717747412123"
+      }
+    }
+  ]
+}

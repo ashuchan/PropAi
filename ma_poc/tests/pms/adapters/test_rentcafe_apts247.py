@@ -114,6 +114,51 @@ def test_parse_securecafe_attaches_floorplan_id_to_source_ids() -> None:
     assert u["sqft"] == ""
 
 
+def test_securecafe_uses_exact_apply_move_in_date_when_cell_is_generic() -> None:
+    """The public Apply action is the unit-specific source of truth when the
+    display cell says only ``Available`` (live Black Hawk / Moda shape)."""
+    html = """
+    <h1>Floor Plan: A1 - 1 Bedroom, 1 Bathroom</h1>
+    <tr class='AvailUnitRow'>
+      <th data-label='Apartment'>#2824</th>
+      <td data-label='Rent'>$1,120</td>
+      <td data-label='Date Available'><span>Available</span></td>
+      <td data-label='Action'>
+        <input onclick="SetTermsUrl('rentaloptions.aspx?UnitID=46573837&amp;FloorPlanID=6091916&amp;MoveInDate=8%2F31%2F2026')">
+      </td>
+    </tr>
+    """
+
+    [unit] = parse_securecafe_availableunits(
+        html, "https://example.test/availableunits.aspx"
+    )
+
+    assert unit["availability_date"] == "8/31/2026"
+    assert unit["available_date"] == "8/31/2026"
+
+
+def test_securecafe_keeps_concrete_visible_date_over_apply_parameter() -> None:
+    """Do not overwrite a concrete operator-facing cell when both sources
+    publish a date; the fallback is intentionally limited to generic cells."""
+    html = """
+    <h1>Floor Plan: B2 - 2 Bedrooms, 2 Bathrooms</h1>
+    <tr class='AvailUnitRow'>
+      <th data-label='Apartment'>#2307</th>
+      <td data-label='Rent'>$3,628</td>
+      <td data-label='Date Available'>9/9/2026</td>
+      <td data-label='Action'>
+        <a href='rentaloptions.aspx?UnitID=1&amp;MoveInDate=9%2F10%2F2026'>Apply</a>
+      </td>
+    </tr>
+    """
+
+    [unit] = parse_securecafe_availableunits(
+        html, "https://example.test/availableunits.aspx"
+    )
+
+    assert unit["availability_date"] == "9/9/2026"
+
+
 # ─── apts247 plan-list shape (live-captured 2026-05-22) ──────────────
 
 

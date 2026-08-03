@@ -142,15 +142,15 @@ def test_failed_fetch_with_no_units_still_unreachable() -> None:
         assert "TRANSIENT" in res.reason
 
 
-def test_dead_url_still_terminal_even_with_units() -> None:
-    """DEAD_URL is checked BEFORE the new guard and stays terminal."""
+def test_dead_entry_url_does_not_discard_recovered_units() -> None:
+    """A dead entry URL is non-terminal when a bounded sub-route found units."""
     from ma_poc.reporting import verdict as V
 
     res = V.compute(
         fetch_outcome="DEAD_URL",
         extract_result=_Extract([{"unit_number": "1", "market_rent_low": 900}]),
     )
-    assert res.verdict == V.Verdict.DEAD_URL
+    assert res.verdict == V.Verdict.SUCCESS
 
 
 def test_units_helper_tolerates_shapes() -> None:

@@ -52,6 +52,9 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     rent_in_sanity_range,
 )
+from ma_poc.pms.adapters._rentcafe_availability import (
+    availability_by_applyga_unit,
+)
 
 log = logging.getLogger(__name__)
 
@@ -376,6 +379,27 @@ def is_nestin_template(html: str) -> bool:
     detection is robust to per-property CSS/class differences.
     """
     return _NESTIN_IMAGE_CDN in (html or "").lower()
+
+
+def is_rentcafe_applicant_shell(html: str) -> bool:
+    """True only for the modern public RentCafe Applicant SPA shell.
+
+    Some Yardi vanity domains serve the generic Applicant shell at ``/``
+    while their native roster remains on the same domain's
+    ``/floorplans/<slug>`` pages.  The title alone is too broad, so require
+    both the exact RentCafe title and the Applicant bundle path.  This signal
+    is used only to attempt the bounded public ``/floorplans`` recovery; all
+    emitted rows must still carry a physical apartment identity + rent.
+    """
+    body = html or ""
+    return bool(
+        re.search(
+            r"<title[^>]*>\s*Applicant Portal\s*\|\s*RentCafe\s*</title>",
+            body,
+            re.IGNORECASE,
+        )
+        and re.search(r"/applicant/(?:js|chunks)/", body, re.IGNORECASE)
+    )
 
 
 def _money_to_int(text: str) -> int | None:
@@ -737,6 +761,10 @@ def _rendered_rent_pairs(detail_html: str) -> set[tuple[int, int]]:
     return pairs
 
 
+def _nestin_unit_from_applyga(_onclick: str, element: Any) -> str:
+    return _normalize_unit_number(element.get("id") or "")
+
+
 def _parse_applyga_button_layout(
     detail_html: str, source_url: str, floor_plan_name: str = ""
 ) -> list[dict[str, Any]]:
@@ -767,6 +795,9 @@ def _parse_applyga_button_layout(
         return []
 
     rendered_pairs = _rendered_rent_pairs(detail_html)
+    unit_dates = availability_by_applyga_unit(
+        detail_html, unit_from_element=_nestin_unit_from_applyga
+    )
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -831,7 +862,7 @@ def _parse_applyga_button_layout(
                 rent_low=rent_int,
                 rent_high=rent_high_int,
                 availability_status="AVAILABLE",
-                availability_date="",
+                availability_date=unit_dates.get(unit_number.upper(), ""),
                 source_api_url=source_url,
                 extraction_tier="TIER_1_DOM_RENTCAFE_NESTIN",
             )
@@ -939,6 +970,7 @@ async def recover_rentcafe_nestin_per_plan(
     fetcher: Any = None,  # callable(url) -> object with .status_code + .text
     page: Any = None,     # Playwright Page; when provided, used in preference
                           # to fetcher for ALL fetches so CF clearance carries
+    property_id: str = "",
 ) -> tuple[list[dict[str, Any]], str]:
     """Run the Nestin per-plan recovery against the property's marketing site.
 
@@ -968,7 +1000,9 @@ async def recover_rentcafe_nestin_per_plan(
         Returns ``([], "")`` when the property isn't Nestin-shaped or no
         detail pages yielded units.
     """
-    if not is_nestin_template(landing_html or ""):
+    landing_is_nestin = is_nestin_template(landing_html or "")
+    landing_is_applicant_shell = is_rentcafe_applicant_shell(landing_html or "")
+    if not landing_is_nestin and not landing_is_applicant_shell:
         return [], ""
 
     origin = _origin_of(base_url)
@@ -1012,21 +1046,75 @@ async def recover_rentcafe_nestin_per_plan(
         finally:
             reset_clearance_cookies(_clr_tok)
 
+    def _hb_allowed() -> bool:
+        if page is not None or fetcher is not None or not str(property_id or "").strip():
+            return False
+        try:
+            from ma_poc.config.feature_flags import hb_enabled
+
+            return hb_enabled()
+        except Exception:
+            return False
+
+    def _first_detail_from_index(index_html: str) -> str:
+        # A generic Applicant shell is enough to justify the bounded index
+        # lookup, but never enough to choose arbitrary links.  The fetched
+        # page itself must be the RentCafe marketing template and publish an
+        # exact same-origin /floorplans/<slug> anchor.
+        if not is_nestin_template(index_html):
+            return ""
+        urls = _find_floorplan_detail_urls(index_html, origin)
+        return urls[0] if urls else ""
+
+    def _parse_one_detail(detail_html: str, detail_url: str) -> list[dict[str, Any]]:
+        if not detail_html:
+            return []
+        ysi_units = parse_ysi_units_list(detail_html, detail_url)
+        if ysi_units:
+            return ysi_units
+        plan_name = _section_heading_for_plan(detail_html)
+        return parse_nestin_detail_page(detail_html, detail_url, plan_name)
+
     # The detail-page links may be on the landing page already, or on a
     # dedicated ``/floorplans`` index. Try both: scan landing_html first,
     # then fetch /floorplans if no detail links found.
-    detail_urls = _find_floorplan_detail_urls(landing_html, origin)
+    detail_urls = (
+        _find_floorplan_detail_urls(landing_html, origin)
+        if landing_is_nestin
+        else []
+    )
     floorplans_url = f"{origin}/floorplans"
     if not detail_urls:
         try:
             resp = await _do_fetch(floorplans_url)
         except Exception as exc:
             log.debug("nestin /floorplans fetch failed: %s", exc)
-            return [], ""
-        if getattr(resp, "status_code", 0) != 200:
-            return [], ""
-        index_html = getattr(resp, "text", "") or ""
-        detail_urls = _find_floorplan_detail_urls(index_html, origin)
+            resp = _PageFetchResp(0, "")
+        if getattr(resp, "status_code", 0) == 200:
+            index_html = getattr(resp, "text", "") or ""
+            detail_urls = _find_floorplan_detail_urls(index_html, origin)
+
+        # Local curl cannot clear the path-scoped CF wall for this cohort.
+        # Resolve the index and exactly ONE published detail href inside one
+        # compliant HB session, so the per-property cap remains one paid
+        # session rather than one session per plan.
+        if not detail_urls and _hb_allowed():
+            try:
+                from ma_poc.fetch.hyperbrowser_backend import hb_raw_get_then
+
+                _index, followup = await hb_raw_get_then(
+                    floorplans_url,
+                    str(property_id),
+                    _first_detail_from_index,
+                )
+                if followup is not None:
+                    detail_url, status, detail_html = followup
+                    if status == 200:
+                        hb_units = _parse_one_detail(detail_html, detail_url)
+                        if hb_units:
+                            return hb_units, floorplans_url
+            except Exception as exc:
+                log.debug("nestin HB index/detail recovery failed: %s", exc)
 
     if not detail_urls:
         return [], ""
@@ -1040,6 +1128,7 @@ async def recover_rentcafe_nestin_per_plan(
     _CF_BLOCK_STATUSES = (403, 429, 503)
     all_units: list[dict[str, Any]] = []
     consecutive_block_count = 0
+    hb_detail_attempted = False
     for detail_url in detail_urls:
         try:
             resp = await _do_fetch(detail_url)
@@ -1048,6 +1137,21 @@ async def recover_rentcafe_nestin_per_plan(
             continue
         status = getattr(resp, "status_code", 0) or 0
         if status in _CF_BLOCK_STATUSES:
+            if _hb_allowed() and not hb_detail_attempted:
+                hb_detail_attempted = True
+                try:
+                    from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+                    hb_status, hb_body = await hb_raw_get(
+                        detail_url,
+                        str(property_id),
+                    )
+                    if hb_status == 200:
+                        hb_units = _parse_one_detail(hb_body, detail_url)
+                        if hb_units:
+                            return hb_units, floorplans_url
+                except Exception as exc:
+                    log.debug("nestin HB detail recovery failed url=%s err=%s", detail_url, exc)
             consecutive_block_count += 1
             # After 3 consecutive CF blocks with no successes yet, the site
             # is CF-walled on detail URLs — bail out. Saves ~25-60s on a
