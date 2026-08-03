@@ -167,6 +167,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--properties", type=Path, default=DEFAULT_PROPERTIES)
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--launch-manifest", type=Path)
+    parser.add_argument(
+        "--supplemental-run-dir",
+        action="append",
+        type=Path,
+        default=[],
+        help="additional immutable run mirror(s), with cross-run duplicates rejected",
+    )
+    parser.add_argument(
+        "--supplemental-launch-manifest",
+        action="append",
+        type=Path,
+        default=[],
+    )
     return parser.parse_args()
 
 
@@ -184,6 +197,15 @@ def main() -> int:
         roles_by_cluster_pid[(cluster, pid)] = text(row["role"])
 
     loaded, source_paths, duplicates = load_properties(args.run_dir)
+    for supplemental_dir in args.supplemental_run_dir:
+        extra, extra_sources, extra_duplicates = load_properties(supplemental_dir)
+        duplicates.extend(extra_duplicates)
+        for pid, prop in extra.items():
+            if pid in loaded:
+                duplicates.append(pid)
+                continue
+            loaded[pid] = prop
+            source_paths[pid] = extra_sources[pid]
     current = {pid: value for pid, value in loaded.items() if pid in expected}
     missing = sorted(set(expected) - set(current), key=int)
     unexpected = sorted(set(loaded) - set(expected), key=int)
@@ -577,6 +599,11 @@ def main() -> int:
     summary["incomplete_clusters"] = incomplete_clusters
     if args.launch_manifest and args.launch_manifest.is_file():
         summary["launch"] = json.loads(args.launch_manifest.read_text(encoding="utf-8"))
+    summary["supplemental_launches"] = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in args.supplemental_launch_manifest
+        if path.is_file()
+    ]
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     write_csv(

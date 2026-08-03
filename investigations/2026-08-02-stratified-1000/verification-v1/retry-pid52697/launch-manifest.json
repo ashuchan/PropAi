@@ -1,0 +1,63 @@
+{
+  "build": {
+    "cloud_build_id": "e54a841b-d7ae-47f0-be71-8b0f19a34787",
+    "commit": "ed94525",
+    "finish_time": "2026-08-03T01:13:04.369648Z",
+    "image_digest": "sha256:06817703095f1daf4cc4dc6e7dc201e2429e747da609618e4863f835d38e2290",
+    "image_uri": "us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:06817703095f1daf4cc4dc6e7dc201e2429e747da609618e4863f835d38e2290",
+    "status": "SUCCESS"
+  },
+  "execution": {
+    "execution": "jugnu-verify-ed94525-xsj2x",
+    "fetch_backend": "hyperbrowser",
+    "job": "jugnu-verify-ed94525",
+    "llm_enabled": false,
+    "parallelism": 1,
+    "project": "jugnu-494013",
+    "property_timeout_seconds": 120,
+    "region": "us-central1",
+    "run_output": "gs://jugnu-canary/runs/2026-08-02-verify-ed94525/",
+    "cancel_time": "2026-08-03T01:19:59.968748Z",
+    "completion_time": "2026-08-03T01:20:23.388533Z",
+    "status": "CANCELLED_NO_TERMINAL_OUTPUT",
+    "task_count": 1,
+    "task_timeout_seconds": 900
+  },
+  "input": {
+    "properties_csv": "gs://jugnu-canary/property-list/verify-ed94525.csv",
+    "properties_csv_generation": "1785719368804164",
+    "properties_sha256": "292870d8248429a9c0dceb1a7b8c584d2e289117aa9b4e968a721bbfd0a93138",
+    "property_count": 1,
+    "property_id": "52697"
+  },
+  "retry_of": {
+    "cancelled_execution": "jugnu-verify-7f800ca-thfcv",
+    "cancelled_execution_completion_time": "2026-08-03T01:04:17.454521Z",
+    "missing_property_id": "52697",
+    "original_output_properties": 28,
+    "reason": "property task exceeded the 600-second deadline and local cleanup allowance"
+  },
+  "runtime_policy": {
+    "captcha_solver_enabled": false,
+    "dc_proxy_enabled": false,
+    "fingerprint_rotation_enabled": false,
+    "flaresolverr_enabled": false,
+    "hyperbrowser_proxy_enabled": true,
+    "hyperbrowser_stealth_enabled": false,
+    "web_unlocker_enabled": false
+  },
+  "verification_result": {
+    "conclusion": "DISPROVED_IN_PROCESS_CANCELLATION_FIX",
+    "last_observed_event": "second Hyperbrowser session opened for property_bound_entrata_route",
+    "last_observed_event_time": "2026-08-03T01:16:49.748792Z",
+    "output_property_count": 0
+  },
+  "warm_profile": {
+    "destination": "gs://jugnu-canary/profiles/verify-ed94525/52697.json",
+    "destination_generation": "1785719368751139",
+    "md5_base64": "YQY96t8Qao3PB7T19OTXnQ==",
+    "shared_store_mutated": false,
+    "source": "gs://jugnu-canary/profiles/verify-7f800ca/52697.json",
+    "source_generation": "1785717747412123"
+  }
+}

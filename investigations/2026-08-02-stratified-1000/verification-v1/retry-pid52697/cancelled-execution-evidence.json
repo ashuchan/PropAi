@@ -1,0 +1,28 @@
+{
+  "cancelled_execution": {
+    "cancelled_count": 1,
+    "completion_time": "2026-08-03T01:04:17.454521Z",
+    "execution": "jugnu-verify-7f800ca-thfcv",
+    "failed_count": 0,
+    "job": "jugnu-verify-7f800ca",
+    "project": "jugnu-494013",
+    "region": "us-central1",
+    "start_time": "2026-08-03T00:49:53.167308Z",
+    "succeeded_count": 28
+  },
+  "residual_hang": {
+    "expected_property_count": 29,
+    "last_property_log": "2026-08-03T00:52:08.568438Z",
+    "last_property_log_event": "Hyperbrowser session POST returned HTTP 200 after the property-bound Entrata route reserved its second session",
+    "missing_artifact_property_id": "52697",
+    "observed_after_cleanup_allowance": "2026-08-03T01:03:41Z",
+    "output_property_count": 28,
+    "property_deadline_seconds": 600,
+    "property_name": "Clearview"
+  },
+  "remediation": {
+    "code_commit": "ed94525",
+    "regression_test": "ma_poc/tests/fetch/test_hyperbrowser_backend.py::test_cancelled_session_skips_wedged_local_teardown",
+    "runtime_contract": "already-cancelling tasks bypass local CDP/Playwright teardown and directly stop the paid remote Hyperbrowser session"
+  }
+}

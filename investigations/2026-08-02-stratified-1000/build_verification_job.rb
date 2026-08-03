@@ -13,6 +13,9 @@ image_digest = ARGV.fetch(1)
 commit = ARGV.fetch(2)
 sample_sha = ARGV.fetch(3)
 property_count = Integer(ARGV.fetch(4))
+property_timeout_seconds = Integer(ARGV.fetch(5, "600"))
+task_timeout_seconds = Integer(ARGV.fetch(6, "14400"))
+runner_timeout_seconds = Integer(ARGV.fetch(7, "13500"))
 short_commit = commit[0, 7]
 
 source = YAML.safe_load(
@@ -38,7 +41,7 @@ job_spec["parallelism"] = [property_count, 30].min
 job_spec.fetch("template").delete("metadata")
 
 task_spec = job_spec.fetch("template").fetch("spec")
-task_spec["timeoutSeconds"] = "14400"
+task_spec["timeoutSeconds"] = task_timeout_seconds.to_s
 task_spec["maxRetries"] = 0
 container = task_spec.fetch("containers").first
 container["image"] = image_digest
@@ -65,6 +68,8 @@ desired = {
   "HYPERBROWSER_RESERVED_PRIORITY_CALLS" => "1",
   "HB_USE_STEALTH" => "false",
   "HB_USE_PROXY" => "true",
+  "PER_PROPERTY_TIMEOUT_SECONDS" => property_timeout_seconds.to_s,
+  "SHARD_RUNNER_TIMEOUT_SECONDS" => runner_timeout_seconds.to_s,
 }
 
 blocked = ["WEB_UNLOCKER_KEY", "WEB_UNLOCKER_ZONE"]

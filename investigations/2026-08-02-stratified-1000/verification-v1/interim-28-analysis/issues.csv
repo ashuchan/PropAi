@@ -1,0 +1,2 @@
+severity,cluster,apartment_id,name,adapter,verdict,code,observed,expected
+critical,timeout_diagnostics,52697,Clearview,,,EXPECTED_PROPERTY_MISSING,no output row,exactly one output row

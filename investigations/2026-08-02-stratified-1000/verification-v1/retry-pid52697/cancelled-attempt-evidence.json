@@ -1,0 +1,39 @@
+{
+  "execution": {
+    "cancel_time": "2026-08-03T01:19:59.968748Z",
+    "cancelled_count": 1,
+    "completion_message": "Cancelled by user.",
+    "completion_time": "2026-08-03T01:20:23.388533Z",
+    "execution": "jugnu-verify-ed94525-xsj2x",
+    "job": "jugnu-verify-ed94525",
+    "project": "jugnu-494013",
+    "region": "us-central1",
+    "start_time": "2026-08-03T01:14:41.206798Z"
+  },
+  "last_log_sequence": [
+    {
+      "event": "processing_property",
+      "property_id": "52697",
+      "timestamp": "2026-08-03T01:16:34.814052Z"
+    },
+    {
+      "event": "first_hyperbrowser_session_stopped",
+      "http_status": 200,
+      "timestamp": "2026-08-03T01:16:49.069943Z"
+    },
+    {
+      "event": "second_hyperbrowser_session_reserved",
+      "reason": "property_bound_entrata_route",
+      "timestamp": "2026-08-03T01:16:49.334699Z"
+    },
+    {
+      "event": "second_hyperbrowser_session_created",
+      "http_status": 200,
+      "timestamp": "2026-08-03T01:16:49.748792Z"
+    }
+  ],
+  "observed_result": {
+    "conclusion": "The child event loop wedged before it could enter the in-process timeout cleanup.",
+    "terminal_property_artifacts": 0
+  }
+}
