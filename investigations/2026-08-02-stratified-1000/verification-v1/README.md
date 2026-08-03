@@ -29,3 +29,31 @@ capture dates, dead-entry failure verdicts with recovered units, missing timeout
 snapshots, and the unarchived ManageBuilding response hash. This establishes
 that a later pass is not caused by an audit that simply cannot see the original
 defects.
+
+## Final result
+
+The initial execution produced 28/29 expected properties. Every exercised
+output cluster passed, but Clearview (`52697`) wedged after its second
+Hyperbrowser session and produced no terminal row. That 28-property output was
+downloaded once and is preserved in `interim-28-analysis/`.
+
+An isolated retry first disproved an in-process cancellation-only fix. Commit
+`823ea7c` then added a parent-process supervisor fallback. Execution
+`jugnu-verify-823ea7c-rf4br` reproduced the wedge and successfully materialized
+Clearview as `FAILED_UNREACHABLE` with both timeout reasons, a zero-row
+extraction snapshot, and a source manifest. Its isolated output was also
+downloaded once.
+
+The combined audit in `post-run-verification/` now has:
+
+- exact 29/29 expected properties, no missing or duplicate properties;
+- 22 `SUCCESS`, five `SUCCESS_PLAN_LEVEL`, one `FAILED_NO_DATA`, and one
+  traceable `FAILED_UNREACHABLE`;
+- 1,188 unit rows, zero avoidable synthetic IDs, and zero unresolved-area rows;
+- 29/29 extraction snapshots; and
+- zero critical or high output issues.
+
+Every defect path that actually occurred in this verification passed. Runtime
+coverage remains explicitly partial for one dead-entry candidate and six
+non-Clearview timeout candidates because their original failure routes did not
+recur; fixture coverage exists, but they are not mislabeled as live exercise.

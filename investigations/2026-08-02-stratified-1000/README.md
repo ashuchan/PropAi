@@ -1,5 +1,10 @@
 # Stratified 1,000-property GCP canary
 
+For the complete cross-stream implementation and evidence handoff—including
+the 49 adapter findings, recovery logic, availability dates, new unit columns,
+daily-history key, raw-source capture, warm-profile stores, and post-fix
+verification—read [`CONSOLIDATED_RELEASE_README.md`](CONSOLIDATED_RELEASE_README.md).
+
 This directory holds the deterministic release gate requested on 2026-08-02.
 The catalog contains address and URL fields but no multifamily asset-type
 column, so **property type** is defined as the prior strict output class:
@@ -41,3 +46,16 @@ and writes its committed evidence to `post-run-audit/`:
 The 50 finding-mapped regression modules are also run as a separate gate. This
 keeps fixture-backed semantic proof distinct from a route actually exercised
 by the live sample.
+
+## Final post-fix verification
+
+The post-canary output fixes were checked with a deterministic 29-property
+affected cohort. The first execution returned 28 properties; the sole missing
+property reproduced an event-loop wedge. A process-supervisor fallback was
+then live-verified on that property in an isolated retry. The combined audit
+has exact 29/29 coverage, 29/29 extraction snapshots, zero critical/high
+issues, zero avoidable synthetic IDs, and zero unresolved-area rows.
+
+See `verification-v1/post-run-verification/REPORT.md`. Its `PARTIAL` conclusion
+means some originally affected routes did not fail again and therefore were
+not live-exercised; it does not mean a detected output defect remains.
