@@ -167,6 +167,7 @@ def test_ssr_parser_returns_empty_when_no_listing_cards() -> None:
     ("2620 Wild Pines Ln, Apt 429, Naples, FL 34112", "429"),
     ("9305 Takomah Trail, Apt 213, Tampa, FL 33617", "213"),
     ("4803 Mandy Avenue, Apt 8, Tampa, FL 33617", "8"),
+    ("18130 S. 66th Court, Apt.302, Tinley Park, IL 60477", "302"),
     # Pattern 3 — Suite / Unit / Ste
     ("123 Main St, Suite 12, Anytown, CA 90001", "12"),
     ("123 Main St, Unit 5B, Anytown, CA 90001", "5B"),
@@ -184,6 +185,10 @@ def test_ssr_parser_returns_empty_when_no_listing_cards() -> None:
     # (americancapitalrealty/Citadel + Riverside North)
     ("4121 San Antonio St, 614, Odessa, TX 79765", "614"),
     ("1349 Redmond Circle, G1-47, Rome, GA 30165", "G1-47"),
+    ("2655 W Farm Rd 164, A-101, Springfield, MO 65807", "A-101"),
+    # Both the street and the apartment end in a number. The inter-comma
+    # apartment token must outrank the street token.
+    ("12925 County Road 5, 208, Burnsville, MN 55337", "208"),
     # No unit (single-family / townhouse) — empty
     ("355 Monument Road, Jacksonville, FL 32225", ""),
     ("7789 Club Ridge Rd, Westerville, OH 43081", ""),

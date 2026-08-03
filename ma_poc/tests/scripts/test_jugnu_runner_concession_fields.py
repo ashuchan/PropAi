@@ -28,6 +28,21 @@ from ma_poc.scripts.runners.jugnu import _format_v2_unit
 
 _TS = datetime(2026, 5, 25, 12, 0, 0, tzinfo=UTC)
 
+
+def test_runner_preserves_public_unit_number_separately_from_storage_id() -> None:
+    out = _format_v2_unit(
+        {
+            "unit_id": "knock_unit_id-7254a4ab-b615-4bc7-b088-4824a25fc03a",
+            "unit_number": "4122",
+            "unit_name": "4122",
+            "rent_low": 1547,
+            "availability_status": "AVAILABLE",
+        },
+        _TS,
+    )
+    assert out["unit_id"].startswith("knock_unit_id-")
+    assert out["unit_number"] == "4122"
+
 # All 10 concession + offer keys the canonical schema emits per unit.
 _CONCESSION_OFFER_KEYS: tuple[str, ...] = (
     "concession_text",

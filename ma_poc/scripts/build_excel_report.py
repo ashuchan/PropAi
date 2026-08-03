@@ -62,6 +62,20 @@ _FILL_FIELDS = (
     "source_ids",
 )
 
+_UNAVAILABLE_TOKENS = {
+    "unavailable",
+    "not available",
+    "rented",
+    "leased",
+    "leased out",
+    "rented out",
+    "occupied",
+    "pending",
+    "coming soon",
+    "off market",
+    "off-market",
+}
+
 
 # ── field extraction (defensive across v1/v2 + provenance-present-or-absent) ──
 
@@ -129,6 +143,98 @@ def _concession_text(c: Any) -> str:
     return str(c)
 
 
+def _scraped_date(p: dict[str, Any], report: dict[str, Any] | None, u: dict[str, Any] | None = None) -> str:
+    # Prefer run-level date when available; fallback to the unit's capture date
+    # so this remains useful outside a run-report artifact.
+    if report and report.get("run_date"):
+        return str(report.get("run_date"))
+    if u:
+        dc = u.get("date_captured")
+        if dc:
+            return str(dc).split()[0]
+    for unit in _property_report_rows(p):
+        if not isinstance(unit, dict):
+            continue
+        dc = unit.get("date_captured")
+        if dc:
+            return str(dc).split()[0]
+    return ""
+
+
+def _property_url(p: dict[str, Any]) -> str:
+    return str(_first(p, "website", "Website", "url", "URL") or "")
+
+
+def _is_available_unit_for_report(u: dict[str, Any]) -> bool:
+    status = _first(u, "availability_status", "availability")
+    if status is None:
+        return True
+    s = str(status).strip().lower()
+    if not s:
+        return True
+    if s in _UNAVAILABLE_TOKENS:
+        return False
+    return not any(token in s for token in _UNAVAILABLE_TOKENS)
+
+
+def _property_report_rows(p: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return UNIT rows plus every canonical ``floor_plans[]`` row.
+
+    Plan rows are copied and explicitly marked; they never acquire a synthetic
+    apartment identity.  A legacy artifact may already have a plan row in
+    ``units[]`` as well as the canonical array, so a conservative plan key
+    prevents double export while retaining distinct plans.
+    """
+
+    rows: list[dict[str, Any]] = []
+    seen_plans: set[tuple[str, str, str, str, str]] = set()
+    for raw in p.get("units") or []:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        rows.append(row)
+        if row.get("is_floor_plan_level"):
+            seen_plans.add(
+                tuple(
+                    str(row.get(key) or "").strip().casefold()
+                    for key in ("floor_plan_id", "floor_plan_name", "beds", "baths", "area_sqft")
+                )
+            )
+    for raw in p.get("floor_plans") or []:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        row["is_floor_plan_level"] = True
+        key = tuple(
+            str(row.get(field) or "").strip().casefold()
+            for field in ("floor_plan_id", "floor_plan_name", "beds", "baths", "area_sqft")
+        )
+        if key in seen_plans:
+            continue
+        seen_plans.add(key)
+        rows.append(row)
+    return rows
+
+
+def _rp_public_unit_id(u: dict[str, Any]) -> str:
+    """Return the operator-visible unit label for the RP presentation layer.
+
+    ``unit_id`` remains the collision-safe storage identity.  Knock is the
+    important legacy fallback: older formatted artifacts retained the public
+    label only in ``unit_name`` while putting ``knock_unit_id-<uuid>`` in the
+    canonical field.
+    """
+    public = _first(u, "unit_number", "display_unit_id", "marketing_unit_number")
+    if public not in (None, "", "null"):
+        return str(public).strip()
+    canonical = str(u.get("unit_id") or "").strip()
+    if canonical.startswith("knock_unit_id-"):
+        label = str(u.get("unit_name") or "").strip()
+        if label:
+            return label
+    return canonical
+
+
 def _unit_row(p: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     sids = u.get("source_ids") or {}
     area_sqft = u.get("area_sqft")
@@ -185,6 +291,58 @@ def _unit_row(p: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
         "source_record_locator": u.get("source_record_locator") or "",
         "source_asset_url": u.get("source_asset_url") or "",
         "source_asset_sha256": u.get("source_asset_sha256") or "",
+    }
+
+
+def _rp_row(
+    p: dict[str, Any],
+    u: dict[str, Any],
+    report: dict[str, Any] | None,
+    plan_no_by_property: dict[str, dict[str, int]],
+) -> dict[str, Any]:
+    property_id = _prop_id(p)
+    plan_key = str(
+        _first(
+            u,
+            "floor_plan_id",
+            "floor_plan_name",
+            "floor_plan_type",
+            "floorplan_name",
+            "floorplanname",
+            "floorplan",
+        )
+        or ""
+    )
+    if not plan_key:
+        if u.get("is_floor_plan_level"):
+            plan_key = "plan-level"
+        else:
+            plan_key = "unit-level"
+    by_property = plan_no_by_property.setdefault(property_id, {})
+    if plan_key in by_property:
+        plan_no = by_property[plan_key]
+    else:
+        plan_no = len(by_property) + 1
+        by_property[plan_key] = plan_no
+
+    return {
+        "apartmentid": property_id,
+        "scrapeddate": _scraped_date(p, report, u),
+        "floorplannumber": plan_no,
+        "floorplanname": u.get("floor_plan_name") or "",
+        "unit_or_plan_level": "PLAN" if u.get("is_floor_plan_level") else "UNIT",
+        "area": _first(u, "area_sqft", "area") if u.get("area_sqft") is not None else None,
+        "beds": u.get("beds"),
+        "baths": u.get("baths"),
+        # A floor plan is not an apartment.  Keep the RP field blank instead
+        # of manufacturing a unit identity from its plan key.
+        "unitid": "" if u.get("is_floor_plan_level") else _rp_public_unit_id(u),
+        "marketrentlow": u.get("rent_low") if u.get("rent_low") is not None else u.get("market_rent_low"),
+        "marketrenthigh": u.get("rent_high") if u.get("rent_high") is not None else u.get("market_rent_high"),
+        "availabledate": u.get("available_date") or u.get("available_date_raw") or "",
+        "property_name": _prop_name(p),
+        "address": _first(p, "address", "Address") or "",
+        "url": _property_url(p),
     }
 
 
@@ -276,7 +434,7 @@ def _recompute_report(properties: list[dict[str, Any]]) -> dict[str, Any]:
     n_units = 0
     for p in properties:
         verdicts[str((p.get("_meta") or {}).get("verdict") or "UNKNOWN")] += 1
-        for u in p.get("units") or []:
+        for u in _property_report_rows(p):
             n_units += 1
             tiers[str(u.get("extraction_tier") or "NONE")] += 1
             for k in _FILL_FIELDS:
@@ -382,10 +540,27 @@ _UNIT_HEADERS = [
     "source_asset_url",
     "source_asset_sha256",
 ]
+_RP_HEADERS = [
+    "apartmentid",
+    "scrapeddate",
+    "floorplannumber",
+    "floorplanname",
+    "unit_or_plan_level",
+    "area",
+    "beds",
+    "baths",
+    "unitid",
+    "marketrentlow",
+    "marketrenthigh",
+    "availabledate",
+    "property_name",
+    "address",
+    "url",
+]
 
 
 def build_workbook(properties: list[dict[str, Any]], report: dict[str, Any] | None) -> Workbook:
-    """Assemble the 3-sheet workbook. Pure; safe on empty input."""
+    """Assemble the 4-sheet workbook. Pure; safe on empty input."""
     rep = report or _recompute_report(properties)
     wb = Workbook()
     _write_summary(wb.active, rep, properties)  # type: ignore[arg-type]
@@ -395,8 +570,21 @@ def build_workbook(properties: list[dict[str, Any]], report: dict[str, Any] | No
     _write_table(ws_p, _PROP_HEADERS, [_property_row(p) for p in properties])
 
     ws_u = wb.create_sheet("Units")
-    unit_rows = [_unit_row(p, u) for p in properties for u in (p.get("units") or [])]
+    unit_rows = [_unit_row(p, u) for p in properties for u in _property_report_rows(p)]
     _write_table(ws_u, _UNIT_HEADERS, unit_rows)
+
+    ws_rp = wb.create_sheet("RP_Format")
+    rp_plan_numbers: dict[str, dict[str, int]] = {}
+    rp_rows = [
+        _rp_row(p, u, rep if isinstance(rep, dict) else None, rp_plan_numbers)
+        for p in properties
+        for u in _property_report_rows(p)
+        # Plan-level success must be represented even when the operator says
+        # waitlist/contact/not available.  Availability filtering applies only
+        # to physical UNIT rows.
+        if u.get("is_floor_plan_level") or _is_available_unit_for_report(u)
+    ]
+    _write_table(ws_rp, _RP_HEADERS, rp_rows)
     return wb
 
 
@@ -435,8 +623,8 @@ def main(argv: list[str] | None = None) -> int:
 
     wb = build_workbook(properties, report)
     wb.save(out)
-    n_units = sum(len(p.get("units") or []) for p in properties)
-    print(f"wrote {out}  ({len(properties)} properties, {n_units} units)")
+    n_rows = sum(len(_property_report_rows(p)) for p in properties)
+    print(f"wrote {out}  ({len(properties)} properties, {n_rows} unit/plan rows)")
     return 0
 
 

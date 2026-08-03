@@ -28,6 +28,21 @@ def test_baths_zero_is_missing_not_confirmed() -> None:
 _TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=UTC)
 
 
+def test_public_unit_number_survives_canonical_formatting() -> None:
+    out = _format_v2_unit(
+        {
+            "unit_id": "knock_unit_id-7254a4ab-b615-4bc7-b088-4824a25fc03a",
+            "unit_number": "4122",
+            "unit_name": "4122",
+            "rent_low": 1547,
+            "availability_status": "AVAILABLE",
+        },
+        _TS,
+    )
+    assert out["unit_id"].startswith("knock_unit_id-")
+    assert out["unit_number"] == "4122"
+
+
 def test_baths_cross_field_sanity_clamp() -> None:
     """Data-audit defect #1: a bath count impossible relative to beds (a source
     data-entry error, e.g. regentsparkchicago.com's ``2bn09`` units shipping

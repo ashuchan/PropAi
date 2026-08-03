@@ -461,6 +461,7 @@ class KnockAdapter:
         JSON API, no rendering is required.
         """
         result = AdapterResult(tier_used="TIER_1_KNOCK_API")
+        deferred_to_marketing = False
 
         # Pull HTML from the L1 fetch result.
         fr = getattr(ctx, "fetch_result", None)
@@ -484,6 +485,16 @@ class KnockAdapter:
                 units = []
             if units:
                 if _validate_and_record_knock_identity(ctx, result) is None:
+                    units = []
+            if units:
+                from ma_poc.pms.marketing_authority import (
+                    knock_must_defer_to_current_marketing,
+                    marketing_authority_error,
+                )
+
+                if knock_must_defer_to_current_marketing(ctx.property_id):
+                    result.errors.append(marketing_authority_error(ctx.property_id))
+                    deferred_to_marketing = True
                     units = []
             if units:
                 result.units = units
@@ -516,6 +527,16 @@ class KnockAdapter:
                 pid, units = None, []
             if pid and units:
                 if _validate_and_record_knock_identity(ctx, result) is None:
+                    units = []
+            if pid and units:
+                from ma_poc.pms.marketing_authority import (
+                    knock_must_defer_to_current_marketing,
+                    marketing_authority_error,
+                )
+
+                if knock_must_defer_to_current_marketing(ctx.property_id):
+                    result.errors.append(marketing_authority_error(ctx.property_id))
+                    deferred_to_marketing = True
                     units = []
             if pid and units:
                 result.units = units
@@ -633,7 +654,7 @@ class KnockAdapter:
         # orchestrator's link-hop fetches them. The Phase 6.2 HTML-table
         # extractor + Phase 6.3 data-attr extractor (shipped 2026-05-21)
         # handle the SSR'd unit data.
-        if (public_key and comm_id) and not result.units and base_url:
+        if ((public_key and comm_id) or deferred_to_marketing) and not result.units and base_url:
             _knock_empty_emit_subpage_hints(result, base_url)
         return result
 

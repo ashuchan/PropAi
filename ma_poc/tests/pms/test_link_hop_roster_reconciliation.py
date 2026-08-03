@@ -190,6 +190,60 @@ def test_repeated_public_label_with_distinct_buildings_fails_open() -> None:
     assert {row["building"] for row in rows} == {"North", "South"}
 
 
+def test_generated_ids_reconcile_on_shared_source_unit_id() -> None:
+    rows = _reconcile_accumulated_rosters(
+        [
+            _snapshot(
+                [{"unit_id": "88763b67-B106", "source_unit_id": "B106", "rent_low": 1400}],
+                url="https://example.com/models",
+                tier="TIER_1_5_EMBEDDED",
+            ),
+            _snapshot(
+                [{"unit_id": "a903f812-B106", "source_unit_id": "B106", "rent_low": 1500}],
+                url="https://example.com/floorplans/b1",
+                tier="TIER_1_5_EMBEDDED",
+            ),
+        ]
+    )
+    assert len(rows) == 1
+    assert rows[0]["source_unit_id"] == "B106"
+
+
+def test_resman_native_overlap_merges_even_when_catalogue_plan_is_stale() -> None:
+    rows = _reconcile_accumulated_rosters(
+        [
+            _snapshot(
+                [
+                    {
+                        "unit_id": "new-U1",
+                        "source_unit_id": "U1",
+                        "floor_plan_name": "Current Plan",
+                        "rent_low": 1700,
+                    }
+                ],
+                url="https://x.myresman.com/Portal/Applicants/Availability?a=1",
+                tier="TIER_1_API_RESMAN",
+            ),
+            _snapshot(
+                [
+                    {
+                        "unit_id": "old-U1",
+                        "source_unit_id": "U1",
+                        "floor_plan_name": "Legacy Plan",
+                        "rent_low": 1400,
+                    },
+                    {"unit_id": "old-U2", "source_unit_id": "U2", "rent_low": 1450},
+                ],
+                url="https://property.example/models",
+                tier="TIER_1_5_EMBEDDED",
+            ),
+        ]
+    )
+    assert len(rows) == 2
+    current = next(row for row in rows if row["source_unit_id"] == "U1")
+    assert current["rent_low"] == 1700
+
+
 class _Outcome:
     def __init__(self, value: str) -> None:
         self.value = value

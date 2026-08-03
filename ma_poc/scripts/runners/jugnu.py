@@ -4212,6 +4212,14 @@ def _format_v2_unit(
             if unit.get("unit_name") not in (None, "", "null")
             else None
         ),
+        # Public apartment label before collision-safe canonicalisation.  Keep
+        # it separate from unit_id so RP/marketing exports do not have to
+        # expose provider UUIDs or address-slug storage keys.
+        "unit_number": (
+            str(unit.get("unit_number") or unit.get("_unit_number")).strip() or None
+            if (unit.get("unit_number") or unit.get("_unit_number")) not in (None, "", "null")
+            else None
+        ),
         # 2026-07-25: #36's placeholder marker was added to
         # ``ma_poc/core/schema_v2.py:_format_v2_unit`` only — but THIS is the
         # formatter the production Jugnu runner uses, so the flag never

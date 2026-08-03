@@ -228,7 +228,22 @@ def _roster_native_unit_id(unit: dict[str, Any]) -> str:
     flags = str(unit.get("data_quality_flag") or "").upper()
     if "PLAN" in flags or "WAITLIST" in flags:
         return ""
-    raw = unit.get("unit_id") or unit.get("unit_number")
+    # Prefer a provider-native apartment anchor, then the source-level public
+    # anchor.  Formatted ``unit_id`` may already be collision-qualified with a
+    # floor-plan hash (e.g. ``88763b67-B106``); using it here is what allowed
+    # the same ResMan/RentCafe apartment to survive repeated snapshots.
+    raw = None
+    source_ids = unit.get("source_ids")
+    if isinstance(source_ids, dict):
+        for key, value in source_ids.items():
+            key_norm = str(key or "").casefold()
+            if any(token in key_norm for token in ("floor_plan", "floorplan", "property", "site", "community")):
+                continue
+            if key_norm.endswith("_unit_id") and _present_roster_value(value):
+                raw = value
+                break
+    if raw is None:
+        raw = unit.get("source_unit_id") or unit.get("unit_number") or unit.get("unit_id")
     if not _present_roster_value(raw):
         return ""
     value = str(raw).strip()
@@ -378,7 +393,11 @@ def _reconcile_accumulated_rosters(
     output: list[tuple[int, dict[str, Any]]] = list(anonymous)
     for unit_id, group in grouped.items():
         pair_entries = [(row, snapshot) for row, snapshot, _order in group]
-        if _roster_rows_conflict(pair_entries):
+        has_resman_available = any(_is_resman_availability_snapshot(snapshot) for _row, snapshot in pair_entries)
+        has_catalogue = any(not _is_resman_availability_snapshot(snapshot) for _row, snapshot in pair_entries)
+        if _roster_rows_conflict(pair_entries) and not (
+            resman_pair and has_resman_available and has_catalogue
+        ):
             # A repeated public label with contradictory stable evidence is not
             # proof of one physical unit. Preserve each row for the existing
             # building/floor-plan disambiguators rather than guessing.
@@ -4441,6 +4460,43 @@ async def scrape(
         # plan-level. A verified native unit roster supersedes it.
         result.pop("_verdict_quality", None)
         result.pop("_plan_level_reason", None)
+
+    # Some operator pages are one RentCafe/SecureCafe collection containing
+    # several sibling communities.  Apply the audited property boundary before
+    # any checkpoint or formatting step so siblings cannot leak into salvage,
+    # plan output, or the RP export.
+    from ma_poc.pms.property_scope import apply_collection_scope, collection_scope_rule
+
+    _scope_rule = collection_scope_rule(getattr(ctx, "property_id", ""))
+    try:
+        _scoped_units, _scope_units_dropped = apply_collection_scope(
+            list(adapter_result.units or []),
+            property_id=getattr(ctx, "property_id", ""),
+            tier=adapter_result.tier_used,
+        )
+        _scoped_plans, _scope_plans_dropped = apply_collection_scope(
+            list(adapter_result.plan_summaries or []),
+            property_id=getattr(ctx, "property_id", ""),
+            tier=adapter_result.tier_used,
+        )
+        if _scope_units_dropped or _scope_plans_dropped:
+            adapter_result.units = _scoped_units
+            adapter_result.plan_summaries = _scoped_plans
+            adapter_result.errors.append(
+                "COLLECTION_PROPERTY_SCOPE_APPLIED: "
+                f"units_dropped={_scope_units_dropped} "
+                f"plans_dropped={_scope_plans_dropped}"
+            )
+    except Exception as exc:
+        # A configured boundary must never fail open because of an unexpected
+        # row shape.  Make the failure observable; the ordinary quality gate
+        # will reject empty/invalid results rather than silently crossing scope.
+        adapter_result.errors.append(
+            f"COLLECTION_PROPERTY_SCOPE_ERROR: {type(exc).__name__}: {str(exc)[:120]}"
+        )
+        if _scope_rule is not None:
+            adapter_result.units = []
+            adapter_result.plan_summaries = []
 
     # Checkpoint the completed adapter result BEFORE optional area enrichment.
     # The enrichment probe runs off-thread but remains inside the global
