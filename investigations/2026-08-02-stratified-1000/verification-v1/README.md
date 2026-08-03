@@ -20,3 +20,12 @@ Generate the manifest reproducibly with:
 ```bash
 python investigations/2026-08-02-stratified-1000/build_verification_manifest.py
 ```
+
+Before using it on the post-fix run, `audit_verification_canary.py` was replayed
+against the immutable pre-fix 1,000-property mirror. It correctly returned
+`HOLD_OUTPUT_DEFECTS` and independently detected defects in all six clusters:
+avoidable synthetic IDs, Entrata parallel rosters/lineage, negative-status
+capture dates, dead-entry failure verdicts with recovered units, missing timeout
+snapshots, and the unarchived ManageBuilding response hash. This establishes
+that a later pass is not caused by an audit that simply cannot see the original
+defects.

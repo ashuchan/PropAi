@@ -1,0 +1,185 @@
+---
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  labels:
+    canary: fix-verification
+    commit: 7f800ca
+    profile-set: isolated
+    sample-sha: 26d074a
+  name: jugnu-verify-7f800ca
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 555.0.0
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      parallelism: 29
+      taskCount: 29
+      template:
+        spec:
+          containers:
+          - command:
+            - python
+            - ma_poc/scripts/runners/shard_entry.py
+            env:
+            - name: BROWSERS_PER_TASK
+              value: '3'
+            - name: CSV_GCS_URI
+              value: gs://jugnu-canary/property-list/verify-7f800ca.csv
+            - name: BUCKET_NAME
+              value: jugnu-canary
+            - name: CLOUD_SQL_INSTANCE
+              value: jugnu-494013:us-central1:jugnu-db-production
+            - name: CLOUD_SQL_IP_TYPE
+              value: PRIVATE
+            - name: DATA_PROVIDER
+              value: filesystem
+            - name: SCHEMA_VERSION
+              value: v2
+            - name: LLM_PROVIDER
+              value: openrouter
+            - name: OPENROUTER_MODEL
+              value: qwen/qwen3-235b-a22b-2507
+            - name: OPENROUTER_VISION_MODEL
+              value: qwen/qwen3-235b-a22b-2507
+            - name: ANTHROPIC_MODEL
+              value: claude-haiku-4-5-20251001
+            - name: ANTHROPIC_VISION_MODEL
+              value: claude-haiku-4-5-20251001
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: openrouter-api-key-production
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: anthropic-api-key-production
+            - name: ENABLE_TIER_ESCALATION
+              value: 'true'
+            - name: ENABLE_DC_PROXY_TIER
+              value: 'false'
+            - name: ENABLE_RESIDENTIAL_TIER
+              value: 'true'
+            - name: ENABLE_UNLOCKER_TIER
+              value: 'false'
+            - name: BRIGHTDATA_CUSTOMER_ID
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: brightdata-customer-id
+            - name: BRIGHTDATA_RESI_ZONE
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: brightdata-resi-zone
+            - name: BRIGHTDATA_RESI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: brightdata-resi-password
+            - name: RUN_DATE
+              value: 2026-08-02-verify-7f800ca
+            - name: ENABLE_TIER4_LLM
+              value: 'false'
+            - name: ENABLE_FLARESOLVERR_TIER
+              value: 'false'
+            - name: PROFILE_GCS_PREFIX
+              value: gs://jugnu-canary/profiles/verify-7f800ca/
+            - name: ENABLE_RESIDENTIAL_RENDER_TIER
+              value: 'true'
+            - name: ENABLE_RENDER_ON_EMPTY
+              value: 'true'
+            - name: ENABLE_END_OF_RUN_RETRY
+              value: 'true'
+            - name: BLOCK_RESOURCE_TYPES
+              value: image,font,media
+            - name: WEB_UNLOCKER_MAX_CALLS_PER_JOB
+              value: '0'
+            - name: PROBE_PROXY_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: brightdata-probe-proxy
+            - name: SHARD_SOURCE
+              value: csv
+            - name: WEB_UNLOCKER_MAX_CALLS_PER_PROPERTY
+              value: '0'
+            - name: ENABLE_PLAN_UNIT_RENDER
+              value: 'true'
+            - name: ENABLE_EMPTY_EXIT_PLAN_TEXT
+              value: 'true'
+            - name: ENABLE_CWS_GETUNITS
+              value: 'true'
+            - name: ENABLE_CAMDEN_ADAPTER
+              value: 'true'
+            - name: ENABLE_VENTERRA_ADAPTER
+              value: 'true'
+            - name: ENABLE_ONSITE_APPLY_ADAPTER
+              value: 'true'
+            - name: RATELIMIT_ENABLED
+              value: '1'
+            - name: ENABLE_BODY_RESOLVER
+              value: 'true'
+            - name: INTERACTION_REVEAL
+              value: 'true'
+            - name: ENABLE_ENCORE_PLAN_RENDER
+              value: 'true'
+            - name: COMPLIANCE_MODE
+              value: '1'
+            - name: FETCH_BACKEND
+              value: hyperbrowser
+            - name: HYPERBROWSER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: hyperbrowser-api-key
+            - name: ENABLE_ENTRATA_PLAN_RENDER
+              value: 'true'
+            - name: PROXY_POOL_URLS
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: proxy-credentials-production
+            - name: ENABLE_KNOCK_DIRECT_GET
+              value: 'true'
+            - name: ENABLE_RENTCAFE_DIRECT_GET
+              value: 'true'
+            - name: ENABLE_SIGHTMAP_DIRECT_GET
+              value: 'true'
+            - name: ENABLE_REALPAGE_DIRECT_GET
+              value: 'true'
+            - name: ENABLE_PLAN_TEXT
+              value: 'true'
+            - name: ENABLE_ROUTE_SHADOW
+              value: 'true'
+            - name: RATELIMIT_DIVIDE_BY_TASKS
+              value: '0'
+            - name: PROFILE_PUSH_INTERVAL_S
+              value: '300'
+            - name: ENABLE_RENTCAFE_AVAILUNITS_FAST
+              value: 'true'
+            - name: ENABLE_RENDER_RETRY_ON_TRANSIENT
+              value: 'true'
+            - name: BUCKET
+              value: jugnu-canary
+            - name: HYPERBROWSER_MAX_CALLS_PER_PROPERTY
+              value: '3'
+            - name: HYPERBROWSER_RESERVED_PRIORITY_CALLS
+              value: '1'
+            - name: HB_USE_STEALTH
+              value: 'false'
+            - name: HB_USE_PROXY
+              value: 'true'
+            image: us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu@sha256:ae62e4ec3235d303530bb680b0c8e15d3d753c14b5d81397bfc72b0a28648ea0
+            resources:
+              limits:
+                cpu: '4'
+                memory: 8Gi
+          maxRetries: 0
+          serviceAccountName: jugnu-worker-production@jugnu-494013.iam.gserviceaccount.com
+          timeoutSeconds: '14400'
