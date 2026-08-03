@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -265,6 +266,62 @@ def test_duplicate_sources_merge_routes_deterministically(tmp_path: Path) -> Non
     assert (tmp_path / "output-1" / "strict-profile-ledger.jsonl").read_bytes() == (
         tmp_path / "output-2" / "strict-profile-ledger.jsonl"
     ).read_bytes()
+
+
+def test_duplicate_sources_keep_newest_non_route_state_and_ignore_source_paths(
+    tmp_path: Path,
+) -> None:
+    old_dir = tmp_path / "download-a" / "profiles"
+    new_dir = tmp_path / "download-z" / "profiles"
+    old = _write_profile(
+        old_dir,
+        "7",
+        winner="https://property-7.example.com/floorplans",
+    )
+    new = _write_profile(
+        new_dir,
+        "7",
+        endpoint="https://property-7.example.com/api/units",
+    )
+    old_profile = ScrapeProfile.model_validate(old)
+    old_profile.updated_at = datetime(2026, 8, 1, 10, 0, 0)
+    old_profile.confidence.last_unit_count = 11
+    (old_dir / "7.json").write_text(old_profile.model_dump_json(indent=2), encoding="utf-8")
+    new_profile = ScrapeProfile.model_validate(new)
+    new_profile.updated_at = datetime(2026, 8, 2, 10, 0, 0)
+    new_profile.confidence.last_unit_count = 29
+    (new_dir / "7.json").write_text(new_profile.model_dump_json(indent=2), encoding="utf-8")
+
+    archive_old = tmp_path / "archive-old.jsonl"
+    archive_new = tmp_path / "archive-new.jsonl"
+    _write_archive(archive_old, "7", old_profile.model_dump(mode="json"), "MATCH")
+    _write_archive(archive_new, "7", new_profile.model_dump(mode="json"), "MATCH")
+
+    run(_args([old_dir, new_dir], [archive_old, archive_new], tmp_path / "first"))
+
+    relocated_old = tmp_path / "relocated" / "one"
+    relocated_new = tmp_path / "relocated" / "two"
+    relocated_old.mkdir(parents=True)
+    relocated_new.mkdir(parents=True)
+    (relocated_old / "7.json").write_bytes((old_dir / "7.json").read_bytes())
+    (relocated_new / "7.json").write_bytes((new_dir / "7.json").read_bytes())
+    run(
+        _args(
+            [relocated_new, relocated_old],
+            [archive_new, archive_old],
+            tmp_path / "second",
+        )
+    )
+
+    first_profile = (tmp_path / "first" / "profiles" / "7.json").read_bytes()
+    assert first_profile == (tmp_path / "second" / "profiles" / "7.json").read_bytes()
+    merged = json.loads(first_profile)
+    assert merged["confidence"]["last_unit_count"] == 29
+    assert (tmp_path / "first" / "strict-profile-ledger.jsonl").read_bytes() == (
+        tmp_path / "second" / "strict-profile-ledger.jsonl"
+    ).read_bytes()
+    ledger = json.loads((tmp_path / "first" / "strict-profile-ledger.jsonl").read_text(encoding="utf-8"))
+    assert all("path" not in source for source in ledger["source_profiles"])
 
 
 def test_conflicting_archive_identity_quarantines_route(tmp_path: Path) -> None:

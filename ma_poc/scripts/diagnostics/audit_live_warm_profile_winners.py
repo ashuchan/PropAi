@@ -3,8 +3,10 @@
 The archived July audit identifies which retained routes still lack an
 independent property identity.  This command probes only the unresolved route
 that a warm profile will try first (or the archived winner when no stored
-winner exists), using ordinary public GETs.  It never enables a proxy, browser,
-Hyperbrowser, Web Unlocker, or a profile-store write.
+winner exists), using ordinary public GETs by default.  An explicit
+``--fetch-backend hyperbrowser`` retry is available for direct fetch failures;
+the production Hyperbrowser backend hard-disables CAPTCHA solving.  This
+command never enables Web Unlocker or writes a profile store.
 
 Durable output contains route hashes, hosts, response hashes, and extracted
 identity only.  Endpoint URLs and response bodies are never persisted.
@@ -13,6 +15,7 @@ identity only.  Endpoint URLs and response bodies are never persisted.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import csv
 import ipaddress
 import json
@@ -38,7 +41,7 @@ from ma_poc.scripts.diagnostics.audit_july_gcp_profile_evidence import (
     safe_locator,
 )
 
-_AUDIT_VERSION = "live-warm-profile-winners-v2"
+_AUDIT_VERSION = "live-warm-profile-winners-v3"
 _NAMED_PROVIDER_GROUPS = frozenset(
     {
         "appfolio",
@@ -167,6 +170,8 @@ def _is_public_http_url(url: str) -> bool:
 def discover_winner_routes(
     profiles_dir: Path,
     archive_ledger: Path,
+    *,
+    all_unresolved_routes: bool = False,
 ) -> tuple[list[WinnerRoute], Counter[str]]:
     archive = _archive_rows(archive_ledger)
     routes: list[WinnerRoute] = []
@@ -181,7 +186,7 @@ def discover_winner_routes(
             status = str((evidence.get("identity") or {}).get("status") or "UNKNOWN")
             is_stored_winner = route.source == "navigation.winning_page_url"
             is_historical_winner = bool(evidence.get("historical_winner"))
-            if not (is_stored_winner or is_historical_winner):
+            if not all_unresolved_routes and not (is_stored_winner or is_historical_winner):
                 continue
             if status in {MATCH, MISMATCH}:
                 skipped[f"already_{status.casefold()}"] += 1
@@ -200,7 +205,9 @@ def discover_winner_routes(
                 item.route.sha256,
             )
         )
-        if candidates:
+        if candidates and all_unresolved_routes:
+            routes.extend(candidates)
+        elif candidates:
             routes.append(candidates[0])
             skipped["lower_priority_candidate"] += len(candidates) - 1
         else:
@@ -208,8 +215,55 @@ def discover_winner_routes(
     return routes, skipped
 
 
-def audit_route(route: WinnerRoute, configured: dict[str, str], timeout: float) -> dict[str, Any]:
+def _retry_keys(paths: list[Path], statuses: set[str]) -> set[str]:
+    keys: set[str] = set()
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            status = str((record.get("decision") or {}).get("status") or "")
+            if status in statuses:
+                keys.add(f"{record.get('property_id')}|{record.get('route_sha256')}")
+    return keys
+
+
+def _fetch_body(
+    route: WinnerRoute,
+    *,
+    timeout: float,
+    fetch_backend: str,
+) -> tuple[int, str, str]:
+    if fetch_backend == "hyperbrowser":
+        from ma_poc.fetch.hyperbrowser_backend import hb_raw_get
+
+        status, body = asyncio.run(
+            hb_raw_get(
+                route.route.url,
+                route.property_id,
+                max_calls_per_property=1,
+                priority=True,
+                reservation_reason="warm_profile_identity_audit",
+            )
+        )
+        return status, body, ""
+
     from ma_poc.pms.adapters._probe import probe_get
+
+    response = probe_get(route.route.url, unlocker=False, retries=1, timeout=timeout)
+    return (
+        int(getattr(response, "status_code", 0) or 0),
+        getattr(response, "text", "") or "",
+        str(getattr(response, "url", "") or ""),
+    )
+
+
+def audit_route(
+    route: WinnerRoute,
+    configured: dict[str, str],
+    timeout: float,
+    fetch_backend: str = "direct",
+) -> dict[str, Any]:
 
     parsed = urlsplit(route.route.canonical)
     provider = provider_for_url(route.route.url)
@@ -221,14 +275,16 @@ def audit_route(route: WinnerRoute, configured: dict[str, str], timeout: float) 
         "route_source": route.route.source,
         "historical_winner": route.historical_winner,
         "provider": provider,
+        "fetch_backend": fetch_backend,
         "host": parsed.hostname or None,
         "locator": safe_locator(route.route.url) or None,
     }
     try:
-        response = probe_get(route.route.url, unlocker=False, retries=1, timeout=timeout)
-        status = int(getattr(response, "status_code", 0) or 0)
-        text = getattr(response, "text", "") or ""
-        final_url = str(getattr(response, "url", "") or "")
+        status, text, final_url = _fetch_body(
+            route,
+            timeout=timeout,
+            fetch_backend=fetch_backend,
+        )
         base.update(
             {
                 "http_status": status,
@@ -268,7 +324,7 @@ def audit_route(route: WinnerRoute, configured: dict[str, str], timeout: float) 
         return base
 
 
-def _read_records(path: Path) -> list[dict[str, Any]]:
+def _read_records(path: Path, fetch_backend: str) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     records: list[dict[str, Any]] = []
@@ -277,13 +333,17 @@ def _read_records(path: Path) -> list[dict[str, Any]]:
             value = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if value.get("audit_version") == _AUDIT_VERSION:
+        record_backend = str(value.get("fetch_backend") or "direct")
+        if value.get("audit_version") == _AUDIT_VERSION and record_backend == fetch_backend:
             records.append(value)
     return records
 
 
 def build_summary(
-    routes: list[WinnerRoute], records: list[dict[str, Any]], skipped: Counter[str]
+    routes: list[WinnerRoute],
+    records: list[dict[str, Any]],
+    skipped: Counter[str],
+    fetch_backend: str = "direct",
 ) -> dict[str, Any]:
     status_counts = Counter(
         str((record.get("decision") or {}).get("status") or "UNKNOWN") for record in records
@@ -291,6 +351,7 @@ def build_summary(
     provider_counts = Counter(_provider_group(provider_for_url(route.route.url)) for route in routes)
     return {
         "audit_version": _AUDIT_VERSION,
+        "fetch_backend": fetch_backend,
         "generated_at": datetime.now(UTC).isoformat(),
         "scope": {
             "routes": len(routes),
@@ -308,10 +369,23 @@ def build_summary(
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
-    for key in ("PROBE_PROXY_URL", "WEB_UNLOCKER_KEY", "HYPERBROWSER_API_KEY"):
+    for key in ("PROBE_PROXY_URL", "WEB_UNLOCKER_KEY"):
         os.environ.pop(key, None)
+    if args.fetch_backend == "direct":
+        os.environ.pop("HYPERBROWSER_API_KEY", None)
+    elif not args.inventory_only and not os.environ.get("HYPERBROWSER_API_KEY", "").strip():
+        raise RuntimeError("hyperbrowser_backend_requires_HYPERBROWSER_API_KEY")
 
-    routes, skipped = discover_winner_routes(args.profiles_dir, args.archive_ledger)
+    routes, skipped = discover_winner_routes(
+        args.profiles_dir,
+        args.archive_ledger,
+        all_unresolved_routes=args.all_unresolved_routes,
+    )
+    retry_paths = list(args.retry_ledger)
+    if retry_paths:
+        retry_statuses = {item.strip() for item in args.retry_status.split(",") if item.strip()}
+        wanted_keys = _retry_keys(retry_paths, retry_statuses)
+        routes = [route for route in routes if route.key in wanted_keys]
     providers = {item.strip().casefold() for item in args.providers.split(",") if item.strip()}
     if providers:
         routes = [route for route in routes if provider_for_url(route.route.url) in providers]
@@ -321,7 +395,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"profile_count_mismatch expected={args.expected_profiles} actual={len(routes)}")
     cohort = _cohort_rows(args.cohort_csv)
     print(
-        f"inventory profiles={len(routes)} routes={len(routes)} direct_only=true paid_fallbacks=false",
+        f"inventory profiles={len({route.property_id for route in routes})} routes={len(routes)} "
+        f"fetch_backend={args.fetch_backend} web_unlocker=false captcha_solver=false",
         flush=True,
     )
 
@@ -331,7 +406,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if args.restart:
         ledger_path.unlink(missing_ok=True)
         summary_path.unlink(missing_ok=True)
-    existing = _read_records(ledger_path)
+    existing = _read_records(ledger_path, args.fetch_backend)
     desired = {route.key for route in routes}
     records_by_key = {
         f"{record.get('property_id')}|{record.get('route_sha256')}": record
@@ -346,7 +421,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             ThreadPoolExecutor(max_workers=args.workers) as executor,
         ):
             futures = {
-                executor.submit(audit_route, route, cohort[route.property_id], args.timeout): route
+                executor.submit(
+                    audit_route,
+                    route,
+                    cohort[route.property_id],
+                    args.timeout,
+                    args.fetch_backend,
+                ): route
                 for route in remaining
             }
             for completed, future in enumerate(as_completed(futures), start=1):
@@ -371,7 +452,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "".join(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n" for record in records),
         encoding="utf-8",
     )
-    summary = build_summary(routes, records, skipped)
+    summary = build_summary(routes, records, skipped, args.fetch_backend)
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return summary
 
@@ -385,10 +466,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=24)
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument("--providers", default="")
+    parser.add_argument("--fetch-backend", choices=("direct", "hyperbrowser"), default="direct")
+    parser.add_argument(
+        "--retry-ledger",
+        type=Path,
+        action="append",
+        default=[],
+        help="Limit probes to property/route keys with selected decisions in this prior ledger",
+    )
+    parser.add_argument(
+        "--retry-status",
+        default="FETCH_FAILED",
+        help="Comma-separated prior decision statuses selected by --retry-ledger",
+    )
     parser.add_argument("--expected-profiles", type=int, default=0)
     parser.add_argument("--max-profiles", type=int, default=0)
     parser.add_argument("--inventory-only", action="store_true")
     parser.add_argument("--restart", action="store_true")
+    parser.add_argument(
+        "--all-unresolved-routes",
+        action="store_true",
+        help=("Probe every unresolved public profile route instead of only the stored or historical winner."),
+    )
     return parser.parse_args()
 
 

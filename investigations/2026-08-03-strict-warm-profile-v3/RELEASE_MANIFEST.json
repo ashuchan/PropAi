@@ -1,0 +1,121 @@
+{
+  "artifacts": [
+    {
+      "bytes": 47,
+      "path": ".gitignore",
+      "sha256": "2fc456788e894205232393ba37a3fcb56653873ac9659aafd54b1a4015fd53bb"
+    },
+    {
+      "bytes": 6675,
+      "path": "README.md",
+      "sha256": "2816db0cf7999a7e95637cb192be73a0aacff9662b4502ca88b34d2e5da4293d"
+    },
+    {
+      "bytes": 5211,
+      "path": "build_release_manifest.py",
+      "sha256": "44f11dd2270c475b03174ad2031ee3706784df1a1934ca65fc7107a2ca6feedc"
+    },
+    {
+      "bytes": 1347096,
+      "path": "evidence/aug1-all-routes-direct-ledger.jsonl",
+      "sha256": "109e12d7fdfbd5f88c4aa94d98a20830f35108afcda8161e8faa7d754ad3e5ab"
+    },
+    {
+      "bytes": 719,
+      "path": "evidence/aug1-all-routes-direct-summary.json",
+      "sha256": "0df13a1ddc88e9b8b68346490c088bf970c394ad364e6393cdba2d11d7110dc8"
+    },
+    {
+      "bytes": 9557066,
+      "path": "evidence/aug1-archive-evidence-ledger.jsonl",
+      "sha256": "75dfd3ec6fb5cc71de4e1e59d695a0f12e20b58acd4e992300ede4a02c3d1a8a"
+    },
+    {
+      "bytes": 6647,
+      "path": "evidence/aug1-archive-summary.json",
+      "sha256": "734cc3fadb5e54e4ecf711a1184a4bf5df4474dda6f2e52a6088d5b0e292d384"
+    },
+    {
+      "bytes": 2424754,
+      "path": "evidence/aug1-preferred-direct-ledger.jsonl",
+      "sha256": "d03edd3d06c4cdc3bb3c3713f3f326981042b76a3f26084732949e4e8aeb9ecb"
+    },
+    {
+      "bytes": 789,
+      "path": "evidence/aug1-preferred-direct-summary.json",
+      "sha256": "8789e9ee905a5d81fb24a31c6af9b7972829003dd7f343b8c9800fa194ad00a9"
+    },
+    {
+      "bytes": 286473,
+      "path": "evidence/aug1-preferred-hyperbrowser-ledger.jsonl",
+      "sha256": "c1b608a221d6480d8e504edc36529583e22ecbe89191b5dc05e1e545e6c6264d"
+    },
+    {
+      "bytes": 691,
+      "path": "evidence/aug1-preferred-hyperbrowser-summary.json",
+      "sha256": "65114021c851bcfd49b4b823aa8d8b71b577ee3a7fb02c384f2c34113503314c"
+    },
+    {
+      "bytes": 1848434,
+      "path": "evidence/strat1000-archive-evidence-ledger.jsonl",
+      "sha256": "6e529fc1529dd48a4ba86d53a9a644e22f738df92250ba77109a82e6e295fa4e"
+    },
+    {
+      "bytes": 5363,
+      "path": "evidence/strat1000-archive-summary.json",
+      "sha256": "e2ec4c40c5986293bb828b5c8a5c404ade0fad5aa8e0e15b525030ad2d350eea"
+    },
+    {
+      "bytes": 489656,
+      "path": "evidence/strat1000-preferred-direct-ledger.jsonl",
+      "sha256": "c2598a1f19667a9c57b01ce42f8c6d5e3837595df59f64aa668acde7f8beefba"
+    },
+    {
+      "bytes": 727,
+      "path": "evidence/strat1000-preferred-direct-summary.json",
+      "sha256": "4aef9b77859a6626f21e0287a971c8f352593c8e3b738dc8842ac9ef13a2eff4"
+    },
+    {
+      "bytes": 51438,
+      "path": "materialization/aug1-strict-actionable-ids.json",
+      "sha256": "5884798b530a9a5210526f05fe33f21e7be50b6675ca406b19a122b343cbf425"
+    },
+    {
+      "bytes": 2581,
+      "path": "materialization/local-summary.json",
+      "sha256": "212d03bbedfccb332c94c73e96943b81d1c89250fb21732fa4816f7dc284828d"
+    },
+    {
+      "bytes": 4131916,
+      "path": "materialization/strict-profile-ledger.jsonl",
+      "sha256": "6bf97ff72fa482addea5055819d0fb2efc0d11279aae1e2a95d59ace5630aa6c"
+    }
+  ],
+  "manifest_version": "strict-warm-profile-v3-release-v1",
+  "scope": {
+    "admitted_profiles": 3594,
+    "aug1_actionable_admitted": 3269,
+    "aug1_actionable_coverage": 0.841225,
+    "aug1_actionable_profiles": 3886,
+    "profile_status_counts": {
+      "ADMIT": 3594,
+      "QUARANTINE": 22,
+      "REVIEW": 1366
+    },
+    "properties": 4982,
+    "retained_routes": 4572
+  },
+  "source_profile_prefixes": [
+    "gs://jugnu-canary/profiles/strict-v2-fa1afb7/",
+    "gs://jugnu-canary/profiles/run-2026-08-01-consolidated-strict-fa1afb7/",
+    "gs://jugnu-canary/profiles/affected386-33864eb/",
+    "gs://jugnu-canary/profiles/strat1000-ff7b377/",
+    "gs://jugnu-canary/profiles/verify-7f800ca/",
+    "gs://jugnu-canary/profiles/verify-823ea7c/"
+  ],
+  "validation": {
+    "profile_set_sha256": "76a8173802d3841924c9bc17112d8d0337d0de81bc812ae1263585d0a616f93b",
+    "reproducibility_reverse_input_order": "PASS",
+    "schema_canonical_hash_route_and_public_url_gate": "PASS"
+  }
+}

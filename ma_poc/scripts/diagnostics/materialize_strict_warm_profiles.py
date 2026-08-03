@@ -220,14 +220,26 @@ def _naive_utc(value: datetime) -> datetime:
 def _merge_source_profiles(
     property_id: str,
     candidates: list[tuple[Path, bytes, ScrapeProfile]],
-) -> tuple[dict[str, Any], list[dict[str, str]], str]:
-    """Deterministically field-merge reusable routes for one property."""
-    ordered = sorted(candidates, key=lambda item: str(item[0].resolve()))
-    merged = ordered[0][2].model_copy(deep=True)
-    original_versions = [item[2].version for item in ordered]
-    original_updated = [_naive_utc(item[2].updated_at) for item in ordered]
+) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+    """Deterministically field-merge reusable routes for one property.
+
+    The newest successful profile owns non-route state such as confidence,
+    quality, and fetch-tier history.  Older snapshots may contribute reusable
+    routes, but a temporary download directory must never decide which
+    snapshot wins.  Content hashes provide a stable tie-break when two stores
+    carry the same ``updated_at`` value.
+    """
+    hashed = [(hashlib.sha256(raw).hexdigest(), path, raw, profile) for path, raw, profile in candidates]
+    ordered = sorted(
+        hashed,
+        key=lambda item: (_naive_utc(item[3].updated_at), item[0]),
+        reverse=True,
+    )
+    merged = ordered[0][3].model_copy(deep=True)
+    original_versions = [item[3].version for item in ordered]
+    original_updated = [_naive_utc(item[3].updated_at) for item in ordered]
     changed = False
-    for _, _, incoming in ordered[1:]:
+    for _, _, _, incoming in ordered[1:]:
         changed |= merge_reusable_routes(merged, incoming.model_copy(deep=True))
     if len(ordered) > 1:
         # merge_reusable_routes timestamps with wall-clock time. Normalize its
@@ -237,16 +249,20 @@ def _merge_source_profiles(
         if changed:
             merged.updated_by = "STRICT_PROFILE_SOURCE_UNION"
     profile = merged.model_dump(mode="json")
-    sources = [
-        {
-            "path": str(path.resolve()),
-            "sha256": hashlib.sha256(raw).hexdigest(),
+    # This ledger is content-addressed.  Absolute scratch paths made identical
+    # inputs produce different release evidence after a download was moved.
+    # Duplicate copies of the same profile are intentionally collapsed: they
+    # add no route knowledge and must not change the candidate digest.
+    unique_sources = {
+        source_sha: {
+            "sha256": source_sha,
+            "updated_at": profile.updated_at.isoformat(),
+            "version": profile.version,
         }
-        for path, raw, _ in ordered
-    ]
-    source_set_sha = hashlib.sha256(
-        "\n".join(f"{item['path']}:{item['sha256']}" for item in sources).encode("utf-8")
-    ).hexdigest()
+        for source_sha, _, _, profile in ordered
+    }
+    sources = [unique_sources[source_sha] for source_sha in sorted(unique_sources)]
+    source_set_sha = hashlib.sha256("\n".join(item["sha256"] for item in sources).encode("utf-8")).hexdigest()
     if str(profile.get("canonical_id")) != property_id:
         raise RuntimeError(f"merged_profile_canonical_id_mismatch:{property_id}")
     return profile, sources, source_set_sha

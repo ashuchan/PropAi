@@ -1,0 +1,63 @@
+{
+  "evidence_source_counts": {
+    "api_sample": 191,
+    "live_fetch_failed": 1165,
+    "live_route_metadata": 1313,
+    "live_winner_route": 3094,
+    "no_positive_identity": 2948
+  },
+  "materializer_version": "strict-warm-profile-candidate-v3",
+  "output": {
+    "ledger": "strict-profile-ledger.jsonl",
+    "profiles": 3594,
+    "retained_routes": 4572
+  },
+  "profile_status_counts": {
+    "ADMIT": 3594,
+    "QUARANTINE": 22,
+    "REVIEW": 1366
+  },
+  "required_admission": {
+    "admitted": 0,
+    "missing_source_ids": [],
+    "not_admitted_ids": [],
+    "passed": true,
+    "required": 0
+  },
+  "route_status_counts": {
+    "MATCH": 4572,
+    "MISMATCH": 26,
+    "UNRESOLVED": 4113
+  },
+  "sanitization": {
+    "admitted_profiles_with_mismatch_routes_removed": 2,
+    "admitted_profiles_with_unresolved_routes_removed": 1874
+  },
+  "scope": {
+    "archive_ledgers": [
+      "/private/tmp/propai-strict-v3.IhgeGQ/aug1-archive-audit/archive-evidence-ledger.jsonl",
+      "/private/tmp/propai-strict-v3.IhgeGQ/strat1000-archive-audit/archive-evidence-ledger.jsonl",
+      "/Users/ankur/PropAi-codex-recovery-replay/investigations/2026-08-01-consolidated-canary/gcp-evidence-audit-v1/archive-evidence-ledger.jsonl"
+    ],
+    "live_winner_ledgers": [
+      "/private/tmp/propai-strict-v3.IhgeGQ/aug1-all-unresolved-audit/live-winner-ledger.jsonl",
+      "/private/tmp/propai-strict-v3.IhgeGQ/aug1-hb-preferred-retry/live-winner-ledger.jsonl",
+      "/private/tmp/propai-strict-v3.IhgeGQ/aug1-live-winner-audit/live-winner-ledger.jsonl",
+      "/private/tmp/propai-strict-v3.IhgeGQ/strat1000-live-winner-audit/live-winner-ledger.jsonl",
+      "/Users/ankur/PropAi-codex-recovery-replay/investigations/2026-08-01-consolidated-canary/live-winner-audit-v1/live-winner-ledger.jsonl",
+      "/Users/ankur/PropAi-codex-recovery-replay/investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-appfolio/live-winner-ledger.jsonl",
+      "/Users/ankur/PropAi-codex-recovery-replay/investigations/2026-08-01-consolidated-canary/live-winner-audit-v2-krc/live-winner-ledger.jsonl"
+    ],
+    "profile_dirs": [
+      "/private/tmp/propai-strict-v3.IhgeGQ/affected386",
+      "/private/tmp/propai-strict-v3.IhgeGQ/aug1",
+      "/private/tmp/propai-strict-v3.IhgeGQ/strat1000",
+      "/private/tmp/propai-strict-v3.IhgeGQ/strict-v2",
+      "/private/tmp/propai-strict-v3.IhgeGQ/verify7",
+      "/private/tmp/propai-strict-v3.IhgeGQ/verify823"
+    ],
+    "source_profile_files": 10820,
+    "source_properties": 4982
+  },
+  "source_snapshot_at": "2026-08-03T00:59:55.652405+00:00"
+}

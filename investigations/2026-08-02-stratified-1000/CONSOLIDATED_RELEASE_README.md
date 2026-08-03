@@ -397,15 +397,31 @@ claims.
 - The exact cross-stream identity-admitted union was 1,996 unique profiles
   with 2,382 retained routes. The versioned seed used by the stratified run was
   `gs://jugnu-canary/profiles/strict-v2-fa1afb7/`.
-- The 1,000-property run copied only the 462 sample-intersecting profiles into
-  `profiles/strat1000-ff7b377/`. The 29-property verification copied 27 and
+- The 1,000-property run was seeded with the 462 sample-intersecting strict-v2
+  profiles, then its normal persistence loop wrote one run-local profile for
+  every sample property. `profiles/strat1000-ff7b377/` therefore contains all
+  **1,000** profiles after the run. The 29-property verification copied 27 and
   created two isolated bootstraps. All retry prefixes are isolated.
+- The subsequent v3 identity union consumes the complete Aug 1 and stratified
+  profile/evidence snapshots. It retains 3,594 profiles and 4,572 positively
+  bound routes; 3,269 cover the 3,886 Aug 1 actionable strict successes
+  (84.12%), and 325 are additional clean profiles. The stratified run adds 58
+  net-new admitted profiles. A bounded Hyperbrowser retry adds another 212;
+  its 133 fetch failures, 49 unknowns, and one mismatch remain excluded. See
+  `../2026-08-03-strict-warm-profile-v3/README.md`.
 
 The stratified and verification runs did **not** mutate the shared root.
 Existing shared-root alternates are not automatically certified merely because
 a safe route was field-merged; future jobs should seed from a versioned,
 identity-admitted candidate rather than treating the whole historical root as
 a clean oracle.
+
+The durable runner already learns into and periodically flushes its configured
+run-local `PROFILE_GCS_PREFIX`. What is not yet automatic is strict promotion
+from that isolated candidate into the production seed. The recommended bridge
+is an end-of-run identity/quality finalizer that builds a new immutable seed and
+generation-guards an atomic `current.json` pointer. Disabling automatic
+promotion must not disable run-local learning or provenance capture.
 
 ## Analysis artifact index
 
