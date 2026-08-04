@@ -122,6 +122,63 @@ async def try_rentcafe_direct(
         confidence=0.9,
     )
 
+    # Direct shortcuts bypass ``scrape_jugnu`` and therefore its adapter-level
+    # collection boundary. Apply the same fail-closed rule here, then apply it
+    # once more at the runner's common final boundary as defence in depth.
+    from ma_poc.pms.property_scope import apply_collection_scope_to_result
+
+    apply_collection_scope_to_result(result, property_id=pid)
+    if not result["units"]:
+        log.warning("rentcafe_direct %s: configured collection scope yielded 0 units — fall through", pid)
+        return None
+
+    # Direct shortcuts bypass ``scrape_jugnu``, which normally carries the
+    # primary response into the runner's content-addressed raw-source archive
+    # and records the exact response that produced each unit.  Preserve that
+    # contract explicitly here: without it the output rows are correct, but a
+    # future audit cannot reproduce them from the run artifacts alone.
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        response_sha256,
+        sanitise_source_url,
+    )
+
+    source_identity = {
+        "status": "CONFIGURED_WARM_ROUTE",
+        "configured_property_id": str(pid),
+        "requested_url": url,
+        "final_url": url,
+    }
+    source_hash = response_sha256(body)
+    safe_url = sanitise_source_url(url)
+    for unit in result["units"]:
+        unit["source_response_sha256"] = source_hash
+        unit["source_response_url"] = safe_url
+        native = str(unit.get("unit_number") or unit.get("unit_id") or "").strip()
+        unit["source_record_locator"] = (
+            f"availableunits.aspx[unit_number={native}]" if native else "availableunits.aspx"
+        )
+    result["_raw_html_responses"] = [
+        {
+            "url": url,
+            "status": 200,
+            "body": body,
+            "content_type": "text/html",
+            "response_kind": "unit_roster",
+            "via": "securecafe_direct",
+            "identity": source_identity,
+        }
+    ]
+    result["_unit_source_provenance"] = [
+        build_unit_source_provenance(
+            provider="rentcafe",
+            source_url=url,
+            body=body,
+            unit_count=len(result["units"]),
+            identity=source_identity,
+        )
+    ]
+
     fr = FetchResult(
         url=url,
         outcome=FetchOutcome.OK,
@@ -142,6 +199,7 @@ async def try_rentcafe_direct(
             }
         ],
         fetch_tier_used=int(FetchTier.HYPERBROWSER),
+        response_sha256=source_hash,
     )
     log.info(
         "rentcafe_direct: %s served %d units (%s) via HB in-page fetch — render skipped (%s)",

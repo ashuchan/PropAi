@@ -153,6 +153,35 @@ def test_parse_sightmap_display_price_fallback() -> None:
     assert "$1,300" in units[0]["rent_range"]
 
 
+def test_explicit_not_available_map_unit_is_not_marked_available() -> None:
+    body = {
+        "data": {
+            "units": [
+                {
+                    "id": "8651158",
+                    "floor_plan_id": "460381",
+                    "unit_number": "1103",
+                    "price": None,
+                    "available_on": "Not Available",
+                }
+            ],
+            "floor_plans": [
+                {
+                    "id": "460381",
+                    "name": "360 - 1 Bed with Den",
+                    "bedroom_count": 1,
+                    "bathroom_count": 1.5,
+                }
+            ],
+        }
+    }
+    units, _ = parse_sightmap_payload(body, "https://sightmap.example/api")
+    assert len(units) == 1
+    assert units[0]["availability_status"] == "UNAVAILABLE"
+    assert units[0]["available_units"] == "0"
+    assert units[0]["availability_date"] == ""
+
+
 # --- 2026-04-19 fix tests (SM_T01 – SM_T08) ---------------------------------
 
 

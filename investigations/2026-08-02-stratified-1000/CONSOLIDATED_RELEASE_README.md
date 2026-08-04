@@ -492,3 +492,11 @@ labeled as a live-route pass.
 Finally, the day-to-day `unit_history_key` is prepared and persisted but not
 yet promoted to current-state merge identity. A multi-day continuity replay is
 the required next gate before that migration.
+
+## Later full-run findings
+
+The completed 2026-08-03 full-4,982 canary produced a separate set of
+post-release findings (property scoping, source authority, duplicate physical
+units, plan-row completeness, marketability, and RP unit-ID presentation).
+They are tracked without rewriting this release gate in
+`../2026-08-03-full4982/POST_RUN_CODE_FIX_REGISTER.md`.

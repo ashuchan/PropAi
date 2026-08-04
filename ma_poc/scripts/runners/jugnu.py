@@ -407,9 +407,7 @@ def _finalize_timeout_diagnostics(
         "_raw_api_responses": list(partial_state.get("raw_api_responses") or []),
         "_raw_html_responses": raw_html,
         "_raw_asset_responses": list(partial_state.get("raw_asset_responses") or []),
-        "_unit_source_provenance": list(
-            partial_state.get("unit_source_provenance") or []
-        ),
+        "_unit_source_provenance": list(partial_state.get("unit_source_provenance") or []),
         "_v2_formatted": failed,
         "_meta": failed.setdefault("_meta", {}),
     }
@@ -2235,6 +2233,13 @@ async def _process_property(
                 )
         except Exception as _enc_exc:  # never let the fan-out crash a property
             log.debug("encore plan-render fan-out failed for %s: %s", task.property_id, _enc_exc)
+
+    # Final collection boundary. This intentionally runs after every direct
+    # shortcut, render escalation, and link-hop reconciliation so a later path
+    # cannot reintroduce sibling communities or cross-feed aliases.
+    from ma_poc.pms.property_scope import apply_collection_scope_to_result
+
+    apply_collection_scope_to_result(result, property_id=task.property_id)
 
     # F6 (H6/H11) — surface the propertyId we used (resolved or cached)
     # so the profile_updater can persist it. Read by
@@ -4210,6 +4215,14 @@ def _format_v2_unit(
         "unit_name": (
             str(unit.get("unit_name")).strip() or None
             if unit.get("unit_name") not in (None, "", "null")
+            else None
+        ),
+        # Public apartment label before collision-safe canonicalisation.  Keep
+        # it separate from unit_id so RP/marketing exports do not have to
+        # expose provider UUIDs or address-slug storage keys.
+        "unit_number": (
+            str(unit.get("unit_number") or unit.get("_unit_number")).strip() or None
+            if (unit.get("unit_number") or unit.get("_unit_number")) not in (None, "", "null")
             else None
         ),
         # 2026-07-25: #36's placeholder marker was added to

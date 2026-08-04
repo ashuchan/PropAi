@@ -103,6 +103,14 @@ async def try_knock_direct(
         return None
 
     pid = getattr(task, "property_id", "?")
+    from ma_poc.pms.marketing_authority import knock_must_defer_to_current_marketing
+
+    # An audited small cohort has a correctly-bound but broader/staler Knock
+    # catalogue.  Do not let a warm replay bypass the live marketing page; the
+    # normal rendered path discovers the current RentCafe/SightMap authority.
+    if knock_must_defer_to_current_marketing(pid):
+        log.info("knock_direct %s: deferred to current marketing authority", pid)
+        return None
     from ma_poc.services.profile_route_quarantine import route_is_quarantined
 
     if route_is_quarantined(pid, endpoint):
@@ -167,7 +175,7 @@ async def try_knock_direct(
         payload = json.loads(body)
         from ma_poc.pms.adapters.knock import parse_knock_units
 
-        units = parse_knock_units(payload)
+        units = parse_knock_units(payload, source_api_url=endpoint)
     except Exception as exc:
         log.debug("knock_direct %s: parse failed (%s) — fall through", pid, exc)
         return None
@@ -191,7 +199,40 @@ async def try_knock_direct(
     result["_property_id"] = pid
     result["_adapter_used"] = "knock"
     result["api_calls_intercepted"] = [endpoint]
-    from ma_poc.pms.source_provenance import build_unit_source_provenance
+    from ma_poc.pms.source_provenance import (
+        build_unit_source_provenance,
+        response_sha256,
+        sanitise_source_url,
+    )
+
+    units_hash = response_sha256(payload)
+    safe_endpoint = sanitise_source_url(endpoint)
+    for unit in units:
+        unit["source_response_sha256"] = units_hash
+        unit["source_response_url"] = safe_endpoint
+        source_ids = unit.get("source_ids") if isinstance(unit.get("source_ids"), dict) else {}
+        native = source_ids.get("knock_unit_id") or unit.get("unit_number") or ""
+        unit["source_record_locator"] = f"units_data.units[id={native}]"
+
+    # The runner's content-addressed raw-source archiver reads this exact
+    # transport field.  Previously the direct tier populated only network_log,
+    # leaving sampled raw manifests empty even though the units were valid.
+    result["_raw_api_responses"] = [
+        {
+            "url": metadata_url,
+            "status": meta_status,
+            "body": metadata_payload,
+            "via": "knock_direct_property_metadata",
+            "identity": identity.to_dict(),
+        },
+        {
+            "url": endpoint,
+            "status": 200,
+            "body": payload,
+            "via": "knock_direct_units",
+            "identity": identity.to_dict(),
+        },
+    ]
 
     result["_unit_source_provenance"] = [
         build_unit_source_provenance(

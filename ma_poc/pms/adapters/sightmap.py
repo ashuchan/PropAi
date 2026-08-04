@@ -20,8 +20,9 @@ Key findings:
     specials_description
   - Floor plan fields: id, name, filter_label, bedroom_count, bathroom_count
   - Known gotchas: The /sightmaps/ endpoint can return amenities-only when the
-    property map is configured without unit data. When units[] exists, SightMap
-    only lists leasable (available) inventory — all units are status AVAILABLE.
+    property map is configured without unit data. Some maps publish the full
+    physical inventory and mark non-marketable polygons with
+    ``available_on='Not Available'``; those rows are explicitly UNAVAILABLE.
     Parser ported from scripts/entrata.py:433 (_parse_sightmap_payload).
     - 2026-04-19 fix: removed "sightmap.com" URL filter from extract().
       lasvegasliving.com (Summer Winds, Madera) proxies SightMap data through
@@ -311,6 +312,19 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
         baths = fp.get("bathroom_count")
         name = fp.get("name") or fp.get("filter_label") or ""
 
+        availability_raw = str(
+            u.get("available_on") or u.get("display_available_on") or ""
+        ).strip()
+        availability_key = " ".join(availability_raw.casefold().split())
+        explicitly_unavailable = availability_key in {
+            "not available",
+            "unavailable",
+            "n/a",
+            "none",
+            "-",
+            "--",
+        }
+
         units_out.append(
             make_unit_dict(
                 floor_plan_name=str(name),
@@ -329,9 +343,13 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 rent_range=f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
                 deposit=_sightmap_deposit(u),
                 concession=str(u.get("specials_description") or ""),
-                availability_status="AVAILABLE",
-                available_units="1",
-                availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
+                # SightMap's units array can be a full property map, not a
+                # current-availability roster.  Nollie exposed 202 explicit
+                # ``Not Available`` units alongside 17 live priced/date rows;
+                # treating every map polygon as AVAILABLE inflated inventory.
+                availability_status="UNAVAILABLE" if explicitly_unavailable else "AVAILABLE",
+                available_units="0" if explicitly_unavailable else "1",
+                availability_date="" if explicitly_unavailable else availability_raw,
                 source_ids={
                     k: v
                     for k, v in {

@@ -130,6 +130,28 @@ async def test_happy_path_builds_result_with_real_unit_ids(monkeypatch) -> None:
     assert all(u.get("market_rent_low") for u in result["units"])
     er = result["_extract_result"]
     assert er.tier_used == "TIER_1_KNOCK_API_DIRECT" and er.adapter_name == "knock"
+    assert len(result["_raw_api_responses"]) == 2
+    assert result["_raw_api_responses"][1]["body"]["units_data"]["units"]
+    assert all(unit.get("source_response_sha256") for unit in result["units"])
+    assert all(unit.get("source_response_url") == _EP for unit in result["units"])
+    assert all(unit.get("source_record_locator") for unit in result["units"])
+
+
+@pytest.mark.asyncio
+async def test_broad_backend_property_skips_direct_fetch_for_live_marketing(monkeypatch) -> None:
+    monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_KNOCK_DIRECT_GET", True)
+    calls = 0
+
+    def _should_not_fetch(*_a, **_kw):
+        nonlocal calls
+        calls += 1
+        return _Resp(200, _UNITS_JSON)
+
+    monkeypatch.setattr("ma_poc.pms.adapters._probe.probe_get", _should_not_fetch)
+    task = _Task()
+    task.property_id = "10590"
+    assert await try_knock_direct(task, _Profile(), {"name": "Tides on Park Lane"}) is None
+    assert calls == 0
 
 
 @pytest.mark.asyncio

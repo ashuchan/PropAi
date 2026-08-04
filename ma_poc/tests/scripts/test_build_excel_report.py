@@ -12,6 +12,7 @@ from typing import Any
 from ma_poc.scripts.build_excel_report import (
     _PROP_HEADERS,
     _UNIT_HEADERS,
+    _RP_HEADERS,
     _recompute_report,
     build_workbook,
 )
@@ -24,6 +25,7 @@ def _prop_with_provenance() -> dict[str, Any]:
         "city": "Everett",
         "state": "WA",
         "zip_code": "98201",
+        "address": "1234 Oak Street",
         "website": "https://anthemeverett.com",
         "concessions": {"text": "6 weeks free"},
         "_meta": {
@@ -78,6 +80,7 @@ def _prop_with_provenance() -> dict[str, Any]:
                 "unit_id": "inferred_x",
                 "beds": 1,
                 "area": -1,
+                "availability_status": "UNAVAILABLE",
                 "area_sqft": None,
                 "area_is_published": False,
                 "extraction_tier": "TIER_4_LLM_DOM",
@@ -102,9 +105,9 @@ def _cell(ws: Any, header_row: list[str], col_name: str, data_row: int) -> Any:
     return ws.cell(row=data_row, column=c).value
 
 
-def test_workbook_has_three_sheets():
+def test_workbook_has_four_sheets():
     wb = build_workbook([_prop_with_provenance(), _prop_legacy()], report=None)
-    assert wb.sheetnames == ["Summary", "Properties", "Units"]
+    assert wb.sheetnames == ["Summary", "Properties", "Units", "RP_Format"]
 
 
 def test_properties_sheet_surfaces_provenance():
@@ -177,9 +180,126 @@ def test_summary_uses_supplied_report():
     assert "2026-07-16" in str(ws.cell(row=1, column=1).value)
 
 
+def test_rp_sheet_is_rp_format_plus_meta():
+    report = {"run_date": "2026-07-16"}
+    wb = build_workbook([_prop_with_provenance()], report=report)
+    ws = wb["RP_Format"]
+    assert _cell(ws, _RP_HEADERS, "apartmentid", 2) == "P1"
+    assert _cell(ws, _RP_HEADERS, "scrapeddate", 2) == "2026-07-16"
+    assert _cell(ws, _RP_HEADERS, "floorplannumber", 2) == 1
+    assert _cell(ws, _RP_HEADERS, "floorplanname", 2) == "Studio A"
+    assert _cell(ws, _RP_HEADERS, "unit_or_plan_level", 2) == "UNIT"
+    assert _cell(ws, _RP_HEADERS, "area", 2) == 464
+    assert _cell(ws, _RP_HEADERS, "unitid", 2) == "B1::3100"
+    assert _cell(ws, _RP_HEADERS, "marketrentlow", 2) == 2400
+    assert _cell(ws, _RP_HEADERS, "marketrenthigh", 2) == 2600
+    assert _cell(ws, _RP_HEADERS, "availabledate", 2) == "2026-09-01"
+    assert _cell(ws, _RP_HEADERS, "property_name", 2) == "Anthem Everett"
+    assert _cell(ws, _RP_HEADERS, "address", 2) == "1234 Oak Street"
+    assert _cell(ws, _RP_HEADERS, "url", 2) == "https://anthemeverett.com"
+    assert ws.max_row == 2  # available-only row
+
+
+def test_rp_sheet_marks_plan_vs_unit_level():
+    wb = build_workbook(
+        [
+            {
+                "apartment_id": "P3",
+                "proj_name": "Level Sample",
+                "units": [
+                    {
+                        "unit_id": "PLAN_1",
+                        "availability_status": "AVAILABLE",
+                        "is_floor_plan_level": True,
+                        "floor_plan_name": "Garden 2B",
+                        "rent_low": 2300,
+                        "rent_high": 2500,
+                    },
+                    {
+                        "unit_id": "UNIT_1",
+                        "availability_status": "AVAILABLE",
+                        "is_floor_plan_level": False,
+                        "floor_plan_name": "Studio 2",
+                        "rent_low": 1500,
+                        "rent_high": 1600,
+                    },
+                ],
+            }
+        ],
+        report={},
+    )
+    ws = wb["RP_Format"]
+    assert ws.max_row == 3
+    assert _cell(ws, _RP_HEADERS, "unit_or_plan_level", 2) == "PLAN"
+    assert _cell(ws, _RP_HEADERS, "unit_or_plan_level", 3) == "UNIT"
+    assert _cell(ws, _RP_HEADERS, "unitid", 2) == ""
+
+
+def test_canonical_floor_plans_array_is_fully_exported_even_when_unavailable():
+    prop = {
+        "apartment_id": "PLAN-PROP",
+        "proj_name": "Plan Only",
+        "_meta": {"verdict": "SUCCESS_PLAN_LEVEL"},
+        "units": [],
+        "floor_plans": [
+            {
+                "floor_plan_id": "A1",
+                "floor_plan_name": "A1",
+                "rent_low": 1200,
+                "rent_high": 1400,
+                "availability_status": "UNAVAILABLE",
+            },
+            {
+                "floor_plan_id": "B1",
+                "floor_plan_name": "B1",
+                "rent_low": 1600,
+                "available_date": "2026-10-01",
+                "availability_status": "WAITLIST",
+            },
+        ],
+    }
+    wb = build_workbook([prop], report={})
+    units = wb["Units"]
+    rp = wb["RP_Format"]
+    assert units.max_row == 3
+    assert rp.max_row == 3
+    assert [_cell(rp, _RP_HEADERS, "unit_or_plan_level", row) for row in (2, 3)] == ["PLAN", "PLAN"]
+    assert [_cell(rp, _RP_HEADERS, "unitid", row) for row in (2, 3)] == ["", ""]
+    assert _recompute_report([prop])["data_quality"]["total_units"] == 2
+
+
+def test_rp_sheet_uses_public_knock_label_without_replacing_canonical_identity():
+    unit = {
+        "unit_id": "knock_unit_id-7254a4ab-b615-4bc7-b088-4824a25fc03a",
+        "unit_name": "4122",
+        "availability_status": "AVAILABLE",
+        "is_floor_plan_level": False,
+    }
+    prop = {"apartment_id": "64945", "proj_name": "Alcove", "units": [unit]}
+    wb = build_workbook([prop], report={})
+
+    assert _cell(wb["RP_Format"], _RP_HEADERS, "unitid", 2) == "4122"
+    assert unit["unit_id"] == "knock_unit_id-7254a4ab-b615-4bc7-b088-4824a25fc03a"
+
+
+def test_rp_sheet_prefers_explicit_public_unit_number():
+    prop = {
+        "apartment_id": "2899",
+        "proj_name": "River Ridge",
+        "units": [{
+            "unit_id": "12925-county-road-5-208-burnsville-mn-55337",
+            "unit_number": "208",
+            "unit_name": "12925 County Road 5, 208, Burnsville, MN 55337",
+            "availability_status": "AVAILABLE",
+        }],
+    }
+    wb = build_workbook([prop], report={})
+    assert _cell(wb["RP_Format"], _RP_HEADERS, "unitid", 2) == "208"
+
+
 def test_empty_input_does_not_crash():
     wb = build_workbook([], report=None)
-    assert wb.sheetnames == ["Summary", "Properties", "Units"]
+    assert wb.sheetnames == ["Summary", "Properties", "Units", "RP_Format"]
     ws = wb["Units"]
     assert ws.cell(row=1, column=1).value == "property_id"  # header present
     assert ws.cell(row=2, column=1).value is None  # no data rows

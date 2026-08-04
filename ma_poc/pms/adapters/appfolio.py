@@ -1102,7 +1102,7 @@ _UNIT_FROM_ADDR_PATTERNS = [
     # Pattern 2 — Apt/Apartment/Apt.: 'Apt 429', 'Apartment 8'
     # kelseymanagement (Brantley Pines I shape).
     re.compile(
-        r"\bApt(?:\.|artment)?\s+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\b",
+        r"\bApt(?:\.|artment)?\s*([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\b",
         re.IGNORECASE,
     ),
     # Pattern 3 — Suite/Unit/Ste: 'Suite 12', 'Unit 5', 'Ste 200'
@@ -1115,18 +1115,20 @@ _UNIT_FROM_ADDR_PATTERNS = [
     # becovic. Captures the token between '- ' and ',' — handles
     # internal hyphens in the unit id like '3050-302'.
     re.compile(r"-\s+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\s*,"),
-    # Pattern 5 — trailing numeric/alphanumeric before first comma:
+    # Pattern 5 — inter-comma alphanumeric token: '4121 San Antonio
+    # St, 614, Odessa' → '614', '1349 Redmond Circle, G1-47, Rome' →
+    # 'G1-47'. This must run before the trailing-street-token rule below:
+    # '12925 County Road 5, 208, Burnsville' contains both candidates and
+    # the marketing unit is 208, not the road number 5.
+    re.compile(
+        r",\s*([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\s*,"
+    ),
+    # Pattern 6 — trailing numeric/alphanumeric before first comma:
     # '301 W. Hawkins Parkway 1116, Longview' → '1116'. Must start
     # with a digit OR be letter+digit (e.g. 'G1-47') to avoid matching
     # the street name itself. bargeprops (Quail Creek shape 2).
     re.compile(
         r"\s+(\d+[A-Za-z0-9\-]*|[A-Za-z]\d[A-Za-z0-9\-]*)\s*,"
-    ),
-    # Pattern 6 — inter-comma alphanumeric token: '4121 San Antonio
-    # St, 614, Odessa' → '614', '1349 Redmond Circle, G1-47, Rome' →
-    # 'G1-47'. americancapitalrealty (Citadel) + Riverside North.
-    re.compile(
-        r",\s*(\d+[A-Za-z0-9\-]*|[A-Za-z]+\d[A-Za-z0-9\-]*)\s*,"
     ),
 ]
 

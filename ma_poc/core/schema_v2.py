@@ -1610,6 +1610,14 @@ def _format_v2_unit(
             if unit.get("unit_name") not in (None, "", "null")
             else None
         ),
+        # Public apartment label before collision-safe canonicalisation.  The
+        # canonical unit_id may intentionally be a provider UUID/address key;
+        # presentation exports need the operator-visible label as well.
+        "unit_number": (
+            str(_first(unit, "unit_number", "_unit_number", "unitNumber", "apartment_number")).strip() or None
+            if _first(unit, "unit_number", "_unit_number", "unitNumber", "apartment_number") not in (None, "", "null")
+            else None
+        ),
         # Explicit placeholder marker (#36) — True for plan-level rows (e.g.
         # SightMap plans with no available units) so consumers don't mistake
         # them for real units missing an id.
