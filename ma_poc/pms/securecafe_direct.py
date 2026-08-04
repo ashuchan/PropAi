@@ -122,6 +122,16 @@ async def try_rentcafe_direct(
         confidence=0.9,
     )
 
+    # Direct shortcuts bypass ``scrape_jugnu`` and therefore its adapter-level
+    # collection boundary. Apply the same fail-closed rule here, then apply it
+    # once more at the runner's common final boundary as defence in depth.
+    from ma_poc.pms.property_scope import apply_collection_scope_to_result
+
+    apply_collection_scope_to_result(result, property_id=pid)
+    if not result["units"]:
+        log.warning("rentcafe_direct %s: configured collection scope yielded 0 units — fall through", pid)
+        return None
+
     fr = FetchResult(
         url=url,
         outcome=FetchOutcome.OK,

@@ -42,6 +42,11 @@ class _Task:
     url = "https://www.grantparkvillage.com/"
 
 
+class _TimberTask:
+    property_id = "98191"
+    url = "https://www.thebeverlycollectionapts.com/timber/"
+
+
 def _patch(monkeypatch, *, flag=True, raw=(200, "<html>rows</html>"), units=None):
     monkeypatch.setattr("ma_poc.config.feature_flags.ENABLE_RENTCAFE_DIRECT_GET", flag)
 
@@ -51,7 +56,7 @@ def _patch(monkeypatch, *, flag=True, raw=(200, "<html>rows</html>"), units=None
     monkeypatch.setattr("ma_poc.fetch.hyperbrowser_backend.hb_raw_get", _fake_hb)
     monkeypatch.setattr(
         "ma_poc.pms.adapters.rentcafe.parse_securecafe_availableunits",
-        lambda html, url: (_UNITS if units is None else units),
+        lambda html, url: _UNITS if units is None else units,
     )
 
 
@@ -60,9 +65,12 @@ def test_url_helper() -> None:
     assert securecafe_availableunits_url(None) is None
     assert securecafe_availableunits_url(_Profile(url="https://x.com/floorplans")) is None
     # securecafe but not availableunits → not the unit surface
-    assert securecafe_availableunits_url(
-        _Profile(url="https://x.securecafe.com/onlineleasing/y/floorplans.aspx")
-    ) is None
+    assert (
+        securecafe_availableunits_url(
+            _Profile(url="https://x.securecafe.com/onlineleasing/y/floorplans.aspx")
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -114,3 +122,34 @@ async def test_non_200_falls_through(monkeypatch) -> None:
 async def test_zero_units_falls_through(monkeypatch) -> None:
     _patch(monkeypatch, units=[])
     assert await try_rentcafe_direct(_Task(), _Profile(), None) is None
+
+
+@pytest.mark.asyncio
+async def test_timber_direct_path_filters_sibling_communities(monkeypatch) -> None:
+    _patch(
+        monkeypatch,
+        units=[
+            {"unit_id": "324", "unit_number": "324", "floor_plan_name": "Timber | A01"},
+            {"unit_id": "240", "unit_number": "240", "floor_plan_name": "Meredith House | B2"},
+            {"unit_id": "321", "unit_number": "321", "floor_plan_name": "Platform | A + Den"},
+        ],
+    )
+
+    direct = await try_rentcafe_direct(_TimberTask(), _Profile(), None)
+
+    assert direct is not None
+    assert [row["unit_number"] for row in direct["result"]["units"]] == ["324"]
+    assert direct["result"]["_extract_result"].records is direct["result"]["units"]
+    assert any("COLLECTION_PROPERTY_SCOPE_FINAL_APPLIED" in error for error in direct["result"]["errors"])
+
+
+@pytest.mark.asyncio
+async def test_timber_direct_path_falls_through_when_only_siblings_remain(monkeypatch) -> None:
+    _patch(
+        monkeypatch,
+        units=[
+            {"unit_id": "240", "unit_number": "240", "floor_plan_name": "Meredith House | B2"},
+        ],
+    )
+
+    assert await try_rentcafe_direct(_TimberTask(), _Profile(), None) is None
