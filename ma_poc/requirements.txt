@@ -36,7 +36,7 @@ rich>=13.7.1
 # psycopg[binary] only needed when DATA_PROVIDER=postgres.
 sqlalchemy>=2.0.30
 alembic>=1.13.0
-psycopg[binary]>=3.1.18
+psycopg[binary]>=3.3.3
 
 # Cloud SQL IAM auth from inside Cloud Run (no proxy sidecar required).
 # The connector obtains + refreshes a short-lived OAuth token, opens the
