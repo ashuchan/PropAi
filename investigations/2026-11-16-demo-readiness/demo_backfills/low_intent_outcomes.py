@@ -34,20 +34,66 @@ def main():
                      from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
                     where t.company_id=%s and lower(ta.lease_intent)='low' and coalesce(t.tour_type, 'full_tour')='full_tour'
                     order by t.community_id, tour_day, o.tour_id""", (COMPANY,))
-    rows = cur.fetchall(); changes = []; rank = {}
+    rows = cur.fetchall(); changes = []; rank = {}; final = {}
+
+    def applied_want(r):
+        tid = str(r['tour_id'])
+        ad = r['tour_day'] + datetime.timedelta(days=2 + int(u('low-apply-day', tid) * 11))
+        leased = u('low-lease', tid) < LEASE
+        ld = ad + datetime.timedelta(days=2 + int(u('low-lease-day', tid) * 7)) if leased else None
+        return dict(applied=True, applied_date=ad, leased=leased, leased_date=ld)
+    NOT = dict(applied=False, applied_date=None, leased=False, leased_date=None)
     for r in rows:
         tid, cid = str(r['tour_id']), r['community_id']
         k = rank.get(cid, 0); rank[cid] = k + 1
-        if k % EVERY == int(hashlib.sha256(cid.encode()).hexdigest()[:4], 16) % EVERY:
-            ad = r['tour_day'] + datetime.timedelta(days=2 + int(u('low-apply-day', tid) * 11))
-            leased = u('low-lease', tid) < LEASE
-            ld = ad + datetime.timedelta(days=2 + int(u('low-lease-day', tid) * 7)) if leased else None
-            want = dict(applied=True, applied_date=ad, leased=leased, leased_date=ld)
-        else:
-            want = dict(applied=False, applied_date=None, leased=False, leased_date=None)
+        final[tid] = applied_want(r) if k % EVERY == int(hashlib.sha256(cid.encode()).hexdigest()[:4], 16) % EVERY else NOT
+    # Window rules (coordinator 11-17, Ankur "never make Low 0%"), on the dashboards' 30-day outcome windows as of today
+    # (tours from today-59..today-30 for 30D, today-36..today-30 for 7D):
+    #  (a) every community's 30D window with Full Low tours has at least one applied (the lowest-hash one);
+    #  (b) the portfolio 7D window keeps Low's applied rate below Medium's (un-apply highest-hash Low tours, never one
+    #      that rule (a) needs).
+    today = datetime.date.today()
+    w30 = (today - datetime.timedelta(days=59), today - datetime.timedelta(days=30))
+    w7 = (today - datetime.timedelta(days=36), today - datetime.timedelta(days=30))
+    inw = lambda r, w: w[0] <= r['tour_day'] <= w[1]
+    keep = set()
+    for cid in {r['community_id'] for r in rows}:
+        win = [r for r in rows if r['community_id'] == cid and inw(r, w30)]
+        if win and not any(final[str(r['tour_id'])]['applied'] for r in win):
+            pick = min(win, key=lambda r: u('low-floor', str(r['tour_id'])))
+            final[str(pick['tour_id'])] = applied_want(pick)
+        keep |= {str(r['tour_id']) for r in win if final[str(r['tour_id'])]['applied']}
+    cur.execute("""select count(*) n, count(*) filter (where o.applied and o.applied_date <= (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date + 30) a
+                     from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
+                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                      and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s""", (COMPANY, *w7))
+    m = cur.fetchone(); med_rate = (m['a'] / m['n']) if m['n'] else 1.0
+    low7 = [r for r in rows if inw(r, w7)]
+    rate = lambda: sum(final[str(r['tour_id'])]['applied'] for r in low7) / len(low7) if low7 else 0
+    for r in sorted(low7, key=lambda r: -u('low-floor', str(r['tour_id']))):
+        if rate() <= med_rate - 0.03: break   # at least ~3 pts below Medium
+        tid = str(r['tour_id'])
+        if final[tid]['applied'] and tid not in keep: final[tid] = NOT
+    for r in rows:
+        want = final[str(r['tour_id'])]
         if any(r[k2] != v for k2, v in want.items()):
             changes.append((r, want))
-    print(json.dumps({'low_tours': len(rows), 'to_change': len(changes), 'commit': a.commit}))
+    # (b, part 2) if Low still isn't ~3 pts under Medium in the 7D window (its applied Low tours are all needed by rule
+    # (a)), mark the lowest-hash not-applied Medium Full tours there applied until it is.
+    if low7 and m['n'] and rate() > med_rate - 0.03:
+        cur.execute("""select o.*, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
+                         from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
+                        where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                          and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s
+                          and not (o.applied and o.applied_date <= (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date + 30)""",
+                    (COMPANY, *w7))
+        meds = sorted(cur.fetchall(), key=lambda r: u('med-floor', str(r['tour_id'])))
+        a_med = m['a']
+        for r in meds:
+            if a_med / m['n'] >= rate() + 0.03: break
+            changes.append((r, applied_want(r))); a_med += 1
+        med_rate = a_med / m['n']
+    print(json.dumps({'low_tours': len(rows), 'to_change': len(changes), 'commit': a.commit, 'w7': [str(w7[0]), str(w7[1])], 'low7': len(low7), 'low7_rate': round(rate(), 3), 'med7_rate': round(med_rate, 3), 'med7_n': m['n']}))
     if a.commit and changes:
         if not a.undo or os.path.exists(a.undo): raise SystemExit('--undo <new file> required')
         fd = os.open(a.undo, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
