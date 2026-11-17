@@ -2,9 +2,11 @@
 
 Why: the A9 intent rule moves ~24% of never-applying Medium tours to Low, so Low reads 0-1% applied per community
 (2026-11-17 matrix), and the demo rule is Low < Medium < High with Low never 0% (Low ~7-9%).
-What: for demo-company tours whose tour_analytics.lease_intent is 'low', a stable ~9% (sha256 of 'low-apply:' + tour id)
-become applied (applied_date = tour day + 2-12 days) and ~70% of those leased (leased_date = applied + 2-8 days).
-Nothing else changes; every other outcome stays the outcome model's own (jobs.demo_outcome_seed).
+What (v2, evenly spaced so every window reads ~11%): per community, Low-intent tours (tour_analytics.lease_intent 'low')
+on Full tours (what the dashboards count) are ranked by tour day; every 10th one (offset hashed from the community id) is applied (applied_date = tour day + 2-12
+days; ~70% of those leased 2-8 days later); every other Low tour is not applied. A random ~9% pick read 0-33% per
+community in small windows (Low above Medium); spacing keeps any window with 10+ Full Low tours at ~10%, never 0. Non-Full Low tours keep the model's outcome.
+Medium/High outcomes stay the outcome model's own (jobs.demo_outcome_seed).
 Run order: after jobs.demo_outcome_seed (which would rewrite these rows to its model draw).
 Staging only (refuses any DB not named ontour_db_staging), demo company only, dry run unless --commit,
 undo file (original rows) written first, 0600, never overwritten; idempotent (a second run changes 0 rows).
@@ -15,7 +17,7 @@ import psycopg2, psycopg2.extras
 from jobs.demo_sync.config import load_db
 
 COMPANY = '3360791e-8c3a-4f3f-87c8-d5abf4ab78ec'
-RATE, LEASE = 0.09, 0.70
+EVERY, LEASE = 10, 0.70   # every 10th Full Low tour per community (~10%)
 
 
 def u(tag, tid):
@@ -28,19 +30,22 @@ def main():
     conn = psycopg2.connect(host=c['host'], port=c['port'], dbname=c['dbname'], user=c['user'], password=c['password'], application_name='low_intent_outcomes')
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute('select current_database() db'); assert cur.fetchone()['db'] == 'ontour_db_staging'
-    cur.execute("""select o.*, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
+    cur.execute("""select o.*, t.community_id::text community_id, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
                      from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
-                    where t.company_id=%s and lower(ta.lease_intent)='low' order by o.tour_id""", (COMPANY,))
-    rows = cur.fetchall(); changes = []
+                    where t.company_id=%s and lower(ta.lease_intent)='low' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                    order by t.community_id, tour_day, o.tour_id""", (COMPANY,))
+    rows = cur.fetchall(); changes = []; rank = {}
     for r in rows:
-        tid = str(r['tour_id'])
-        if u('low-apply', tid) >= RATE:
-            continue
-        ad = r['tour_day'] + datetime.timedelta(days=2 + int(u('low-apply-day', tid) * 11))
-        leased = u('low-lease', tid) < LEASE
-        ld = ad + datetime.timedelta(days=2 + int(u('low-lease-day', tid) * 7)) if leased else None
-        want = dict(applied=True, applied_date=ad, leased=leased, leased_date=ld)
-        if any(r[k] != v for k, v in want.items()):
+        tid, cid = str(r['tour_id']), r['community_id']
+        k = rank.get(cid, 0); rank[cid] = k + 1
+        if k % EVERY == int(hashlib.sha256(cid.encode()).hexdigest()[:4], 16) % EVERY:
+            ad = r['tour_day'] + datetime.timedelta(days=2 + int(u('low-apply-day', tid) * 11))
+            leased = u('low-lease', tid) < LEASE
+            ld = ad + datetime.timedelta(days=2 + int(u('low-lease-day', tid) * 7)) if leased else None
+            want = dict(applied=True, applied_date=ad, leased=leased, leased_date=ld)
+        else:
+            want = dict(applied=False, applied_date=None, leased=False, leased_date=None)
+        if any(r[k2] != v for k2, v in want.items()):
             changes.append((r, want))
     print(json.dumps({'low_tours': len(rows), 'to_change': len(changes), 'commit': a.commit}))
     if a.commit and changes:
