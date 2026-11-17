@@ -123,6 +123,23 @@ def main():
         for r in sorted((r for r in meds if not ok(r)), key=lambda r: u('med-floor', str(r['tour_id']))):
             if a_med / len(meds) >= low_rate + 0.03: break
             changes.append((r, applied_want(r))); queued.add(str(r['tour_id'])); a_med += 1
+    # (d) per community, 7D window: a Medium level the UI shows as a rate (10+ tours) never reads 0% or below Low
+    #     (coordinator 11-17: Cedar Point Medium 0 of 10 next to High 2 of 5): lowest-hash not-applied Medium Full
+    #     tours there are marked applied until Medium >= max(10%, Low + 3 pts).
+    cur.execute("""select o.*, t.community_id::text community_id, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
+                     from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
+                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour' and """ + VALID_SQL + """
+                      and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s""", (COMPANY, *w7))
+    meds7 = cur.fetchall()
+    for cid in sorted({r['community_id'] for r in meds7}):
+        meds = [r for r in meds7 if r['community_id'] == cid]
+        if len(meds) < 10: continue
+        lows = [r for r in low7 if r['community_id'] == cid]
+        low_rate = sum(final[str(r['tour_id'])]['applied'] for r in lows) / len(lows) if lows else 0
+        a_med = sum(ok(r) for r in meds)
+        for r in sorted((r for r in meds if not ok(r)), key=lambda r: u('med-floor', str(r['tour_id']))):
+            if a_med / len(meds) >= max(0.10, low_rate + 0.03): break
+            changes.append((r, applied_want(r))); queued.add(str(r['tour_id'])); a_med += 1
     print(json.dumps({'low_tours': len(rows), 'to_change': len(changes), 'commit': a.commit, 'w7': [str(w7[0]), str(w7[1])], 'low7': len(low7), 'low7_rate': round(rate(), 3), 'med7_rate': round(med_rate, 3), 'med7_n': m['n']}))
     if a.commit and changes:
         if not a.undo or os.path.exists(a.undo): raise SystemExit('--undo <new file> required')
