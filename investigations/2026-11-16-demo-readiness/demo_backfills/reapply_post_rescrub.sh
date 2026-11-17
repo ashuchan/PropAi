@@ -18,7 +18,8 @@ done; wait; tail -qn1 $R/briefs-*-$T.log
 echo "== 5 A9 $(ts)"
 (cd ~/PropAi-main/investigations/2026-11-16-demo-readiness/demo_scrub && $OPSPY a9_cli.py --commit --undo $U/undo-a9-$T.jsonl | tail -1 | cut -c1-600)
 echo "== 6 low-intent overlay $(ts)"; $PY low_intent_outcomes.py --commit --undo $U/undo-low-intent-$T.json
-echo "== 7 second runs, expect 0 $(ts)"; $PY shift_july_tours.py | tail -1; $PY low_intent_outcomes.py | head -1
+echo "== 6b matured-tours fill (ledger re-apply + top-up) $(ts)"; $PY matured_tours_fill.py --commit --undo $U/undo-matured-fill-$T.json | /usr/bin/grep -v '"associate"'
+echo "== 7 second runs, expect 0 $(ts)"; $PY shift_july_tours.py | tail -1; $PY low_intent_outcomes.py | head -1; $PY matured_tours_fill.py | head -1
 $S/qw.sh -f a6_remy_willow_run.sql; $S/qw.sh -t -f a7_coaching_assignments.sql | /usr/bin/grep INSERT
 (cd ~/PropAi-main/investigations/2026-11-16-demo-readiness/demo_scrub && $OPSPY a9_cli.py | tail -1 | cut -c1-600)
 echo "== done $(ts)"
