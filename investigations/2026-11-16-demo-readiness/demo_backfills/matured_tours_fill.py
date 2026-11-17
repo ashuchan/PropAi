@@ -89,7 +89,8 @@ def tours(cur):
                            coalesce(t.transcript_text, '') || ' ' || coalesce(t.client_transcript_text, '') || ' ' || coalesce(row_to_json(ta)::text, '') txt
                       from tours t left join demo_seed.tour_outcomes o on o.tour_id=t.tour_id
                       left join tour_analytics ta on ta.tour_id=t.tour_id left join associates a on a.id=t.associate_id
-                     where t.company_id=%s and {FULL} and t.created_at > now() - interval '130 days'""", (COMPANY,))
+                     where t.company_id=%s and {FULL} and t.created_at > now() - interval '130 days'
+                       and coalesce(t.audio_file_url, '') not like '%%/ontour-files-ontour-485600/%%'""", (COMPANY,))
     return cur.fetchall()
 
 
@@ -156,7 +157,12 @@ def main():
         print(json.dumps({'undo_moves': len(u_['moves']), **counts}))
         conn.commit(); print('committed'); return
     cur.execute(LEDGER_DDL)
-    cur.execute('select tour_id::text, from_associate::text, to_associate::text from demo_seed.associate_move_ledger')
+    # demo-company tours between demo associates only; tours recorded on staging never move (ontour-ops #119 review)
+    cur.execute("""select l.tour_id::text, l.from_associate::text, l.to_associate::text from demo_seed.associate_move_ledger l
+                     join tours t on t.tour_id=l.tour_id and t.company_id=%s
+                    where coalesce(t.audio_file_url, '') not like '%%/ontour-files-ontour-485600/%%'
+                      and l.from_associate in (select associate_id from associate_company_map where company_id=%s)
+                      and l.to_associate in (select associate_id from associate_company_map where company_id=%s)""", (COMPANY, COMPANY, COMPANY))
     led = cur.fetchall()
     # 1. re-apply the ledger (only rows the merge put back on the original associate move)
     reapplied = 0
@@ -164,7 +170,7 @@ def main():
         before = sum(counts.values()); move(cur, m['tour_id'], m['from_associate'], m['to_associate'], counts)
         reapplied += sum(counts.values()) > before
     # 2. invalidate staged recordings (EXCLUDE): the original status goes to the undo file
-    cur.execute("select tour_id::text, status from tours where tour_id=any(%s::uuid[]) and company_id=%s and status<>'ANALYTICS_FAILED'",
+    cur.execute("select tour_id::text, status from tours where tour_id=any(%s::uuid[]) and company_id=%s and status<>'ANALYTICS_FAILED' and coalesce(audio_file_url, '') not like '%%/ontour-files-ontour-485600/%%'",
                 (list(EXCLUDE), COMPANY))
     excl = cur.fetchall()
     for e in excl:

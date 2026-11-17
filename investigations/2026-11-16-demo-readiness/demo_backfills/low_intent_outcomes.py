@@ -84,7 +84,10 @@ def main():
         if rate() <= med_rate - 0.03: break   # at least ~3 pts below Medium
         tid = str(r['tour_id'])
         if sum(final[str(x['tour_id'])]['applied'] for x in low7) <= 1: break   # (b0) never the last applied one
-        if final[tid]['applied'] and tid not in keep: final[tid] = NOT
+        # never the last applied Low tour of its community's 30D window (rule a); 7D sits inside 30D, so protecting every
+        # applied one there made (b) a no-op (ontour-ops #119 review 11-17)
+        if final[tid]['applied'] and sum(final[str(x['tour_id'])]['applied'] for x in rows
+                                         if x['community_id'] == r['community_id'] and inw(x, w30)) > 1: final[tid] = NOT
     for r in rows:
         want = final[str(r['tour_id'])]
         if any(r[k2] != v for k2, v in want.items()):
