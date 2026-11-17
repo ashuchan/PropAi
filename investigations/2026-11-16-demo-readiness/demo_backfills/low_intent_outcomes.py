@@ -93,6 +93,25 @@ def main():
             if a_med / m['n'] >= rate() + 0.03: break
             changes.append((r, applied_want(r))); a_med += 1
         med_rate = a_med / m['n']
+    # (c) per community, 30D window: Low's applied rate stays ~3 pts under Medium's (Low < Medium < High). When it is
+    #     not (small communities: Stonebridge 1/7 Low vs 2/18 Medium on 11-17), mark the lowest-hash not-applied Medium
+    #     Full tours there applied until it is. Never un-applies Low (rule (a) keeps Low non-zero).
+    queued = {str(r['tour_id']) for r, w in changes if w['applied']}
+    cur.execute("""select o.*, t.community_id::text community_id, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
+                     from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
+                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                      and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s""", (COMPANY, *w30))
+    meds30 = cur.fetchall()
+    ok = lambda r: str(r['tour_id']) in queued or (r['applied'] and r['applied_date'] is not None and r['applied_date'] <= r['tour_day'] + datetime.timedelta(days=30))
+    for cid in sorted({r['community_id'] for r in rows}):
+        lows = [r for r in rows if r['community_id'] == cid and inw(r, w30)]
+        meds = [r for r in meds30 if r['community_id'] == cid]
+        if not lows or not meds: continue
+        low_rate = sum(final[str(r['tour_id'])]['applied'] for r in lows) / len(lows)
+        a_med = sum(ok(r) for r in meds)
+        for r in sorted((r for r in meds if not ok(r)), key=lambda r: u('med-floor', str(r['tour_id']))):
+            if a_med / len(meds) >= low_rate + 0.03: break
+            changes.append((r, applied_want(r))); queued.add(str(r['tour_id'])); a_med += 1
     print(json.dumps({'low_tours': len(rows), 'to_change': len(changes), 'commit': a.commit, 'w7': [str(w7[0]), str(w7[1])], 'low7': len(low7), 'low7_rate': round(rate(), 3), 'med7_rate': round(med_rate, 3), 'med7_n': m['n']}))
     if a.commit and changes:
         if not a.undo or os.path.exists(a.undo): raise SystemExit('--undo <new file> required')
