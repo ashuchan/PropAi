@@ -34,6 +34,12 @@ from jobs.demo_sync.config import load_db
 
 COMPANY = '3360791e-8c3a-4f3f-87c8-d5abf4ab78ec'
 MIN, DONOR_KEEP = 3, 8
+# Staged / test recordings in the demo tenant that the product scored as real tours: marked ANALYTICS_FAILED (the
+# dashboards' invalid state, as for any recording that could not be scored). Re-applied after every merge.
+# 71157236: Morgan W., Prestige Park, Oct 19: a 509-character staged clip ("crazy apartment", "$200K" for a 2-bed),
+# rated 1.2 / AI score 9; it was Morgan's only tour in the 30D period and stretched Conversion vs Star Level to 1.0
+# (coordinator 11-17). Its rating is not changed.
+EXCLUDE = {'71157236-0284-42b1-a83f-327cac221744': 'staged 509-char clip, not a tour'}
 VALID = ('ANALYTICS_FINISHED', 'FINISHED', 'INSIGHTS_OPENED', 'COACHING_OPENED', 'OBJECTION_OPENED',
          'SCORE_TRANSCRIPT_OPENED', 'FOLLOWUP_COPIED', 'TOUR_FOLLOWED_UP', 'REWARD_AWARDED')
 # (table, associate column) rows keyed by tour_id that move with the tour
@@ -87,6 +93,12 @@ def tours(cur):
     return cur.fetchall()
 
 
+def named(r):
+    """True when the tour's current associate's first name appears in its transcript or analysis."""
+    fn = (r['first_name'] or '').strip()
+    return len(fn) >= 2 and bool(re.search(r'\b' + re.escape(fn) + r'\b', r['txt'], re.I))
+
+
 def plan(rows, today, ledger):
     w30 = (today - datetime.timedelta(days=59), today - datetime.timedelta(days=30))
     cur30 = today - datetime.timedelta(days=29)
@@ -109,8 +121,7 @@ def plan(rows, today, ledger):
         def ok(r):
             if r['cid'] != cid or r['aid'] == a or r['aid'] in short or r['tour_id'] in ledger or r['blocked'] or not matured(r):
                 return False
-            fn = (r['first_name'] or '').strip()
-            if len(fn) >= 2 and re.search(r'\b' + re.escape(fn) + r'\b', r['txt'], re.I):
+            if named(r):
                 return False
             return r['aid'] not in active or len(mat.get(r['aid'], [])) > DONOR_KEEP
         order = lambda r: (r['aid'] in active, -r['d'].toordinal(), u('matured-fill', r['tour_id']))
@@ -138,6 +149,9 @@ def main():
         for m in u_['moves']:
             move(cur, m['tour_id'], m['to'], m['from'], counts)
             cur.execute('delete from demo_seed.associate_move_ledger where tour_id=%s', (m['tour_id'],))
+        for e in u_.get('excluded', []):
+            cur.execute("update tours set status=%s where tour_id=%s and status='ANALYTICS_FAILED'", (e['status'], e['tour_id']))
+            counts['unexcluded'] = counts.get('unexcluded', 0) + cur.rowcount
         cur.execute('delete from cm_rollup_watermarks where community_id=any(%s::uuid[])', (sorted({m['community_id'] for m in u_['moves']}),))
         print(json.dumps({'undo_moves': len(u_['moves']), **counts}))
         conn.commit(); print('committed'); return
@@ -149,31 +163,41 @@ def main():
     for m in led:
         before = sum(counts.values()); move(cur, m['tour_id'], m['from_associate'], m['to_associate'], counts)
         reapplied += sum(counts.values()) > before
-    # 2. top up associates still short
+    # 2. invalidate staged recordings (EXCLUDE): the original status goes to the undo file
+    cur.execute("select tour_id::text, status from tours where tour_id=any(%s::uuid[]) and company_id=%s and status<>'ANALYTICS_FAILED'",
+                (list(EXCLUDE), COMPANY))
+    excl = cur.fetchall()
+    for e in excl:
+        cur.execute("update tours set status='ANALYTICS_FAILED' where tour_id=%s and status=%s", (e['tour_id'], e['status']))
+        counts['excluded'] = counts.get('excluded', 0) + cur.rowcount
+    # 3. top up associates still short
     rows = tours(cur)
     picks, report = plan(rows, datetime.date.today(), {m['tour_id'] for m in led})
-    print(json.dumps({'ledger': len(led), 'ledger_reapplied_tours': reapplied, 'new_moves': len(picks), 'commit': a.commit}))
+    print(json.dumps({'ledger': len(led), 'ledger_reapplied_tours': reapplied, 'excluded': len(excl), 'new_moves': len(picks), 'commit': a.commit}))
     for r in report: print(json.dumps(r))
     comms = sorted({p[3] for p in picks} | ({r['cid'] for r in rows if r['tour_id'] in {m['tour_id'] for m in led}} if reapplied else set()))
     rollups = {}
     for r in ROLLUPS:
         cur.execute(f'select * from public.{r} where community_id=any(%s::uuid[])', (comms,)); rollups[r] = cur.fetchall()
-    if a.commit and (picks or reapplied):
+    if a.commit and (picks or reapplied or excl):
         if not a.undo or os.path.exists(a.undo): raise SystemExit('--undo <new file> required')
         fd = os.open(a.undo, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as f:
             cmap = {r['tour_id']: r['cid'] for r in rows}
             allm = [(m['tour_id'], m['from_associate'], m['to_associate'], cmap.get(m['tour_id'])) for m in led] + picks
             json.dump({'moves': [{'tour_id': t, 'from': fr, 'to': to, 'community_id': c} for t, fr, to, c in allm if c],
-                       'ledger_reapplied': reapplied, 'rollups': rollups, 'written_at': datetime.datetime.utcnow().isoformat()}, f, default=str)
+                       'ledger_reapplied': reapplied, 'excluded': excl, 'rollups': rollups, 'written_at': datetime.datetime.utcnow().isoformat()}, f, default=str)
     for t, fr, to, c in picks:
         move(cur, t, fr, to, counts)
         cur.execute('insert into demo_seed.associate_move_ledger (tour_id, from_associate, to_associate) values (%s, %s, %s) on conflict do nothing', (t, fr, to))
-    if picks or reapplied:
+    if excl:
+        cur.execute('select distinct community_id::text c from tours where tour_id=any(%s::uuid[])', ([e['tour_id'] for e in excl],))
+        comms = sorted(set(comms) | {r['c'] for r in cur.fetchall()})
+    if picks or reapplied or excl:
         for r in ROLLUPS:
             cur.execute(f'delete from public.{r} where community_id=any(%s::uuid[])', (comms,)); counts['deleted:' + r] = cur.rowcount
     print(json.dumps(counts))
-    if a.commit and (picks or reapplied):
+    if a.commit and (picks or reapplied or excl):
         conn.commit(); print('committed')
     else:
         conn.rollback(); print('dry run: rolled back' if not a.commit else 'nothing to do')
