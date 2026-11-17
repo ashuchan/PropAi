@@ -100,7 +100,7 @@ def named(r):
     return len(fn) >= 2 and bool(re.search(r'\b' + re.escape(fn) + r'\b', r['txt'], re.I))
 
 
-def plan(rows, today, ledger):
+def plan(rows, today, ledger, receivers=None):
     w30 = (today - datetime.timedelta(days=59), today - datetime.timedelta(days=30))
     cur30 = today - datetime.timedelta(days=29)
     matured = lambda r: w30[0] <= r['d'] <= w30[1] and r['window_closed'] and r['leased'] is not None
@@ -111,7 +111,9 @@ def plan(rows, today, ledger):
             active.add(a); home.setdefault(a, {}); home[a][r['cid']] = home[a].get(r['cid'], 0) + 1
             if r['star_rating'] and 1 <= r['star_rating'] <= 5: stars.setdefault(a, []).append(r['star_rating'])
         if matured(r): mat.setdefault(a, []).append(r)
-    short = sorted((a for a in active if len(mat.get(a, [])) < MIN), key=lambda a: (len(mat.get(a, [])), a))
+    # only demo-mapped associates receive: a move to anyone else is out of the ledger's re-apply scope (ontour-ops #121)
+    short = sorted((a for a in active if len(mat.get(a, [])) < MIN and (receivers is None or a in receivers)),
+                   key=lambda a: (len(mat.get(a, [])), a))
     picks, report = [], []
     for a in short:
         cid = max(home[a].items(), key=lambda kv: (kv[1], kv[0]))[0]
@@ -179,7 +181,8 @@ def main():
         counts['excluded'] = counts.get('excluded', 0) + cur.rowcount
     # 3. top up associates still short
     rows = tours(cur)
-    picks, report = plan(rows, datetime.date.today(), {m['tour_id'] for m in led})
+    cur.execute('select associate_id::text a from associate_company_map where company_id=%s', (COMPANY,))
+    picks, report = plan(rows, datetime.date.today(), {m['tour_id'] for m in led}, {r['a'] for r in cur.fetchall()})
     print(json.dumps({'ledger': len(led), 'ledger_reapplied_tours': reapplied, 'excluded': len(excl), 'new_moves': len(picks), 'commit': a.commit}))
     for r in report: print(json.dumps(r))
     comms = sorted({p[3] for p in picks} | ({r['cid'] for r in rows if r['tour_id'] in {m['tour_id'] for m in led}} if reapplied else set()))
