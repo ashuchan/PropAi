@@ -18,6 +18,12 @@ from jobs.demo_sync.config import load_db
 
 COMPANY = '3360791e-8c3a-4f3f-87c8-d5abf4ab78ec'
 EVERY, LEASE = 10, 0.70   # every 10th Full Low tour per community (~10%)
+# The dashboards count only these statuses (dashboard_backend config.COMPLETED_TOUR_STATUSES; ANALYTICS_FAILED is an
+# invalid tour), so the overlay ranks and counts the same tours the UI shows (11-17: an applied ANALYTICS_FAILED Low
+# tour made the 7D portfolio read Low 0 of 20).
+VALID = ('ANALYTICS_FINISHED', 'FINISHED', 'INSIGHTS_OPENED', 'COACHING_OPENED', 'OBJECTION_OPENED',
+         'SCORE_TRANSCRIPT_OPENED', 'FOLLOWUP_COPIED', 'TOUR_FOLLOWED_UP', 'REWARD_AWARDED')
+VALID_SQL = 't.status in (' + ','.join(f"'{v}'" for v in VALID) + ')'
 
 
 def u(tag, tid):
@@ -32,7 +38,7 @@ def main():
     cur.execute('select current_database() db'); assert cur.fetchone()['db'] == 'ontour_db_staging'
     cur.execute("""select o.*, t.community_id::text community_id, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
                      from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
-                    where t.company_id=%s and lower(ta.lease_intent)='low' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                    where t.company_id=%s and lower(ta.lease_intent)='low' and coalesce(t.tour_type, 'full_tour')='full_tour' and """ + VALID_SQL + """
                     order by t.community_id, tour_day, o.tour_id""", (COMPANY,))
     rows = cur.fetchall(); changes = []; rank = {}; final = {}
 
@@ -65,14 +71,19 @@ def main():
         keep |= {str(r['tour_id']) for r in win if final[str(r['tour_id'])]['applied']}
     cur.execute("""select count(*) n, count(*) filter (where o.applied and o.applied_date <= (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date + 30) a
                      from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
-                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour' and """ + VALID_SQL + """
                       and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s""", (COMPANY, *w7))
     m = cur.fetchone(); med_rate = (m['a'] / m['n']) if m['n'] else 1.0
     low7 = [r for r in rows if inw(r, w7)]
+    # (b0) the portfolio 7D window with Full Low tours has at least one applied (Ankur: never make Low 0%)
+    if low7 and not any(final[str(r['tour_id'])]['applied'] for r in low7):
+        pick = min(low7, key=lambda r: u('low-floor', str(r['tour_id'])))
+        final[str(pick['tour_id'])] = applied_want(pick)
     rate = lambda: sum(final[str(r['tour_id'])]['applied'] for r in low7) / len(low7) if low7 else 0
     for r in sorted(low7, key=lambda r: -u('low-floor', str(r['tour_id']))):
         if rate() <= med_rate - 0.03: break   # at least ~3 pts below Medium
         tid = str(r['tour_id'])
+        if sum(final[str(x['tour_id'])]['applied'] for x in low7) <= 1: break   # (b0) never the last applied one
         if final[tid]['applied'] and tid not in keep: final[tid] = NOT
     for r in rows:
         want = final[str(r['tour_id'])]
@@ -83,7 +94,7 @@ def main():
     if low7 and m['n'] and rate() > med_rate - 0.03:
         cur.execute("""select o.*, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
                          from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
-                        where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                        where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour' and """ + VALID_SQL + """
                           and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s
                           and not (o.applied and o.applied_date <= (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date + 30)""",
                     (COMPANY, *w7))
@@ -99,7 +110,7 @@ def main():
     queued = {str(r['tour_id']) for r, w in changes if w['applied']}
     cur.execute("""select o.*, t.community_id::text community_id, (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date tour_day
                      from demo_seed.tour_outcomes o join tours t on t.tour_id=o.tour_id join tour_analytics ta on ta.tour_id=t.tour_id
-                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour'
+                    where t.company_id=%s and lower(ta.lease_intent)='medium' and coalesce(t.tour_type, 'full_tour')='full_tour' and """ + VALID_SQL + """
                       and (t.created_at at time zone 'UTC' at time zone 'America/Chicago')::date between %s and %s""", (COMPANY, *w30))
     meds30 = cur.fetchall()
     ok = lambda r: str(r['tour_id']) in queued or (r['applied'] and r['applied_date'] is not None and r['applied_date'] <= r['tour_day'] + datetime.timedelta(days=30))
