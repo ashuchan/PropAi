@@ -157,12 +157,13 @@ def main():
         print(json.dumps({'undo_moves': len(u_['moves']), **counts}))
         conn.commit(); print('committed'); return
     cur.execute(LEDGER_DDL)
-    # demo-company tours between demo associates only; tours recorded on staging never move (ontour-ops #119 review)
+    # demo-company tours to demo associates only; tours recorded on staging never move (ontour-ops #119 review). The
+    # original associate is not required to be demo-mapped: some demo tours belong to an associate mapped to another
+    # company (ad2d1498), and moving a demo tour away from them touches no other tenant's rows.
     cur.execute("""select l.tour_id::text, l.from_associate::text, l.to_associate::text from demo_seed.associate_move_ledger l
                      join tours t on t.tour_id=l.tour_id and t.company_id=%s
                     where coalesce(t.audio_file_url, '') not like '%%/ontour-files-ontour-485600/%%'
-                      and l.from_associate in (select associate_id from associate_company_map where company_id=%s)
-                      and l.to_associate in (select associate_id from associate_company_map where company_id=%s)""", (COMPANY, COMPANY, COMPANY))
+                      and l.to_associate in (select associate_id from associate_company_map where company_id=%s)""", (COMPANY, COMPANY))
     led = cur.fetchall()
     # 1. re-apply the ledger (only rows the merge put back on the original associate move)
     reapplied = 0
